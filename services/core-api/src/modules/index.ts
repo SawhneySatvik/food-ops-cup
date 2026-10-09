@@ -24,13 +24,14 @@ export const MODULES = [
   "goals",
   "imports",
   "storefront",
+  "accounts",
   "evidence",
   "findings",
   "inbox",
   "runs",
   "traces",
 ] as const;
-export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal"] as const;
+export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal", "platform"] as const;
 
 export async function loadRouters(): Promise<Array<{ name: string; router: Hono<AppEnv> }>> {
   const src = join(import.meta.dirname, "..");
