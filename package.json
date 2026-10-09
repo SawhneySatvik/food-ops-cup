@@ -1,0 +1,9 @@
+{
+  "name": "munim",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
