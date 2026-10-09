@@ -1,0 +1,321 @@
+{
+  "_note": "Expected instants hand-written from the system tz database (`zdump -v -c 2026,2027 Australia/Melbourne`, 9 Oct 2026): AEDT->AEST at 2026-04-04T16:00:00Z (local 03:00 -> 02:00), AEST->AEDT at 2026-10-03T16:00:00Z (local 02:00 -> 03:00). Asia/Kolkata is a constant +05:30 control. Slots are equal real durations from the local start to the local end (gap times resolve forward, overlap times resolve to the earlier instant). Business dates and day bounds take an outlet cutoff (W1 fix #60, default 04:00): business_date = date of (local wall time - cutoff), the same as Postgres ((ts AT TIME ZONE tz) - cutoff)::date. The 04:30 AEDT case on 4 Oct separates wall-time from elapsed-time subtraction (elapsed would give 3 Oct).",
+  "business_date": [
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-03T13:59:59Z",
+      "date": "2026-10-03",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-03T14:00:00Z",
+      "date": "2026-10-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-03T15:59:59Z",
+      "date": "2026-10-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-03T16:00:00Z",
+      "date": "2026-10-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-04T12:59:59Z",
+      "date": "2026-10-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-04T13:00:00Z",
+      "date": "2026-10-05",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-04-04T12:59:59Z",
+      "date": "2026-04-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-04-04T13:00:00Z",
+      "date": "2026-04-05",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-04-05T13:59:59Z",
+      "date": "2026-04-05",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-04-05T14:00:00Z",
+      "date": "2026-04-06",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "instant": "2026-10-03T18:29:59Z",
+      "date": "2026-10-03",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "instant": "2026-10-03T18:30:00Z",
+      "date": "2026-10-04",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "instant": "2026-04-04T18:30:00Z",
+      "date": "2026-04-05",
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-10-03T16:30:00Z",
+      "date": "2026-10-03"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-10-03T16:59:59Z",
+      "date": "2026-10-03"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-10-03T17:00:00Z",
+      "date": "2026-10-04"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-10-03T17:30:00Z",
+      "date": "2026-10-04"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-04-04T16:30:00Z",
+      "date": "2026-04-04"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-04-04T17:59:59Z",
+      "date": "2026-04-04"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "instant": "2026-04-04T18:00:00Z",
+      "date": "2026-04-05"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "cutoff": "04:00",
+      "instant": "2026-10-09T18:45:00Z",
+      "date": "2026-10-09"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "cutoff": "04:00",
+      "instant": "2026-10-09T22:29:59Z",
+      "date": "2026-10-09"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "cutoff": "04:00",
+      "instant": "2026-10-09T22:30:00Z",
+      "date": "2026-10-10"
+    }
+  ],
+  "day_bounds": [
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-04",
+      "start": "2026-10-03T14:00:00.000Z",
+      "end": "2026-10-04T13:00:00.000Z",
+      "hours": 23,
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-04-05",
+      "start": "2026-04-04T13:00:00.000Z",
+      "end": "2026-04-05T14:00:00.000Z",
+      "hours": 25,
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-05",
+      "start": "2026-10-04T13:00:00.000Z",
+      "end": "2026-10-05T13:00:00.000Z",
+      "hours": 24,
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "date": "2026-10-04",
+      "start": "2026-10-03T18:30:00.000Z",
+      "end": "2026-10-04T18:30:00.000Z",
+      "hours": 24,
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "date": "2026-04-05",
+      "start": "2026-04-04T18:30:00.000Z",
+      "end": "2026-04-05T18:30:00.000Z",
+      "hours": 24,
+      "cutoff": "00:00"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "date": "2026-10-03",
+      "start": "2026-10-02T18:00:00.000Z",
+      "end": "2026-10-03T17:00:00.000Z",
+      "hours": 23
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "date": "2026-10-04",
+      "start": "2026-10-03T17:00:00.000Z",
+      "end": "2026-10-04T17:00:00.000Z",
+      "hours": 24
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "cutoff": "04:00",
+      "date": "2026-04-04",
+      "start": "2026-04-03T17:00:00.000Z",
+      "end": "2026-04-04T18:00:00.000Z",
+      "hours": 25
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "cutoff": "04:00",
+      "date": "2026-10-09",
+      "start": "2026-10-08T22:30:00.000Z",
+      "end": "2026-10-09T22:30:00.000Z",
+      "hours": 24
+    }
+  ],
+  "local_to_instant": [
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-04",
+      "time": "01:30",
+      "instant": "2026-10-03T15:30:00.000Z",
+      "case": "before the gap"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-04",
+      "time": "02:30",
+      "instant": "2026-10-03T16:30:00.000Z",
+      "case": "in the gap: resolves forward to 03:30 AEDT"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-04",
+      "time": "03:00",
+      "instant": "2026-10-03T16:00:00.000Z",
+      "case": "first instant after the gap"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-04-05",
+      "time": "02:30",
+      "instant": "2026-04-04T15:30:00.000Z",
+      "case": "in the overlap: earlier (AEDT) instant"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-04-05",
+      "time": "03:00",
+      "instant": "2026-04-04T17:00:00.000Z",
+      "case": "after the overlap"
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "date": "2026-10-04",
+      "time": "02:30",
+      "instant": "2026-10-03T21:00:00.000Z",
+      "case": "control"
+    }
+  ],
+  "slots": [
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-10-04",
+      "from": "01:00",
+      "to": "04:00",
+      "minutes": 30,
+      "starts": [
+        "2026-10-03T15:00:00.000Z",
+        "2026-10-03T15:30:00.000Z",
+        "2026-10-03T16:00:00.000Z",
+        "2026-10-03T16:30:00.000Z"
+      ]
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "date": "2026-04-05",
+      "from": "01:00",
+      "to": "04:00",
+      "minutes": 30,
+      "starts": [
+        "2026-04-04T14:00:00.000Z",
+        "2026-04-04T14:30:00.000Z",
+        "2026-04-04T15:00:00.000Z",
+        "2026-04-04T15:30:00.000Z",
+        "2026-04-04T16:00:00.000Z",
+        "2026-04-04T16:30:00.000Z",
+        "2026-04-04T17:00:00.000Z",
+        "2026-04-04T17:30:00.000Z"
+      ]
+    },
+    {
+      "tz": "Asia/Kolkata",
+      "date": "2026-10-04",
+      "from": "01:00",
+      "to": "04:00",
+      "minutes": 30,
+      "starts": [
+        "2026-10-03T19:30:00.000Z",
+        "2026-10-03T20:00:00.000Z",
+        "2026-10-03T20:30:00.000Z",
+        "2026-10-03T21:00:00.000Z",
+        "2026-10-03T21:30:00.000Z",
+        "2026-10-03T22:00:00.000Z"
+      ]
+    }
+  ],
+  "local_date": [
+    {
+      "_why": "invoice date is the calendar date, not the business date",
+      "tz": "Asia/Kolkata",
+      "instant": "2026-10-09T18:45:00Z",
+      "date": "2026-10-10"
+    },
+    {
+      "tz": "Australia/Melbourne",
+      "instant": "2026-10-04T15:30:00Z",
+      "date": "2026-10-05"
+    }
+  ]
+}

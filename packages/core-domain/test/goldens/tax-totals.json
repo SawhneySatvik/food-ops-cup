@@ -1,0 +1,102 @@
+{
+  "_note": "Hand-computed tax totals for the receipt fixtures, by channel. IN aggregator orders (Sec 9(5), pack tax_treatment operator_collects_excluded) move the tax out of the merchant's own liability; AU aggregators are merchant_collects. Discount cases (fixtures/discount-sales.json): IN L1 2 x (250.00 + 30.00) = 560.00 - 56.00 = 504.00, CGST/SGST 2.5% = 12.60 each; L2 89.99 - 0.01 = 89.98, 2.5% = 2.2495 -> 2.25 each. AU (gross): L1 18.00 + 2.50 = 20.50 - 2.05 = 18.45 gross, GST 18.45/11 = 1.677 -> 1.68, net 16.77; L2 2 x 6.50 = 13.00, GST 1.1818 -> 1.18, net 11.82.",
+  "IN:counter": {
+    "net_minor": 35111,
+    "tax_minor": 1756,
+    "total_minor": 36867,
+    "components": [
+      {
+        "code": "CGST",
+        "rate_bp": 250,
+        "amount_minor": 878
+      },
+      {
+        "code": "SGST",
+        "rate_bp": 250,
+        "amount_minor": 878
+      }
+    ],
+    "own_liability_minor": 1756,
+    "operator_liability_minor": 0
+  },
+  "IN:aggregator:swiggy": {
+    "net_minor": 35111,
+    "tax_minor": 1756,
+    "total_minor": 36867,
+    "components": [
+      {
+        "code": "CGST",
+        "rate_bp": 250,
+        "amount_minor": 878
+      },
+      {
+        "code": "SGST",
+        "rate_bp": 250,
+        "amount_minor": 878
+      }
+    ],
+    "own_liability_minor": 0,
+    "operator_liability_minor": 1756
+  },
+  "AU:counter": {
+    "net_minor": 6799,
+    "tax_minor": 590,
+    "total_minor": 7389,
+    "components": [
+      {
+        "code": "GST",
+        "rate_bp": 1000,
+        "amount_minor": 590
+      }
+    ],
+    "own_liability_minor": 590,
+    "operator_liability_minor": 0
+  },
+  "AU:aggregator:ubereats": {
+    "net_minor": 6799,
+    "tax_minor": 590,
+    "total_minor": 7389,
+    "components": [
+      {
+        "code": "GST",
+        "rate_bp": 1000,
+        "amount_minor": 590
+      }
+    ],
+    "own_liability_minor": 590,
+    "operator_liability_minor": 0
+  },
+  "IN:discount": {
+    "net_minor": 59398,
+    "tax_minor": 2970,
+    "total_minor": 62368,
+    "components": [
+      {
+        "code": "CGST",
+        "rate_bp": 250,
+        "amount_minor": 1485
+      },
+      {
+        "code": "SGST",
+        "rate_bp": 250,
+        "amount_minor": 1485
+      }
+    ],
+    "own_liability_minor": 2970,
+    "operator_liability_minor": 0
+  },
+  "AU:discount": {
+    "net_minor": 2859,
+    "tax_minor": 286,
+    "total_minor": 3145,
+    "components": [
+      {
+        "code": "GST",
+        "rate_bp": 1000,
+        "amount_minor": 286
+      }
+    ],
+    "own_liability_minor": 286,
+    "operator_liability_minor": 0
+  }
+}

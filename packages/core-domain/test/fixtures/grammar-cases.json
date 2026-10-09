@@ -1,0 +1,59 @@
+{
+  "_note": "Number-grammar gate (03-architecture §1.7, 04-agent-framework §11). Hand-written before the matcher. `rule` is the classification the grammar must report for a reject. Ref ids are UUIDv7 inside refs, so their digits are not prose.",
+  "reject": [
+    { "id": "r01", "rule": "numeric_char", "text": "Sales rose 12 times at ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩." },
+    { "id": "r02", "rule": "numeric_char", "text": "Paneer is now ⟨snap:0192f000-0000-7000-8000-000000000001·0·price⟩ against 340 last week." },
+    { "id": "r03", "rule": "numeric_char", "text": "बिक्री ५ गुना बढ़ी ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩।" },
+    { "id": "r04", "rule": "numeric_char", "text": "Orders were ３ times higher ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r05", "rule": "numeric_char", "text": "About ½ of the paneer spoiled ⟨snap:0192f000-0000-7000-8000-000000000001·0·qty⟩." },
+    { "id": "r06", "rule": "numeric_char", "text": "The cold room is ⟨snap:0192f000-0000-7000-8000-000000000001·0·area⟩ m² now." },
+    { "id": "r07", "rule": "numeric_char", "text": "Batch Ⅻ failed the temperature check ⟨cite:row:core.temp_log:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "r08", "rule": "numeric_char", "text": "Supplier ٣ is late again ⟨cite:row:core.supplier:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "r09", "rule": "numeric_char", "text": "Delivered on 05/10/2026 per ⟨cite:row:core.goods_received:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "r10", "rule": "numeric_char", "text": "The count on 2026-10-05 differs from ⟨snap:0192f000-0000-7000-8000-000000000001·0·qty⟩." },
+    { "id": "r11", "rule": "numeric_char", "text": "Revenue was 5k higher than ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r12", "rule": "numeric_char", "text": "Sales hit 2L at ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩." },
+    { "id": "r13", "rule": "magnitude_suffix", "text": "Revenue reached ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩k this week." },
+    { "id": "r14", "rule": "magnitude_suffix", "text": "Annual sales are ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩Cr." },
+    { "id": "r15", "rule": "magnitude_suffix", "text": "Payables stand at ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩L." },
+    { "id": "r16", "rule": "number_word", "text": "Three outlets missed the delivery window ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩." },
+    { "id": "r17", "rule": "number_word", "text": "There were twenty-five late orders ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r18", "rule": "number_word", "text": "NINETY-NINE tickets were bumped ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r19", "rule": "number_word", "text": "Order a dozen eggs from ⟨cite:row:core.supplier:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "r20", "rule": "number_word", "text": "That is about a lakh in sales ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r21", "rule": "number_word", "text": "The chain crossed a crore ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r22", "rule": "number_word", "text": "Nearly a hundred covers were lost ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "r23", "rule": "typed_quotation", "text": "The note says \"no paneer today\" ⟨cite:msg:0192f000-0000-7000-8000-000000000003⟩." },
+    { "id": "r24", "rule": "number_word", "text": "पाँच ऑर्डर देर से आए ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩।" },
+    { "id": "r25", "rule": "number_word", "text": "दस आउटलेट में स्टॉक कम है ⟨snap:0192f000-0000-7000-8000-000000000001·0·qty⟩।" },
+    { "id": "r26", "rule": "number_word", "text": "लगभग हज़ार रुपये का नुकसान ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩।" },
+    { "id": "r27", "rule": "number_symbol", "text": "Margin fell ⟨snap:0192f000-0000-7000-8000-000000000001·0·pct_change⟩% this week." },
+    { "id": "r28", "rule": "number_symbol", "text": "Food cost is ⟨snap:0192f000-0000-7000-8000-000000000001·0·pct⟩％ of sales." },
+    { "id": "r29", "rule": "typed_quotation", "text": "The supplier wrote “we cannot deliver on time” ⟨cite:msg:0192f000-0000-7000-8000-000000000003⟩." },
+    { "id": "r30", "rule": "typed_quotation", "text": "Staff called it 'the slow week' in ⟨cite:msg:0192f000-0000-7000-8000-000000000003⟩." }
+  ],
+  "accept": [
+    { "id": "a01", "text": "Do you want to reorder paneer from ⟨cite:row:core.supplier:0192f000-0000-7000-8000-000000000002⟩?" },
+    { "id": "a02", "text": "The quarter-end close is pending at ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩." },
+    { "id": "a03", "text": "Sales in the first half of the month were ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+    { "id": "a04", "text": "Paneer cost rose ⟨snap:0192f000-0000-7000-8000-000000000001·0·pct_change⟩ since ⟨snap:0192f000-0000-7000-8000-000000000001·0·from_date⟩ at ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩ ⟨cite:row:core.supplier_price:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "a05", "text": "Totals (⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩), ⟨snap:0192f000-0000-7000-8000-000000000001·1·total⟩; and ⟨snap:0192f000-0000-7000-8000-000000000001·2·total⟩!" },
+    { "id": "a06", "text": "The owner's note and the manager’s reply ⟨cite:msg:0192f000-0000-7000-8000-000000000003⟩ agree." },
+    { "id": "a07", "text": "The supplier wrote “⟨cite:msg:0192f000-0000-7000-8000-000000000003·0-42⟩” about ⟨cite:row:core.supplier:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "a08", "text": "Double-check the teen batch: someone, anyone or everyone can ⟨cite:row:core.batch:0192f000-0000-7000-8000-000000000002⟩." },
+    { "id": "a09", "text": "कृपया बिल दो, आधा स्टॉक ⟨snap:0192f000-0000-7000-8000-000000000001·0·qty⟩ बचा है।" },
+    { "id": "a10", "text": "Stock at ⟨snap:0192f000-0000-7000-8000-000000000001·0·outlet_name⟩ is ⟨snap:0192f000-0000-7000-8000-000000000001·0·qty⟩kg and Lettuce is fresh." }
+  ],
+  "reject_pending_contracts": {
+    "_note": "Plural magnitude words. Expected reject; written while contracts lacked them (red until @munim/contracts/grammar listed them, which it did at 23:46 on 9 Oct). The matcher reads the lists, it does not add an s? rule.",
+    "cases": [
+      { "id": "p01", "rule": "number_word", "text": "Thousands of orders came through ⟨cite:row:core.order:0192f000-0000-7000-8000-000000000002⟩." },
+      { "id": "p02", "rule": "number_word", "text": "Lakhs were lost to waste ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+      { "id": "p03", "rule": "number_word", "text": "Crores moved through the chain ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+      { "id": "p04", "rule": "number_word", "text": "Hundreds of covers were lost ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+      { "id": "p05", "rule": "number_word", "text": "Millions of rupees moved ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+      { "id": "p06", "rule": "number_word", "text": "Billions in volume ⟨snap:0192f000-0000-7000-8000-000000000001·0·total⟩." },
+      { "id": "p07", "rule": "number_word", "text": "Dozens of eggs broke ⟨cite:row:core.waste_log:0192f000-0000-7000-8000-000000000002⟩." }
+    ]
+  }
+}

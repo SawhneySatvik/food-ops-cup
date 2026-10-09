@@ -1,0 +1,22 @@
+Tax invoice
+Laneway Pantry (synthetic)
+8 Degraves Street, Melbourne VIC
+ABN: 51824753556
+Invoice no: MEL1-000007
+Date: 05/10/2026
+----
+1 Flat White
+  2 x $5.50 = $11.00
+  GST 10% $1.00
+2 Smashed Avo
+  1 x $23.90 = $23.90
+  GST 10% $2.17
+3 Sourdough Loaf
+  1 x $9.00 = $9.00
+  GST-free
+4 House Blend Beans (kg)
+  1.5 x $19.99 = $29.99
+  GST 10% $2.73
+----
+Total: $73.89
+Includes GST 10%: $5.90

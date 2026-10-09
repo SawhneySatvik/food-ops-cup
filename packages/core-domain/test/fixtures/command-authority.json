@@ -1,0 +1,78 @@
+{
+  "_note": "A subset of the 0003 seed rows (db/migrations/0003_core_foundation.sql, read 9 Oct) plus one capped row the seed does not have yet (every 0003 cap is null), so the amount branch is exercised. W1 fix #44: adds an 'own' row (0004 seed customers.profile.update.v1) and a row with a scope the engine does not know (must deny). 'tenant' scope needs an all-outlet context ({*}), as the 0003 guard does.",
+  "rows": [
+    {
+      "command_type": "catalogue.item.upsert.v1",
+      "allowed_roles": [
+        "owner",
+        "manager",
+        "judge"
+      ],
+      "scope": "tenant",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "catalogue.price.set.v1",
+      "allowed_roles": [
+        "owner",
+        "manager",
+        "judge"
+      ],
+      "scope": "outlet",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "orders.place.v1",
+      "allowed_roles": [
+        "owner",
+        "manager",
+        "staff",
+        "customer",
+        "judge"
+      ],
+      "scope": "outlet",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "storefront.guest.create.v1",
+      "allowed_roles": [
+        "customer"
+      ],
+      "scope": "own_order",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "tenancy.provision.v1",
+      "allowed_roles": [
+        "operator"
+      ],
+      "scope": "tenant",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "orders.refund.v1",
+      "allowed_roles": [
+        "owner",
+        "manager"
+      ],
+      "scope": "outlet",
+      "max_amount_minor": 500000
+    },
+    {
+      "command_type": "customers.profile.update.v1",
+      "allowed_roles": [
+        "customer"
+      ],
+      "scope": "own",
+      "max_amount_minor": null
+    },
+    {
+      "command_type": "demo.mystery.v1",
+      "allowed_roles": [
+        "owner"
+      ],
+      "scope": "galaxy",
+      "max_amount_minor": null
+    }
+  ]
+}

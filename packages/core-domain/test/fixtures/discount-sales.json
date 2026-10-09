@@ -1,0 +1,43 @@
+{
+  "_note": "Sales with option price deltas (per unit, added to the unit price) and line discounts. Exclusive packs (IN) tax the discounted net. Inclusive packs (AU) apply the discount to the GROSS (tax-inclusive) amount and extract tax from the discounted gross.",
+  "IN": [
+    {
+      "name": "Paneer Tikka",
+      "qty_milli": 2000,
+      "unit_price_minor": 25000,
+      "option_delta_minor": 3000,
+      "line_discount_minor": 5600,
+      "tax_class": "restaurant_5",
+      "mrp_minor": null
+    },
+    {
+      "name": "Sweet Lassi",
+      "qty_milli": 1000,
+      "unit_price_minor": 8999,
+      "option_delta_minor": 0,
+      "line_discount_minor": 1,
+      "tax_class": "restaurant_5",
+      "mrp_minor": null
+    }
+  ],
+  "AU": [
+    {
+      "name": "Burger",
+      "qty_milli": 1000,
+      "unit_price_minor": 1800,
+      "option_delta_minor": 250,
+      "line_discount_minor": 205,
+      "tax_class": "gst_10",
+      "mrp_minor": null
+    },
+    {
+      "name": "Chips",
+      "qty_milli": 2000,
+      "unit_price_minor": 650,
+      "option_delta_minor": 0,
+      "line_discount_minor": 0,
+      "tax_class": "gst_10",
+      "mrp_minor": null
+    }
+  ]
+}

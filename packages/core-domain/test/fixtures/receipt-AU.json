@@ -1,0 +1,19 @@
+{
+  "_note": "Synthetic AU cafe/pantry bill, GST-inclusive prices. Issued 2026-10-04T15:30Z = 5 Oct 02:30 AEDT (+11), so the invoice date is 05/10/2026. Line 4: 1.5 x 1999 = 2998.5 -> 2999 (half-up); GST 2999/11 = 272.63 -> 273.",
+  "seller": {
+    "name": "Laneway Pantry (synthetic)",
+    "address": "8 Degraves Street, Melbourne VIC",
+    "tax_ids": { "ABN": "51824753556" }
+  },
+  "invoice_no": "MEL1-000007",
+  "issued_at": "2026-10-04T15:30:00Z",
+  "tz": "Australia/Melbourne",
+  "channel_kind": "counter",
+  "buyer": null,
+  "lines": [
+    { "name": "Flat White", "qty_milli": 2000, "unit_price_minor": 550, "tax_class": null, "mrp_minor": null },
+    { "name": "Smashed Avo", "qty_milli": 1000, "unit_price_minor": 2390, "tax_class": "gst_10", "mrp_minor": null },
+    { "name": "Sourdough Loaf", "qty_milli": 1000, "unit_price_minor": 900, "tax_class": "gst_free", "mrp_minor": null },
+    { "name": "House Blend Beans (kg)", "qty_milli": 1500, "unit_price_minor": 1999, "tax_class": "gst_10", "mrp_minor": null }
+  ]
+}

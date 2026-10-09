@@ -1,0 +1,18 @@
+{
+  "_note": "Synthetic IN restaurant bill. Issued 2026-10-09T18:45Z = 10 Oct 00:15 IST, so the invoice date is 10/10/2026. Line 3 (1010 paise) is the rounding case: rate 5% = 50.5 but CGST 25.25 -> 25 and SGST 25.25 -> 25, so its tax is 50 (components rounded per line).",
+  "seller": {
+    "name": "Chai Kona (synthetic)",
+    "address": "14 Residency Road, Bengaluru",
+    "tax_ids": { "GSTIN": "29ABCDE1234F1Z5", "FSSAI": "11226999000123" }
+  },
+  "invoice_no": "BLR1-000042",
+  "issued_at": "2026-10-09T18:45:00Z",
+  "tz": "Asia/Kolkata",
+  "channel_kind": "counter",
+  "buyer": null,
+  "lines": [
+    { "name": "Masala Dosa", "qty_milli": 2000, "unit_price_minor": 12000, "tax_class": null, "mrp_minor": null },
+    { "name": "Filter Coffee", "qty_milli": 3000, "unit_price_minor": 3367, "tax_class": "restaurant_5", "mrp_minor": null },
+    { "name": "Butter Biscuit", "qty_milli": 1000, "unit_price_minor": 1010, "tax_class": "restaurant_5", "mrp_minor": null }
+  ]
+}

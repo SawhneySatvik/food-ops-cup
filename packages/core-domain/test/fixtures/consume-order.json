@@ -1,0 +1,222 @@
+{
+  "_note": "inventory.consume_order + inventory.consume_sku fixture. The order row carries business_date 2026-10-10 (placed 2026-10-09T23:00Z = 10 Oct 04:30 IST, after the 04:00 cutoff; the row's value is used, never recomputed — the UTC date would be 9 Oct), so Paneer Tikka v2 is in force. Units: qty_milli = thousandths of the unit; a recipe batch yields yield_qty_milli portions-milli; option deltas are per one portion; waste is a gross-up x(1 + waste_pct_bp/10000) (INFERENCE). Lines 6-7 sell SKU d4, which stocks through ingredient a6 1:1 by quantity.",
+  "order": {
+    "order_id": "0192f000-0000-7000-8000-0000000000c1",
+    "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+    "placed_at": "2026-10-09T23:00:00Z",
+    "lines": [
+      {
+        "line_no": 1,
+        "item_id": "0192f000-0000-7000-8000-0000000000d1",
+        "variant_id": null,
+        "option_ids": [
+          "0192f000-0000-7000-8000-0000000000f1"
+        ],
+        "qty_milli": 3000
+      },
+      {
+        "line_no": 2,
+        "item_id": "0192f000-0000-7000-8000-0000000000d1",
+        "variant_id": null,
+        "option_ids": [
+          "0192f000-0000-7000-8000-0000000000f2"
+        ],
+        "qty_milli": 1000
+      },
+      {
+        "line_no": 3,
+        "item_id": "0192f000-0000-7000-8000-0000000000d2",
+        "variant_id": null,
+        "option_ids": [],
+        "qty_milli": 2000
+      },
+      {
+        "line_no": 4,
+        "item_id": "0192f000-0000-7000-8000-0000000000d2",
+        "variant_id": "0192f000-0000-7000-8000-0000000000e1",
+        "option_ids": [],
+        "qty_milli": 1000
+      },
+      {
+        "line_no": 5,
+        "item_id": "0192f000-0000-7000-8000-0000000000d3",
+        "variant_id": null,
+        "option_ids": [],
+        "qty_milli": 2000
+      },
+      {
+        "line_no": 6,
+        "item_id": "0192f000-0000-7000-8000-0000000000d4",
+        "variant_id": null,
+        "option_ids": [],
+        "qty_milli": 3000
+      },
+      {
+        "line_no": 7,
+        "item_id": "0192f000-0000-7000-8000-0000000000d4",
+        "variant_id": null,
+        "option_ids": [],
+        "qty_milli": 1000
+      }
+    ],
+    "business_date": "2026-10-10"
+  },
+  "items": [
+    {
+      "item_id": "0192f000-0000-7000-8000-0000000000d1",
+      "kind": "dish",
+      "stock_ingredient_id": null
+    },
+    {
+      "item_id": "0192f000-0000-7000-8000-0000000000d2",
+      "kind": "dish",
+      "stock_ingredient_id": null
+    },
+    {
+      "item_id": "0192f000-0000-7000-8000-0000000000d3",
+      "kind": "dish",
+      "stock_ingredient_id": null
+    },
+    {
+      "item_id": "0192f000-0000-7000-8000-0000000000d4",
+      "kind": "sku",
+      "stock_ingredient_id": "0192f000-0000-7000-8000-0000000000a6"
+    }
+  ],
+  "ingredients": [
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a1",
+      "base_unit": "kg"
+    },
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a2",
+      "base_unit": "kg"
+    },
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a3",
+      "base_unit": "l"
+    },
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a4",
+      "base_unit": "l"
+    },
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a5",
+      "base_unit": "kg"
+    },
+    {
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a6",
+      "base_unit": "pc"
+    }
+  ],
+  "recipe_versions": [
+    {
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000101",
+      "item_id": "0192f000-0000-7000-8000-0000000000d1",
+      "variant_id": null,
+      "version": 1,
+      "valid_from": "2026-09-01",
+      "valid_to": "2026-10-10",
+      "yield_qty_milli": 4000,
+      "lines": [
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a1",
+          "qty_milli": 800,
+          "unit": "kg",
+          "waste_pct_bp": 0
+        }
+      ]
+    },
+    {
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000102",
+      "item_id": "0192f000-0000-7000-8000-0000000000d1",
+      "variant_id": null,
+      "version": 2,
+      "valid_from": "2026-10-10",
+      "valid_to": null,
+      "yield_qty_milli": 4000,
+      "lines": [
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a1",
+          "qty_milli": 600,
+          "unit": "kg",
+          "waste_pct_bp": 500
+        },
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a2",
+          "qty_milli": 200,
+          "unit": "kg",
+          "waste_pct_bp": 1000
+        },
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a3",
+          "qty_milli": 50,
+          "unit": "l",
+          "waste_pct_bp": 100
+        }
+      ]
+    },
+    {
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000103",
+      "item_id": "0192f000-0000-7000-8000-0000000000d2",
+      "variant_id": null,
+      "version": 1,
+      "valid_from": "2026-01-01",
+      "valid_to": null,
+      "yield_qty_milli": 1000,
+      "lines": [
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a4",
+          "qty_milli": 150,
+          "unit": "l",
+          "waste_pct_bp": 0
+        },
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a5",
+          "qty_milli": 5,
+          "unit": "kg",
+          "waste_pct_bp": 200
+        }
+      ]
+    },
+    {
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000104",
+      "item_id": "0192f000-0000-7000-8000-0000000000d2",
+      "variant_id": "0192f000-0000-7000-8000-0000000000e1",
+      "version": 1,
+      "valid_from": "2026-01-01",
+      "valid_to": null,
+      "yield_qty_milli": 1000,
+      "lines": [
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a4",
+          "qty_milli": 250,
+          "unit": "l",
+          "waste_pct_bp": 0
+        },
+        {
+          "ingredient_id": "0192f000-0000-7000-8000-0000000000a5",
+          "qty_milli": 8,
+          "unit": "kg",
+          "waste_pct_bp": 200
+        }
+      ]
+    }
+  ],
+  "option_deltas": [
+    {
+      "option_id": "0192f000-0000-7000-8000-0000000000f1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a1",
+      "qty_milli": 100,
+      "unit": "kg",
+      "waste_pct_bp": 500
+    },
+    {
+      "option_id": "0192f000-0000-7000-8000-0000000000f2",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a2",
+      "qty_milli": -50,
+      "unit": "kg",
+      "waste_pct_bp": 1000
+    }
+  ]
+}

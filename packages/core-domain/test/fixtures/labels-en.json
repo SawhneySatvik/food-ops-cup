@@ -1,0 +1,14 @@
+{
+  "receipt.invoice_no": "Invoice no",
+  "receipt.date": "Date",
+  "receipt.buyer": "Buyer",
+  "receipt.net": "Taxable value",
+  "receipt.tax_total": "Total tax",
+  "receipt.total": "Total",
+  "receipt.includes": "Includes",
+  "receipt.record_title": "Order record (not a tax invoice)",
+  "receipt.order_no": "Order no",
+  "receipt.channel": "Channel",
+  "receipt.tax_paid_by": "Tax on this order is paid by",
+  "receipt.discount": "Discount"
+}

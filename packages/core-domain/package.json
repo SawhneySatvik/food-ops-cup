@@ -1,0 +1,22 @@
+{
+  "name": "@munim/core-domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./*": "./*/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --reporter=verbose",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@munim/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  }
+}

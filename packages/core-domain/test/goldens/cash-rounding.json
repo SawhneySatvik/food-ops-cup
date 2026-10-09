@@ -1,0 +1,69 @@
+{
+  "_note": "Cash rounding (W1 ruling #59): a cash tender rounds the amount due to the pack's cash_rounding_minor (AU 5 cents, IN 100 paise = Rs 1, INFERENCE), half-up; rounding_minor = rounded - due is recorded on the tender. Non-cash tenders never round.",
+  "cases": [
+    {
+      "pack": "AU",
+      "step": 5,
+      "method": "cash",
+      "due_minor": 7389,
+      "amount_minor": 7390,
+      "rounding_minor": 1
+    },
+    {
+      "pack": "AU",
+      "step": 5,
+      "method": "cash",
+      "due_minor": 7387,
+      "amount_minor": 7385,
+      "rounding_minor": -2
+    },
+    {
+      "pack": "AU",
+      "step": 5,
+      "method": "cash",
+      "due_minor": 7385,
+      "amount_minor": 7385,
+      "rounding_minor": 0
+    },
+    {
+      "pack": "AU",
+      "step": 5,
+      "method": "card",
+      "due_minor": 7389,
+      "amount_minor": 7389,
+      "rounding_minor": 0
+    },
+    {
+      "pack": "IN",
+      "step": 100,
+      "method": "cash",
+      "due_minor": 36867,
+      "amount_minor": 36900,
+      "rounding_minor": 33
+    },
+    {
+      "pack": "IN",
+      "step": 100,
+      "method": "cash",
+      "due_minor": 36849,
+      "amount_minor": 36800,
+      "rounding_minor": -49
+    },
+    {
+      "pack": "IN",
+      "step": 100,
+      "method": "cash",
+      "due_minor": 36850,
+      "amount_minor": 36900,
+      "rounding_minor": 50
+    },
+    {
+      "pack": "IN",
+      "step": 100,
+      "method": "upi",
+      "due_minor": 36867,
+      "amount_minor": 36867,
+      "rounding_minor": 0
+    }
+  ]
+}

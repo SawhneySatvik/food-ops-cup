@@ -1,0 +1,26 @@
+Tax Invoice
+Chai Kona (synthetic)
+14 Residency Road, Bengaluru
+GSTIN: 29ABCDE1234F1Z5
+FSSAI Lic. No.: 11226999000123
+Invoice no: BLR1-000042
+Date: 10/10/2026
+----
+1 Masala Dosa
+  2 x ₹120.00 = ₹240.00
+  CGST 2.5% ₹6.00
+  SGST 2.5% ₹6.00
+2 Filter Coffee
+  3 x ₹33.67 = ₹101.01
+  CGST 2.5% ₹2.53
+  SGST 2.5% ₹2.53
+3 Butter Biscuit
+  1 x ₹10.10 = ₹10.10
+  CGST 2.5% ₹0.25
+  SGST 2.5% ₹0.25
+----
+Taxable value: ₹351.11
+CGST 2.5%: ₹8.78
+SGST 2.5%: ₹8.78
+Total tax: ₹17.56
+Total: ₹368.67

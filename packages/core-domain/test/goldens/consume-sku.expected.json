@@ -1,0 +1,18 @@
+{
+  "_note": "Hand-computed. inventory.consume_sku: SKU d4 stocks through ingredient a6 (base unit pc) 1:1 by quantity: line 6 3000 + line 7 1000 = 4000 milli-pc. Dish lines are consume_order's.",
+  "rule_id": "inventory.consume_sku",
+  "business_date": "2026-10-10",
+  "movements": [
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a6",
+      "qty_milli": -4000,
+      "unit": "pc",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    }
+  ],
+  "issues": []
+}

@@ -1,0 +1,82 @@
+{
+  "_note": "Hand-computed. Paneer a1: L1 3000/4000*600*1.05 = 472.5; option f1 3*100*1.05 = 315; L2 1000/4000*600*1.05 = 157.5; sum 945. Capsicum a2: L1 3/4*200*1.1 = 165; L2 1/4*200*1.1 = 55, option f2 1*(-50)*1.1 = -55; sum 165. Oil a3: L1 3/4*50*1.01 = 37.875; L2 1/4*50*1.01 = 12.625; sum 50.5 -> 51 (half-up, rounded once per ingredient). Milk a4: L3 2*150 = 300; L4 (variant e1) 1*250 = 250; sum 550. Tea a5: L3 2*5*1.02 = 10.2; L4 1*8*1.02 = 8.16; sum 18.36 -> 18. Line 5 (d3) has no recipe. Lines 6-7 (SKU d4) belong to inventory.consume_sku, not to this rule. ref_type is the DB form core.<table> (W1 fix #38).",
+  "rule_id": "inventory.consume_order",
+  "business_date": "2026-10-10",
+  "movements": [
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a1",
+      "qty_milli": -945,
+      "unit": "kg",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    },
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a2",
+      "qty_milli": -165,
+      "unit": "kg",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    },
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a3",
+      "qty_milli": -51,
+      "unit": "l",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    },
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a4",
+      "qty_milli": -550,
+      "unit": "l",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    },
+    {
+      "outlet_id": "0192f000-0000-7000-8000-0000000000b1",
+      "ingredient_id": "0192f000-0000-7000-8000-0000000000a5",
+      "qty_milli": -18,
+      "unit": "kg",
+      "kind": "sale_consumption",
+      "ref_type": "core.order",
+      "ref_id": "0192f000-0000-7000-8000-0000000000c1",
+      "at": "2026-10-09T23:00:00Z"
+    }
+  ],
+  "lines": [
+    {
+      "line_no": 1,
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000102"
+    },
+    {
+      "line_no": 2,
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000102"
+    },
+    {
+      "line_no": 3,
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000103"
+    },
+    {
+      "line_no": 4,
+      "recipe_version_id": "0192f000-0000-7000-8000-000000000104"
+    }
+  ],
+  "recipe_missing": [
+    {
+      "line_no": 5,
+      "item_id": "0192f000-0000-7000-8000-0000000000d3"
+    }
+  ],
+  "issues": []
+}
