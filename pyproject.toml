@@ -1,0 +1,19 @@
+# uv workspace root only (virtual: no [project]). Members appear as their tickets land
+# (services/intel: T-009a; services/suppliers-sim: T-025). A missing member is tolerated; a member
+# directory without its pyproject.toml makes `uv run` refuse the workspace, so gates use uvx.
+[tool.uv.workspace]
+members = ["services/intel", "services/suppliers-sim"]
+
+# Python boundaries (03-architecture §7): intel imports no other service; on the contracts side it
+# imports only the generated models in munim_intel.contracts_gen. Run via `make boundaries`, which
+# puts services/intel on PYTHONPATH and fails if a services/* package is missing from forbidden_modules.
+# Tool pins live with their callers: import-linter in scripts/check/boundaries.sh, pytest in the Makefile.
+[tool.importlinter]
+root_packages = ["munim_intel"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "intel imports no other service"
+type = "forbidden"
+source_modules = ["munim_intel"]
+forbidden_modules = ["suppliers_sim", "services"]

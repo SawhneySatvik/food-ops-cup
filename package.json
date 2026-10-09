@@ -2,8 +2,12 @@
   "name": "munim",
   "private": true,
   "packageManager": "pnpm@11.9.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "devDependencies": {
+    "dependency-cruiser": "18.5.0",
+    "pg": "8.23.1",
     "typescript": "6.0.3"
   }
 }
