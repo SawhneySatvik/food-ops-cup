@@ -1,0 +1,6 @@
+tenancy.provision.v1
+tenancy.outlet.create.v1
+tenancy.member.invite.v1
+tenancy.brand.create.v1
+tenancy.channel.create.v1
+tenancy.device.register.v1

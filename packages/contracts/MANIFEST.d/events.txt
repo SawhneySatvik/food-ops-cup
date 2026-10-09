@@ -1,0 +1,4 @@
+munim.orders.order.placed.v1
+munim.inventory.movement.recorded.v1
+munim.purchasing.po.committed.v1
+munim-event

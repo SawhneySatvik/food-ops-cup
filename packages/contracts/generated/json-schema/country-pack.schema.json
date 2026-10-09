@@ -1,0 +1,758 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "country-pack",
+  "title": "CountryPack",
+  "x-munim-module": "packs",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2}-[A-Z]{2}$"
+    },
+    "currency": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "minor_unit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4
+        }
+      },
+      "required": [
+        "code",
+        "minor_unit",
+        "symbol"
+      ],
+      "additionalProperties": false
+    },
+    "fy_start_month": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+    },
+    "timezones": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+      }
+    },
+    "default_timezone": {
+      "type": "string",
+      "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+    },
+    "formats": {
+      "type": "object",
+      "properties": {
+        "number_grouping": {
+          "type": "string",
+          "enum": [
+            "indian",
+            "thousands"
+          ]
+        },
+        "decimal_separator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "group_separator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "date": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "magnitude_words": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "word": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suffix": {
+                "type": "string",
+                "minLength": 1
+              },
+              "exponent": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "word",
+              "suffix",
+              "exponent"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "number_grouping",
+        "decimal_separator",
+        "group_separator",
+        "date",
+        "magnitude_words"
+      ],
+      "additionalProperties": false
+    },
+    "tax": {
+      "type": "object",
+      "properties": {
+        "regime": {
+          "type": "string",
+          "pattern": "^[a-z_]+$"
+        },
+        "price_display": {
+          "type": "string",
+          "enum": [
+            "inclusive",
+            "exclusive"
+          ]
+        },
+        "rounding": {
+          "type": "string",
+          "const": "half_up_per_line"
+        },
+        "default_class": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+        },
+        "classes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "rate_bp": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{2,6}$"
+                    },
+                    "rate_bp": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "rate_bp"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "input_tax_credit": {
+                "type": "boolean"
+              },
+              "supply": {
+                "type": "string",
+                "enum": [
+                  "service",
+                  "goods",
+                  "any"
+                ]
+              },
+              "applies_to": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "_unverified": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "code",
+              "label",
+              "rate_bp",
+              "components",
+              "input_tax_credit",
+              "supply",
+              "applies_to"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "_unverified": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "regime",
+        "price_display",
+        "rounding",
+        "default_class",
+        "classes"
+      ],
+      "additionalProperties": false
+    },
+    "tax_ids": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1
+          },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "business",
+              "outlet"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "on_receipt": {
+            "type": "boolean"
+          },
+          "receipt_field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "_unverified": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "pattern",
+          "holder",
+          "required",
+          "on_receipt",
+          "receipt_field"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "invoice": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "every_receipt_is_tax_invoice": {
+          "type": "boolean"
+        },
+        "required_fields": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          }
+        },
+        "buyer_identity_above_minor": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_unverified": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "title",
+        "every_receipt_is_tax_invoice",
+        "required_fields",
+        "buyer_identity_above_minor"
+      ],
+      "additionalProperties": false
+    },
+    "printed_price": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "enum": [
+            "none",
+            "sale_above_mrp_refused"
+          ]
+        },
+        "applies_to": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "_unverified": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "rule",
+        "applies_to"
+      ],
+      "additionalProperties": false
+    },
+    "aggregators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "import_format": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "tax_treatment": {
+            "type": "string",
+            "enum": [
+              "merchant_collects",
+              "operator_collects_excluded"
+            ]
+          },
+          "legal_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "_unverified": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "code",
+          "display_name",
+          "import_format",
+          "tax_treatment",
+          "legal_basis"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "payroll_scope": {
+      "type": "string",
+      "enum": [
+        "drafts",
+        "roster_only"
+      ]
+    },
+    "surcharges": {
+      "type": "object",
+      "properties": {
+        "card_surcharge": {
+          "type": "string",
+          "enum": [
+            "not_applicable",
+            "allowed",
+            "prohibited"
+          ]
+        },
+        "_unverified": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "card_surcharge"
+      ],
+      "additionalProperties": false
+    },
+    "compliance_calendar": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "recurrence": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "quarterly",
+              "annual",
+              "on_change"
+            ]
+          },
+          "due_day_after_period": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "_unverified": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "recurrence",
+          "due_day_after_period"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "licence_kinds": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "business",
+              "outlet"
+            ]
+          },
+          "outlet_kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "restaurant",
+                "cloud_kitchen",
+                "store"
+              ]
+            }
+          },
+          "_unverified": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "holder",
+          "outlet_kinds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "expired_sale_override": {
+      "type": "boolean"
+    },
+    "status_channels": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "in_app",
+          "email",
+          "sms"
+        ]
+      }
+    },
+    "cash_rounding_minor": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "severity_ladder": {
+      "type": "object",
+      "properties": {
+        "critical_minor_gte": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "high_minor_gte": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "medium_minor_gte": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "_notes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "critical_minor_gte",
+        "high_minor_gte",
+        "medium_minor_gte",
+        "_notes"
+      ],
+      "additionalProperties": false
+    },
+    "detectors": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z_]*\\.[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "thresholds": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "_notes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "thresholds",
+          "_notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chart_of_accounts": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{4}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "liability",
+              "equity",
+              "income",
+              "expense"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "_unverified": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "code",
+    "version",
+    "effective_from",
+    "name",
+    "locale",
+    "currency",
+    "fy_start_month",
+    "timezones",
+    "default_timezone",
+    "formats",
+    "tax",
+    "tax_ids",
+    "invoice",
+    "printed_price",
+    "aggregators",
+    "payroll_scope",
+    "surcharges",
+    "compliance_calendar",
+    "licence_kinds",
+    "expired_sale_override",
+    "status_channels",
+    "cash_rounding_minor",
+    "severity_ladder",
+    "detectors",
+    "chart_of_accounts"
+  ],
+  "additionalProperties": false
+}

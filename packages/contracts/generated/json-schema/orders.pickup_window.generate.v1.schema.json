@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orders.pickup_window.generate.v1",
+  "title": "OrdersPickupWindowGenerateV1",
+  "x-munim-module": "orders",
+  "type": "object",
+  "properties": {
+    "outlet_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "business_date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+    },
+    "from_local": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "to_local": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "slot_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120
+    },
+    "capacity_orders": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    }
+  },
+  "required": [
+    "outlet_id",
+    "business_date",
+    "from_local",
+    "to_local",
+    "slot_minutes",
+    "capacity_orders"
+  ],
+  "additionalProperties": false
+}

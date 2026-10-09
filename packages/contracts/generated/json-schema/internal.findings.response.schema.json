@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal.findings.response",
+  "title": "InternalFindingsResponse",
+  "x-munim-module": "internal",
+  "type": "object",
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "stored",
+        "merged",
+        "abstained"
+      ]
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "number_grammar",
+            "unresolved_ref",
+            "cross_tenant_ref",
+            "quote_mismatch",
+            "missing_ref",
+            "settlements_missing",
+            "recipe_missing",
+            "stale_draft",
+            "authority_denied",
+            "cost_price_missing",
+            "ticket_times_missing",
+            "count_missing",
+            "expiry_missing",
+            "budget_exceeded",
+            "budget_missing",
+            "margin_below_floor",
+            "moq_exceeds_need",
+            "open_commitment_overlap",
+            "payment_terms_worse",
+            "consent_record_missing",
+            "bank_lines_missing",
+            "attendance_missing",
+            "payroll_out_of_scope",
+            "no_marketing_consent",
+            "not_a_certificate",
+            "log_coverage_missing",
+            "signal_source_missing",
+            "insufficient_history",
+            "forecast_stale",
+            "window_full",
+            "outlet_paused",
+            "item_sold_out",
+            "deal_rejudged",
+            "coupon_invalid",
+            "coupon_cap_reached",
+            "coupon_min_spend",
+            "change_window_closed",
+            "price_above_mrp",
+            "expired_batch",
+            "period_closed",
+            "model_blocked",
+            "preview_total_changed",
+            "buyer_identity_required",
+            "tax_id_missing",
+            "unknown_tax_class",
+            "unknown_channel",
+            "unit_mismatch"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "finding_id",
+    "outcome",
+    "reason_code"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.member.invite.v1",
+  "title": "TenancyMemberInviteV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "member_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "email": {
+      "type": "string",
+      "maxLength": 254,
+      "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "manager",
+        "staff",
+        "advisor"
+      ]
+    },
+    "outlet_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      }
+    }
+  },
+  "required": [
+    "member_id",
+    "name",
+    "email",
+    "role",
+    "outlet_ids"
+  ],
+  "additionalProperties": false
+}

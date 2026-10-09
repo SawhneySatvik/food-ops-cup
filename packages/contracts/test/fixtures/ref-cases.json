@@ -1,0 +1,102 @@
+{
+  "_note": "Committed Ref parser table (T-002): 12 strings, expected accept/reject and parse result. Ref, parseRef and the capture regexes must all agree with it.",
+  "cases": [
+    {
+      "label": "snapshot cell",
+      "input": "⟨snap:0199e0a0-0000-7000-8000-000000000384·0·on_hand_qty_milli⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "snap",
+        "snapshot_id": "0199e0a0-0000-7000-8000-000000000384",
+        "row": 0,
+        "column": "on_hand_qty_milli"
+      }
+    },
+    {
+      "label": "cite row with schema.table",
+      "input": "⟨cite:row:core.supplier_price:0199e0a0-0000-7000-8000-000000000384⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "row",
+        "id": "core.supplier_price:0199e0a0-0000-7000-8000-000000000384",
+        "span": null
+      }
+    },
+    {
+      "label": "cite doc with span",
+      "input": "⟨cite:doc:0199e0a0-0000-7000-8000-000000000384·10-42⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "doc",
+        "id": "0199e0a0-0000-7000-8000-000000000384",
+        "span": [
+          10,
+          42
+        ]
+      }
+    },
+    {
+      "label": "cite msg",
+      "input": "⟨cite:msg:0199e0a0-0000-7000-8000-000000000384⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "msg",
+        "id": "0199e0a0-0000-7000-8000-000000000384",
+        "span": null
+      }
+    },
+    {
+      "label": "cite claim with span",
+      "input": "⟨cite:claim:0199e0a0-0000-7000-8000-000000000384·0-7⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "claim",
+        "id": "0199e0a0-0000-7000-8000-000000000384",
+        "span": [
+          0,
+          7
+        ]
+      }
+    },
+    {
+      "label": "cite snapshot",
+      "input": "⟨cite:snapshot:0199e0a0-0000-7000-8000-000000000384⟩",
+      "accept": true,
+      "parsed": {
+        "kind": "snapshot",
+        "id": "0199e0a0-0000-7000-8000-000000000384",
+        "span": null
+      }
+    },
+    {
+      "label": "ASCII dot instead of U+00B7",
+      "input": "⟨snap:0199e0a0-0000-7000-8000-000000000384.0.qty⟩",
+      "accept": false
+    },
+    {
+      "label": "negative row",
+      "input": "⟨snap:0199e0a0-0000-7000-8000-000000000384·-1·qty⟩",
+      "accept": false
+    },
+    {
+      "label": "unknown cite kind",
+      "input": "⟨cite:email:0199e0a0-0000-7000-8000-000000000384⟩",
+      "accept": false
+    },
+    {
+      "label": "row cite without a table",
+      "input": "⟨cite:row:0199e0a0-0000-7000-8000-000000000384⟩",
+      "accept": false
+    },
+    {
+      "label": "UUIDv4, not v7",
+      "input": "⟨snap:0199e0a0-0000-4000-8000-000000000384·0·qty⟩",
+      "accept": false
+    },
+    {
+      "label": "span without an end",
+      "input": "⟨cite:doc:0199e0a0-0000-7000-8000-000000000384·10-⟩",
+      "accept": false
+    }
+  ]
+}

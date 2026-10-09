@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-token-claims",
+  "title": "RunTokenClaims",
+  "x-munim-module": "shared",
+  "type": "object",
+  "properties": {
+    "iss": {
+      "type": "string",
+      "const": "munim-core"
+    },
+    "aud": {
+      "type": "string",
+      "const": "munim-intel"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "outlet_scope": {
+      "anyOf": [
+        {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        {
+          "minItems": 1,
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "const": "*"
+          }
+        }
+      ]
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "event",
+        "watch_sweep",
+        "ask",
+        "brief"
+      ]
+    },
+    "actor": {
+      "type": "string",
+      "pattern": "^(watcher:[a-z_]+|brief|[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$"
+    },
+    "iat": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "exp": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "iss",
+    "aud",
+    "run_id",
+    "tenant_id",
+    "outlet_scope",
+    "trigger",
+    "actor",
+    "iat",
+    "exp"
+  ],
+  "additionalProperties": false
+}

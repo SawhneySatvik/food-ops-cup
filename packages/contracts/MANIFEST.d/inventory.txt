@@ -1,0 +1,4 @@
+inventory.ingredient.upsert.v1
+inventory.reorder_level.set.v1
+inventory.stock.receive.v1
+proposal.inventory.reorder_level.set.v1

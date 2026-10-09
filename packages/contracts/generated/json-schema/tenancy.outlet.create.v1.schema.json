@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.outlet.create.v1",
+  "title": "TenancyOutletCreateV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "outlet_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "restaurant",
+        "cloud_kitchen",
+        "store"
+      ]
+    },
+    "tz": {
+      "type": "string",
+      "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+    },
+    "address": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "tax_ids": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      }
+    }
+  },
+  "required": [
+    "outlet_id",
+    "name",
+    "kind",
+    "tz",
+    "address",
+    "tax_ids"
+  ],
+  "additionalProperties": false
+}

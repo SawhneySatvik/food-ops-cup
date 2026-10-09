@@ -1,0 +1,6 @@
+drafts.approve.v1
+drafts.reject.v1
+v1.draft
+v1.drafts.response
+v1.draft.detail
+drafts.decision-error

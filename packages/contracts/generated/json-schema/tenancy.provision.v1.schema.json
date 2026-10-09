@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.provision.v1",
+  "title": "TenancyProvisionV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "is_demo": {
+      "type": "boolean"
+    },
+    "owner": {
+      "type": "object",
+      "properties": {
+        "member_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        }
+      },
+      "required": [
+        "member_id",
+        "name",
+        "email"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "tenant_id",
+    "name",
+    "country_code",
+    "is_demo",
+    "owner"
+  ],
+  "additionalProperties": false
+}

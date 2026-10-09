@@ -1,0 +1,70 @@
+// Refusal / abstention reason codes (03-architecture §1.7, 04-agent-framework §4, docs/plan/packs/*.md,
+// docs/plan/screens/00-README.md §4, R40). core-api composes the shown text from i18n by code
+// ("Cannot verify: …"); intel never writes reason text. Append-only: codes are never renamed or removed.
+import { z } from "zod";
+
+/** Envelope / validator abstentions (W1). */
+export const CORE_REASON_CODES = [
+  "number_grammar",
+  "unresolved_ref",
+  "cross_tenant_ref",
+  "quote_mismatch",
+  "missing_ref",
+  "settlements_missing",
+  "recipe_missing",
+  "stale_draft",
+  "authority_denied",
+] as const;
+
+/** Pack refusals: the evidence a pack needs is missing or a deal-review rule failed (D-1 pack specs). */
+export const PACK_REASON_CODES = [
+  "cost_price_missing",
+  "ticket_times_missing",
+  "count_missing",
+  "expiry_missing",
+  "budget_exceeded",
+  "budget_missing",
+  "margin_below_floor",
+  "moq_exceeds_need",
+  "open_commitment_overlap",
+  "payment_terms_worse",
+  "consent_record_missing",
+  "bank_lines_missing",
+  "attendance_missing",
+  "payroll_out_of_scope",
+  "no_marketing_consent",
+  "not_a_certificate",
+  "log_coverage_missing",
+  "signal_source_missing",
+  "insufficient_history",
+  "forecast_stale",
+] as const;
+
+/** Storefront refusals shown to a customer (T-032). */
+export const STOREFRONT_REASON_CODES = [
+  "window_full",
+  "outlet_paused",
+  "item_sold_out",
+  "deal_rejudged",
+  "coupon_invalid",
+  "coupon_cap_reached",
+  "coupon_min_spend",
+  "change_window_closed",
+] as const;
+
+/** Book-rule refusals from core commands (R40 C1, C7; period close; platform model kill switch). */
+export const COMMAND_REASON_CODES = ["price_above_mrp", "expired_batch", "period_closed", "model_blocked", "preview_total_changed"] as const;
+
+/** Country-pack rule refusals raised by core-domain's pack engine (W1 fix #56) and the recipe unit rule
+ *  (#50: a recipe or option-delta line's unit must equal the ingredient's base unit). */
+export const PACK_RULE_REASON_CODES = ["buyer_identity_required", "tax_id_missing", "unknown_tax_class", "unknown_channel", "unit_mismatch"] as const;
+
+export const REASON_CODES = [
+  ...CORE_REASON_CODES,
+  ...PACK_REASON_CODES,
+  ...STOREFRONT_REASON_CODES,
+  ...COMMAND_REASON_CODES,
+  ...PACK_RULE_REASON_CODES,
+] as const;
+export const ReasonCode = z.enum(REASON_CODES);
+export type ReasonCode = z.infer<typeof ReasonCode>;

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "proposal.inventory.reorder_level.set.v1",
+  "title": "ProposalInventoryReorderLevelSetV1",
+  "x-munim-module": "inventory",
+  "type": "object",
+  "properties": {
+    "outlet_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ingredient_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "min_qty_milli": {
+      "type": "string",
+      "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+    },
+    "par_qty_milli": {
+      "type": "string",
+      "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+    }
+  },
+  "required": [
+    "outlet_id",
+    "ingredient_id",
+    "min_qty_milli",
+    "par_qty_milli"
+  ],
+  "additionalProperties": false
+}

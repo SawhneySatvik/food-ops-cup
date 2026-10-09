@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal.watch-claim.request",
+  "title": "InternalWatchClaimRequest",
+  "x-munim-module": "internal",
+  "type": "object",
+  "properties": {
+    "pack": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    }
+  },
+  "required": [
+    "pack"
+  ],
+  "additionalProperties": false
+}

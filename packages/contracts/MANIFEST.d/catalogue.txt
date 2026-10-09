@@ -1,0 +1,4 @@
+catalogue.item.upsert.v1
+catalogue.recipe.version.create.v1
+catalogue.price.set.v1
+proposal.catalogue.price.set.v1

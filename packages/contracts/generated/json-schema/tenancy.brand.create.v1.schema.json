@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.brand.create.v1",
+  "title": "TenancyBrandCreateV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "brand_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "outlet_ids": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      }
+    }
+  },
+  "required": [
+    "brand_id",
+    "name",
+    "outlet_ids"
+  ],
+  "additionalProperties": false
+}
