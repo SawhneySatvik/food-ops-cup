@@ -1,0 +1,29 @@
+{
+  "name": "@munim/core-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "vitest run --reporter=verbose",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.4",
+    "@munim/config": "workspace:*",
+    "@munim/contracts": "workspace:*",
+    "@munim/core-domain": "workspace:*",
+    "hono": "4.13.13",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@munim/db": "workspace:*",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3"
+  }
+}
