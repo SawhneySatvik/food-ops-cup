@@ -1,0 +1,243 @@
+{
+  "_note": "Hand-written list of every core.derivation_rule row (W1 fix #55). db/tests/rules.test.ts asserts the database equals this file; core-domain's parity test may read it instead of parsing migration SQL. One entry per (rule_id, source_table); target_tables lists each seeded target. implemented_by = the ticket that owns the deterministic code.",
+  "rules": [
+    {
+      "rule_id": "inventory.consume_order",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status IN ('placed', 'accepted', 'preparing', 'ready', 'completed')",
+      "seeded_in": "0005",
+      "implemented_by": "T-003 (core-domain inventory/rules.ts)"
+    },
+    {
+      "rule_id": "inventory.consume_sku",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status IN ('placed', 'accepted', 'preparing', 'ready', 'completed')",
+      "seeded_in": "0005",
+      "implemented_by": "T-003 (core-domain inventory/rules.ts)"
+    },
+    {
+      "rule_id": "finance.post_order",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status = 'completed'",
+      "seeded_in": "0008",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_tender",
+      "source_table": "core.tender",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "true",
+      "seeded_in": "0008",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_grn",
+      "source_table": "core.goods_received",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "true",
+      "seeded_in": "0008",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_supplier_invoice",
+      "source_table": "core.supplier_invoice",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status = 'approved'",
+      "seeded_in": "0008",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_settlement",
+      "source_table": "core.settlement",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "seeded_in": "0008",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "purchasing.payable_from_invoice",
+      "source_table": "core.supplier_invoice",
+      "target_tables": [
+        "core.payable"
+      ],
+      "source_state": "s.status = 'approved'",
+      "seeded_in": "0008",
+      "implemented_by": "T-025"
+    },
+    {
+      "rule_id": "inventory.receive_grn",
+      "source_table": "core.goods_received",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "true",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "inventory.record_waste",
+      "source_table": "core.waste_log",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "true",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "inventory.transfer_out",
+      "source_table": "core.transfer",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status IN ('sent', 'received')",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "inventory.transfer_in",
+      "source_table": "core.transfer",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status = 'received'",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "inventory.supplier_return",
+      "source_table": "core.supplier_return",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "true",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "inventory.sale_return",
+      "source_table": "core.sale_return",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.restock",
+      "seeded_in": "0008",
+      "implemented_by": "T-024"
+    },
+    {
+      "rule_id": "customers.loyalty_earn",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.loyalty_entry"
+      ],
+      "source_state": "s.status = 'completed'",
+      "seeded_in": "0011",
+      "implemented_by": "T-028"
+    },
+    {
+      "rule_id": "customers.loyalty_reverse",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.loyalty_entry"
+      ],
+      "source_state": "s.status IN ('cancelled', 'rejected')",
+      "seeded_in": "0011",
+      "implemented_by": "T-028"
+    },
+    {
+      "rule_id": "finance.post_refund",
+      "source_table": "core.refund",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "true",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_expense",
+      "source_table": "core.expense",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "true",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_payroll",
+      "source_table": "core.payroll_draft",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status IN ('approved', 'paid_externally')",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "orders.reprice",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.order"
+      ],
+      "source_state": "s.status IN ('placed', 'accepted')",
+      "seeded_in": "0014",
+      "implemented_by": "T-022 / T-003 (pricing)"
+    },
+    {
+      "rule_id": "finance.reconcile_settlement",
+      "source_table": "core.settlement",
+      "target_tables": [
+        "core.reconciliation_break"
+      ],
+      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.reconcile_bank",
+      "source_table": "core.bank_line",
+      "target_tables": [
+        "core.reconciliation_break"
+      ],
+      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.reconcile_order",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.reconciliation_break"
+      ],
+      "source_state": "s.status = 'completed'",
+      "seeded_in": "0014",
+      "implemented_by": "T-026"
+    }
+  ]
+}
