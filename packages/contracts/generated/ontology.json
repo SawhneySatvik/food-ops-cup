@@ -17008,7 +17008,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "e6e381fe8296777736ee68913ecfcbad3f78b1ecb48e78ad603a8e9461706bbc",
+      "sha256": "e7edb562bdf42793585ceeb89c20ad15156e5c40115f204e66563d09ad2cdcfa",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -17033,6 +17033,7 @@
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "5468907c41975c1e5b923236f25d5150c6b3c035719c643b806def3ffe15acea",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
+        "packages/contracts/src/ai_policy/index.ts": "c500bc3c8a46b6bc4f170d8c84bc6faf1a3a92bf6ecc21f261623cafd538c4c3",
         "packages/contracts/src/approvals/index.ts": "86364e8ea930198acc9231f52fa40dc37360d13b0bbfe4523737a2624923accd",
         "packages/contracts/src/catalogue/index.ts": "801fd856288e0178c3f9bb37a0972c4dfb24f47fca61c85507fd655949a567d9",
         "packages/contracts/src/compliance/index.ts": "4e6db3e379d9df14cce7b7f03a3e9f0301d3ab0803bdd0b81a60e250e370aa0b",
@@ -17070,12 +17071,13 @@
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
         "packages/contracts/src/shared/primitives.ts": "97b9d196f7f5354c5924e12475ab6f2c7fa79b109e8ce3fb3ab961167bdf7de2",
-        "packages/contracts/src/shared/reason-codes.ts": "2ebe19f05c9719211ab040402d0f7a4c26cd7e4f026b7c7b9ba0b7f132b13a72",
+        "packages/contracts/src/shared/reason-codes.ts": "9c170c2917af90aa74f151309f835d641c9acf8a3f512fa907c845f977accda7",
         "packages/contracts/src/shared/refs.ts": "1ca3960ba3c317b909b6dfddf6c73ac16b4d7afd1acbccae8a8405c6ca1c006c",
         "packages/contracts/src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
         "packages/contracts/src/shared/run-token.ts": "e9fc4127e1b7ffdc0271908f3992903e4b6204e46e7432b99a134ce94297054f",
         "packages/contracts/src/shared/snapshot.ts": "3d3ca4eda9abae7a51208c8bcc4df616f99001f67499c8793e650a1dacde0e02",
         "packages/contracts/src/shared/trace.ts": "840307850bf41af292d4e4f8b8f76bb2f68d3d45f74ec3d02b012d855347ae61",
+        "packages/contracts/src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
         "packages/contracts/src/storefront/index.ts": "57240f351ecd3d3c8872b3f50a667b9a3784ef93e1a5aaf25604e9a0d14efb65",
         "packages/contracts/src/tenancy/index.ts": "c7a7cda4fcc11f3b3a1b194720b45fed3795bc8b52f67be9133f89d1f5819996"
       }

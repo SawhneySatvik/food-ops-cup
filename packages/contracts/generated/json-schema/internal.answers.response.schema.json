@@ -75,7 +75,10 @@
             "refund_first",
             "order_tendered",
             "cash_below_rounding",
-            "recently_rejected"
+            "recently_rejected",
+            "mode_above_ceiling",
+            "cap_above_platform_budget",
+            "platform_budget_missing"
           ]
         },
         {

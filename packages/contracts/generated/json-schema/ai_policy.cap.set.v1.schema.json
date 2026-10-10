@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai_policy.cap.set.v1",
+  "title": "AiPolicyCapSetV1",
+  "x-munim-module": "ai_policy",
+  "type": "object",
+  "properties": {
+    "monthly_cap_minor": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "monthly_cap_minor"
+  ],
+  "additionalProperties": false
+}

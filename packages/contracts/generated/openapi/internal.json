@@ -2116,6 +2116,134 @@
         ],
         "additionalProperties": false
       },
+      "AiPolicyCeilingSetV1": {
+        "title": "AiPolicyCeilingSetV1",
+        "x-munim-contract": "ai_policy.ceiling.set.v1",
+        "x-munim-module": "ai_policy",
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "manager",
+              "staff",
+              "advisor",
+              "judge"
+            ]
+          },
+          "mode_ceiling": {
+            "type": "string",
+            "enum": [
+              "step",
+              "plan",
+              "auto"
+            ]
+          }
+        },
+        "required": [
+          "role",
+          "mode_ceiling"
+        ],
+        "additionalProperties": false
+      },
+      "AiPolicyCapSetV1": {
+        "title": "AiPolicyCapSetV1",
+        "x-munim-contract": "ai_policy.cap.set.v1",
+        "x-munim-module": "ai_policy",
+        "type": "object",
+        "properties": {
+          "monthly_cap_minor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "monthly_cap_minor"
+        ],
+        "additionalProperties": false
+      },
+      "V1AiPolicy": {
+        "title": "V1AiPolicy",
+        "x-munim-contract": "v1.ai.policy",
+        "x-munim-module": "ai_policy",
+        "type": "object",
+        "properties": {
+          "ceilings": {
+            "minItems": 5,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "manager",
+                    "staff",
+                    "advisor",
+                    "judge"
+                  ]
+                },
+                "mode_ceiling": {
+                  "type": "string",
+                  "enum": [
+                    "step",
+                    "plan",
+                    "auto"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "set"
+                  ]
+                }
+              },
+              "required": [
+                "role",
+                "mode_ceiling",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cap": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "monthly_cap_minor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  }
+                },
+                "required": [
+                  "monthly_cap_minor",
+                  "currency"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ceilings",
+          "cap"
+        ],
+        "additionalProperties": false
+      },
       "DraftsApproveV1": {
         "title": "DraftsApproveV1",
         "x-munim-contract": "drafts.approve.v1",
@@ -24883,7 +25011,10 @@
           "refund_first",
           "order_tendered",
           "cash_below_rounding",
-          "recently_rejected"
+          "recently_rejected",
+          "mode_above_ceiling",
+          "cap_above_platform_budget",
+          "platform_budget_missing"
         ]
       },
       "AnswerEnvelope": {
@@ -25689,6 +25820,279 @@
         },
         "required": [
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "V1SpecialistsResponse": {
+        "title": "V1SpecialistsResponse",
+        "x-munim-contract": "v1.specialists.response",
+        "x-munim-module": "specialists",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "specialist",
+                    "manager",
+                    "service"
+                  ]
+                },
+                "name_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "desk_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z_]*$"
+                  }
+                },
+                "detectors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "templates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "draftables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "name_key",
+                "desk_key",
+                "aliases",
+                "detectors",
+                "templates",
+                "draftables"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1SpecialistDesk": {
+        "title": "V1SpecialistDesk",
+        "x-munim-contract": "v1.specialist.desk",
+        "x-munim-module": "specialists",
+        "type": "object",
+        "properties": {
+          "specialist": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "specialist",
+                  "manager",
+                  "service"
+                ]
+              },
+              "name_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "desk_key": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]*$"
+                }
+              },
+              "detectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                }
+              },
+              "templates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                }
+              },
+              "draftables": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "name_key",
+              "desk_key",
+              "aliases",
+              "detectors",
+              "templates",
+              "draftables"
+            ],
+            "additionalProperties": false
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1Finding"
+            }
+          },
+          "drafts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1Draft"
+            }
+          },
+          "track_record": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "snapshot_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "cells": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "proposed": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          "approved": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          "edited": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          "rejected": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          "stale": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          "abstained": {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          }
+                        },
+                        "required": [
+                          "proposed",
+                          "approved",
+                          "edited",
+                          "rejected",
+                          "stale",
+                          "abstained"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "snapshot_id",
+                  "cells"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "thread_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "last_activity_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "thread_id",
+                "last_activity_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "specialist",
+          "applicable",
+          "findings",
+          "drafts",
+          "track_record",
+          "threads"
         ],
         "additionalProperties": false
       },

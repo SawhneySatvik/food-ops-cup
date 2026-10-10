@@ -140,6 +140,46 @@ class OrderLineId(RootModel[str]):
     root: Annotated[str, Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')]
 
 
+class AiPolicyCeilingSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    role: Literal['owner', 'manager', 'staff', 'advisor', 'judge']
+    mode_ceiling: Literal['step', 'plan', 'auto']
+
+
+class AiPolicyCapSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    monthly_cap_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Ceiling(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    role: Literal['owner', 'manager', 'staff', 'advisor', 'judge']
+    mode_ceiling: Literal['step', 'plan', 'auto']
+    source: Literal['default', 'set']
+
+
+class Cap(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    monthly_cap_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class V1AiPolicy(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ceilings: Annotated[list[Ceiling], Field(max_length=5, min_length=5)]
+    cap: Cap | None
+
+
 class ValueBp(RootModel[str]):
     root: Annotated[
         str,
@@ -3854,10 +3894,10 @@ class RefId(RootModel[str]):
 
 
 class ReasonCode(
-    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected']]
+    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing']]
 ):
     root: Annotated[
-        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected'],
+        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing'],
         Field(title='ReasonCode'),
     ]
 
@@ -4050,6 +4090,87 @@ class Error(BaseModel):
     error: Annotated[ErrorBody, Field(title='ErrorBody')]
 
 
+class Item13(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: Literal['specialist', 'manager', 'service']
+    name_key: Annotated[str, Field(min_length=1)]
+    desk_key: DeskKey | None
+    aliases: list[Alias]
+    detectors: list[Detector]
+    templates: list[Template]
+    draftables: list[Draftable]
+
+
+class V1SpecialistsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[Item13]
+
+
+class Specialist1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: Literal['specialist', 'manager', 'service']
+    name_key: Annotated[str, Field(min_length=1)]
+    desk_key: DeskKey | None
+    aliases: list[Alias]
+    detectors: list[Detector]
+    templates: list[Template]
+    draftables: list[Draftable]
+
+
+class Cells(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    proposed: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    approved: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    edited: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    rejected: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    stale: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    abstained: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+
+
+class TrackRecord(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    snapshot_id: Uuid7
+    cells: Cells | None
+
+
+class Thread(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thread_id: Uuid7
+    last_activity_at: IsoDatetime
+
+
 class Email3(RootModel[str]):
     root: Annotated[str, Field(max_length=254, pattern='^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')]
 
@@ -4151,7 +4272,7 @@ class OptionGroup4(BaseModel):
     options: list[Option5]
 
 
-class Item13(BaseModel):
+class Item14(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -8943,6 +9064,18 @@ class TraceEvent(RootModel[TraceEvent1 | TraceEvent2]):
     root: Annotated[TraceEvent1 | TraceEvent2, Field(title='TraceEvent')]
 
 
+class V1SpecialistDesk(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    specialist: Specialist1
+    applicable: bool
+    findings: list[V1Finding]
+    drafts: list[V1Draft]
+    track_record: TrackRecord | None
+    threads: list[Thread]
+
+
 class StorefrontReschedulePreviewResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -8960,7 +9093,7 @@ class StorefrontMenuResponse(BaseModel):
     outlet_id: Uuid7
     channel_kind: Literal['counter', 'table_qr', 'pickup', 'own_site'] | ChannelKind
     accepting: StorefrontAcceptingResponse
-    items: list[Item13]
+    items: list[Item14]
     deals: list[Deal2]
     pay_at_counter: Literal[True]
 

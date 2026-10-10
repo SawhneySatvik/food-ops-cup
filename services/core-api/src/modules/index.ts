@@ -12,6 +12,7 @@ import type { AppEnv } from "../lib/types.ts";
 /** W1/W2 modules (03-arch §7), then the non-module routers that mount through here (T-006 stream, internal API). */
 export const MODULES = [
   "tenancy",
+  "specialists",
   "catalogue",
   "orders",
   "kitchen",

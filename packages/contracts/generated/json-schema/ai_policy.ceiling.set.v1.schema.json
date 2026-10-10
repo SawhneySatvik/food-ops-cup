@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ai_policy.ceiling.set.v1",
+  "title": "AiPolicyCeilingSetV1",
+  "x-munim-module": "ai_policy",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "manager",
+        "staff",
+        "advisor",
+        "judge"
+      ]
+    },
+    "mode_ceiling": {
+      "type": "string",
+      "enum": [
+        "step",
+        "plan",
+        "auto"
+      ]
+    }
+  },
+  "required": [
+    "role",
+    "mode_ceiling"
+  ],
+  "additionalProperties": false
+}
