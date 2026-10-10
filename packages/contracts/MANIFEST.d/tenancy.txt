@@ -4,3 +4,13 @@ tenancy.member.invite.v1
 tenancy.brand.create.v1
 tenancy.channel.create.v1
 tenancy.device.register.v1
+tenancy.onboard.v1
+tenancy.outlet.update.v1
+tenancy.tenant.update.v1
+tenancy.member.bind.v1
+demo.session.start.v1
+tenancy.storefront-key.create
+tenancy.storefront-key.created
+tenancy.storefront-key.list
+tenancy.storefront-key.revoked
+tenancy.me.tenants
