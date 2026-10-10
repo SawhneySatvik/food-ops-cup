@@ -8184,8 +8184,8 @@
     },
     "/v1/runs": {
       "get": {
-        "operationId": "getRunByFinding",
-        "summary": "The run that produced a finding (?finding=)",
+        "operationId": "listRuns",
+        "summary": "Runs in the caller's scope, newest first; ?finding= gives the run that produced it",
         "security": [
           {
             "memberToken": [],
@@ -8196,10 +8196,28 @@
           {
             "name": "finding",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
               "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
             }
           }
         ],
@@ -8209,7 +8227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/V1RunResponse"
+                  "$ref": "#/components/schemas/V1RunsResponse"
                 }
               }
             }
@@ -34508,6 +34526,31 @@
         ],
         "additionalProperties": false
       },
+      "V1RunsResponse": {
+        "title": "V1RunsResponse",
+        "x-munim-contract": "v1.runs.response",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1RunResponse"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "V1TracesResponse": {
         "title": "V1TracesResponse",
         "x-munim-contract": "v1.traces.response",
@@ -34540,6 +34583,92 @@
           "run_id",
           "events",
           "next_after_seq"
+        ],
+        "additionalProperties": false
+      },
+      "IntelSpecialistsRegistry": {
+        "title": "IntelSpecialistsRegistry",
+        "x-munim-contract": "intel.specialists.registry",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "specialists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "specialist",
+                    "manager",
+                    "service"
+                  ]
+                },
+                "name_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "desk_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z_]*$"
+                  }
+                },
+                "detectors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "templates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "draftables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "name_key",
+                "desk_key",
+                "aliases",
+                "detectors",
+                "templates",
+                "draftables"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "specialists"
         ],
         "additionalProperties": false
       },
@@ -34809,6 +34938,10 @@
         "properties": {
           "draft_id": {
             "$ref": "#/components/schemas/Uuid7"
+          },
+          "pack": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
           },
           "command_type": {
             "type": "string",
@@ -36331,6 +36464,7 @@
         },
         "required": [
           "draft_id",
+          "pack",
           "command_type",
           "payload",
           "outlet_ids",
@@ -44219,7 +44353,8 @@
           "guest_cannot_change",
           "refund_first",
           "order_tendered",
-          "cash_below_rounding"
+          "cash_below_rounding",
+          "recently_rejected"
         ]
       },
       "AnswerEnvelope": {
@@ -44259,7 +44394,14 @@
             "type": "boolean"
           },
           "reason_code": {
-            "$ref": "#/components/schemas/ReasonCode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -44317,7 +44459,14 @@
             "type": "boolean"
           },
           "reason_code": {
-            "$ref": "#/components/schemas/ReasonCode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -47261,7 +47410,7 @@
       "serviceCredential": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-Munim-Service-Credential",
+        "name": "x-munim-service-secret",
         "description": "Service-to-service credential of the intel service"
       },
       "tenantHeader": {

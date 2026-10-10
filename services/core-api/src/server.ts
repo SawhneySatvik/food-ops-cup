@@ -12,6 +12,7 @@ import { storefrontResolver } from "./auth/resolve.ts";
 import type { PublishDeps } from "./commit/index.ts";
 import { createHttpPublisher, createPersistentLocalIdp, devhostIdp } from "./dev-root.ts";
 import { setIdpMode } from "./health/index.ts";
+import { configureInternal } from "./internal/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
@@ -74,6 +75,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   });
   // createApp awaits loadContracts() → loadRegistry(), so every draftable type is registered before serving (gotcha 28).
   const app = await createApp(deps);
+  configureInternal(deps, { serviceSecret: w.serviceSecret, keys });
   return {
     app, deps, publish, svc, keys,
     async close() {

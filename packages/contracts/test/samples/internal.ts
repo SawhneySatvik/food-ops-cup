@@ -10,7 +10,7 @@ export const SAMPLES: Record<string, unknown> = {
   "internal.snapshots.request": { template_id: "inventory.below_reorder", params: { outlet_id: u(2), ingredient_ids: [u(40)], as_of: null } },
   "internal.findings.request": { pack: "inventory_purchasing", type: "inventory.below_reorder", severity: "high", confidence_bp: 9000, dedupe_key: `below_reorder:${u(40)}`, envelope: findingEnvelope },
   "internal.findings.response": { finding_id: u(80), outcome: "abstained", reason_code: "number_grammar" },
-  "internal.drafts.request": { draft_id: u(90), command_type: "purchasing.po.create.v1", payload: proposalPo, outlet_ids: [u(2)], finding_id: u(80), evidence: [`snap:${S1}`, `row:intel.supplier_quote:${u(70)}`], based_on: [snapRef(S1, 0, "on_hand_qty_milli")] },
+  "internal.drafts.request": { draft_id: u(90), pack: "inventory_purchasing", command_type: "purchasing.po.create.v1", payload: proposalPo, outlet_ids: [u(2)], finding_id: u(80), evidence: [`snap:${S1}`, `row:intel.supplier_quote:${u(70)}`], based_on: [snapRef(S1, 0, "on_hand_qty_milli")] },
   "internal.drafts.response": { draft_id: u(90), status: "proposed", reason_code: null },
   "internal.answers.request": { question: "Why is paneer short at Indiranagar?", envelope: { answer_id: u(130), segments: envelopeSegments, abstained: false } },
   "internal.answers.response": { answer_id: u(130), abstained: false, reason_code: null },

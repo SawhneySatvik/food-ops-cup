@@ -1093,8 +1093,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The run that produced a finding (?finding=) */
-        get: operations["getRunByFinding"];
+        /** Runs in the caller's scope, newest first; ?finding= gives the run that produced it */
+        get: operations["listRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5262,11 +5262,30 @@ export interface components {
             expires_at: components["schemas"]["IsoDatetime"];
             ended_at: components["schemas"]["IsoDatetime"] | null;
         };
+        /** V1RunsResponse */
+        V1RunsResponse: {
+            items: components["schemas"]["V1RunResponse"][];
+            next_cursor: string | null;
+        };
         /** V1TracesResponse */
         V1TracesResponse: {
             run_id: components["schemas"]["Uuid7"];
             events: components["schemas"]["TraceEvent"][];
             next_after_seq: number | null;
+        };
+        /** IntelSpecialistsRegistry */
+        IntelSpecialistsRegistry: {
+            specialists: {
+                id: string;
+                /** @enum {string} */
+                kind: "specialist" | "manager" | "service";
+                name_key: string;
+                desk_key: string | null;
+                aliases: string[];
+                detectors: string[];
+                templates: string[];
+                draftables: string[];
+            }[];
         };
         /** V1SnapshotsRequest */
         V1SnapshotsRequest: {
@@ -5321,6 +5340,7 @@ export interface components {
         /** InternalDraftsRequest */
         InternalDraftsRequest: {
             draft_id: components["schemas"]["Uuid7"];
+            pack: string;
             command_type: string;
             payload: {
                 coupon_id: string;
@@ -7024,7 +7044,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -7033,7 +7053,7 @@ export interface components {
                 refs: components["schemas"]["RefId"][];
             }[];
             abstained: boolean;
-            reason_code?: components["schemas"]["ReasonCode"];
+            reason_code?: components["schemas"]["ReasonCode"] | null;
         };
         /** FindingEnvelope */
         FindingEnvelope: {
@@ -7044,7 +7064,7 @@ export interface components {
             }[];
             impact_ref: string | null;
             abstained: boolean;
-            reason_code?: components["schemas"]["ReasonCode"];
+            reason_code?: components["schemas"]["ReasonCode"] | null;
         };
         /** PersonEdit */
         PersonEdit: {
@@ -13297,10 +13317,12 @@ export interface operations {
             };
         };
     };
-    getRunByFinding: {
+    listRuns: {
         parameters: {
-            query: {
-                finding: string;
+            query?: {
+                finding?: string;
+                cursor?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -13314,7 +13336,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["V1RunResponse"];
+                    "application/json": components["schemas"]["V1RunsResponse"];
                 };
             };
             /** @description Bad request */

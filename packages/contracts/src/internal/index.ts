@@ -43,6 +43,8 @@ export const FindingsResponse = z.strictObject({
 export const DraftsRequest = z
   .strictObject({
     draft_id: Uuid7,
+    /** The proposing specialist (F8): core stores `source = intel:<pack>`; a cited finding must be of this pack. */
+    pack: z.string().regex(/^[a-z][a-z0-9_]*$/),
     /** A registered draftable command type (shared/draftables.ts); anything else is refused. */
     command_type: CommandType,
     /** The registered proposal schema: numeric leaves are refs only (R26), no person-edit form. */
@@ -56,6 +58,9 @@ export const DraftsRequest = z
     based_on: z.array(SnapCellRef).min(1),
   })
   .superRefine(checkDraftPayload("proposal", "payload"));
+/** Core-side idempotency (ADR-014 §5.5): same id + same body → the original response; same id + another body →
+ *  409. An open draft with the same fingerprint → its id (`proposed`, no new row). A fingerprint a person rejected
+ *  within 30 days → `abstained` + `recently_rejected` (nothing stored). Other refusals → `abstained` + reason. */
 export const DraftsResponse = z.strictObject({ draft_id: Uuid7, status: z.enum(["proposed", "abstained"]), reason_code: ReasonCode.nullable() });
 
 export const AnswersRequest = z.strictObject({
@@ -104,4 +109,7 @@ export const ROUTES: readonly Route[] = [
   intel("drafts", "writeDraft", "Draft proposal; numeric payload fields must be refs", "internal.drafts.request", "internal.drafts.response", 201),
   intel("answers", "writeAnswer", "Validated answer envelope (or a stored abstention)", "internal.answers.request", "internal.answers.response", 201),
   intel("traces:batch", "writeTraces", "Append trace events (at most 500 per call)", "internal.traces-batch.request", "internal.traces-batch.response", 201),
+  // ADR-014 §14 C2 (filed under T-040b on the board; served by T-040 for T-041's live role lookup).
+  { surface: "internal", method: "get", path: `${P}/model-roles`, operationId: "getModelRoles", summary: "Provider + model per role (R36), read-only",
+    auth: "intel", response: "platform.model-roles", status: 200 },
 ];

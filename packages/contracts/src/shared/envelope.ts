@@ -15,10 +15,12 @@ export const Segment = z.strictObject({
 });
 export type Segment = z.infer<typeof Segment>;
 
-const abstainRule = (e: { abstained: boolean; reason_code?: ReasonCode | undefined }, ctx: z.RefinementCtx) => {
-  if (e.abstained && e.reason_code === undefined)
+// `reason_code` may be absent or null when not abstained: intel's generated Pydantic models serialise an unset
+// Optional as `null`, and a strict `.optional()` refused every such envelope with 422 (T-040, found against T-041's client).
+const abstainRule = (e: { abstained: boolean; reason_code?: ReasonCode | null | undefined }, ctx: z.RefinementCtx) => {
+  if (e.abstained && e.reason_code == null)
     ctx.addIssue({ code: "custom", path: ["reason_code"], message: "an abstained envelope names a reason_code" });
-  if (!e.abstained && e.reason_code !== undefined)
+  if (!e.abstained && e.reason_code != null)
     ctx.addIssue({ code: "custom", path: ["reason_code"], message: "reason_code only on an abstained envelope" });
 };
 
@@ -28,7 +30,7 @@ export const AnswerEnvelope = z
     answer_id: Uuid7,
     segments: z.array(Segment),
     abstained: z.boolean(),
-    reason_code: ReasonCode.optional(),
+    reason_code: ReasonCode.nullish(),
   })
   .superRefine(abstainRule);
 export type AnswerEnvelope = z.infer<typeof AnswerEnvelope>;
@@ -41,7 +43,7 @@ export const FindingEnvelope = z
     segments: z.array(Segment),
     impact_ref: SnapCellRef.nullable(),
     abstained: z.boolean(),
-    reason_code: ReasonCode.optional(),
+    reason_code: ReasonCode.nullish(),
   })
   .superRefine((e, ctx) => {
     abstainRule(e, ctx);

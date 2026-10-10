@@ -51,6 +51,9 @@ export const RunView = z.strictObject({
   ended_at: IsoDateTime.nullable(),
 });
 
+/** `GET /v1/runs` (back-office run picker, G-OFF-1); `?finding=` narrows it to the run that produced that finding. */
+export const RunsListResponse = z.strictObject({ items: z.array(RunView), next_cursor: z.string().nullable() });
+
 export const TracesResponse = z.strictObject({
   run_id: Uuid7,
   events: z.array(TraceEvent),
@@ -63,6 +66,7 @@ export const SCHEMAS = {
   "v1.findings.response": FindingsListResponse,
   "v1.inbox.response": InboxResponse,
   "v1.run.response": RunView,
+  "v1.runs.response": RunsListResponse,
   "v1.traces.response": TracesResponse,
   /** Same shape as the intel mint request; a distinct schema object so each registry name owns one. */
   "intel.specialists.registry": SpecialistRegistry,
@@ -90,6 +94,6 @@ export const ROUTES: readonly Route[] = [
   },
   read({ path: "/v1/snapshots/{id}", operationId: "getSnapshot", summary: "Open the rows behind a ref", response: "snapshot", pathParams: [{ name: "id", uuid: true }] }),
   read({ path: "/v1/runs/{id}", operationId: "getRun", summary: "A run by id", response: "v1.run.response", pathParams: [{ name: "id", uuid: true }] }),
-  read({ path: "/v1/runs", operationId: "getRunByFinding", summary: "The run that produced a finding (?finding=)", response: "v1.run.response", query: [{ name: "finding", required: true, schema: uuid }] }),
+  read({ path: "/v1/runs", operationId: "listRuns", summary: "Runs in the caller's scope, newest first; ?finding= gives the run that produced it", response: "v1.runs.response", query: [{ name: "finding", required: false, schema: uuid }, cursor, limit] }),
   read({ path: "/v1/traces/{run}", operationId: "getTrace", summary: "Trace events of a run, in seq order", response: "v1.traces.response", pathParams: [{ name: "run", uuid: true }], query: [{ name: "after_seq", required: false, schema: { type: "integer", minimum: 0 } }, limit] }),
 ];

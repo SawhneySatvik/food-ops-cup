@@ -604,6 +604,80 @@
           }
         }
       }
+    },
+    "/internal/intel/v1/model-roles": {
+      "get": {
+        "operationId": "getModelRoles",
+        "summary": "Provider + model per role (R36), read-only",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformModelRoles"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14981,6 +15055,31 @@
         ],
         "additionalProperties": false
       },
+      "V1RunsResponse": {
+        "title": "V1RunsResponse",
+        "x-munim-contract": "v1.runs.response",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1RunResponse"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "V1TracesResponse": {
         "title": "V1TracesResponse",
         "x-munim-contract": "v1.traces.response",
@@ -15013,6 +15112,92 @@
           "run_id",
           "events",
           "next_after_seq"
+        ],
+        "additionalProperties": false
+      },
+      "IntelSpecialistsRegistry": {
+        "title": "IntelSpecialistsRegistry",
+        "x-munim-contract": "intel.specialists.registry",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "specialists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "specialist",
+                    "manager",
+                    "service"
+                  ]
+                },
+                "name_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "desk_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z_]*$"
+                  }
+                },
+                "detectors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "templates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                },
+                "draftables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "name_key",
+                "desk_key",
+                "aliases",
+                "detectors",
+                "templates",
+                "draftables"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "specialists"
         ],
         "additionalProperties": false
       },
@@ -15282,6 +15467,10 @@
         "properties": {
           "draft_id": {
             "$ref": "#/components/schemas/Uuid7"
+          },
+          "pack": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
           },
           "command_type": {
             "type": "string",
@@ -16804,6 +16993,7 @@
         },
         "required": [
           "draft_id",
+          "pack",
           "command_type",
           "payload",
           "outlet_ids",
@@ -24692,7 +24882,8 @@
           "guest_cannot_change",
           "refund_first",
           "order_tendered",
-          "cash_below_rounding"
+          "cash_below_rounding",
+          "recently_rejected"
         ]
       },
       "AnswerEnvelope": {
@@ -24732,7 +24923,14 @@
             "type": "boolean"
           },
           "reason_code": {
-            "$ref": "#/components/schemas/ReasonCode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -24790,7 +24988,14 @@
             "type": "boolean"
           },
           "reason_code": {
-            "$ref": "#/components/schemas/ReasonCode"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -27734,7 +27939,7 @@
       "serviceCredential": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-Munim-Service-Credential",
+        "name": "x-munim-service-secret",
         "description": "Service-to-service credential of the intel service"
       },
       "tenantHeader": {

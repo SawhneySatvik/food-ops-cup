@@ -87,7 +87,8 @@
                 "guest_cannot_change",
                 "refund_first",
                 "order_tendered",
-                "cash_below_rounding"
+                "cash_below_rounding",
+                "recently_rejected"
               ]
             },
             {

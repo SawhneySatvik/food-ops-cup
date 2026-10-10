@@ -156,7 +156,7 @@ function openapi(surface: Surface | "all", schemas: Record<string, Json>): Json 
         memberToken: { type: "http", scheme: "bearer", description: "IdP ID token of a signed-in person (a tenant member; alone on identity routes)" },
         operatorToken: { type: "http", scheme: "bearer", description: "IdP ID token of a platform operator" },
         runToken: { type: "http", scheme: "bearer", bearerFormat: "JWT (EdDSA)", description: "Run token minted by core-api (Ed25519)" },
-        serviceCredential: { type: "apiKey", in: "header", name: "X-Munim-Service-Credential", description: "Service-to-service credential of the intel service" },
+        serviceCredential: { type: "apiKey", in: "header", name: "x-munim-service-secret", description: "Service-to-service credential of the intel service" },
         tenantHeader: { type: "apiKey", in: "header", name: TENANT_HEADER, description: "The tenant a member acts in (with memberToken)" },
         storefrontKey: { type: "apiKey", in: "header", name: STOREFRONT_KEY_HEADER, description: "Public storefront key; resolves the tenant and channel" },
         customerToken: { type: "http", scheme: "bearer", description: "IdP ID token of a customer (optional on storefront routes)" },

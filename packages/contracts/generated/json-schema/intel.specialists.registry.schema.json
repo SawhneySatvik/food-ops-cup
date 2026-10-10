@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "intel.specialists.registry",
+  "title": "IntelSpecialistsRegistry",
+  "x-munim-module": "intel",
+  "type": "object",
+  "properties": {
+    "specialists": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "specialist",
+              "manager",
+              "service"
+            ]
+          },
+          "name_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "desk_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z_]*$"
+            }
+          },
+          "detectors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+            }
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+            }
+          },
+          "draftables": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name_key",
+          "desk_key",
+          "aliases",
+          "detectors",
+          "templates",
+          "draftables"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "specialists"
+  ],
+  "additionalProperties": false
+}
