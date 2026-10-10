@@ -7180,7 +7180,7 @@ export interface components {
             /** ErrorBody */
             error: {
                 /** @enum {string} */
-                code: "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "book_write_refused" | "country_locked" | "currency_mismatch" | "illegal_transition" | "override_refused" | "decision_refused" | "customer_erased" | "command_table_mismatch" | "period_closed" | "books_unbalanced" | "loyalty_refused" | "claim_quote_mismatch" | "out_of_pack_scope" | "sequence_gap" | "idempotency_conflict" | "command_type_mismatch" | "invalid_payload" | "unregistered_command_type" | "cannot_verify" | "already_decided" | "stale_draft" | "chart_incomplete" | "execution_failed" | "unavailable" | "internal";
+                code: "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "book_write_refused" | "country_locked" | "currency_mismatch" | "illegal_transition" | "override_refused" | "decision_refused" | "customer_erased" | "command_table_mismatch" | "period_closed" | "books_unbalanced" | "loyalty_refused" | "claim_quote_mismatch" | "out_of_pack_scope" | "sequence_gap" | "investigation_refused" | "idempotency_conflict" | "command_type_mismatch" | "invalid_payload" | "unregistered_command_type" | "cannot_verify" | "already_decided" | "stale_draft" | "chart_incomplete" | "execution_failed" | "unavailable" | "internal";
                 message: string;
                 reason_code: components["schemas"]["ReasonCode"] | null;
             };

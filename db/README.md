@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (19 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (20 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -29,7 +29,8 @@ guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the 
 never re-stamped, re-approval re-opens the payable, the guest-token claim merges an emptied guest profile, coupon discount
 follows a re-price), 0018 history imports (R44 b, c: the `pos_bills` / `waste_log` kinds, what an approved import writes,
 `core.write_derived`), 0019 M-C1a (outlet RLS on the outlet-data tables, the advisor rung, `numeric_source` lists, the
-fourteen catalogue/finance templates) — gates see 18 applied.
+fourteen catalogue/finance templates), 0020 M-C23 (specialist threads, the AI policy books, investigations with modes, the
+standing grant behind Auto and the `auto_step` run trigger, three intel templates) — gates see 19 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -110,7 +111,8 @@ own-row rule (R41): with `app.role = 'customer'` only the row `id = app.customer
 | `MB011` | `loyalty_refused` | a loyalty entry that would take the balance below 0 (under the customer's row lock); a `reverse` entry that does not undo an entry of the same customer and order with the opposite sign and at most its points (0016) |
 | `MB012` | `claim_quote_mismatch` | `intel.claim.quote` ≠ the source chunk/message text at `[span_start, span_end)` |
 | `MB013` | `out_of_pack_scope` | a payroll draft where the pack's `payroll_scope` ≠ `drafts`; a licence kind not in the pack's `licence_kinds` |
-| `MB014` | `sequence_gap` | an `intel.trace_event` seq that is not the run's last seq + 1 |
+| `MB014` | `sequence_gap` | an `intel.trace_event` seq that is not the run's last seq + 1; since 0020 also a `core.ai_thread_turn.turn_no` / `core.investigation_step.step_no` that is not the next one |
+| `MB015` | `investigation_refused` | (0020) an investigation not created by the signed-in member; a plan approved twice or by someone else; a step whose trigger is not who it claims (member / plan / auto — below); a standing grant not the creator's own for the investigation's scope, or revoked twice / by someone else; an `auto_step` run without a live grant of its actor covering its scope |
 
 **Book guard.** A write to a `munim:book` table is admitted, in this order, by: (2) `app.decision_id` → an
 `approved`/`edited` decision whose draft is `executing` with `exec_txid = txid_current()`; (3)
@@ -238,7 +240,7 @@ second post (no `reverses_id`) is still 23505.
   `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
   write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
   'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
-- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0019` per item and requires `tests/w2fixcycle2.test.ts` to exit
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0021` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
   non-zero naming that item's tests (the plant is removed after each run).
 
 **History imports (0018, R44 b, c) — shapes other lanes code against.**
@@ -268,7 +270,7 @@ second post (no `reverses_id`) is still 23505.
   (409 `period_closed`, nothing written) when a month closed after the preview.
 - **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
   run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
-- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0020` per item (`0019` since 0019 landed) and requires
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0021` per item (renumbered as later files landed) and requires
   `tests/history.test.ts` to exit non-zero naming that item's tests. `redproof-0017.sh` likewise.
 
 **M-C1a (0019) — shapes other lanes code against.**
@@ -318,6 +320,71 @@ second post (no `reverses_id`) is still 23505.
   world + `tests/mc1a-fixture.ts`); `node db/tests/templates-worlds.ts` (columns and bridge balance on the worldgen
   `restaurant_group` and `store` worlds through core-api, plus answer-key checks); `db/tests/redproof-0019.sh` (its red-proofs).
   `tests/template-spec.ts` parses the expected ids, params and columns from the pack docs and ADR-014 §7.3.
+
+**M-C23 (0020) — shapes other lanes code against.** All seven tables lead with `tenant_id`, carry forced RLS and the
+restrictive `customer_scope` / `guest_scope` (deny) policies; `intel_ro` cannot write them.
+- **Threads (F9, operational).** `core.ai_thread (tenant_id, id, specialist NULL | one of the 8 F8 ids, created_by → member,
+  outlet_scope text[] (intel.run's form: '{*}' or uuids), summary jsonb, created_at, updated_at)`. `core.ai_thread_turn
+  (tenant_id, thread_id, turn_no, id (unique), member_id, answer_id → intel.answer (unique) NULL, addressed_to NULL | F8 id,
+  tainted, created_at)`. Turns are **insert-once** (no UPDATE grant: write the turn after the answer is stored, with its
+  `tainted`), gapless per thread: insert `turn_no` NULL → the next number (concurrent asks land consecutively under a
+  per-thread lock); a supplied number must be the next (MB014). `summary` = ≤ 8 objects, each with an integer `turn_no` ≥ 1
+  (other keys free, e.g. `refs`); every cited turn must exist in the thread, be answered and untainted (23514
+  `thread_summary_refused`) — B1. munim_core: INSERT, UPDATE (summary); munim_svc: SELECT (run-frame).
+- **AI policy (F10, F11 O-2; books).** `core.ai_policy (tenant_id, id, role ∈ owner|manager|staff|advisor|judge, mode_ceiling ∈
+  step|plan|auto, …, origin)`, one per role; `core.ai_budget_cap (tenant_id, id, monthly_cap_minor ≥ 0, currency = tenant base
+  (MB003), …, origin)`, one per tenant. Written only by the owner's own commands `ai_policy.ceiling.set.v1` → `core.ai_policy`,
+  `ai_policy.cap.set.v1` → `core.ai_budget_cap` (allowed_roles owner only — judge, manager, staff → MB001; scope tenant →
+  '{*}'); munim_svc SELECT only. UPDATE: `mode_ceiling` / `monthly_cap_minor`. No rows are backfilled (code defaults); the
+  "cap ≤ operator limit" refusal is core's (422 `cap_above_platform_budget`).
+- **Investigations (ADR-014 §7.2, F10; operational).** `core.investigation (tenant_id, id, playbook_id, params jsonb, outlet_scope
+  text[], created_by, mode ∈ step|plan|auto (default step), status ∈ open|waiting|done|no_driver_found|cannot_verify|cancelled|
+  exhausted, checklist jsonb [], steps_done, max_steps 1–10 (default 10), plan_approved_by NULL, plan_approved_at NULL,
+  stop_reason NULL | draft|abstain|budget|scope|waiting, created_at, updated_at)`. `created_by` = the signed-in member (MB015);
+  `plan_approved_by` is set once, to the signed-in member, and stamps `plan_approved_at := now()` (MB015); `mode = 'auto'`
+  needs `plan_approved_by` (23514); a terminal status never changes (MB004). munim_core: INSERT, UPDATE (status, checklist,
+  steps_done, stop_reason, mode, plan_approved_by, plan_approved_at, updated_at); munim_svc: UPDATE exactly (status, checklist,
+  steps_done, stop_reason, updated_at) — never mode, scope or creator.
+  `core.investigation_step (tenant_id, investigation_id, step_no, member_id, triggered_by ∈ member|plan|auto, grant_id (set iff
+  auto), run_id NULL, started_at, item_updates jsonb [], summary_answer_id NULL, tainted)`: gapless (MB014; NULL → next), only
+  while the investigation is open/waiting and `step_no ≤ max_steps` (MB004). Who (MB015): `member` — munim_core,
+  `member_id` = app.member_id; `plan` — munim_core, `member_id` = app.member_id = `plan_approved_by`, mode plan|auto; `auto` —
+  **munim_svc** (core-worker), mode auto, `grant_id` = this investigation's live grant given by `member_id`, whose member and
+  membership are active and whose current membership covers the grant's scope. `run_id` / `summary_answer_id` are set once
+  and `tainted` never returns to false (MB004); an auto step's run must be an `auto_step` run of the same grant, any other
+  step's run must not be one (MB015). munim_core and munim_svc: INSERT, UPDATE (run_id, summary_answer_id, tainted).
+- **The standing grant (F11 O-1; operational).** `core.investigation_grant (tenant_id, id, investigation_id, member_id,
+  outlet_scope, created_at, revoked_at NULL, revoked_by NULL)`: inserted by the investigation's creator in their own request
+  (`member_id` = app.member_id = `created_by`), `outlet_scope` = the investigation's, covered by their membership now (MB015);
+  at most one live grant per investigation (23505); revoked once by the signed-in member (`revoked_at := now()`, MB015
+  otherwise). munim_core: INSERT, UPDATE (revoked_at, revoked_by); munim_svc: SELECT. Membership coverage follows core-domain
+  `outletScopeOf`: an empty membership list is every outlet for owner/advisor/judge and none for anyone else; a narrowed or
+  removed membership refuses (it does not intersect). Revoking stops Auto (no auto step or run passes); moving the
+  investigation out of `auto` or cancelling it is core's.
+- **`intel.run`.** `trigger` admits `auto_step` (core-worker's run token for an Auto step) and `grant_id` (set iff
+  `auto_step`, FK → the grant); `actor` = the grantor's member id. An `auto_step` insert needs the grant live, actor = grantor,
+  the investigation in mode auto and open/waiting, the grantor's membership as above, and the run's scope inside the grant's
+  (MB015). Mint auto_step runs from a service context holding '{*}' (the checks read the grant, investigation and membership
+  under the caller's RLS; a narrower context fails closed).
+- **RLS.** `ai_thread`, `investigation`, `investigation_grant`: intel.run's `tenant_run_scope` form on `outlet_scope` (viewer
+  scope ⊇ row scope — review M7; a '{*}' row only to an all-outlet owner/advisor/judge or a service context); turns and steps:
+  `tenant_via_parent` (USING and WITH CHECK through the parent); the two books: tenant-only.
+- **`intel_ro.investigation_current`** `(id, playbook_id, params, mode, status, stop_reason, checklist, updated_at)` — no
+  numeric column; owner munim_view_owner; rows visible as `core.investigation`'s policy allows the token's scope.
+- **Templates** (min_role manager):
+  `intel.agent_track_record(specialist | null)` → `specialist, proposed, approved, edited, rejected, stale, abstained` per F8
+  id with ≥ 1 count (proposed = drafts with `source = 'intel:<id>'`, any status; approved/edited/rejected = their decisions;
+  stale = drafts `stale`; abstained = `intel.trace_event` kind `abstain` with actor `specialist:<id>`).
+  `intel.ai_budget_left(month)` → `month, currency, owner_cap_minor, operator_limit_minor, effective_cap_minor = least(limit,
+  cap), spent_minor, left_minor = effective − spent` (the operator budget's currency; the owner cap applies only in that
+  currency; 0 rows without an operator budget for the month).
+  `intel.investigation_cost_estimate(investigation_id)` → `currency, per_step_minor = round(Σ spend of runs linked to steps of
+  same-playbook investigations ÷ those steps) (half away from zero), steps_in_history, remaining_items (not frozen),
+  estimate_minor = per_step × remaining, label = 'estimate (computed)'`; 0 rows without history.
+  `INTEL_NUMERIC_ALLOW` gains `count:intel.trace_event` and `platform.llm_budget.limit_minor` (by hand).
+- **Gates:** `tests/mc23.test.ts`; the manifest (+7 tables, +2 books, +1 svc INSERT table, +1 view, +3 templates);
+  `tests/redproof-0020.sh` (each gate red with a non-zero exit). `tests/gates.ts` intel-cannot-write now requires the refusal
+  to name the table (or its schema) — a write past the table privilege that fails inside a trigger no longer counts.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

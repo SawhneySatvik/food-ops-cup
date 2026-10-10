@@ -36,6 +36,11 @@ export interface World {
   messageBody: string;
   chunk: string;
   finding: string;
+  /** 0020: the owner's finance thread (1 unanswered turn) and a finished ('done') Auto investigation with a live
+   *  standing grant and 1 member step; ai_policy owner = auto; ai_budget_cap = 500000 (= the world's operator limit). */
+  thread: string;
+  investigation: string;
+  grant: string;
 }
 
 /** UUIDv7 (02-schema §0; contracts UUID7_PATTERN pins version 7): 48-bit ms timestamp, version, variant, random. */
@@ -104,6 +109,7 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     outlets: [u(), u(), u()], devices: [u(), u()], orders: [u(), u()], orderLines: [u(), u()],
     batches: [u(), u()], ingredient: u(), item: u(), drafts: [u(), u()], run: u(), snapshot: u(), supplier: u(), customer: u(),
     accounts: { cash: u(), sales: u() }, channel: u(), person: u(), message: u(), messageBody, chunk: u(), finding: u(),
+    thread: u(), investigation: u(), grant: u(),
   };
   const T = w.tenant;
 
@@ -394,6 +400,26 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await cmd("market.viability_case.upsert.v1");
     await q(`INSERT INTO core.viability_case (tenant_id, id, name, outlet_kind, comparable_outlet_id, rent_minor, capex_minor, avg_ticket_minor, expected_daily_orders, currency)
              VALUES ($1, $2, 'Second site', 'restaurant', $3, 15000000, 300000000, 45000, 120, $4)`, [T, u(), w.outlets[0], currency]);
+    // 0020 (M-C23): the AI policy books (the owner's own commands), a thread, and an Auto investigation under a grant.
+    // Skipped on a database migrated to an earlier file (the 0016 backfill test builds its world on 0001–0015).
+    if (!(await q("SELECT to_regclass('core.investigation') IS NOT NULL AS ok")).rows[0].ok) return;
+    await cmd("ai_policy.ceiling.set.v1");
+    await q(`INSERT INTO core.ai_policy (tenant_id, id, role, mode_ceiling) VALUES ($1, $2, 'owner', 'auto')`, [T, u()]);
+    // Cap = the operator limit set in step 5 (500000), so the effective cap (the lower of the two) is what it was without a cap.
+    await cmd("ai_policy.cap.set.v1");
+    await q(`INSERT INTO core.ai_budget_cap (tenant_id, id, monthly_cap_minor, currency) VALUES ($1, $2, 500000, $3)`, [T, u(), currency]);
+    await q(`INSERT INTO core.ai_thread (tenant_id, id, specialist, created_by, outlet_scope) VALUES ($1, $2, 'finance', $3, '{*}')`, [T, w.thread, w.owner]);
+    await q(`INSERT INTO core.ai_thread_turn (tenant_id, thread_id, turn_no, id, member_id, addressed_to) VALUES ($1, $2, NULL, $3, $4, 'finance')`,
+      [T, w.thread, u(), w.owner]);
+    await q(`INSERT INTO core.investigation (tenant_id, id, playbook_id, params, outlet_scope, created_by, mode, checklist, plan_approved_by)
+             VALUES ($1, $2, 'margin_fall', '{"period_month": "2026-09-01", "compare_month": "2026-08-01"}', '{*}', $3, 'auto',
+                     '[{"item_id": "h0", "status": "pending", "frozen": false, "snapshot_ids": []}]', $3)`, [T, w.investigation, w.owner]);
+    await q(`INSERT INTO core.investigation_grant (tenant_id, id, investigation_id, member_id, outlet_scope) VALUES ($1, $2, $3, $4, '{*}')`,
+      [T, w.grant, w.investigation, w.owner]);
+    await q(`INSERT INTO core.investigation_step (tenant_id, investigation_id, step_no, member_id, triggered_by) VALUES ($1, $2, 1, $3, 'member')`,
+      [T, w.investigation, w.owner]);
+    // Finished, so lanes counting open (Auto) investigations start from 0; its rows stay for the isolation gate.
+    await q(`UPDATE core.investigation SET status = 'done', steps_done = 1 WHERE tenant_id = $1 AND id = $2`, [T, w.investigation]);
   });
 
   // 3. The service role writes the operational rows intel's internal routes produce.

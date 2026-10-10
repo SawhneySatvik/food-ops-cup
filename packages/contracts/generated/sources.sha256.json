@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "bf4f0447b8c171303fd5f8aae73344d5e762127fed00e55fb1c07c02b9e4219b",
+    "sha256": "de76c793b6a724dc192868acba0ed1ef0fd101d3ad07b6d7394066924ff56230",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "7ef211308a14666fb9e14238d265da0c390d5f3a9d346eb76b888959119f9c8c",
@@ -41,7 +41,7 @@
       "src/shared/draft.ts": "d6a23f16c1742663b19e5f0be395c821243adbcb4921d1cdca66bb3bed950a0c",
       "src/shared/draftables.ts": "4bcaa87ccae30b15f7d37ce3c274072456eea44cf25754ad9afb99d0a4bb142c",
       "src/shared/envelope.ts": "db708215a9403304ec5ef72f63726a3913e8dc367a325a792e28cce980a2e6f8",
-      "src/shared/error.ts": "301fb7da15c9ad82bf7b2dfc08b103f85410e5a940638d73329c039a75d1b755",
+      "src/shared/error.ts": "43f77505beb12ce0d24ca5ed0411de141cafa2b3a02ef86730c36d1464f5d8da",
       "src/shared/grammar/index.ts": "2014cd49d302d5736f9a56a6951d1c5c6e40c43d9a79425a4c0964e4c24e1137",
       "src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
       "src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
@@ -57,7 +57,7 @@
     }
   },
   "outputs": {
-    "sha256": "f57b3af38ff54db857a361f776f38b640b376ac4d27d75a6462f7a25d6abbb6b",
+    "sha256": "ec7922ade1ef26da0a1a148dc15a0409ad3e588fc416ca475f8afc8c9fa5fca9",
     "files": {
       "packages/contracts/generated/json-schema/answer-envelope.schema.json": "6b2be76f5143a03b0b45946a957eb073409415914abfbc8931e6e8b19b5920b2",
       "packages/contracts/generated/json-schema/catalogue.availability.set.v1.schema.json": "57ffc2bb35cd2f831177981991b9c6de63c88d4342762d873e29a56003399faa",
@@ -102,7 +102,7 @@
       "packages/contracts/generated/json-schema/drafts.approve.v1.schema.json": "365cb963250a1739f79d81cff47991178ea12d098fd7adadf63d7e7a31c9c4c9",
       "packages/contracts/generated/json-schema/drafts.decision-error.schema.json": "5fe4db96801dcbdfe3b71b9d81cfb13aff98fd99bb3e0108e5910d9c05995833",
       "packages/contracts/generated/json-schema/drafts.reject.v1.schema.json": "89cba13da167d3aa84de75ef94cbd0e49d94733370a26187d34c1c567d568f3a",
-      "packages/contracts/generated/json-schema/error.schema.json": "aff645d6c81f1bd8f1d584f1fa8c49b5286e4e0bf00fb550fce268556dafbfbb",
+      "packages/contracts/generated/json-schema/error.schema.json": "a6b48db36215fb3fbbd4216aa6c1a31cfb5b848f4379b15e68a00a4fb223fbdd",
       "packages/contracts/generated/json-schema/finance.channel_terms.set.v1.schema.json": "10557a63740f19b9c0fc469521a610435634b41cc66d1c71784ff397244f9728",
       "packages/contracts/generated/json-schema/finance.dispute.draft.v1.schema.json": "665a04f55fe1b6facbb85f91daf93104de2354483767f0c241e7cbab90e26a13",
       "packages/contracts/generated/json-schema/finance.expense.record.v1.schema.json": "f41db9a0a412fd5dd225fac795533fde871d07dfca324265d00bc669080aa30c",
@@ -343,12 +343,12 @@
       "packages/contracts/generated/json-schema/v1.tenant.schema.json": "1d04bb7506cdcb0eb5066be95c6dfcef91f53322fe6b4e78dbec08ab0331296e",
       "packages/contracts/generated/json-schema/v1.tender.schema.json": "e638960dcc8b99b0645fb6ae2136135c8544b851fd75aef79ebd810496ac198a",
       "packages/contracts/generated/json-schema/v1.traces.response.schema.json": "234ed83a1502585553263cea4387318a8e5e7f038659e33617c54947468df8ef",
-      "packages/contracts/generated/openapi/internal.json": "b1b6f6755da5798b04e20723e13ae5ba7414fddd345c26df8f054bc5a090d544",
-      "packages/contracts/generated/openapi/public.json": "4226b0b6a3b35c4f0a5ce3bfe6e44a8b9cdb151a2cb39c3bf2b6caa49bf08cb9",
+      "packages/contracts/generated/openapi/internal.json": "6ca326a564db3025162eea75cafa9c4a1e00606f51410e398a9b2b110c01f7b5",
+      "packages/contracts/generated/openapi/public.json": "da45f3f2571d9382e0b0384dad69377e955a3e97ba43138454fdd07c5328e0c5",
       "packages/sdk/src/gen/client.ts": "8b5bbb402371d741277f201b2f546626ef0e5e5bed29806df46de7f0c14ab3e9",
-      "packages/sdk/src/gen/openapi.ts": "7f7f1cb2f88ad3b678091e17e07303e431a1298bed3b8c58f2061e5ed9aec7f4",
+      "packages/sdk/src/gen/openapi.ts": "b12caa4213abe02322e510b0ad0f5f54159e8fc2c166df2857dd24a857a98dae",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "4fab3551b06d41fbbd8f952871e14a93fb762561b700f095bfd06fff8f158e1c",
+      "services/intel/munim_intel/contracts_gen/models.py": "f7b773b711672b1be74751329d3fee2542919d474faf69d47fc7c68c4edd7b88",
       "services/intel/munim_intel/contracts_gen/names.py": "45a5bb3b4062349b9382f38e82f9d096842d8df6800eccffbaee973e34530455"
     }
   }

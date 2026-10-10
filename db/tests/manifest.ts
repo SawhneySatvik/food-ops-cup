@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0019 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0020 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -22,6 +22,7 @@ export const MIGRATIONS = [
   "0017_w2_fix_cycle_2",
   "0018_history_imports",
   "0019_mc1a_templates_outlet_rls",
+  "0020_mc23_threads_policy_investigations",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -200,6 +201,14 @@ export const TABLES: Record<string, T> = {
   // 0014
   "core.book_scope": global,
   "core.book_status_transition": global,
+  // 0020 (M-C23): threads (F9), AI policy books (F10, F11 O-2), investigations (ADR-014 §7.2, F10), the standing grant (F11 O-1)
+  "core.ai_thread": op(), // intel.run's scope form on outlet_scope, tested separately
+  "core.ai_thread_turn": op(), // through its thread
+  "core.ai_policy": book(),
+  "core.ai_budget_cap": book(),
+  "core.investigation": op(), // intel.run's scope form on outlet_scope
+  "core.investigation_step": op(), // through its investigation
+  "core.investigation_grant": op(), // intel.run's scope form on outlet_scope
 };
 
 export const OUR_SCHEMAS = ["core", "evidence", "intel", "platform", "intel_ro", "munim_meta"];
@@ -212,7 +221,12 @@ export const TENANT_TABLES = names.filter((n) => TABLES[n]!.tenant);
 export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
 
 /** Hand counts, so a mistake in the object above also shows up as a count mismatch. */
-export const EXPECTED_COUNTS = { all: 147, core: 118, book: 92, tenant: 133, outlet: 54 };
+/** fk: foreign-key constraints in core/evidence/intel/platform, counted from the migration TEXT (never the catalog or
+ *  ontology.json): REFERENCES clauses per file 0002 2, 0003 26, 0004 59, 0005 59, 0007 2, 0008 49, 0009 24, 0010 25, 0011 15,
+ *  0012 80, 0014 1, 0015 3, 0016 1 (= 346 through 0019), minus 1 dropped by 0014 (expired_sale_override → order_line, re-added
+ *  as its 1) = 345; 0020 adds 20 (ai_thread 2, ai_thread_turn 3, ai_policy 1, ai_budget_cap 1, investigation 3,
+ *  investigation_grant 4, investigation_step 5, intel.run.grant_id 1) = 365. */
+export const EXPECTED_COUNTS = { all: 154, core: 125, book: 94, tenant: 140, outlet: 54, fk: 365 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -231,8 +245,8 @@ export const PACK_SCOPED_TABLES: Record<string, string[]> = { AU: ["core.payroll
 /** EXACTLY the tables munim_svc may INSERT into (03-architecture §1.3; M-B adds documents/imports and the
  *  intel tables written by core-api's internal routes, R25). */
 export const SVC_INSERT_TABLES = [
-  "core.document", "core.draft", "core.import_quarantine", "core.import_run", "core.import_staging", "core.outbox",
-  "evidence.snapshot",
+  "core.document", "core.draft", "core.import_quarantine", "core.import_run", "core.import_staging", "core.investigation_step",
+  "core.outbox", "evidence.snapshot",
   "intel.alias", "intel.answer", "intel.chunk", "intel.claim", "intel.edge", "intel.entity", "intel.event_claim",
   "intel.finding", "intel.forecast_point", "intel.forecast_run", "intel.intel_spend", "intel.outcome", "intel.run",
   "intel.supplier_quote", "intel.trace_event", "intel.watch_state", "intel.wiki_page", "intel.wiki_version",
@@ -241,10 +255,12 @@ export const SVC_INSERT_TABLES = [
 /** intel_ro views (02-schema §5), owned by munim_view_owner; finding_recent's exact column list. */
 export const INTEL_RO_VIEWS = [
   "intel_ro.chunk_search", "intel_ro.claim_search", "intel_ro.entity_alias", "intel_ro.finding_recent",
-  "intel_ro.ingredient_names", "intel_ro.item_names", "intel_ro.outlet_names", "intel_ro.supplier_names",
+  "intel_ro.ingredient_names", "intel_ro.investigation_current", "intel_ro.item_names", "intel_ro.outlet_names", "intel_ro.supplier_names",
   "intel_ro.trace_recent", "intel_ro.wiki_current",
 ];
 export const FINDING_RECENT_COLUMNS = ["id", "pack", "type", "severity", "status", "dedupe_key"];
+/** 0020: investigation_current exposes ids, text and jsonb only (no steps_done / max_steps). */
+export const INVESTIGATION_CURRENT_COLUMNS = ["id", "playbook_id", "params", "mode", "status", "stop_reason", "checklist", "updated_at"];
 
 /** The legal order transitions, written out by hand from 02-schema §2.4. */
 export const ORDER_STATUSES = ["placed", "accepted", "rejected", "preparing", "ready", "completed", "cancelled"];
@@ -274,6 +290,7 @@ export const TEMPLATES = [
   "catalogue.sku_price_check",
   "finance.close_status", "finance.gst_check", "finance.margin_bridge", "finance.missing_payouts", "finance.pnl",
   "finance.settlement_vs_orders", "finance.tender_vs_bank", "finance.unapproved_deductions",
+  "intel.agent_track_record", "intel.ai_budget_left", "intel.investigation_cost_estimate",
   "inventory.below_reorder", "platform.spend_by_tenant",
 ];
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
@@ -291,6 +308,14 @@ export const OUTLET_NULLABLE = [
   "core.journal_entry", "core.licence", "core.market_signal", "core.period_close", "core.reconciliation_break", "core.settlement",
   "core.task", "core.tax_return_draft",
 ];
+/** 0020: tables carrying intel.run's scope policy (tenant_run_scope) on their `outlet_scope` text[] (review M7: visible
+ *  when the caller's scope covers the row's; a '{*}' row only to an all-outlet owner/advisor/judge or a service context). */
+export const RUN_SCOPED = ["core.ai_thread", "core.investigation", "core.investigation_grant", "intel.run"];
+/** 0020: children of RUN_SCOPED parents, visible (and inserted) exactly when their parent is (policy tenant_via_parent). */
+export const RUN_SCOPED_CHILDREN: Record<string, { parent: string; fk: string }> = {
+  "core.ai_thread_turn": { parent: "core.ai_thread", fk: "thread_id" },
+  "core.investigation_step": { parent: "core.investigation", fk: "investigation_id" },
+};
 /** Allowed intel numeric sources, column-level (R40 C5): deterministic forecast points, simulated quote
  *  terms, spend, and ROW COUNTS of intel.answer / intel.outcome. Never finding.confidence_bp or any other
  *  intel-supplied value. Widened by hand in M-B (forecast intervals, quote terms used by D-1 templates). */
@@ -306,4 +331,8 @@ export const INTEL_NUMERIC_ALLOW = [
   "intel.intel_spend.amount_minor",
   "count:intel.answer",
   "count:intel.outcome",
+  // 0020, widened by hand: specialist abstains (intel.agent_track_record, R40 C5 names trace_event abstain counts) and the
+  // operator's monthly AI limit (intel.ai_budget_left, F11 O-2: a platform ledger row, not an intel value).
+  "count:intel.trace_event",
+  "platform.llm_budget.limit_minor",
 ];

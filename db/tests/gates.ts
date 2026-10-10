@@ -115,10 +115,13 @@ export async function intelWriteRefusals(db: TestDb, tables: string[]): Promise<
       DELETE: `DELETE FROM ${ident(t)}`,
       TRUNCATE: `TRUNCATE ${ident(t)}`,
     };
+    // The refusal must name this table (or its schema): a write that got past the table privilege and then hit a
+    // permission error inside a trigger (0020: core.ai_thread's summary trigger reads core.ai_thread_turn) is not one.
+    const own = new RegExp(`^permission denied for (table ${t.split(".")[1]}|schema ${t.split(".")[0]})$`);
     for (const [op, sql] of Object.entries(stmts)) {
       attempts++;
       const e = await attempt(db, "munim_intel_ro", {}, sql);
-      if (!e || e.code !== "42501" || !/^permission denied for/.test(e.message)) {
+      if (!e || e.code !== "42501" || !own.test(e.message)) {
         failures.push(`${t} ${op}: ${e ? `${e.code} ${e.message}` : "succeeded"}`);
       }
     }

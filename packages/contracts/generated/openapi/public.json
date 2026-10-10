@@ -45119,6 +45119,7 @@
                   "claim_quote_mismatch",
                   "out_of_pack_scope",
                   "sequence_gap",
+                  "investigation_refused",
                   "idempotency_conflict",
                   "command_type_mismatch",
                   "invalid_payload",

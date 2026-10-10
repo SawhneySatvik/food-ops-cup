@@ -25,6 +25,7 @@ const MESSAGES: Record<ErrorCode, string> = {
   claim_quote_mismatch: "The quoted text does not match its source.",
   out_of_pack_scope: "This is not available in your country pack.",
   sequence_gap: "Out of sequence; retry.",
+  investigation_refused: "This investigation step is not allowed any more — check its mode, grant and your outlet access.",
   // Commit helper (T-005)
   idempotency_conflict: "This request key was already used for a different request.",
   command_type_mismatch: "This command does not belong to this route.",
@@ -97,6 +98,7 @@ const STATUS: Record<ErrorCode, ContentfulStatusCode> = {
   claim_quote_mismatch: 422,
   out_of_pack_scope: 422,
   sequence_gap: 409,
+  investigation_refused: 409,
   idempotency_conflict: 409,
   command_type_mismatch: 422,
   invalid_payload: 422,
@@ -152,9 +154,10 @@ const SQLSTATES: Record<string, { code: ErrorCode; reason_code: ReasonCode | nul
   MB012: { code: "claim_quote_mismatch", reason_code: "quote_mismatch" },
   MB013: { code: "out_of_pack_scope", reason_code: null },
   MB014: { code: "sequence_gap", reason_code: null },
+  MB015: { code: "investigation_refused", reason_code: null },
 };
 
-/** The ApiError for a Munim SQLSTATE (MB001–MB014), or null for anything else. */
+/** The ApiError for a Munim SQLSTATE (MB001–MB015), or null for anything else. */
 export function fromSqlState(err: unknown): ApiError | null {
   const state = (err as { code?: unknown } | null)?.code;
   const hit = typeof state === "string" ? SQLSTATES[state] : undefined;

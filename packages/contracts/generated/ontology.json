@@ -123,6 +123,203 @@
       ]
     },
     {
+      "name": "core.ai_budget_cap",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "monthly_cap_minor",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "currency",
+          "type": "character(3)",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.ai_policy",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "mode_ceiling",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.ai_thread",
+      "tag": "operational",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "specialist",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_scope",
+          "type": "text[]",
+          "not_null": true
+        },
+        {
+          "name": "summary",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.ai_thread_turn",
+      "tag": "operational",
+      "tenant": true,
+      "primary_key": "{tenant_id,thread_id,turn_no}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "thread_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "turn_no",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "member_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "answer_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "addressed_to",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "tainted",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
       "name": "core.amc",
       "tag": "book",
       "tenant": true,
@@ -2829,6 +3026,205 @@
         {
           "name": "origin",
           "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.investigation",
+      "tag": "operational",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "playbook_id",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "params",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "outlet_scope",
+          "type": "text[]",
+          "not_null": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "checklist",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "steps_done",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "max_steps",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "plan_approved_by",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "plan_approved_at",
+          "type": "timestamp with time zone",
+          "not_null": false
+        },
+        {
+          "name": "stop_reason",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.investigation_grant",
+      "tag": "operational",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "investigation_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "member_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_scope",
+          "type": "text[]",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "not_null": false
+        },
+        {
+          "name": "revoked_by",
+          "type": "uuid",
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "core.investigation_step",
+      "tag": "operational",
+      "tenant": true,
+      "primary_key": "{tenant_id,investigation_id,step_no}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "investigation_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "step_no",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "member_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "triggered_by",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "grant_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "item_updates",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "summary_answer_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "tainted",
+          "type": "boolean",
           "not_null": true
         }
       ]
@@ -8672,6 +9068,11 @@
           "name": "ended_at",
           "type": "timestamp with time zone",
           "not_null": false
+        },
+        {
+          "name": "grant_id",
+          "type": "uuid",
+          "not_null": false
         }
       ]
     },
@@ -9336,6 +9737,55 @@
         "from": "core.advance",
         "to": "core.staff",
         "from_cols": "{tenant_id,staff_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "ai_budget_cap_tenant_id_fkey",
+        "from": "core.ai_budget_cap",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "ai_policy_tenant_id_fkey",
+        "from": "core.ai_policy",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "ai_thread_tenant_id_created_by_fkey",
+        "from": "core.ai_thread",
+        "to": "core.member",
+        "from_cols": "{tenant_id,created_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "ai_thread_tenant_id_fkey",
+        "from": "core.ai_thread",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "ai_thread_turn_tenant_id_answer_id_fkey",
+        "from": "core.ai_thread_turn",
+        "to": "intel.answer",
+        "from_cols": "{tenant_id,answer_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "ai_thread_turn_tenant_id_member_id_fkey",
+        "from": "core.ai_thread_turn",
+        "to": "core.member",
+        "from_cols": "{tenant_id,member_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "ai_thread_turn_tenant_id_thread_id_fkey",
+        "from": "core.ai_thread_turn",
+        "to": "core.ai_thread",
+        "from_cols": "{tenant_id,thread_id}",
         "to_cols": "{tenant_id,id}"
       },
       {
@@ -10016,6 +10466,90 @@
         "to": "core.tenant",
         "from_cols": "{tenant_id}",
         "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "investigation_tenant_id_created_by_fkey",
+        "from": "core.investigation",
+        "to": "core.member",
+        "from_cols": "{tenant_id,created_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_tenant_id_fkey",
+        "from": "core.investigation",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "investigation_tenant_id_plan_approved_by_fkey",
+        "from": "core.investigation",
+        "to": "core.member",
+        "from_cols": "{tenant_id,plan_approved_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_grant_tenant_id_fkey",
+        "from": "core.investigation_grant",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "investigation_grant_tenant_id_investigation_id_fkey",
+        "from": "core.investigation_grant",
+        "to": "core.investigation",
+        "from_cols": "{tenant_id,investigation_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_grant_tenant_id_member_id_fkey",
+        "from": "core.investigation_grant",
+        "to": "core.member",
+        "from_cols": "{tenant_id,member_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_grant_tenant_id_revoked_by_fkey",
+        "from": "core.investigation_grant",
+        "to": "core.member",
+        "from_cols": "{tenant_id,revoked_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_step_tenant_id_grant_id_fkey",
+        "from": "core.investigation_step",
+        "to": "core.investigation_grant",
+        "from_cols": "{tenant_id,grant_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_step_tenant_id_investigation_id_fkey",
+        "from": "core.investigation_step",
+        "to": "core.investigation",
+        "from_cols": "{tenant_id,investigation_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_step_tenant_id_member_id_fkey",
+        "from": "core.investigation_step",
+        "to": "core.member",
+        "from_cols": "{tenant_id,member_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_step_tenant_id_run_id_fkey",
+        "from": "core.investigation_step",
+        "to": "intel.run",
+        "from_cols": "{tenant_id,run_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "investigation_step_tenant_id_summary_answer_id_fkey",
+        "from": "core.investigation_step",
+        "to": "intel.answer",
+        "from_cols": "{tenant_id,summary_answer_id}",
+        "to_cols": "{tenant_id,id}"
       },
       {
         "name": "invoice_counter_tenant_id_device_id_fkey",
@@ -11612,6 +12146,13 @@
         "to": "core.tenant",
         "from_cols": "{tenant_id}",
         "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "run_grant_fk",
+        "from": "intel.run",
+        "to": "core.investigation_grant",
+        "from_cols": "{tenant_id,grant_id}",
+        "to_cols": "{tenant_id,id}"
       },
       {
         "name": "run_tenant_id_fkey",
@@ -13425,6 +13966,276 @@
           "path": "/channel_id",
           "kind": "entity",
           "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "intel.agent_track_record",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_intel_agent_track_record",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "specialist"
+        ],
+        "properties": {
+          "specialist": {
+            "anyOf": [
+              {
+                "enum": [
+                  "catalogue",
+                  "kitchen",
+                  "inventory_purchasing",
+                  "finance",
+                  "people",
+                  "customers",
+                  "compliance",
+                  "market"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "specialist",
+          "type": "text"
+        },
+        {
+          "name": "proposed",
+          "type": "integer",
+          "numeric_source": "count:core.draft"
+        },
+        {
+          "name": "approved",
+          "type": "integer",
+          "numeric_source": "count:core.decision"
+        },
+        {
+          "name": "edited",
+          "type": "integer",
+          "numeric_source": "count:core.decision"
+        },
+        {
+          "name": "rejected",
+          "type": "integer",
+          "numeric_source": "count:core.decision"
+        },
+        {
+          "name": "stale",
+          "type": "integer",
+          "numeric_source": "count:core.draft"
+        },
+        {
+          "name": "abstained",
+          "type": "integer",
+          "numeric_source": "count:intel.trace_event"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "specialist": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "catalogue",
+              "kitchen",
+              "inventory_purchasing",
+              "finance",
+              "people",
+              "customers",
+              "compliance",
+              "market",
+              null
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "specialist",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "intel.ai_budget_left",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_intel_ai_budget_left",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "month"
+        ],
+        "properties": {
+          "month": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "month",
+          "type": "date"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "owner_cap_minor",
+          "type": "integer",
+          "numeric_source": "core.ai_budget_cap.monthly_cap_minor"
+        },
+        {
+          "name": "operator_limit_minor",
+          "type": "integer",
+          "numeric_source": "platform.llm_budget.limit_minor"
+        },
+        {
+          "name": "effective_cap_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.ai_budget_cap.monthly_cap_minor",
+            "platform.llm_budget.limit_minor"
+          ]
+        },
+        {
+          "name": "spent_minor",
+          "type": "integer",
+          "numeric_source": "intel.intel_spend.amount_minor"
+        },
+        {
+          "name": "left_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.ai_budget_cap.monthly_cap_minor",
+            "platform.llm_budget.limit_minor",
+            "intel.intel_spend.amount_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "month",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "intel.investigation_cost_estimate",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_intel_investigation_cost_estimate",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "investigation_id"
+        ],
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "currency",
+          "type": "text"
+        },
+        {
+          "name": "per_step_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.intel_spend.amount_minor",
+            "count:core.investigation_step"
+          ]
+        },
+        {
+          "name": "steps_in_history",
+          "type": "integer",
+          "numeric_source": "count:core.investigation_step"
+        },
+        {
+          "name": "remaining_items",
+          "type": "integer",
+          "numeric_source": "core.investigation.checklist"
+        },
+        {
+          "name": "estimate_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.intel_spend.amount_minor",
+            "count:core.investigation_step",
+            "core.investigation.checklist"
+          ]
+        },
+        {
+          "name": "label",
+          "type": "text"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "investigation_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/investigation_id",
+          "kind": "entity",
+          "nullable": false
         }
       ],
       "optional": []
@@ -16261,7 +17072,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "966a35d9eae97f76090094529a9ef396bbd2911fc5fbd894f3966135a69c32a2",
+      "sha256": "d00de29cdd5f172de7acd222fbee114d5594ca0ffe3fefea17314c74389b3c38",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -16282,6 +17093,7 @@
         "db/migrations/0017_w2_fix_cycle_2.sql": "50c988c2fcd28807de3395dfa7dd753a7cf874534984c26272cb8f21414a826d",
         "db/migrations/0018_history_imports.sql": "04f03b23adc78a92e5ccf9e7252d6a81564a32c7d62731b6bcf51d4e9c220bce",
         "db/migrations/0019_mc1a_templates_outlet_rls.sql": "c16ae27b28b62f651474ab3c1cd2c969fde95034b138c536a3c40fa57db088c0",
+        "db/migrations/0020_mc23_threads_policy_investigations.sql": "de3a04ef4f9c95630d6a88afeb6bd01eff374ca4f147354befa76a20934f98ae",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "661de2ffe10c228d12219775f8b5b3e565c7d3b2cd3bd58d854f655a22495699",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -16317,7 +17129,7 @@
         "packages/contracts/src/shared/draft.ts": "d6a23f16c1742663b19e5f0be395c821243adbcb4921d1cdca66bb3bed950a0c",
         "packages/contracts/src/shared/draftables.ts": "4bcaa87ccae30b15f7d37ce3c274072456eea44cf25754ad9afb99d0a4bb142c",
         "packages/contracts/src/shared/envelope.ts": "db708215a9403304ec5ef72f63726a3913e8dc367a325a792e28cce980a2e6f8",
-        "packages/contracts/src/shared/error.ts": "301fb7da15c9ad82bf7b2dfc08b103f85410e5a940638d73329c039a75d1b755",
+        "packages/contracts/src/shared/error.ts": "43f77505beb12ce0d24ca5ed0411de141cafa2b3a02ef86730c36d1464f5d8da",
         "packages/contracts/src/shared/grammar/index.ts": "2014cd49d302d5736f9a56a6951d1c5c6e40c43d9a79425a4c0964e4c24e1137",
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
@@ -16332,6 +17144,6 @@
         "packages/contracts/src/tenancy/index.ts": "c7a7cda4fcc11f3b3a1b194720b45fed3795bc8b52f67be9133f89d1f5819996"
       }
     },
-    "body_sha256": "0407fd40cc03c263cfc4fd7430f189ed89d828c638b64bd86a2e599b74563592"
+    "body_sha256": "aec84043a9d4bfc8e12eb7c41136fe6e17038f2eddff37ec6ef8a73f92869b6b"
   }
 }

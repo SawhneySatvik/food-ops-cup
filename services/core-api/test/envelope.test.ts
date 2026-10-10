@@ -22,7 +22,7 @@ describe("error envelope", () => {
   it("every MB SQLSTATE in db/README.md maps to a distinct error code", () => {
     const readme = readFileSync(join(import.meta.dirname, "../../../db/README.md"), "utf8");
     const states = [...readme.matchAll(/^\| `(MB\d{3})` \| `([a-z_]+)` \|/gm)].map((m) => m[1]!);
-    expect(states.length).toBe(14);
+    expect(states.length).toBe(15);
     const codes = states.map((code) => fromSqlState({ code }));
     for (const [i, e] of codes.entries()) expect([states[i], e instanceof ApiError]).toEqual([states[i], true]);
     expect(new Set(codes.map((e) => e!.code)).size).toBe(states.length);

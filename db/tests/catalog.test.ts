@@ -1,5 +1,5 @@
 // Gates on stored catalog state (never trust IF NOT EXISTS — assert what Postgres actually holds):
-//  - every policy predicate reads back as one of the forms written in 0003–0019, with qual = with-check (0019's
+//  - every policy predicate reads back as one of the forms written in 0003–0020, with qual = with-check (0019's
 //    book children: with-check = the tenant form), FOR ALL, PERMISSIVE, TO PUBLIC; the form per table matches the
 //    manifest; platform.llm_budget's two policies are exactly as written;
 //  - no foreign key cascades (a cascade would be a book write that bypasses the guard).
@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { TestDb } from "../src/harness.ts";
 import { openDb } from "./db.ts";
 import {
-  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, OUTLET_NULLABLE, OUTLET_TABLES, PARENT_SCOPED, TENANT_TABLES,
+  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, OUTLET_NULLABLE, OUTLET_TABLES, PARENT_SCOPED,
+  RUN_SCOPED, RUN_SCOPED_CHILDREN, TENANT_TABLES,
 } from "./manifest.ts";
 
 let db: TestDb;
@@ -45,6 +46,8 @@ END)`,
   maintenance_via_asset: viaAsset("maintenance"),
   // 0019 O2: children read through their parent (WITH CHECK: the tenant form, message excepted — CHECK_VIA_PARENT).
   ...Object.fromEntries(Object.entries(PARENT_SCOPED).map(([t, { parent, fk }]) => [`${t.slice(5)}_via_parent`, viaParent(t, parent, fk)])),
+  // 0020: turns and steps through their thread / investigation (which carry run_scope).
+  ...Object.fromEntries(Object.entries(RUN_SCOPED_CHILDREN).map(([t, { parent, fk }]) => [`${t.slice(5)}_via_parent`, viaParent(t, parent, fk)])),
 };
 function viaAsset(t: string): string {
   return `(${TENANT} AND (EXISTS ( SELECT 1
@@ -59,7 +62,7 @@ function viaParent(t: string, parent: string, fk: string): string {
 }
 // 0015 A3's five, and since 0019 every outlet-scoped table whose outlet_id is nullable.
 const OUTLET_OR_WIDE = ["core.asset", ...OUTLET_NULLABLE];
-const CHECK_VIA_PARENT = ["core.message"];
+const CHECK_VIA_PARENT = ["core.message", ...Object.keys(RUN_SCOPED_CHILDREN)];
 
 // F4 (0014): the RESTRICTIVE customer_scope policy, (qual, with check) per class.
 const NC = `(( SELECT current_setting('app.role'::text, true) AS current_setting) IS DISTINCT FROM 'customer'::text)`;
@@ -110,7 +113,8 @@ function expectedForm(t: string): string {
   if (t === "core.transfer") return "transfer_either_end";
   if (t === "core.customer") return "customer_own";
   if (t === "core.loyalty_entry") return "customer_own_rows";
-  if (t === "intel.run") return "run_scope";
+  if (RUN_SCOPED.includes(t)) return "run_scope";
+  if (t in RUN_SCOPED_CHILDREN) return `${t.slice(5)}_via_parent`;
   if (t === "intel.trace_event") return "trace_via_run";
   if (OUTLET_OR_WIDE.includes(t)) return "outlet_or_wide";
   if (t === "core.amc" || t === "core.maintenance") return `${t.slice(5)}_via_asset`;

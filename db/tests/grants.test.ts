@@ -60,20 +60,20 @@ const appliedNames = async (x: TestDb) =>
   (await x.admin("SELECT name FROM munim_meta.schema_migrations ORDER BY version")).rows.map((r) => r.name as string);
 
 describe("migrations", () => {
-  test("migration count = 18 applied, names and order match the manifest, 0013_embeddings skipped loudly", async () => {
+  test("migration count = 19 applied, names and order match the manifest, 0013_embeddings skipped loudly", async () => {
     const names = await appliedNames(db);
     console.log(`migrations: ${names.length} applied — ${names.join(", ")}; skipped ${JSON.stringify(db.migration.skipped)}`);
     expect(names).toEqual([...MIGRATIONS]);
-    expect(names.length).toBe(18);
+    expect(names.length).toBe(19);
     expect(db.migration.skipped).toEqual(SKIPPED_HERE);
   });
 
-  test("RED-PROOF: a planted 0020 applied to a clone → count/names no longer match the manifest", async () => {
+  test("RED-PROOF: a planted 0021 applied to a clone → count/names no longer match the manifest", async () => {
     await withClone(async (x) => {
       const dir = mkdtempSync(join(tmpdir(), "munim-count-"));
       try {
         cpSync(MIGRATIONS_DIR, dir, { recursive: true });
-        writeFileSync(join(dir, "0020_planted.sql"), "CREATE TABLE intel.planted (id int);\n");
+        writeFileSync(join(dir, "0021_planted.sql"), "CREATE TABLE intel.planted (id int);\n");
         const c = await x.connect("admin");
         try {
           await migrate(c, { dir, log: () => {} });
@@ -83,7 +83,7 @@ describe("migrations", () => {
         const names = await appliedNames(x);
         console.log(`RED-PROOF migration count: ${names.length} applied, last ${names.at(-1)}`);
         expect(names).not.toEqual([...MIGRATIONS]);
-        expect(names.length).toBe(19);
+        expect(names.length).toBe(20);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
