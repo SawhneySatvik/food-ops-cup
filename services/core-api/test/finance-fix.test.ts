@@ -2,6 +2,7 @@
 //   R2-S1-4 points redeemed: finance.post_loyalty_redemption (0016) moves their value out of 1110; it nets to 0 with the tenders;
 //   R2-S1-6 invoice vs GRN: GRNI clears for what was received, the variance and non-goods lines are cost;
 //   R2-S3-2 partial refunds reverse exactly the order's tax; R2-S2-10 an aggregator refund is a channel deduction;
+//   R2 P4 a refund of a sale never posted (paid, refunded, then cancelled) leaves sales and tax alone;
 //   R2-S2-9 short payout expects the ORDER's tax where the operator collects it;
 //   R2-S3-5 an invoice / payout dated in a closed month posts on the first open day, labelled (an expense still refuses).
 // Synthetic data only.
@@ -140,6 +141,17 @@ describe("R2-S3-2 and R2-S2-10: refunds", () => {
     for (const r of rs) tax.push((await net([r]))["2100"]);
     expect(tax).toEqual([17, 16, 17]);
     expect((await net([o, ...rs]))["2100"] ?? 0).toBe(0);
+  });
+
+  it("R2 P4: paid 21,000 cash, refunded before it completed (no sale posted): the refund debits 1110 back against cash; sales and tax untouched, 1110 nets to 0", async () => {
+    const o = uuidv7();
+    await inCmd(fx, "orders.place.v1", (c) =>
+      c.query(`INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot)
+               VALUES ($1, $2, $3, $4, 'takeaway', 'placed', 20000, 1000, 21000, 'INR', '{}')`, [fx.tenant, o, fx.outlets[0], fx.counter]));
+    const t = await tender(db, fx, { order: o, outlet: fx.outlets[0], method: "cash", amount: 21000 });
+    const r = await refund(db, fx, { order: o, outlet: fx.outlets[0], method: "cash", amount: 21000 });
+    expect(await net([r])).toEqual({ "1000": -21000, "1110": 21000 });
+    expect(await net([o, t, r])).toEqual({ "1000": 0, "1110": 0 });
   });
 
   it("an aggregator order's refund (IN Sec 9(5)) debits sales and credits the channel receivable — no cash or bank", async () => {

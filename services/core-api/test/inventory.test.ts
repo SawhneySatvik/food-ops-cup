@@ -57,7 +57,7 @@ const onHand = (outlet: string, ingredient: string) =>
   num(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE tenant_id = $1 AND outlet_id = $2 AND ingredient_id = $3`, [T.tenant, outlet, ingredient]);
 const batchLeft = (batch: string) => num(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE tenant_id = $1 AND batch_id = $2`, [T.tenant, batch]);
 
-type PlaceLine = { item: string; qty: number; options?: string[]; line_id?: string };
+type PlaceLine = { item: string; qty: number; options?: string[]; line_id?: string; recipe?: string };
 /** Stand-in for T-022's orders.place.v1: inserts the order and lines, then calls THE SEAMS in the same transaction
  *  (consumeExpiredOverrides, deriveOrderConsumption) and returns their events. */
 async function place(lines: PlaceLine[], o: { outlet?: string; status?: string; derive?: boolean } = {}): Promise<{ order: string; result: ConsumptionResult | null }> {
@@ -71,8 +71,9 @@ async function place(lines: PlaceLine[], o: { outlet?: string; status?: string; 
         `INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot)
          VALUES ($1, $2, $3, $4, 'takeaway', $5, 1000, 0, 1000, $6, '{}')`, [T.tenant, order, outlet, T.channel, o.status ?? "placed", T.currency]);
       for (const [i, l] of lines.entries()) {
-        await c.query(`INSERT INTO core.order_line (tenant_id, id, outlet_id, order_id, line_no, item_id, options, qty_milli, unit_price_minor) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1000)`,
-          [T.tenant, l.line_id ?? u(), outlet, order, i + 1, l.item, JSON.stringify(l.options ?? []), l.qty]);
+        await c.query(`INSERT INTO core.order_line (tenant_id, id, outlet_id, order_id, line_no, item_id, options, qty_milli, unit_price_minor, recipe_version_id)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1000, $9)`,
+          [T.tenant, l.line_id ?? u(), outlet, order, i + 1, l.item, JSON.stringify(l.options ?? []), l.qty, l.recipe ?? null]);
       }
       if (o.derive !== false) {
         await consumeExpiredOverrides(c, order);
@@ -327,6 +328,28 @@ describe("expired-sale override — IN pack flag expired_sale_override = false (
       expect((await r.json()).error.code).toBe("out_of_pack_scope");
     }
     expect(await num(`SELECT count(*) AS n FROM core.expired_sale_override WHERE tenant_id = $1`, [T.tenant])).toBe(before);
+  });
+});
+
+describe("R2-S3-3: consumption follows the recipe version stamped at placement", () => {
+  it("v1 (100 g lentils) stamped at placement, then v2 (300 g) takes over from the order's business date: 2 portions consume 200 g, not 600 g", async () => {
+    const lentils = u(), dal = u(), v1 = u(), v2 = u();
+    expect((await call("POST", "/v1/inventory/ingredients", "owner", env("inventory.ingredient.upsert.v1", { ingredient_id: lentils, name: "Lentils (synthetic)", base_unit: "g", shelf_life_days: null, tracked_by_batch: false }))).status).toBe(200);
+    await db.withContext("munim_core", own("catalogue.item.upsert.v1"), (c) =>
+      c.query(`INSERT INTO core.item (tenant_id, id, kind, name_key, category) VALUES ($1, $2, 'dish', 'menu.dal_stamp', 'mains')`, [T.tenant, dal]));
+    const version = (id: string, n: number, from: string, grams: number) => db.withContext("munim_core", own("catalogue.recipe.version.create.v1"), async (c) => {
+      await c.query(`INSERT INTO core.recipe_version (tenant_id, id, item_id, version, valid_from, yield_qty_milli) VALUES ($1, $2, $3, $4, $5, 1000)`, [T.tenant, id, dal, n, from]);
+      await c.query(`INSERT INTO core.recipe_line (tenant_id, id, recipe_version_id, ingredient_id, qty_milli, unit) VALUES ($1, $2, $3, $4, $5, 'g')`, [T.tenant, u(), id, lentils, grams * 1000]);
+    });
+    await version(v1, 1, "2026-01-01", 100);
+    const { order } = await place([{ item: dal, qty: 2000, recipe: v1 }], { derive: false });
+    const bd = (await one<{ d: string }>(`SELECT business_date::text AS d FROM core."order" WHERE id = $1`, [order])).d;
+    // v2 takes over from the order's own business date (W2-R1: v1 closes at v2's start), so v1 is no longer "in force" then.
+    await db.withContext("munim_core", own("catalogue.recipe.version.create.v1"), (c) => c.query(`UPDATE core.recipe_version SET valid_to = $2 WHERE id = $1`, [v1, bd]));
+    await version(v2, 2, bd, 300);
+    const r = await db.withContext("munim_core", own("orders.place.v1"), (c) => deriveOrderConsumption(c, order));
+    expect(r.recipe_lines).toEqual([{ line_no: 1, recipe_version_id: v1 }]);
+    expect(await num(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE tenant_id = $1 AND ref_id = $2 AND ingredient_id = $3`, [T.tenant, order, lentils])).toBe(-200_000);
   });
 });
 

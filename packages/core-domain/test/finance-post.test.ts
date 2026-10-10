@@ -55,6 +55,17 @@ describe("posting goldens (hand-computed)", () => {
     expect(parts.flat().filter((l) => l.role === "output_tax").reduce((a, l) => a + l.amount_minor, 0)).toBe(50);
   });
 
+  it("finance.post_refund of a sale never posted (paid → refunded → cancelled): 1110 back against the till, sales and tax untouched (R2 P4)", () => {
+    // 21,000 cash taken (Dr 1000 / Cr 1110), refunded in full before completion.
+    const t = postTender({ aggregator: false, method: "cash", amount_minor: 21000, rounding_minor: 0 })!;
+    const r = postRefund({ operator_collects: false, method: "cash", amount_minor: 21000, order_total_minor: 21000, order_tax_minor: 1000, sale_posted: false })!;
+    expect(r).toEqual(L(["counter_receivable", 21000], ["cash", -21000]));
+    const sum = (role: string) => [...t, ...r].filter((l) => l.role === role).reduce((a, l) => a + l.amount_minor, 0);
+    expect([sum("counter_receivable"), sum("cash"), sum("sales"), sum("output_tax")]).toEqual([0, 0, 0, 0]);
+    // An aggregator order never posted: nothing to undo (no entry).
+    expect(postRefund({ aggregator: true, operator_collects: true, method: "upi", amount_minor: 1000, order_total_minor: 1050, order_tax_minor: 50, sale_posted: false })).toBeNull();
+  });
+
   it("finance.post_refund of an aggregator order is a deduction from the channel, never our till (R2-S2-10)", () => {
     // AU merchant-collects: 11,000 with 1,000 GST refunded 5,500 → sales 5,000, GST 500, against the channel receivable.
     expect(postRefund({ aggregator: true, operator_collects: false, method: "card", amount_minor: 5500, order_total_minor: 11000, order_tax_minor: 1000 }))
@@ -218,7 +229,7 @@ export function generateDocs(n: number, seed = SEED): Array<{ kind: string; line
         const total = int(1, 2_000_000);
         const prior = pick([0, int(0, total - 1)]);
         out.push({ kind, lines: postRefund({ aggregator: tr.aggregator, operator_collects: tr.operator_collects, method: pick(["cash", "card", "upi"] as const), amount_minor: int(1, total - prior),
-          order_total_minor: total, order_tax_minor: int(0, Math.floor(total / 5)), prior_refunded_minor: prior }), moves: true });
+          order_total_minor: total, order_tax_minor: int(0, Math.floor(total / 5)), prior_refunded_minor: prior, sale_posted: tr.aggregator || r() < 0.8 }), moves: true });
         break;
       }
       case "grn": {

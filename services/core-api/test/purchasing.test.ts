@@ -376,6 +376,19 @@ describe("supplier invoices: duplicate refused, approval derives the payable", (
     // A second dispute on the disputed invoice records the claim and reverses nothing again.
     expect((await call("POST", path, "owner", env("purchasing.invoice.dispute.v1", body(1000)))).status).toBe(201);
     expect((await entries()).length).toBe(2);
+    // D2 follow-up (0017): approved again → the payable is released (disputed → open, audited) and the entry re-posted
+    // once. The real finance seam here: the file's fake postFor writes a fresh entry each call, where finance re-posts
+    // a reversed entry as the reversal of its reversal.
+    restoreSeams();
+    try {
+      expect((await call("POST", `/v1/supplier-invoices/${S.inv1}:approve`, "owner", env("purchasing.invoice.approve.v1", { supplier_invoice_id: S.inv1 }))).status).toBe(200);
+    } finally {
+      restoreSeams = setSeams(fakes as never);
+    }
+    expect(await one(`SELECT status FROM core.payable WHERE id = $1`, [payable.id])).toEqual({ status: "open" });
+    expect((await db.admin(`SELECT before, after FROM core.audit_log WHERE entity = 'core.payable' AND entity_id = $1 AND before IS NOT NULL ORDER BY seq`, [payable.id])).rows)
+      .toEqual([{ before: { status: "open" }, after: { status: "disputed" } }, { before: { status: "disputed" }, after: { status: "open" } }]);
+    expect((await entries()).length).toBe(3);
   });
 });
 
@@ -476,7 +489,7 @@ describe("read models: contract shapes and the simulated-supplier label", () => 
     const d = await (await call("GET", `/v1/purchase-orders/${S.poPool}`, "owner")).json();
     expect(PoView.parse(d).supplier.label).toBe("Simulated supplier");
     const inv = InvoiceView.parse(await (await call("GET", `/v1/supplier-invoices/${S.inv1}`, "owner")).json());
-    expect(inv.payable).toMatchObject({ due_on: "2026-10-20", amount_minor: 1061500, status: "disputed" }); // disputed above (D2)
+    expect(inv.payable).toMatchObject({ due_on: "2026-10-20", amount_minor: 1061500, status: "open" }); // disputed, then re-opened by the re-approval (D2)
     expect(inv.supplier.label).toBeNull();
     // staff: supplier list without price observations
     const staff = await (await call("GET", "/v1/suppliers", "staff")).json();

@@ -71,18 +71,21 @@ export function postTender(t: { aggregator: boolean; method: TenderMethod; amoun
  *  this one (`prior_refunded_minor`), half away from zero — so partial refunds that add up to the order reverse
  *  exactly its tax (INFERENCE: the refund row has no split). An aggregator's refund is a deduction from what the
  *  channel owes us (R2-S2-10: the customer is refunded by the channel, never from our till), whatever the row's
- *  method says. */
+ *  method says. A refund of an order whose sale was never posted (`sale_posted` false: paid, then refunded before it
+ *  completed — R2 P4) gives the money back against the receivable its tender cleared; sales and tax are untouched. */
 export function postRefund(r: {
   aggregator?: boolean; operator_collects: boolean; method: TenderMethod; amount_minor: number; order_total_minor: number; order_tax_minor: number;
-  prior_refunded_minor?: number;
+  prior_refunded_minor?: number; sale_posted?: boolean;
 }): Line[] | null {
+  const paidFrom: Role = r.aggregator ? "channel_receivable" : tenderAccount(r.method);
+  if (r.sale_posted === false) return finish([{ role: receivable(r.aggregator ?? false), amount_minor: r.amount_minor }, { role: paidFrom, amount_minor: -r.amount_minor }]);
   const prior = r.prior_refunded_minor ?? 0;
   const share = (cum: number) => (r.operator_collects || r.order_total_minor <= 0 ? 0 : mulDiv(cum, r.order_tax_minor, r.order_total_minor));
   const tax = share(prior + r.amount_minor) - share(prior);
   return finish([
     { role: "sales", amount_minor: r.amount_minor - tax },
     { role: "output_tax", amount_minor: tax },
-    { role: r.aggregator ? "channel_receivable" : tenderAccount(r.method), amount_minor: -r.amount_minor },
+    { role: paidFrom, amount_minor: -r.amount_minor },
   ]);
 }
 

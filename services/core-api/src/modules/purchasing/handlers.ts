@@ -235,16 +235,23 @@ export const invoiceApprove: CommandHandler = {
     // recorded → approved (or disputed → approved) only; approving twice would raise a second payable.
     if (inv.status !== "recorded" && inv.status !== "disputed") throw new ApiError("conflict");
     await c.query(`UPDATE core.supplier_invoice SET status = 'approved' WHERE id = $1`, [p.supplier_invoice_id]);
-    // A dispute resolved back to approved keeps the payable it already raised; its entry, reversed by the dispute,
-    // is re-posted by finance as the reversal of that reversal.
+    // A dispute resolved back to approved keeps the payable it already raised, which the dispute held (disputed → open,
+    // D2; 0017 lets this command write core.payable); its entry, reversed by the dispute, is re-posted by finance as the
+    // reversal of that reversal.
     const raised = await first(c, `SELECT 1 FROM core.payable WHERE source_type = 'core.supplier_invoice' AND source_id = $1`, [p.supplier_invoice_id]);
     const payable = raised ? null : await derivePayable(c, p.supplier_invoice_id);
+    const released = inv.status === "disputed"
+      ? (await c.query<{ id: string }>(
+          `UPDATE core.payable SET status = 'open' WHERE source_type = 'core.supplier_invoice' AND source_id = $1 AND status = 'disputed' RETURNING id`,
+          [p.supplier_invoice_id])).rows
+      : [];
     await seams.postFor(c, "finance.post_supplier_invoice", `core.supplier_invoice:${p.supplier_invoice_id}`);
     return {
       entityId: p.supplier_invoice_id,
       audit: [
         { entity: "core.supplier_invoice", entityId: p.supplier_invoice_id, before: { status: inv.status }, after: { status: "approved" } },
         ...(payable ? [{ entity: "core.payable", entityId: payable.payableId, after: { status: "open", source: "core.supplier_invoice" } }] : []),
+        ...released.map((r) => ({ entity: "core.payable", entityId: r.id, before: { status: "disputed" }, after: { status: "open" } })),
       ],
     };
   },

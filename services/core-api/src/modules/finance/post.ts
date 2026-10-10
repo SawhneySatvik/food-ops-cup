@@ -170,18 +170,22 @@ const DERIVE: Record<PostingRuleId, (tx: Tx, id: string, pack: CountryPack, inpu
   async "finance.post_refund"(tx, id, pack) {
     // prior: the order's other refunds already posted — the tax share is cumulative (R2-S3-2). Refunds of one
     // order are serialised by the order row lock (orders/money.ts), so "already posted" is "recorded before".
-    const f = await one<{ order_id: string; method: TenderMethod; amount_minor: string; at: Date; currency: string; tz: string; cutoff: string; prior: string }>(tx,
+    // posted: whether the order's sale was ever posted (finance.post_order) — a refund before completion (paid, refunded,
+    // cancelled: R2 P4) reverses only the tender's clearing.
+    const f = await one<{ order_id: string; method: TenderMethod; amount_minor: string; at: Date; currency: string; tz: string; cutoff: string; prior: string; posted: boolean }>(tx,
       `SELECT f.order_id, f.method, f.amount_minor, f.at, f.currency, ou.tz, ou.business_day_cutoff::text AS cutoff,
               (SELECT coalesce(sum(x.amount_minor), 0) FROM core.refund x WHERE x.tenant_id = f.tenant_id AND x.order_id = f.order_id AND x.id <> f.id
                   AND EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = x.tenant_id AND je.posting_rule = 'finance.post_refund'
-                                AND je.source_type = 'core.refund' AND je.source_id = x.id AND je.reverses_id IS NULL)) AS prior
+                                AND je.source_type = 'core.refund' AND je.source_id = x.id AND je.reverses_id IS NULL)) AS prior,
+              EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = f.tenant_id AND je.posting_rule = 'finance.post_order'
+                         AND je.source_type = 'core.order' AND je.source_id = f.order_id AND je.reverses_id IS NULL) AS posted
          FROM core.refund f JOIN core.outlet ou ON ou.tenant_id = f.tenant_id AND ou.id = f.outlet_id WHERE f.id = $1`, id);
     const o = await one<OrderRow>(tx, ORDER_SQL, f.order_id);
     const tr = channelTreatment(pack, o.kind);
     return {
       header: { entry_date: businessDate(f.at, f.tz, hhmm(f.cutoff)), outlet_id: o.outlet_id, brand_id: o.brand_id, channel_id: o.channel_id, currency: f.currency },
       lines: postRefund({ aggregator: tr.aggregator, operator_collects: tr.operator_collects, method: f.method, amount_minor: n(f.amount_minor),
-        order_total_minor: n(o.total_minor), order_tax_minor: n(o.tax_minor), prior_refunded_minor: n(f.prior) }),
+        order_total_minor: n(o.total_minor), order_tax_minor: n(o.tax_minor), prior_refunded_minor: n(f.prior), sale_posted: f.posted }),
     };
   },
   async "finance.post_grn"(tx, id) {

@@ -109,13 +109,13 @@ async function unusedOverrides(c: Queryable, outletId: string, lineIds: readonly
 // ---------------------------------------------------------------------------------------------------------
 
 type OrderRow = { id: string; outlet_id: string; business_date: string; created_at: Date };
-type OrderLineRow = { id: string; line_no: number; item_id: string; variant_id: string | null; options: unknown; qty_milli: string };
+type OrderLineRow = { id: string; line_no: number; item_id: string; variant_id: string | null; options: unknown; qty_milli: string; recipe_version_id: string | null };
 
 async function orderOf(c: Queryable, orderId: string) {
   const order = await first<OrderRow>(c, `SELECT id, outlet_id, business_date::text, created_at FROM core."order" WHERE id = $1`, [orderId]);
   if (!order) throw new ApiError("not_found");
   const lines = (await c.query<OrderLineRow>(
-    `SELECT id, line_no, item_id, variant_id, options, qty_milli::text FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [orderId])).rows;
+    `SELECT id, line_no, item_id, variant_id, options, qty_milli::text, recipe_version_id FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [orderId])).rows;
   const items = await itemsOf(c, [...new Set(lines.map((l) => l.item_id))]);
   return { order, lines, items };
 }
@@ -163,8 +163,9 @@ export type ConsumptionResult = DerivationResult & {
 
 const refused = () => new ApiError("book_write_refused", "authority_denied");
 
-/** Rules inventory.consume_order (dishes through the recipe in force on the order row's business_date, plus option
- *  deltas) and inventory.consume_sku (SKUs 1:1 into their stock record), core-domain arithmetic. Batch-tracked
+/** Rules inventory.consume_order (dishes through the recipe version stamped on each line at placement — R2-S3-3: a
+ *  version created or closed afterwards changes nothing — or, for a line written without a stamp, the version in force
+ *  on the order row's business_date; plus option deltas) and inventory.consume_sku (SKUs 1:1 into their stock record), core-domain arithmetic. Batch-tracked
  *  stock is split FEFO (fefo.ts) by the order row's business date: SKU lines first, refused on expired stock
  *  without a consumed override (`expired_batch`); recipe ingredients take unexpired stock, then unbatched.
  *  Refused (writes nothing) for an order outside the rules' source_state. Idempotent per order. */
@@ -178,8 +179,13 @@ export async function deriveOrderConsumption(c: Queryable, orderId: string): Pro
   if (done.length > 0) return { derived: false, movement_ids: done.map((m) => m.id), events: [], negative_on_hand: [], recipe_lines: [], recipe_missing: [], issues: [] };
 
   const itemIds = [...items.keys()];
-  const versions = (await c.query<{ id: string; item_id: string; variant_id: string | null; version: number; valid_from: string; valid_to: string | null; yield_qty_milli: string }>(
+  const all = (await c.query<{ id: string; item_id: string; variant_id: string | null; version: number; valid_from: string; valid_to: string | null; yield_qty_milli: string }>(
     `SELECT id, item_id, variant_id, version, valid_from::text, valid_to::text, yield_qty_milli::text FROM core.recipe_version WHERE item_id = ANY ($1::uuid[])`, [itemIds])).rows;
+  // An item whose lines carry a stamp is exploded through exactly the stamped version(s), whatever their validity
+  // window says now (core-domain picks the version in force on the business date, so the window is opened for it).
+  const stamped = new Set(lines.flatMap((l) => (l.recipe_version_id ? [l.recipe_version_id] : [])));
+  const stampedItems = new Set(all.filter((v) => stamped.has(v.id)).map((v) => v.item_id));
+  const versions = all.flatMap((v) => (stamped.has(v.id) ? [{ ...v, valid_from: "0001-01-01", valid_to: null }] : stampedItems.has(v.item_id) ? [] : [v]));
   const recipeLines = (await c.query<{ recipe_version_id: string; ingredient_id: string; qty_milli: string; unit: string; waste_pct_bp: number }>(
     `SELECT recipe_version_id, ingredient_id, qty_milli::text, unit, waste_pct_bp FROM core.recipe_line WHERE recipe_version_id = ANY ($1::uuid[])`, [versions.map((v) => v.id)])).rows;
   const allOptions = [...new Set(lines.flatMap((l) => optionIds(l.options)))];
