@@ -1,1 +1,7 @@
 kitchen.ticket.advance.v1
+kitchen.prep_time.set.v1
+kitchen.prep_list.create.v1
+proposal.kitchen.prep_time.set.v1
+proposal.kitchen.prep_list.create.v1
+v1.kds.board
+v1.kitchen.prep_list

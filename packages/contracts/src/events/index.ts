@@ -4,6 +4,7 @@ import { z } from "zod";
 import { cloudEvent } from "../shared/cloudevents.ts";
 import { IsoDateTime, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
+import { KitchenTicketAdvancedV1, KitchenTicketCreatedV1 } from "../kitchen/events.ts";
 
 export const OrderPlacedV1 = cloudEvent(
   "munim.orders.order.placed.v1",
@@ -49,13 +50,15 @@ export const PoCommittedV1 = cloudEvent(
 );
 
 /** Every W1 event, discriminated on `type` (what intel `/events` accepts). */
-export const MunimEvent = z.discriminatedUnion("type", [OrderPlacedV1, MovementRecordedV1, PoCommittedV1]);
+export const MunimEvent = z.discriminatedUnion("type", [OrderPlacedV1, MovementRecordedV1, PoCommittedV1, KitchenTicketCreatedV1, KitchenTicketAdvancedV1]);
 export type MunimEvent = z.infer<typeof MunimEvent>;
 
 export const SCHEMAS = {
   "munim.orders.order.placed.v1": OrderPlacedV1,
   "munim.inventory.movement.recorded.v1": MovementRecordedV1,
   "munim.purchasing.po.committed.v1": PoCommittedV1,
+  "munim.kitchen.ticket.created.v1": KitchenTicketCreatedV1,
+  "munim.kitchen.ticket.advanced.v1": KitchenTicketAdvancedV1,
   "munim-event": MunimEvent,
 };
 export const ROUTES: readonly Route[] = [];
