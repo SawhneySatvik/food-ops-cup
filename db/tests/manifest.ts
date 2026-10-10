@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0018 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0019 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -21,6 +21,7 @@ export const MIGRATIONS = [
   "0016_w2_fix_cycle_1",
   "0017_w2_fix_cycle_2",
   "0018_history_imports",
+  "0019_mc1a_templates_outlet_rls",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -60,7 +61,7 @@ export const TABLES: Record<string, T> = {
   "core.membership": book(),
   "core.device": op(true),
   "core.outlet_calendar": book(true),
-  "core.business_policy": book(),
+  "core.business_policy": book(true), // outlet RLS since 0019 (R1-m9)
   "core.command_authority": global,
   "core.derivation_rule": global,
   "core.command_log": op(),
@@ -81,13 +82,13 @@ export const TABLES: Record<string, T> = {
   "core.option_ingredient_delta": book(),
   "core.recipe_version": book(),
   "core.recipe_line": book(),
-  "core.price": book(),
+  "core.price": book(true), // outlet RLS since 0019 (R1-m9)
   "core.deal": book(),
   "core.coupon": book(),
   "core.item_availability": op(true),
   "core.pickup_window": op(true),
   "core.order_status_transition": global,
-  "core.ticket_counter": op(),
+  "core.ticket_counter": op(true), // outlet RLS since 0019 (R1-m9)
   "core.invoice_counter": op(),
   "core.order": book(true),
   "core.order_line": book(true),
@@ -127,46 +128,46 @@ export const TABLES: Record<string, T> = {
   // 0008
   "core.account": book(),
   "core.channel_terms": book(),
-  "core.journal_entry": book(),
+  "core.journal_entry": book(true), // outlet RLS since 0019 (R1-m9)
   "core.posting": book(),
-  "core.period_close": book(),
-  "core.settlement": book(),
+  "core.period_close": book(true), // outlet RLS since 0019 (R1-m9)
+  "core.settlement": book(true), // outlet RLS since 0019 (R1-m9)
   "core.settlement_line": book(),
-  "core.bank_line": book(),
+  "core.bank_line": book(true), // outlet RLS since 0019 (R1-m9)
   "core.dispute": book(),
   "core.dispute_line": book(),
-  "core.reconciliation_break": book(), // book since 0014 (#22)
-  "core.budget": book(),
-  "core.expense": book(),
+  "core.reconciliation_break": book(true), // book since 0014 (#22); outlet RLS since 0019 (R1-m9)
+  "core.budget": book(true), // outlet RLS since 0019 (R1-m9)
+  "core.expense": book(true), // outlet RLS since 0019 (R1-m9)
   "core.payable": book(),
   "core.receivable": book(),
-  "core.tax_return_draft": book(),
+  "core.tax_return_draft": book(true), // outlet RLS since 0019 (R1-m9)
   // 0009
   "core.document": op(),
   "core.import_format": op(),
   "core.import_run": op(),
   "core.import_staging": op(),
   "core.import_quarantine": op(),
-  "core.conversation": op(),
+  "core.conversation": op(true), // outlet RLS since 0019 (R1-m9)
   "core.message": op(),
   // 0010
-  "core.staff": book(),
-  "core.roster": book(),
+  "core.staff": book(true), // outlet RLS since 0019 (R1-m9)
+  "core.roster": book(true), // outlet RLS since 0019 (R1-m9)
   "core.roster_shift": book(true),
   "core.attendance": book(true),
-  "core.payroll_draft": book(),
+  "core.payroll_draft": book(true), // outlet RLS since 0019 (R1-m9)
   "core.payroll_draft_line": book(),
   "core.advance": book(),
-  "core.tip_pool": book(),
+  "core.tip_pool": book(true), // outlet RLS since 0019 (R1-m9)
   "core.tip_pool_share": book(),
   "core.training_record": book(),
-  "core.hiring_candidate": book(),
+  "core.hiring_candidate": book(true), // outlet RLS since 0019 (R1-m9)
   // 0011
   "core.loyalty_entry": book(), // customer own-rows policy, tested separately
   "core.campaign": book(),
-  "core.reservation": book(),
-  "core.review": book(),
-  "core.bulk_order": book(),
+  "core.reservation": book(true), // outlet RLS since 0019 (R1-m9)
+  "core.review": book(true), // outlet RLS since 0019 (R1-m9)
+  "core.bulk_order": book(true), // outlet RLS since 0019 (R1-m9)
   // 0012
   "core.licence": book(true), // outlet RLS since 0015 (A3; outlet_id NULL = tenant-wide)
   "core.checklist": book(true),
@@ -177,7 +178,7 @@ export const TABLES: Record<string, T> = {
   "core.maintenance": book(), // visible through its asset (0015 A3), tested separately
   "core.goal": book(true),
   "core.task": book(true),
-  "core.market_signal": op(),
+  "core.market_signal": op(true), // outlet RLS since 0019 (R1-m9)
   "core.viability_case": book(), // book since 0014 (#22)
   "intel.entity": plain(true),
   "intel.alias": plain(true),
@@ -211,7 +212,7 @@ export const TENANT_TABLES = names.filter((n) => TABLES[n]!.tenant);
 export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
 
 /** Hand counts, so a mistake in the object above also shows up as a count mismatch. */
-export const EXPECTED_COUNTS = { all: 147, core: 118, book: 92, tenant: 133, outlet: 33 };
+export const EXPECTED_COUNTS = { all: 147, core: 118, book: 92, tenant: 133, outlet: 54 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -266,8 +267,30 @@ export const CROSSTENANT_OBJECTS = [
   "platform.tenant_registry",
 ];
 
-/** Snapshot templates and their per-column numeric-source allow-list (02-schema §3, R40 C5). */
-export const TEMPLATES = ["inventory.below_reorder", "platform.spend_by_tenant"];
+/** Snapshot templates and their per-column numeric-source allow-list (02-schema §3, R40 C5). 0019 adds the fourteen of
+ *  M-C1a (catalogue §3, finance §3, ADR-014 §7.3); tests/template-spec.ts parses those from the docs on its own. */
+export const TEMPLATES = [
+  "catalogue.cost_drift", "catalogue.deal_cost", "catalogue.dish_margin", "catalogue.menu_matrix", "catalogue.recipe_current",
+  "catalogue.sku_price_check",
+  "finance.close_status", "finance.gst_check", "finance.margin_bridge", "finance.missing_payouts", "finance.pnl",
+  "finance.settlement_vs_orders", "finance.tender_vs_bank", "finance.unapproved_deductions",
+  "inventory.below_reorder", "platform.spend_by_tenant",
+];
+/** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
+ *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read
+ *  postings through their journal entry (tests/templates.test.ts). */
+export const PARENT_SCOPED: Record<string, { parent: string; fk: string }> = {
+  "core.message": { parent: "core.conversation", fk: "conversation_id" },
+  "core.payroll_draft_line": { parent: "core.payroll_draft", fk: "payroll_draft_id" },
+  "core.settlement_line": { parent: "core.settlement", fk: "settlement_id" },
+  "core.tip_pool_share": { parent: "core.tip_pool", fk: "tip_pool_id" },
+};
+/** 0019 O1: outlet-scoped tables whose outlet_id may be NULL (a tenant-wide row, visible to every member). */
+export const OUTLET_NULLABLE = [
+  "core.bank_line", "core.budget", "core.business_policy", "core.checklist", "core.conversation", "core.expense", "core.goal",
+  "core.journal_entry", "core.licence", "core.market_signal", "core.period_close", "core.reconciliation_break", "core.settlement",
+  "core.task", "core.tax_return_draft",
+];
 /** Allowed intel numeric sources, column-level (R40 C5): deterministic forecast points, simulated quote
  *  terms, spend, and ROW COUNTS of intel.answer / intel.outcome. Never finding.confidence_bp or any other
  *  intel-supplied value. Widened by hand in M-B (forecast intervals, quote terms used by D-1 templates). */

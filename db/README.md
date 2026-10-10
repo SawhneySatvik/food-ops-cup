@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (18 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (19 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -28,7 +28,8 @@ pricing freezes read the reprice source state, guest hash cleared on claim, merg
 guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the payable), 0017 W2 fix cycle 2 (origin
 never re-stamped, re-approval re-opens the payable, the guest-token claim merges an emptied guest profile, coupon discount
 follows a re-price), 0018 history imports (R44 b, c: the `pos_bills` / `waste_log` kinds, what an approved import writes,
-`core.write_derived`) — gates see 17 applied.
+`core.write_derived`), 0019 M-C1a (outlet RLS on the outlet-data tables, the advisor rung, `numeric_source` lists, the
+fourteen catalogue/finance templates) — gates see 18 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -267,8 +268,56 @@ second post (no `reverses_id`) is still 23505.
   (409 `period_closed`, nothing written) when a month closed after the preview.
 - **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
   run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
-- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0019` per item and requires `tests/history.test.ts` to exit non-zero naming
-  that item's tests.
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0020` per item (`0019` since 0019 landed) and requires
+  `tests/history.test.ts` to exit non-zero naming that item's tests. `redproof-0017.sh` likewise.
+
+**M-C1a (0019) — shapes other lanes code against.**
+- **Outlet RLS (R1-m9).** Since 0019 these carry `tenant_outlet_isolation` (the 0014 predicate) instead of the tenant-only
+  policy: `bulk_order, hiring_candidate, payroll_draft, price, reservation, review, roster, staff, ticket_counter, tip_pool`
+  (outlet NOT NULL) and, with `outlet_id IS NULL` = tenant-wide (visible to every member), `bank_line, budget,
+  business_policy, conversation, expense, journal_entry, market_signal, period_close, reconciliation_break, settlement,
+  tax_return_draft`. A member scoped to some outlets now sees only those outlets' prices, staff, rosters, journal entries,
+  settlements… — a read that needs another outlet's row must run under `'{*}'`. A context that sets `app.tenant_id` but no
+  `app.outlet_ids` sees none of them (as for every outlet-scoped table).
+- **Children through their parent** (policy `tenant_via_parent`): `settlement_line` (settlement), `payroll_draft_line`
+  (payroll draft), `tip_pool_share` (tip pool), `message` (conversation) are readable exactly when their parent is. New rows of
+  the three book children are checked by tenant only (the book guard refuses one under an invisible parent), so a parent and
+  its children may still be written in one statement — but an `INSERT … RETURNING` on the child in that same statement is
+  refused (RETURNING reads through the parent, which the statement cannot see yet). `message` checks new rows through its
+  conversation too.
+- **`core.posting` stays tenant-visible.** A parent policy on it made `core.journal_entry_balanced` (deferred, once per
+  posting) quadratic inside a large import (worldgen seeding 3× slower, measured). So a scoped member's raw read of
+  `core.posting` is tenant-wide: read postings only joined to their journal entry (`JOIN core.posting p ON p.tenant_id =
+  je.tenant_id AND p.journal_entry_id = je.id`), as every template does — `tests/templates.test.ts` gates it.
+- **The period check is RLS-bound.** `core.journal_entry_open_period()` reads `core.period_close` as the writer: a writer scoped
+  to outlet A does not see outlet B's close. Today no scoped context writes a tenant-wide (outlet NULL) entry (every such
+  command or decision needs `'{*}'`; every derivation copies an outlet-bearing source's outlet), so MB009 still holds.
+- **Template `min_role`** admits `staff, advisor, manager, owner, operator`; the eight `finance.*` templates are `advisor`,
+  the six `catalogue.*` `manager`. The ladder is core-api's (approvals `snapshots.ts` RANK): advisor must rank above staff
+  (today it ranks with staff, so staff would open every `advisor` template — change RANK with 0019). Whether advisor ranks
+  above or below manager decides whether managers open finance templates; recommended `staff 1 < manager 2 < advisor 3 <
+  owner 4 = judge 4 < operator 5` (managers stay out of finance, as W2-R8 and the finance routes have it).
+- **`numeric_source`** is a string or a non-empty list of strings (CHECK `snapshot_template_numeric_sourced`); every element
+  must be on the allow-list (`tests/books.test.ts`). Template SQL never ends with `;` (CHECK `snapshot_template_sql_no_semicolon`).
+- **Templates** (`SELECT id, params_schema, columns, min_role FROM evidence.snapshot_template`): catalogue `dish_margin,
+  menu_matrix, cost_drift, deal_cost, sku_price_check, recipe_current`; finance `unapproved_deductions, settlement_vs_orders,
+  missing_payouts, tender_vs_bank, pnl, gst_check, close_status` and `margin_bridge`. Every named param must be supplied
+  (core-api's runTemplate refuses a missing one): nullable ones (`outlet_id`, `channel_id`, `channel_kind`) take `null` = every
+  outlet / channel in the minter's scope; `outlet_id` only narrows the scope (R40 C4). `unapproved_deductions`,
+  `settlement_vs_orders` and `missing_payouts` add an `outlet_id` param the pack table does not list. `finance.pnl` and
+  `finance.gst_check` are core-api's FINANCE_TEMPLATES SQL with the role codes resolved; `finance.gst_summary` is not
+  installed (non-pack: M-C1d). `finance.tender_vs_bank` and `finance.close_status` narrow `core.outlet` (tenant-visible) to the
+  minter's outlets themselves. Σ rows (`settlement_vs_orders`, `missing_payouts`) are the last row, ids null.
+- **`finance.margin_bridge`** (`period_month`, `compare_month`): rows `revenue_volume, revenue_price, deal_discount,
+  cogs_supplier_price, cogs_volume_mix, waste, channel_fees, labour, other, unexplained`, then the Σ row `margin_delta_minor`;
+  columns `component, prior_minor, current_minor, delta_minor, share_bp`. Each row is a component's level in each month, so
+  Σ prior = last month's margin, Σ current = this month's and Σ delta = `margin_delta_minor` exactly (margin = −Σ income and
+  expense postings). Revenue rows explain completed orders' sales; COGS rows explain the COGS postings (volume/mix is the rest
+  after supplier price and waste); `unexplained` = income not from completed orders' sales (refunds, loyalty, rounding).
+- **Gates:** `tests/templates.test.ts` (ids, columns, manager scope, bridge balance, advisor rung, CHECKs — on the canonical
+  world + `tests/mc1a-fixture.ts`); `node db/tests/templates-worlds.ts` (columns and bridge balance on the worldgen
+  `restaurant_group` and `store` worlds through core-api, plus answer-key checks); `db/tests/redproof-0019.sh` (its red-proofs).
+  `tests/template-spec.ts` parses the expected ids, params and columns from the pack docs and ADR-014 §7.3.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
@@ -395,10 +444,11 @@ reference `core.supplier (tenant_id, id, kind)` with `supplier_kind = 'simulated
 mark `published_at` per row under that row's `app.tenant_id`. `core.active_tenants()` returns tenant ids.
 
 **Snapshots (R40 C4/C5).** Exactly one of `run_id` / `minted_by_member_id` / `minted_by_operator_id`;
-`munim_core` and `munim_svc` may insert. Template `columns` entries carry `numeric_source` =
-`core.<table>.<column>`, `count:core.<table>`, or an entry of the column-level intel allow-list
-(`tests/manifest.ts` `INTEL_NUMERIC_ALLOW`: forecast qty/lo/hi, quote price/qty/min order/payment days/round, spend
-amount, `count:intel.answer`, `count:intel.outcome` — never `finding.confidence_bp`); `min_role` gates who opens it.
+`munim_core` and `munim_svc` may insert. Template `columns` entries carry `numeric_source` (one string, or since 0019 a
+non-empty list of them, each) = `core.<table>.<column>`, `count:core.<table>`, or an entry of the column-level intel
+allow-list (`tests/manifest.ts` `INTEL_NUMERIC_ALLOW`: forecast qty/lo/hi, quote price/qty/min order/payment days/round,
+spend amount, `count:intel.answer`, `count:intel.outcome` — never `finding.confidence_bp`); `min_role` gates who opens it
+(the ladder: M-C1a above).
 
 **Books invariants added in M-B.** Journal entries balance per currency at COMMIT (deferred constraint
 triggers), are immutable (no UPDATE grant; postings only in the entry's transaction; one reversal each) and

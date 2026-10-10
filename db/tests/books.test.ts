@@ -166,8 +166,9 @@ describe("snapshots", () => {
     expect(await snap("munim_core", ", minted_by_operator_id", ", $2", [op])).toBeNull();
   });
 
-  /** Every numeric column of every template names an allowed source column (R40 C5: column-level). */
-  async function templateSourceFailures(x: TestDb): Promise<{ templates: string[]; failures: string[] }> {
+  /** Every numeric column of every template names allowed source columns (R40 C5: column-level). numeric_source is one
+   *  string or a list of them (0019, ADR-014 §14 C6): every element is checked, and an empty list names nothing. */
+  async function templateSourceFailures(x: TestDb): Promise<{ templates: string[]; failures: string[]; elements: number }> {
     const cols = new Set((await x.admin(`
       SELECT s.nspname || '.' || c.relname || '.' || a.attname AS col FROM pg_attribute a
         JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace s ON s.oid = c.relnamespace
@@ -175,22 +176,42 @@ describe("snapshots", () => {
     const tables = new Set([...cols].map((c) => c.split(".").slice(0, 2).join(".")));
     const t = await x.admin("SELECT id, columns FROM evidence.snapshot_template ORDER BY id");
     const failures: string[] = [];
+    let elements = 0;
     for (const row of t.rows) {
-      for (const col of row.columns as { name: string; type: string; numeric_source?: string }[]) {
+      for (const col of row.columns as { name: string; type: string; numeric_source?: string | string[] }[]) {
         if (col.type !== "integer" && col.type !== "numeric") continue;
-        const src = col.numeric_source ?? "";
-        const ok = cols.has(src) || (src.startsWith("count:") && tables.has(src.slice(6))) || INTEL_NUMERIC_ALLOW.includes(src);
-        if (!ok) failures.push(`${row.id}.${col.name}: numeric_source '${src}' not allowed`);
+        const list = Array.isArray(col.numeric_source) ? col.numeric_source : [col.numeric_source ?? ""];
+        if (list.length === 0) failures.push(`${row.id}.${col.name}: numeric_source is an empty list`);
+        for (const src of list) {
+          elements++;
+          const ok = cols.has(src) || (src.startsWith("count:") && tables.has(src.slice(6))) || INTEL_NUMERIC_ALLOW.includes(src);
+          if (!ok) failures.push(`${row.id}.${col.name}: numeric_source '${src}' not allowed`);
+        }
       }
     }
-    return { templates: t.rows.map((r) => r.id), failures };
+    return { templates: t.rows.map((r) => r.id), failures, elements };
   }
 
   test("template numeric sources: every numeric column names an allowed source column", async () => {
     const r = await templateSourceFailures(db);
-    console.log(`templates: ${r.templates.length} checked (${r.templates.join(", ")}), ${r.failures.length} bad numeric sources`);
+    console.log(`templates: ${r.templates.length} checked (${r.templates.join(", ")}), ${r.elements} source elements, ${r.failures.length} bad numeric sources`);
     expect(r.templates).toEqual(TEMPLATES);
+    // 0019's list-form columns carry more than one element each: a scan that read only strings would see far fewer.
+    expect(r.elements).toBeGreaterThan(150);
     expect(r.failures).toEqual([]);
+  });
+
+  test("RED-PROOF (0019 list form): an intel column planted as one element of a list → red", async () => {
+    const x = await db.clone();
+    try {
+      await x.admin(`UPDATE evidence.snapshot_template SET columns = jsonb_set(columns, '{2,numeric_source}',
+                       '["core.order_line.qty_milli", "intel.finding.confidence_bp"]') WHERE id = 'catalogue.dish_margin'`);
+      const r = await templateSourceFailures(x);
+      console.log("RED-PROOF template sources (list element):", r.failures);
+      expect(r.failures).toEqual(["catalogue.dish_margin.units_sold: numeric_source 'intel.finding.confidence_bp' not allowed"]);
+    } finally {
+      await x.stop();
+    }
   });
 
   test("inventory.below_reorder runs as munim_svc under RLS and returns its declared columns and the hand values", async () => {

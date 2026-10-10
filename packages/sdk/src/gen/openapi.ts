@@ -7166,7 +7166,7 @@ export interface components {
                 name: string;
                 /** @enum {string} */
                 type: "integer" | "numeric" | "text" | "date" | "timestamptz" | "boolean" | "uuid";
-                numeric_source?: string | null;
+                numeric_source?: (string | string[]) | null;
             }[];
             rows: {
                 [key: string]: string | number | boolean | null;

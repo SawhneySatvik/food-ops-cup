@@ -1,13 +1,13 @@
 // Gates on stored catalog state (never trust IF NOT EXISTS — assert what Postgres actually holds):
-//  - every policy predicate reads back as one of the four forms written in 0003–0005, with qual = with-check,
-//    FOR ALL, PERMISSIVE, TO PUBLIC; the form per table matches the manifest; platform.llm_budget's two
-//    policies are exactly as written;
+//  - every policy predicate reads back as one of the forms written in 0003–0019, with qual = with-check (0019's
+//    book children: with-check = the tenant form), FOR ALL, PERMISSIVE, TO PUBLIC; the form per table matches the
+//    manifest; platform.llm_budget's two policies are exactly as written;
 //  - no foreign key cascades (a cascade would be a book write that bypasses the guard).
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { TestDb } from "../src/harness.ts";
 import { openDb } from "./db.ts";
 import {
-  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, OUTLET_TABLES, TENANT_TABLES,
+  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, OUTLET_NULLABLE, OUTLET_TABLES, PARENT_SCOPED, TENANT_TABLES,
 } from "./manifest.ts";
 
 let db: TestDb;
@@ -43,13 +43,23 @@ END)`,
   outlet_or_wide: `(${TENANT} AND ((( SELECT current_setting('app.role'::text, true) AS current_setting) = ANY (ARRAY['customer'::text, 'guest'::text])) OR ${ALL_OUTLETS} OR (outlet_id IS NULL) OR ${inScope("outlet_id")}))`,
   amc_via_asset: viaAsset("amc"),
   maintenance_via_asset: viaAsset("maintenance"),
+  // 0019 O2: children read through their parent (WITH CHECK: the tenant form, message excepted — CHECK_VIA_PARENT).
+  ...Object.fromEntries(Object.entries(PARENT_SCOPED).map(([t, { parent, fk }]) => [`${t.slice(5)}_via_parent`, viaParent(t, parent, fk)])),
 };
 function viaAsset(t: string): string {
   return `(${TENANT} AND (EXISTS ( SELECT 1
    FROM core.asset a
   WHERE ((a.tenant_id = ${t}.tenant_id) AND (a.id = ${t}.asset_id)))))`;
 }
-const OUTLET_OR_WIDE = ["core.licence", "core.checklist", "core.asset", "core.goal", "core.task"];
+function viaParent(t: string, parent: string, fk: string): string {
+  const name = t.slice(5);
+  return `(${TENANT} AND (EXISTS ( SELECT 1
+   FROM ${parent} x
+  WHERE ((x.tenant_id = ${name}.tenant_id) AND (x.id = ${name}.${fk})))))`;
+}
+// 0015 A3's five, and since 0019 every outlet-scoped table whose outlet_id is nullable.
+const OUTLET_OR_WIDE = ["core.asset", ...OUTLET_NULLABLE];
+const CHECK_VIA_PARENT = ["core.message"];
 
 // F4 (0014): the RESTRICTIVE customer_scope policy, (qual, with check) per class.
 const NC = `(( SELECT current_setting('app.role'::text, true) AS current_setting) IS DISTINCT FROM 'customer'::text)`;
@@ -104,6 +114,7 @@ function expectedForm(t: string): string {
   if (t === "intel.trace_event") return "trace_via_run";
   if (OUTLET_OR_WIDE.includes(t)) return "outlet_or_wide";
   if (t === "core.amc" || t === "core.maintenance") return `${t.slice(5)}_via_asset`;
+  if (t in PARENT_SCOPED) return `${t.slice(5)}_via_parent`;
   return OUTLET_TABLES.includes(t) ? "outlet" : "tenant";
 }
 /** Extra policies written on purpose (each pinned exactly in its own test). */
@@ -136,7 +147,9 @@ async function policyFailures(x: TestDb): Promise<{ checked: number; failures: s
     const p = ps[0]!;
     const form = Object.entries(FORMS).find(([, f]) => f === p.qual)?.[0] ?? "UNKNOWN";
     if (form !== expectedForm(t)) failures.push(`${t}: form ${form}, expected ${expectedForm(t)}`);
-    if (p.chk !== p.qual) failures.push(`${t}: WITH CHECK differs from USING`);
+    // 0019 O2: the book children check new rows by tenant only (written with their parent in one statement).
+    const wantChk = t in PARENT_SCOPED && !CHECK_VIA_PARENT.includes(t) ? TENANT : p.qual;
+    if (p.chk !== wantChk) failures.push(`${t}: WITH CHECK not as written`);
     if (p.cmd !== "*" || !p.permissive || p.roles.join() !== "public") failures.push(`${t}: cmd=${p.cmd} permissive=${p.permissive} roles=${p.roles}`);
   }
   const stray = all.filter((p) => !tables.includes(p.t) && p.t !== "platform.llm_budget");

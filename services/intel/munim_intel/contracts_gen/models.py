@@ -3999,13 +3999,17 @@ class OutletScope5(RootModel[list[Literal['*']]]):
     root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
 
 
+class NumericSource(RootModel[list[str]]):
+    root: Annotated[list[str], Field(min_length=1)]
+
+
 class Column(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     name: Annotated[str, Field(pattern='^[a-z_][a-z0-9_]*$')]
     type: Literal['integer', 'numeric', 'text', 'date', 'timestamptz', 'boolean', 'uuid']
-    numeric_source: str | None = None
+    numeric_source: str | NumericSource | None = None
 
 
 class Rows(RootModel[int]):

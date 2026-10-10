@@ -54,7 +54,7 @@ beforeAll(async () => {
   fx = await buildFinanceTenant(db, "IN");
   // W3/M-C installs these templates; the gate installs the same rows into this clone.
   for (const t of FINANCE_TEMPLATES) {
-    await db.admin(`INSERT INTO evidence.snapshot_template (id, version, sql, params_schema, columns, min_role) VALUES ($1, $2, $3, $4, $5, $6)`,
+    await db.admin(`INSERT INTO evidence.snapshot_template (id, version, sql, params_schema, columns, min_role) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id, version) DO NOTHING`,
       [t.id, t.version, t.sql, JSON.stringify(t.params_schema), JSON.stringify(t.columns), t.min_role]);
   }
   pools = { core: db.pool("munim_core", 6), svc: db.pool("munim_svc", 2) };

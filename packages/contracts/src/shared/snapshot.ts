@@ -11,7 +11,7 @@ export const ColumnType = z.enum(["integer", "numeric", "text", "date", "timesta
 export const SnapshotColumn = z.strictObject({
   name: z.string().regex(/^[a-z_][a-z0-9_]*$/),
   type: ColumnType,
-  numeric_source: z.string().nullable().optional(),
+  numeric_source: z.union([z.string(), z.array(z.string()).min(1)]).nullable().optional(),
 });
 export const Cell = z.union([z.string(), z.int(), z.boolean(), z.null()]);
 export const TemplateParams = z.record(

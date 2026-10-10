@@ -68,7 +68,7 @@ const MONTH_PARAM = { period_month: { type: "string", format: "date" } };
 /** Templates for M-C to install (evidence.snapshot_template rows). min_role owner: finance is owner-level. */
 export const FINANCE_TEMPLATES = [
   {
-    id: "finance.pnl", version: 1, sql: PNL_SQL, min_role: "owner",
+    id: "finance.pnl", version: 1, sql: PNL_SQL, min_role: "advisor",
     params_schema: { type: "object", required: ["period_month", "group_by"], additionalProperties: false,
       properties: { ...MONTH_PARAM, group_by: { type: "string", enum: ["outlet", "brand", "channel"] } } },
     columns: [
@@ -77,7 +77,7 @@ export const FINANCE_TEMPLATES = [
     ],
   },
   {
-    id: "finance.gst_check", version: 1, sql: GST_CHECK_SQL, min_role: "owner",
+    id: "finance.gst_check", version: 1, sql: GST_CHECK_SQL, min_role: "advisor",
     params_schema: { type: "object", required: ["period_month"], additionalProperties: false, properties: MONTH_PARAM },
     columns: [
       { name: "outlet_id", type: "uuid" },

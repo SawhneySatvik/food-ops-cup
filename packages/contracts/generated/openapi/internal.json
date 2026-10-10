@@ -25532,9 +25532,24 @@
                   ]
                 },
                 "numeric_source": {
-                  "type": [
-                    "string",
-                    "null"
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },

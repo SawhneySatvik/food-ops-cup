@@ -23,8 +23,9 @@ export interface LoadedSnapshot {
   created_at: Date;
 }
 
-// INFERENCE: advisor reads at staff level, judge has owner rights in its demo tenant (03-arch §6).
-const RANK: Record<string, number> = { staff: 1, advisor: 1, manager: 2, owner: 3, judge: 3, operator: 4 };
+// Template min_role ladder (0019, settles W2-R8): staff < manager < advisor (read-only finance, R27) < owner; judge has
+// owner rights in its demo tenant (03-arch §6); operator templates are operator-only.
+const RANK: Record<string, number> = { staff: 1, manager: 2, advisor: 3, owner: 4, judge: 4, operator: 5 };
 
 export function visibleTo(s: LoadedSnapshot, m: Member): boolean {
   if ((RANK[m.role] ?? 0) < (RANK[s.min_role] ?? 99)) return false;
