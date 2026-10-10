@@ -1,0 +1,57 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "ping"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/router",
+  "output": [
+   null,
+   null,
+   null
+  ],
+  "system": "Call the echo tool once with the user's text, then reply with the single word: done.\n\nYou are an agent. Your internal name is \"smoke\".",
+  "tools": [
+   {
+    "description": "Echo the text back, with the id and outlet scope of the current run.",
+    "name": "echo",
+    "parameters_json_schema": {
+     "properties": {
+      "text": {
+       "title": "Text",
+       "type": "string"
+      }
+     },
+     "required": [
+      "text"
+     ],
+     "title": "echoParams",
+     "type": "object"
+    }
+   }
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "text": "ping"
+       },
+       "name": "echo"
+      }
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

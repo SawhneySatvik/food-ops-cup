@@ -1,0 +1,69 @@
+# Munim Intelligence (03-architecture §1.1): Python 3.12 + Google ADK, no Postgres write path (R25).
+# R36: google-adk pinned exactly; NO litellm, never the [eval] / [extensions] / [all] / [test] extras —
+# tests/test_lockfile.py fails on either. openai is ADK's own [openai] range (OpenAILlm needs it).
+[project]
+name = "munim-intel"
+version = "0.0.0"
+requires-python = "==3.12.*"
+dependencies = [
+  "google-adk==2.11.0",
+  "openai>=2.20,<3",
+  "cryptography",
+  "fastapi",
+  "httpx",
+  "pydantic",
+  "uvicorn",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "ruff==0.17.0", "mypy==2.4.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["munim_intel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
+# ruff + mypy (`make lint` / `make typecheck`) cover the areas listed here. An area joins when its lane makes it
+# pass; contracts_gen is generated and never checked.
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+# Explicit names: ruff's `*` also matches `/`.
+include = [
+  "munim_intel/__init__.py", "munim_intel/__main__.py", "munim_intel/app.py", "munim_intel/config.py", "munim_intel/smoke.py",
+  "munim_intel/runtime/**/*.py", "munim_intel/llm/**/*.py", "munim_intel/tools/**/*.py",
+  "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
+  "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
+  "tests/fixtures/smoke_once.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE"]
+# assert is how pytest asserts; subprocess calls in tests run fixed argv lists of our own tools.
+per-file-ignores = { "tests/**" = ["S101", "S105", "S106", "S603"], "munim_intel/runtime/internal_client.py" = ["S101", "S105"] }
+
+[tool.ruff.lint.isort]
+known-first-party = ["munim_intel", "conftest"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = [
+  "munim_intel/__init__.py", "munim_intel/__main__.py", "munim_intel/app.py", "munim_intel/config.py", "munim_intel/smoke.py",
+  "munim_intel/runtime", "munim_intel/llm", "munim_intel/tools",
+  "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
+  "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
+  "tests/fixtures/smoke_once.py",
+]
+mypy_path = "tests"
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["munim_intel.contracts_gen.*"]
+follow_imports = "silent"

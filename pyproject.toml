@@ -17,3 +17,26 @@ name = "intel imports no other service"
 type = "forbidden"
 source_modules = ["munim_intel"]
 forbidden_modules = ["suppliers_sim", "services"]
+
+# R25 + gotcha 25 made structural: intel has no Postgres client (every write goes through core-api) and no
+# LiteLLM (R36). External names are top-level only: import-linter squashes external packages.
+[[tool.importlinter.contracts]]
+name = "intel has no database client and no litellm"
+type = "forbidden"
+source_modules = ["munim_intel"]
+forbidden_modules = ["litellm", "sqlalchemy", "psycopg", "psycopg2", "asyncpg"]
+
+# T-041 runtime: entry points above tools above run context / LLM layer above config above generated contracts.
+# Areas not listed (other W3 lanes) are unconstrained here.
+[[tool.importlinter.contracts]]
+name = "intel runtime layers"
+type = "layers"
+layers = [
+  "munim_intel.__main__",
+  "munim_intel.app",
+  "munim_intel.smoke",
+  "munim_intel.tools",
+  "munim_intel.runtime | munim_intel.llm",
+  "munim_intel.config",
+  "munim_intel.contracts_gen",
+]

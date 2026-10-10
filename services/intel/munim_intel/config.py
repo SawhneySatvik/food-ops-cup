@@ -1,0 +1,119 @@
+"""intel's one config module (project rule 20).
+
+Reads provider keys by their exact `.env.example` names, holds Munim-internal settings (defaults in code,
+generated files under the run directory) and redacts every secret value from error text and log lines.
+`.env` is read only when a caller passes `env_file` — `load_repo_config` (the process entry) does; tests
+never do. Nothing here writes `os.environ`: keys are handed to the model clients explicitly.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import traceback
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
+
+from dotenv import dotenv_values
+
+# The provider keys of `.env.example` (no OPENAI key there: the openai provider is skipped loudly).
+PROVIDER_KEY_NAMES = ("GEMINI_API_KEY", "NVIDIA_API_KEY", "OPENROUTER_API_KEY")
+ProviderKeyName = Literal["GEMINI_API_KEY", "NVIDIA_API_KEY", "OPENROUTER_API_KEY"]
+ModelMode = Literal["recorded", "live"]
+
+DEFAULT_INTEL_URL = "http://127.0.0.1:8081"
+PUBLIC_KEY_FILE = "run-token-ed25519.pub.pem"
+
+
+class ConfigError(Exception):
+    """A configuration problem. Its message names variables and paths, never their values."""
+
+
+class Config:
+    def __init__(self, env: Mapping[str, str | None], file_values: Mapping[str, str | None], run_dir: Path) -> None:
+        self._env = env
+        self._keys: dict[str, str] = {}
+        for name in PROVIDER_KEY_NAMES:
+            v = (env.get(name) or file_values.get(name) or "").strip()
+            if v:
+                self._keys[name] = v
+        self._secrets: list[tuple[str, str]] = []
+        for name, v in self._keys.items():
+            self._register(name, v)
+
+        mode = env.get("MUNIM_MODEL_MODE") or "recorded"
+        if mode not in ("recorded", "live"):
+            raise ConfigError('MUNIM_MODEL_MODE must be "recorded" or "live"')
+        self.model_mode: ModelMode = "live" if mode == "live" else "recorded"
+        self.run_dir = Path((env.get("MUNIM_RUN_DIR") or "").strip() or run_dir)
+        intel = urlsplit((env.get("MUNIM_INTEL_URL") or "").strip() or DEFAULT_INTEL_URL)
+        if not intel.hostname or not intel.port:
+            raise ConfigError("MUNIM_INTEL_URL must be http://<host>:<port>")
+        self.host: str = intel.hostname
+        self.port: int = intel.port
+        core = (env.get("MUNIM_CORE_URL") or "").strip()
+        self.core_url = core or f"http://127.0.0.1:{(env.get('PORT') or '8787').strip()}"
+
+    def _register(self, label: str, value: str) -> None:
+        if len(value) >= 4 and (label, value) not in self._secrets:
+            self._secrets.append((label, value))
+            # Longest first, so a secret that contains another is replaced whole.
+            self._secrets.sort(key=lambda s: -len(s[1]))
+
+    def provider_key(self, name: ProviderKeyName) -> str | None:
+        return self._keys.get(name)
+
+    def service_secret(self) -> str:
+        """The core <-> intel shared secret: `MUNIM_SERVICE_SECRET`, else `<run dir>/service-secret`.
+
+        core-api generates the file; intel only reads it, and refuses (fails closed) when there is none.
+        """
+        v = (self._env.get("MUNIM_SERVICE_SECRET") or "").strip()
+        if not v:
+            f = self.run_dir / "service-secret"
+            v = f.read_text("utf8").strip() if f.is_file() else ""
+        if not v:
+            raise ConfigError(f"no service secret: set MUNIM_SERVICE_SECRET or start core-api to create {self.run_dir}/service-secret")
+        self._register("service secret", v)
+        return v
+
+    def run_token_public_key_pem(self) -> bytes:
+        """core's Ed25519 PUBLIC key (`<run dir>/keys/...pub.pem`). intel never reads the private key."""
+        f = self.run_dir / "keys" / PUBLIC_KEY_FILE
+        if not f.is_file():
+            raise ConfigError(f"no run-token public key at {f}: start core-api once to create it")
+        return f.read_bytes()
+
+    def redact(self, text: str) -> str:
+        for label, v in self._secrets:
+            text = text.replace(v, f"[redacted:{label}]")
+        return text
+
+
+def load_config(env: Mapping[str, str | None] | None = None, env_file: Path | None = None, run_dir: Path = Path(".run")) -> Config:
+    file_values: Mapping[str, str | None] = dotenv_values(env_file) if env_file is not None and env_file.is_file() else {}
+    return Config(os.environ if env is None else env, file_values, run_dir)
+
+
+def load_repo_config(root: Path) -> Config:
+    """The process entry's config: `<root>/.env` (or `MUNIM_ENV_FILE`) and `<root>/.run`."""
+    env_file = (os.environ.get("MUNIM_ENV_FILE") or "").strip()
+    return load_config(os.environ, Path(env_file) if env_file else root / ".env", root / ".run")
+
+
+class RedactingFilter(logging.Filter):
+    """Attach to every handler: renders each record (traceback included) and redacts it before output."""
+
+    def __init__(self, cfg: Config) -> None:
+        super().__init__()
+        self._cfg = cfg
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = self._cfg.redact(record.getMessage())
+        record.args = None
+        if record.exc_info:
+            record.exc_text = self._cfg.redact("".join(traceback.format_exception(*record.exc_info)).rstrip())
+            record.exc_info = None
+        return True
