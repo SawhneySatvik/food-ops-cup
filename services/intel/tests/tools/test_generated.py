@@ -45,7 +45,16 @@ OUTLET = "01920000-0000-7000-8000-00000000b002"
 INGREDIENT = "01920000-0000-7000-8000-00000000b003"
 FINDING = "01920000-0000-7000-8000-00000000c001"
 # ADR-014 §5.1 / pack md §3 + §6, by hand: reads that exist today (catalogue 6, finance 7, inventory 1) + proposes.
-TOOLSET_SIZE = {"catalogue": 9, "finance": 10, "inventory_purchasing": 6, "kitchen": 2, "people": 2, "customers": 2, "compliance": 2, "market": 2}
+TOOLSET_SIZE = {
+    "catalogue": 9,
+    "finance": 10,
+    "inventory_purchasing": 6,
+    "kitchen": 2,
+    "people": 2,
+    "customers": 2,
+    "compliance": 2,
+    "market": 2,
+}
 
 
 def snapshot(template: str, columns: list[dict[str, Any]], rows: list[dict[str, Any]], sid: str = SNAP_ID) -> dict[str, Any]:
@@ -94,8 +103,14 @@ class Core:
         if path == "snapshots":
             self.mints += 1
             n = self.mints
-            rows = [{"item_id": f"01920000-0000-7000-8000-{n:06x}{i:06x}", "units_sold": i * 7, "margin_minor": 1000 + i} for i in range(500)]
-            cols = [{"name": "item_id", "type": "uuid"}, {"name": "units_sold", "type": "integer"}, {"name": "margin_minor", "type": "integer"}]
+            rows = [
+                {"item_id": f"01920000-0000-7000-8000-{n:06x}{i:06x}", "units_sold": i * 7, "margin_minor": 1000 + i} for i in range(500)
+            ]
+            cols = [
+                {"name": "item_id", "type": "uuid"},
+                {"name": "units_sold", "type": "integer"},
+                {"name": "margin_minor", "type": "integer"},
+            ]
             snap = snapshot(body["template_id"], cols, rows, sid=f"01920000-0000-7000-8000-{n:012x}")
             snap["params"] = body["params"]
             return httpx.Response(201, json=snap)
@@ -125,7 +140,14 @@ def po_args(**over: Any) -> dict[str, Any]:
         "outlet_ids": ["S1.r0.outlet_id"],
         "currency": "INR",
         "expected_on": None,
-        "lines": [{"ingredient_id": "S1.r0.ingredient_id", "qty_milli": "S1.r0.qty_milli", "unit": "kg", "unit_price_minor": "S1.r0.unit_price_minor"}],
+        "lines": [
+            {
+                "ingredient_id": "S1.r0.ingredient_id",
+                "qty_milli": "S1.r0.qty_milli",
+                "unit": "kg",
+                "unit_price_minor": "S1.r0.unit_price_minor",
+            }
+        ],
         "based_on": ["S1.r0.qty_milli"],
         "finding": None,
     }
@@ -137,7 +159,12 @@ def grammar(texts: list[str]) -> list[dict[str, Any]]:
     node = shutil.which("node")
     assert node, "node is required: the grammar gate runs core-domain's checkGrammar"
     out = subprocess.run(
-        [node, str(INTEL / "tests" / "tools" / "grammar_check.mts")], input=json.dumps(texts), capture_output=True, text=True, check=True, timeout=60
+        [node, str(INTEL / "tests" / "tools" / "grammar_check.mts")],
+        input=json.dumps(texts),
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
     )
     result: list[dict[str, Any]] = json.loads(out.stdout)
     return result
@@ -170,8 +197,14 @@ def test_one_handle_table_per_run_shared_counter_across_toolsets() -> None:
     client = core.client()
     manager = build_toolset("catalogue", CTX, client, h)
     branch = build_toolset("finance", CTX, client, h, propose=False)
-    a = run(tool(manager, "read_catalogue_dish_margin").run_async(args={"from": "2026-09-01", "to": "2026-09-30", "outlet_id": None, "channel_kind": None, "page": 0}, tool_context=None))
-    b = run(tool(branch, "read_finance_pnl").run_async(args={"period_month": "2026-09-01", "group_by": "outlet", "page": 0}, tool_context=None))
+    a = run(
+        tool(manager, "read_catalogue_dish_margin").run_async(
+            args={"from": "2026-09-01", "to": "2026-09-30", "outlet_id": None, "channel_kind": None, "page": 0}, tool_context=None
+        )
+    )
+    b = run(
+        tool(branch, "read_finance_pnl").run_async(args={"period_month": "2026-09-01", "group_by": "outlet", "page": 0}, tool_context=None)
+    )
     assert (a["handle"], b["handle"]) == ("S1", "S2")
     assert sorted(index) == ["S1", "S2"] and index["S2"].startswith("snap:")
     assert h.add_snapshot(h.snapshot("S1")) == "S1"  # the same snapshot id keeps its handle
@@ -236,7 +269,11 @@ def test_propose_expands_handles_mints_ids_and_posts_only_canonical_refs() -> No
     h.add_finding(FINDING)
     po = tool(build_toolset("inventory_purchasing", CTX, core.client(), h), "propose_purchasing_po_create")
     out = run(po.run_async(args=po_args(finding="F1"), tool_context=None))
-    assert out == {"draft": "P1", "status": "proposed", "message": "Recorded as a proposal; a named person must approve it before anything changes."}
+    assert out == {
+        "draft": "P1",
+        "status": "proposed",
+        "message": "Recorded as a proposal; a named person must approve it before anything changes.",
+    }
     path, body = core.requests[-1]
     p = body["payload"]
     ref = f"⟨snap:{SNAP_ID}·0·"
@@ -479,7 +516,9 @@ def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
         timeout=120,
     )
     result = json.loads(out.stdout)
-    print(f"zod: {len(drafts)} draft bodies, {len(mints)} mint bodies; failing {[i for i in result['drafts'] if i]} {[i for i in result['snapshots'] if i]}")
+    print(
+        f"zod: {len(drafts)} draft bodies, {len(mints)} mint bodies; failing {[i for i in result['drafts'] if i]} {[i for i in result['snapshots'] if i]}"
+    )
     assert (len(drafts), len(mints)) == (20, 15)
     assert result == {"drafts": [[] for _ in drafts], "snapshots": [[] for _ in mints]}
     # the refusal side: a bare number where a Ref belongs is refused by the same check
