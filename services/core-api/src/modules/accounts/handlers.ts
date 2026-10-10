@@ -49,8 +49,8 @@ export function linkHandler(spec: LinkSpec): CommandHandler {
         const hit = (await c.query<{ id: string; customer_id: string | null }>(
           `SELECT id, customer_id FROM core."order" WHERE guest_access_hash = decode($1, 'hex')`, [spec.claimHash])).rows;
         const o = hit.length === 1 ? hit[0]! : undefined;
+        // An order already claimed (or merged) is unreachable here: 0016 clears its hash whenever customer_id changes.
         if (!o) throw new ApiError("not_found");
-        if (o.customer_id === spec.customerId) throw new ApiError("conflict");
         if (o.customer_id !== null) {
           // Only a guest checkout's order is claimable: an order already on another signed-in profile stays
           // there (a leaked tracker link must not move someone's history). Core-owned check, nothing returned.
@@ -122,15 +122,44 @@ export function exportHandler(customerId: string): CommandHandler {
   };
 }
 
-/** Setting erased_at is all core-api does: core.customer_erasure (0004) blanks name, phone, email, idp_sub,
- *  email_verified_at and consent in the same row write, and refuses any later change (MB007). */
+/** Placeholder for a NOT NULL name column of an erased customer's reservation or bulk order. */
+export const ERASED_NAME = "[erased]";
+
+/** R41 erasure (R1-M1). Personal text is blanked wherever this customer left it — reservations (name, phone,
+ *  note), bulk orders (contact name, phone, note) and the notes on their order lines — then the profile itself and
+ *  every guest profile merged into it are closed: core.customer_erasure (0004) blanks name, phone, email, idp_sub,
+ *  email_verified_at and consent in the same row write and refuses any later change (MB007). Order rows, amounts
+ *  and loyalty entries are kept. One audit entry per changed row, ids and column names only. */
 export function erasureHandler(customerId: string): CommandHandler {
   return {
     type: ERASURE,
     async run(c) {
+      const audit: AuditEntry[] = [];
+      const blank = async (entity: string, sql: string, fields: string[], params: unknown[] = [customerId]) => {
+        for (const r of (await c.query<{ id: string }>(sql, params)).rows) {
+          audit.push({ entity, entityId: r.id, after: { erased_fields: fields } });
+        }
+      };
+      await blank("core.reservation",
+        `UPDATE core.reservation SET name = $2, phone = NULL, note = NULL
+          WHERE customer_id = $1 AND (name <> $2 OR phone IS NOT NULL OR note IS NOT NULL) RETURNING id`, ["name", "phone", "note"], [customerId, ERASED_NAME]);
+      await blank("core.bulk_order",
+        `UPDATE core.bulk_order SET contact_name = $2, contact_phone = NULL, note = NULL
+          WHERE customer_id = $1 AND (contact_name <> $2 OR contact_phone IS NOT NULL OR note IS NOT NULL) RETURNING id`, ["contact_name", "contact_phone", "note"], [customerId, ERASED_NAME]);
+      await blank("core.order_line",
+        `UPDATE core.order_line l SET note = NULL
+          WHERE l.note IS NOT NULL
+            AND EXISTS (SELECT 1 FROM core."order" o WHERE o.tenant_id = l.tenant_id AND o.id = l.order_id AND o.customer_id = $1) RETURNING l.id`, ["note"]);
       const r = await c.query(`UPDATE core.customer SET erased_at = now() WHERE id = $1 AND erased_at IS NULL`, [customerId]);
       if (r.rowCount !== 1) throw new ApiError("not_found");
-      return { entityId: customerId, audit: [{ entity: "core.customer", entityId: customerId, after: { erased: true } }] };
+      audit.push({ entity: "core.customer", entityId: customerId, after: { erased: true } });
+      // Guest profiles merged into this one by the verified-email merge hold the same person's name, phone and email.
+      // This context cannot see them (customer_scope; the guard's own-row rule), so 0016's definer erases them —
+      // only after the profile itself is erased — and returns each one for its audit entry.
+      for (const g of (await c.query<{ entity_id: string }>(`SELECT entity_id FROM core.customer_erase_merged_guests($1)`, [customerId])).rows) {
+        audit.push({ entity: "core.customer", entityId: g.entity_id, after: { erased: true, merged_into: customerId } });
+      }
+      return { entityId: customerId, audit };
     },
   };
 }

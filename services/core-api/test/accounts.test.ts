@@ -10,6 +10,8 @@
 //   6. verified-email merge (0015 A10): 2 orders + 1 reservation move, the guest is merged; 4 audit rows = the
 //      function's returned set; an unverified email moves nothing
 //   7. ensureProfile seam: first call creates, second returns the same id, guest → 401
+//   8. R1-m12: an unhandled Postgres error (a real 23505 whose row holds an email) is logged by SQLSTATE,
+//      constraint and table only — the email in its detail never reaches the log line
 import { createHash, randomBytes } from "node:crypto";
 import { createLogger } from "@munim/config";
 import { STOREFRONT_KEY_HEADER } from "@munim/contracts";
@@ -168,12 +170,12 @@ describe("guest-order claim by token", () => {
     expect([...p1.orders, ...p2.orders].map((o) => o.order_id).sort()).toEqual(guestOrders.map((g) => g.order).sort());
   });
 
-  it("a wrong token → 404 and nothing moves; an already-claimed token → 409; another account's order → 404", async () => {
+  it("a wrong token → 404 and nothing moves; an already-claimed token → 404 (0016 forgets the hash on claim); another account's order → 404", async () => {
     const before = await n(`SELECT count(*) AS n FROM core.command_log WHERE tenant_id = $1`, [A.tenant]);
     const wrong = await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: LOGIN, guestToken: randomBytes(32).toString("base64url"), body: linkBody() });
     expect(wrong.status).toBe(404);
     expect(await n(`SELECT count(*) AS n FROM core.command_log WHERE tenant_id = $1`, [A.tenant])).toBe(before);
-    expect((await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: LOGIN, guestToken: guestOrders[0]!.token, body: linkBody() })).status).toBe(409);
+    expect((await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: LOGIN, guestToken: guestOrders[0]!.token, body: linkBody() })).status).toBe(404);
     const stolen = await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: LOGIN, guestToken: otherOrder.token, body: linkBody() });
     expect(stolen.status).toBe(404);
     expect((await db.admin(`SELECT customer_id FROM core."order" WHERE tenant_id = $1 AND id = $2`, [A.tenant, otherOrder.order])).rows[0]!.customer_id).toBe(otherAccount);
@@ -398,5 +400,33 @@ describe("ensureProfile seam (T-032)", () => {
     expect(await n(`SELECT count(*) AS n FROM core.customer WHERE tenant_id = $1 AND idp_sub = $2`, [A.tenant, sub])).toBe(1);
     expect(await n(`SELECT count(*) AS n FROM core.command_log WHERE tenant_id = $1 AND command_type = 'customers.account.link.v1' AND actor->>'id' = $2`, [A.tenant, a.id])).toBe(1);
     expect((await call("POST", "/v1/_test/ensure-profile", { key: A.storefrontKey })).status).toBe(401);
+  });
+});
+
+describe("R1-m12: unhandled Postgres errors are logged without row values", () => {
+  it("a real 23505 with an email in the duplicate key → 500 internal; the log line has 23505 + constraint + table, not the email", async () => {
+    const lines: string[] = [];
+    const config = { nodeEnv: "test", redact: (x: string) => x };
+    const logged = await createApp({ pools, idp, storefronts: storefrontResolver(pools.core), config, log: createLogger(config, (l) => lines.push(l)) });
+    const SENTINEL = `pii.sentinel.${uuidv7()}@example.test`;
+    logged.post("/v1/_test/pg-23505", async () => {
+      // A real server error from the embedded cluster: a duplicate key in a throwaway table (superuser, temp).
+      const c = await db.connect("admin");
+      try {
+        await c.query("BEGIN");
+        await c.query("CREATE TEMP TABLE m12_probe (email text CONSTRAINT m12_probe_email_key PRIMARY KEY) ON COMMIT DROP");
+        await c.query("INSERT INTO m12_probe VALUES ($1), ($1)", [SENTINEL]);
+      } finally {
+        await c.query("ROLLBACK");
+        await c.end();
+      }
+      return new Response(null, { status: 204 });
+    });
+    const r = await logged.request("/v1/_test/pg-23505", { method: "POST" });
+    expect([r.status, ((await r.json()) as { error: { code: string } }).error.code]).toEqual([500, "internal"]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^POST \/v1\/_test\/pg-23505: unhandled pg 23505 constraint=m12_probe_email_key table=pg_temp_\d+\.m12_probe$/);
+    expect(lines[0]!.includes(SENTINEL)).toBe(false);
+    expect(lines.join("\n").includes("already exists")).toBe(false);
   });
 });

@@ -7,9 +7,17 @@ export interface Identity {
   email_verified: boolean;
 }
 
+export interface VerifyOpts {
+  /** Ask the IdP whether the address is confirmed (R1-M5). Only the routes that bind an email to a person need it:
+   *  /v1/onboarding, /v1/members:bind and a customer's first sign-in at a merchant (/v1/account:link, R41's
+   *  verified-email merge). Without it an adapter may skip that round trip and report `email_verified: false`;
+   *  every other member and customer request depends on the token's signature alone. */
+  needEmailVerified?: boolean;
+}
+
 export interface IdP {
   /** Resolves the identity, or rejects with IdpError for any bad, forged, expired or unreadable token. */
-  verify(token: string): Promise<Identity>;
+  verify(token: string, opts?: VerifyOpts): Promise<Identity>;
 }
 
 export class IdpError extends Error {

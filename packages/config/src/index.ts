@@ -233,12 +233,28 @@ export function loadConfig(opts: LoadOptions = {}): Config {
 }
 
 /** A logger whose every line passes through the config's redaction. Errors are inspected in full (own
- *  properties and causes included — e.g. a URL TypeError carries the bad input) and then redacted. */
+ *  properties and causes included — e.g. a URL TypeError carries the bad input) and then redacted — except a
+ *  Postgres server error (also as a cause), which is logged by SQLSTATE, constraint and table only (R1-m12): its
+ *  message and detail quote row values (23505 "Key (email)=(…) already exists", 22P02 the bad input). */
 export function createLogger(cfg: Pick<Config, "redact">, sink: (line: string) => void = (l) => process.stderr.write(`${l}\n`)) {
   return (msg: string, err?: unknown) => {
-    const line = err === undefined ? msg : `${msg} ${inspect(err, { depth: 4, breakLength: Infinity })}`;
+    const pg = err === undefined ? null : pgLabel(err);
+    const line = err === undefined ? msg : pg ? `${msg} pg ${pg}` : `${msg} ${inspect(err, { depth: 4, breakLength: Infinity })}`;
     sink(cfg.redact(line));
   };
+}
+
+/** "<sqlstate> constraint=<name> table=<schema>.<table>" for a pg DatabaseError (severity + 5-char code) found in
+ *  `err` or its causes, else null. Built from those identifier fields only. */
+function pgLabel(err: unknown): string | null {
+  for (let e = err, depth = 0; e && typeof e === "object" && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    const x = e as { code?: unknown; severity?: unknown; constraint?: unknown; schema?: unknown; table?: unknown };
+    if (typeof x.code === "string" && /^[0-9A-Z]{5}$/.test(x.code) && typeof x.severity === "string") {
+      const id = (v: unknown) => (typeof v === "string" && /^[A-Za-z0-9_$]{1,63}$/.test(v) ? v : "-");
+      return `${x.code} constraint=${id(x.constraint)} table=${id(x.schema)}.${id(x.table)}`;
+    }
+  }
+  return null;
 }
 export type Logger = ReturnType<typeof createLogger>;
 

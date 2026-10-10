@@ -1,5 +1,5 @@
 // Tenancy module (T-020). Mounted by modules/index.ts; exports `router` (full paths) and the provisionTenant seam.
-//   POST /v1/onboarding                      tenancy.onboard.v1   signed-in person → owner of a new tenant
+//   POST /v1/onboarding                      tenancy.onboard.v1   signed-in person → owner of a new tenant (id minted by core)
 //   GET  /v1/me/tenants                      where this sign-in is an active member
 //   GET  /v1/tenant · /v1/outlets · /v1/brands · /v1/channels · /v1/devices · /v1/members   (reads, own fields)
 //   POST /v1/tenant:update                   tenancy.tenant.update.v1   (country locked after onboarding, R30)
@@ -8,6 +8,7 @@
 //   POST /v1/members:bind                    tenancy.member.bind.v1     (the invitee's first sign-in)
 //   POST|GET /v1/storefront-keys · POST /v1/storefront-keys/{id}:revoke
 //   POST /platform/v1/demo-sessions          demo.session.start.v1      (operator)
+import { createHash } from "node:crypto";
 import { CommandEnvelope } from "@munim/contracts";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember, requireOperator, TENANT_HEADER } from "../../auth/resolve.ts";
@@ -42,15 +43,26 @@ function envelope(body: unknown): CommandEnvelope {
   return r.data;
 }
 
-/** The verified IdP identity of a request that has no tenant yet (onboarding, discovery, bind). */
-async function whoami(c: Context<AppEnv>): Promise<{ sub: string; email: string | null; email_verified: boolean }> {
+/** The verified IdP identity of a request that has no tenant yet (onboarding, discovery, bind). Only onboarding
+ *  and bind tie the email to a person, so only they ask the IdP whether it is confirmed (R1-M5). */
+async function whoami(c: Context<AppEnv>, needEmailVerified = false): Promise<{ sub: string; email: string | null; email_verified: boolean }> {
   const m = /^Bearer ([A-Za-z0-9._~+/=-]+)$/.exec(c.req.header("Authorization") ?? "");
   if (!m) throw new ApiError("unauthenticated");
   try {
-    return await c.var.deps.idp.verify(m[1]!);
+    return await c.var.deps.idp.verify(m[1]!, { needEmailVerified });
   } catch {
     throw new ApiError("unauthenticated");
   }
+}
+
+/** The onboarded tenant's id: sha256(sub, idempotency key) in the UUIDv7 layout the contracts require (version and
+ *  variant bits set; the other 122 bits are the hash, not a timestamp). */
+export function onboardTenantId(sub: string, idempotencyKey: string): string {
+  const h = createHash("sha256").update(`munim.onboard\u0000${sub}\u0000${idempotencyKey}`, "utf8").digest();
+  h[6] = (h[6]! & 0x0f) | 0x70;
+  h[8] = (h[8]! & 0x3f) | 0x80;
+  const x = h.subarray(0, 16).toString("hex");
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
 }
 
 function reply(c: Context<AppEnv>, out: { body: string; replayed: boolean }, status: 200 | 201 = 200) {
@@ -92,19 +104,23 @@ const list = (table: string, cols: string, order = "created_at, id") => async (c
 export const router = new Hono<AppEnv>()
   // ---- self-serve onboarding: the caller has a sign-in and no tenant yet ----
   .post("/v1/onboarding", async (c) => {
-    const who = await whoami(c);
+    const who = await whoami(c, true);
     // The owner's email is the IdP's; an unconfirmed address is not an identity to build a tenant on (F2).
     if (!who.email || !who.email_verified) throw new ApiError("invalid_payload", null, { refs: ["identity:email"] });
-    const env = envelope(await json(c));
-    const p = env.payload as { tenant_id?: unknown; owner_member_id?: unknown };
-    if (typeof p.tenant_id !== "string" || typeof p.owner_member_id !== "string" || !UUID.test(p.tenant_id) || !UUID.test(p.owner_member_id)) {
-      throw new ApiError("invalid_payload");
-    }
+    const sent = envelope(await json(c));
+    const p = sent.payload as { tenant_id?: unknown; owner_member_id?: unknown };
+    if (typeof p.owner_member_id !== "string" || !UUID.test(p.owner_member_id)) throw new ApiError("invalid_payload");
+    // R1-m6: the tenant id is core's, never the caller's — a caller-chosen id that already exists would be refused
+    // and so tell anyone that the tenant exists. It is derived from who signed in and the envelope's key, so a
+    // retry of the same envelope lands on the same tenant (and replays from its command_log); the payload's
+    // tenant_id is ignored. The result's entity_id names the new tenant.
+    const tenant = onboardTenantId(who.sub, sent.idempotency_key);
+    const env: CommandEnvelope = { ...sent, payload: { ...(sent.payload as object), tenant_id: tenant } };
     const { deps } = c.var;
     // The context is the NEW tenant with the new owner: nothing is trusted from the token but who signed in.
-    const ctx = { tenant_id: p.tenant_id, outlet_ids: "*" as const, role: "owner" as const, member_id: p.owner_member_id };
+    const ctx = { tenant_id: tenant, outlet_ids: "*" as const, role: "owner" as const, member_id: p.owner_member_id };
     const out = await executeCommand(
-      { tx: (fn) => withContext(deps.pools.core, ctx, fn), tenantId: p.tenant_id, actor: { kind: "member", id: p.owner_member_id, role: "owner" },
+      { tx: (fn) => withContext(deps.pools.core, ctx, fn), tenantId: tenant, actor: { kind: "member", id: p.owner_member_id, role: "owner" },
         ...(deps.publish ? { publish: deps.publish } : {}) },
       env, onboardHandler({ sub: who.sub, email: who.email }));
     return reply(c, out, 201);
@@ -117,7 +133,7 @@ export const router = new Hono<AppEnv>()
   })
   // ---- the invitee's first sign-in: tenant from the invite link (header), identity from the token ----
   .post("/v1/members:bind", async (c) => {
-    const who = await whoami(c);
+    const who = await whoami(c, true);
     const tenant = c.req.header(TENANT_HEADER);
     // An unverified address must never claim an invite that matches it (B16): 404, same as any other mismatch.
     if (!who.email || !who.email_verified || !tenant || !UUID.test(tenant)) throw new ApiError("not_found");

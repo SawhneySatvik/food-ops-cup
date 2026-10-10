@@ -50,15 +50,16 @@ function withProfile(c: Context<AppEnv>): SignedIn {
   return p;
 }
 
-/** The email and its verification come only from the verified token — never from a payload. requireCustomer
- *  keeps just `sub`, so the bearer is verified again here through the same IdP port. `email_verified` is not
- *  yet on the port's Identity (requested from T-004): until it is, no email counts as verified (fail closed). */
+/** The email and its verification come only from the IdP — never from a payload. requireCustomer keeps just
+ *  `sub` and never asks for the confirmation, so the bearer is verified again here, asking the IdP whether the
+ *  address is confirmed (R1-M5: the first sign-in at a merchant is the one customer request that binds an email
+ *  — R41's verified-email merge and email_verified_at depend on it). */
 async function tokenEmail(c: Context<AppEnv>, p: SignedIn): Promise<{ email: string | null; verified: boolean }> {
   const m = /^Bearer ([A-Za-z0-9._~+/=-]+)$/.exec(c.req.header("Authorization") ?? "");
   if (!m) throw new ApiError("unauthenticated");
-  let id: { sub: string; email: string | null; email_verified?: unknown };
+  let id: { sub: string; email: string | null; email_verified: boolean };
   try {
-    id = await c.var.deps.idp.verify(m[1]!);
+    id = await c.var.deps.idp.verify(m[1]!, { needEmailVerified: true });
   } catch {
     throw new ApiError("unauthenticated");
   }
