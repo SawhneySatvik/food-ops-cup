@@ -18,7 +18,7 @@ import { registerDraftHandler } from "../approvals/index.ts";
 import { availabilitySet, couponSet, dealEnd, dealUpsert, DRAFT_HANDLERS, itemUpsert, priceSet, recipeVersionCreate } from "./handlers.ts";
 import { itemsForSale, lookupBarcode } from "./menu.ts";
 
-export { priceLines, type PriceRequest, type PriceResult, type PricedLine, type PriceRefusal } from "./pricing.ts";
+export { couponUses, priceLines, type PriceRequest, type PriceResult, type PricedLine, type PriceRefusal } from "./pricing.ts";
 export { itemsForSale, type MenuEntry } from "./menu.ts";
 export { inWindows } from "./deals.ts";
 

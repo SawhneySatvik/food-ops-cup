@@ -109,19 +109,34 @@ describe("source state (derivation_rule.source_state)", () => {
 
   it("an unapproved (previewed) import's settlement cannot post: refused with 0 entries; once committed, 1 entry", async () => {
     const run = await previewedRun(db, fx);
-    // A settlement row written as a person's own imports.run.commit.v1 (the DB admits it) whose run is only
-    // previewed: the posting rule's source_state does not hold, so the guard refuses the entry.
+    // imports.run.commit.v1 is draft-only (0015 A1): a settlement row exists only under an approved draft. Inside
+    // that approval, before the run flips to committed, the posting rule's source_state does not hold, so the guard
+    // refuses the entry (savepoints keep the settlement and let the approval finish with the run still previewed).
     const s = settlement(run);
-    await db.withContext("munim_core", own(fx, "imports.run.commit.v1"), (c) =>
-      c.query(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
-               VALUES ($1, $2, $3, '2026-05-01', '2026-05-07', $4, 1000, 'INR', $5)`, [fx.tenant, s.settlement_id, fx.agg, s.external_ref, run]));
-    const refused = await sqlstate(db.withContext("munim_core", own(fx, "imports.run.commit.v1"), (c) => postFor(c, "finance.post_settlement", `core.settlement:${s.settlement_id}`)));
-    expect(refused).toMatch(/^MB00[18]$/);
-    expect(refused).toBe("MB008"); // pinned: the derivation fails, then the own-command branch names the mismatch
-    expect(await entriesFor(db, s.settlement_id)).toBe(0);
-    // The seam refuses before writing anything while the run is not committed.
-    const seam = await db.withContext("munim_core", own(fx, "imports.run.commit.v1"), (c) => recordSettlement(c, settlement(run)).then(() => "ok", (e: { code?: string }) => e.code ?? "?"));
+    const { refused, seam } = await inImportApproval(db, fx, run, async (c) => {
+      await c.query(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
+                     VALUES ($1, $2, $3, '2026-05-01', '2026-05-07', $4, 1000, 'INR', $5)`, [fx.tenant, s.settlement_id, fx.agg, s.external_ref, run]);
+      const attempt = async (fn: () => Promise<unknown>) => {
+        await c.query("SAVEPOINT attempt");
+        const code = await sqlstate(fn());
+        await c.query("ROLLBACK TO SAVEPOINT attempt");
+        return code;
+      };
+      return {
+        refused: await attempt(() => postFor(c, "finance.post_settlement", `core.settlement:${s.settlement_id}`)),
+        // The seam refuses before writing anything while the run is not committed.
+        seam: await attempt(() => recordSettlement(c, settlement(run))),
+      };
+    }, { commitRun: false });
+    expect(refused).toBe("MB008"); // pinned: the derivation fails, then the draft's command (no journal tables) names the mismatch
     expect(seam).toBe("book_write_refused");
+    expect(await entriesFor(db, s.settlement_id)).toBe(0);
+    expect(await count(db, `SELECT count(*) n FROM core.settlement WHERE id = $1`, [s.settlement_id])).toBe(1);
+    // A person's own imports.run.commit.v1 cannot write a settlement at all (draft-only → MB001).
+    const ownCmd = await sqlstate(db.withContext("munim_core", own(fx, "imports.run.commit.v1"), (c) =>
+      c.query(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
+               VALUES ($1, $2, $3, '2026-05-01', '2026-05-07', $4, 1000, 'INR', $5)`, [fx.tenant, uuidv7(), fx.agg, `PAYOUT-${uuidv7()}`, run])));
+    expect(ownCmd).toBe("MB001");
     // Approved: the run commits, then the seam records and posts.
     const ok = settlement(run);
     const out = await inImportApproval(db, fx, run, (c) => recordSettlement(c, ok));

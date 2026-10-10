@@ -13,6 +13,9 @@ export interface Seams {
   deriveGoodsReceipt(tx: Queryable, grnId: string): Promise<unknown>;
   /** finance: the derived journal entry for one seeded posting rule, `sourceRef` = "core.<table>:<id>". */
   postFor(tx: Queryable, ruleId: string, sourceRef: string): Promise<unknown>;
+  /** finance: the reversal of an approved invoice's entry once it is disputed or voided (0015 A6). Optional in an
+   *  installed set: absent, the real finance seam reverses whatever entry the set's postFor wrote. */
+  reverseSource?(tx: Queryable, ruleId: "finance.reverse_supplier_invoice", sourceRef: string): Promise<unknown>;
 }
 
 let installed: Seams | undefined;
@@ -42,5 +45,9 @@ export const seams: Seams = {
   async postFor(tx, ruleId, sourceRef) {
     if (installed) return installed.postFor(tx, ruleId, sourceRef);
     return (await load<Seams["postFor"]>("finance", "postFor"))(tx, ruleId, sourceRef);
+  },
+  async reverseSource(tx, ruleId, sourceRef) {
+    if (installed?.reverseSource) return installed.reverseSource(tx, ruleId, sourceRef);
+    return (await load<NonNullable<Seams["reverseSource"]>>("finance", "reverseSource"))(tx, ruleId, sourceRef);
   },
 };

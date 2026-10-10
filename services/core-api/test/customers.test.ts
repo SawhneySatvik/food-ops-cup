@@ -2,7 +2,8 @@
 //   loyalty: earn on complete / reverse on cancel (fixture, hand-computed); 50 concurrent redeems never drive the
 //   balance below 0 and balance_after is consistent; a direct campaign insert is refused and only an approved
 //   decision creates one; no code path sends a message (scanner + test); a customer context sees only its own rows.
-// Hand-computed expectations (INFERENCE rate: 1 point per 1,000 minor of subtotal − discount, LOYALTY.earnPerMinor):
+// Hand-computed expectations (the world's business_policy defaults, W2-R4: 1 point per 1,000 minor of subtotal −
+// discount, 1 point = 10 minor at redemption; the last gate adds a policy version and checks the new rates):
 //   order N1: subtotal 32000, discount 0 → 32 points.   order N2: subtotal 45500, discount 4500 → 41000/1000 = 41.
 // Synthetic data only.
 import { createLogger } from "@munim/config";
@@ -424,5 +425,30 @@ describe("customer records, role limits and the rest of the member surface", () 
     expect(r.status).toBe(200);
     expect((await r.json()).coupon_uses.map((u: any) => [u.coupon_id, u.order_id, u.discount_minor, u.currency])).toEqual([[coupon, o, 5000, t.currency]]);
     expect((await get("owner", `/v1/customers/${uuidv7()}/coupon-uses`)).status).toBe(404);
+  });
+});
+
+describe("loyalty policy per tenant (W2-R4: core.business_policy, not constants)", () => {
+  it("a new policy version (earn 1 point per 500, a point worth 20) doubles the earn and the redemption value; an older order date keeps the old rates", async () => {
+    const x = await customer("Synthetic Policy Regular");
+    expect((await adjust("owner", x, 100)).status).toBe(200);
+    // Before: the world's policy (defaults 1000 / 10): 32,000 net → 32 points; 40 points redeem for 400.
+    const before = await order(x, 32000);
+    expect((await advance(before, "completed", (c) => loyaltyEarnFor(c, before)))?.points).toBe(32);
+    const r0Order = await order(x, 32000);
+    const r0 = await db.withContext("munim_core", own("orders.place.v1"), (c) => loyaltyRedeem(c, r0Order, 40));
+    expect(r0.value_minor).toBe(400);
+    // A refusal paired with the accept: a policy row is a book row — staff cannot set one (tenancy.policy.set.v1 is owner).
+    const policy = (ctx: AppContext) => db.withContext("munim_core", ctx, (c) =>
+      c.query(`INSERT INTO core.business_policy (tenant_id, id, valid_from, loyalty_earn_per_minor, loyalty_point_value_minor) VALUES ($1, $2, '2026-10-05', 500, 20)`,
+        [t.tenant, uuidv7()]));
+    await expect(policy({ tenant_id: t.tenant, outlet_ids: [t.outlets[0]], role: "staff", member_id: t.staff, command_type: "tenancy.policy.set.v1" })).rejects.toMatchObject({ code: "MB001" });
+    await policy(own("tenancy.policy.set.v1"));
+    // After (orders dated today, 2026-10-05 ≤ today): 32,000 / 500 = 64 points; 40 points × 20 = 800.
+    const after = await order(x, 32000);
+    expect((await advance(after, "completed", (c) => loyaltyEarnFor(c, after)))?.points).toBe(64);
+    const r1Order = await order(x, 32000);
+    const r1 = await db.withContext("munim_core", own("orders.place.v1"), (c) => loyaltyRedeem(c, r1Order, 40));
+    expect(r1.value_minor).toBe(800);
   });
 });

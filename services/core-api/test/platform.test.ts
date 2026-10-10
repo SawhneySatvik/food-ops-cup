@@ -36,6 +36,15 @@ const call = (method: string, path: string, sub: string | null, body?: unknown, 
 const draftCount = async () => Number((await db.admin("SELECT count(*) AS n FROM platform.config_draft")).rows[0]!.n);
 const roleRow = async (role: string) => (await db.admin("SELECT provider, model_id FROM platform.model_role WHERE role = $1", [role])).rows[0];
 const propose = (target: string, patch: unknown, sub = OP1) => call("POST", "/platform/v1/config-drafts", sub, { target, patch });
+// The defaults 0015 A11 seeds (hand-typed from the migration): every role starts on a Gemini 3.x id.
+const SEEDED: Record<string, { provider: string; model_id: string }> = {
+  router: { provider: "gemini", model_id: "gemini-3.5-flash-lite" },
+  extract: { provider: "gemini", model_id: "gemini-3.5-flash-lite" },
+  narrate: { provider: "gemini", model_id: "gemini-3.5-flash-lite" },
+  reason: { provider: "gemini", model_id: "gemini-3.8-flash" },
+  vision: { provider: "gemini", model_id: "gemini-3.8-flash" },
+  embed: { provider: "gemini", model_id: "gemini-embedding-001" },
+};
 
 beforeAll(async () => {
   db = await openDb();
@@ -61,12 +70,12 @@ afterAll(async () => {
 
 describe("model roles change only through an approved config draft", () => {
   it("propose leaves the role untouched (proposed); approve applies it (applied) and audits it", async () => {
-    expect(await roleRow("reason")).toBeUndefined();
+    expect(await roleRow("reason")).toEqual(SEEDED.reason);
     const p = await propose("model_role:reason", { provider: "openrouter", model_id: "meta/llama-3.3-70b-instruct" });
     expect(p.status).toBe(201);
     const d = await p.json();
     expect(d.status).toBe("proposed");
-    expect(await roleRow("reason")).toBeUndefined(); // pending: nothing applied
+    expect(await roleRow("reason")).toEqual(SEEDED.reason); // pending: nothing applied
     // the operator's own command is its approval (R27): the proposer approves
     const a = await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {});
     expect(a.status).toBe(200);
@@ -79,7 +88,10 @@ describe("model roles change only through an approved config draft", () => {
     expect(audit.rows[1]!.actor).toEqual({ kind: "operator", id: opId1 });
     expect(audit.rows[1]!.after).toMatchObject({ provider: "openrouter" });
     const list = await (await call("GET", "/platform/v1/model-roles", OP1)).json();
-    expect(list.items.map((r: { role: string; model_id: string }) => [r.role, r.model_id])).toEqual([["reason", "meta/llama-3.3-70b-instruct"]]);
+    expect(list.items.map((r: { role: string; model_id: string }) => [r.role, r.model_id])).toEqual([
+      ["embed", "gemini-embedding-001"], ["extract", "gemini-3.5-flash-lite"], ["narrate", "gemini-3.5-flash-lite"],
+      ["reason", "meta/llama-3.3-70b-instruct"], ["router", "gemini-3.5-flash-lite"], ["vision", "gemini-3.8-flash"],
+    ]);
   });
 
   it("a second approve is refused (already_decided); reject by a second operator needs a reason and changes nothing", async () => {
@@ -88,11 +100,11 @@ describe("model roles change only through an approved config draft", () => {
     const r = await call("POST", `/platform/v1/config-drafts/${d.id}:reject`, OP2, { reason: "not now" });
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ status: "rejected", decided_by: opId2, reason: "not now" });
-    expect(await roleRow("router")).toBeUndefined();
+    expect(await roleRow("router")).toEqual(SEEDED.router);
     const again = await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {});
     expect(again.status).toBe(409);
     expect((await again.json()).error.code).toBe("already_decided");
-    expect(await roleRow("router")).toBeUndefined();
+    expect(await roleRow("router")).toEqual(SEEDED.router);
   });
 
   it("gemini-2.5 (any case, anywhere in the id) is refused with model_blocked and leaves no draft; gemini-3 is accepted", async () => {
@@ -128,7 +140,7 @@ describe("model roles change only through an approved config draft", () => {
       [id, JSON.stringify({ provider: "gemini", model_id: "gemini-2.5-flash" })]);
     const r = await call("POST", `/platform/v1/config-drafts/${id}:approve`, OP1, {});
     expect(r.status).toBe(422);
-    expect(await roleRow("vision")).toBeUndefined();
+    expect(await roleRow("vision")).toEqual(SEEDED.vision);
     expect((await db.admin("SELECT status FROM platform.config_draft WHERE id = $1", [id])).rows[0]!.status).toBe("proposed");
   });
 

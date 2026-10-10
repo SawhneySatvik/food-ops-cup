@@ -22,7 +22,7 @@ import { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClos
 import { tallyExport } from "./read.ts";
 
 export { seedChart } from "./chart.ts";
-export { postFor, reverseFor, type PostResult } from "./post.ts";
+export { postFor, reverseFor, reverseSource, type PostResult, type ReversalRuleId } from "./post.ts";
 export { recordBankLines, recordSettlement, reconcileSettlement, type BankLineInput, type SettlementInput } from "./settle.ts";
 export { FINANCE_TEMPLATES } from "./read.ts";
 export { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";

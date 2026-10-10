@@ -43,6 +43,7 @@ let KEY: string; // pickup channel key
 let CH: string; // pickup channel id
 let OUT: string; // outlet 1
 let ITEM2: string; // sold-out item
+let VARIANT: string; // the world paneer tikka's one variant (the item sells only as it)
 let win: { w1300: string; full: string; w1600: string; w1630: string };
 let clockNow = AT_1300;
 
@@ -69,6 +70,8 @@ beforeAll(async () => {
   await db.withContext("munim_core", cmdCtx("catalogue.item.upsert.v1"), async (c) => {
     await c.query(`INSERT INTO core.item (tenant_id, id, kind, name_key, category) VALUES ($1, $2, 'dish', 'menu.lassi', 'drinks')`, [W.tenant, ITEM2]);
   });
+  // The world's paneer tikka is sold by its one variant (catalogue's sellable rule): carts name it.
+  VARIANT = (await db.admin<{ id: string }>(`SELECT id FROM core.variant WHERE tenant_id = $1 AND item_id = $2`, [W.tenant, W.item])).rows[0]!.id;
   await db.withContext("munim_core", cmdCtx("catalogue.price.set.v1"), async (c) => {
     await c.query(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from) VALUES ($1, $2, $3, $4, 'pickup', 32000, 'INR', 'restaurant_5', '2026-10-01')`, [W.tenant, uuidv7(), W.item, OUT]);
     await c.query(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from) VALUES ($1, $2, $3, $4, 'pickup', 8000, 'INR', 'restaurant_5', '2026-10-01')`, [W.tenant, uuidv7(), ITEM2, OUT]);
@@ -139,7 +142,7 @@ function placeBody(over: Record<string, unknown> = {}, opts: { guest?: boolean; 
         payload: {
           order_id: orderId, outlet_id: OUT, channel_id: W.channel, brand_id: null, device_id: null, kind: "pickup", table_ref: null,
           pickup_window_id: win.w1300, promised_at: P_1300, external_ref: null,
-          lines: [{ line_id: uuidv7(), item_id: opts.item ?? W.item, variant_id: null, option_ids: [], qty_milli: 1000, barcode: null, note: null }],
+          lines: [{ line_id: uuidv7(), item_id: opts.item ?? W.item, variant_id: (opts.item ?? W.item) === W.item ? VARIANT : null, option_ids: [], qty_milli: 1000, barcode: null, note: null }],
           coupon_codes: [], loyalty_redeem_points: 0, preview_total_minor: null, client_totals: null,
           ...over,
         },
@@ -299,7 +302,7 @@ describe("refusals: each code, paired with an accept", () => {
   it("preview: same price, labelled preview, writes nothing, and carries the storefront's own refusals", async () => {
     const before = Number((await db.admin(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n);
     const req = { outlet_id: OUT, channel_id: W.channel, brand_id: null, kind: "pickup", pickup_window_id: win.full, promised_at: P_1300, coupon_codes: [], loyalty_redeem_points: 0,
-      lines: [{ item_id: W.item, variant_id: null, option_ids: [], qty_milli: 1000, barcode: null }] };
+      lines: [{ item_id: W.item, variant_id: VARIANT, option_ids: [], qty_milli: 1000, barcode: null }] };
     const r = (await (await call("POST", "/v1/storefront/orders:preview", req)).json()) as any;
     expect(r).toMatchObject({ label: "preview", total_minor: 30240, tax_minor: 1440, discount_minor: 3200 });
     expect(r.refusals).toEqual([{ line_no: null, reason_code: "window_full" }]);

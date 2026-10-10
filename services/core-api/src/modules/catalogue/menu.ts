@@ -7,7 +7,7 @@
 import type { DealWindow } from "@munim/contracts/catalogue";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
-import { loadDeals, outletClock } from "./pricing.ts";
+import { loadDeals, outletClock, sellableAs } from "./pricing.ts";
 
 export type MenuEntry = {
   item_id: string;
@@ -38,8 +38,7 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
               CASE WHEN v.id IS NULL THEN i.barcode ELSE v.barcode END AS barcode, i.mrp_minor
          FROM core.item i
          LEFT JOIN core.variant v ON v.tenant_id = i.tenant_id AND v.item_id = i.id AND v.active
-        WHERE i.active AND ($4::uuid IS NULL OR i.id = $4)
-          AND (v.id IS NOT NULL OR NOT EXISTS (SELECT 1 FROM core.variant w WHERE w.tenant_id = i.tenant_id AND w.item_id = i.id AND w.active)))
+        WHERE i.active AND ($4::uuid IS NULL OR i.id = $4) AND ${sellableAs("i", "v.id")})
      SELECT s.*, p.id AS price_id, p.amount_minor AS price_minor, p.currency, p.tax_class,
             NOT EXISTS (SELECT 1 FROM core.item_availability a WHERE a.outlet_id = $1 AND a.item_id = s.item_id
                           AND (a.variant_id IS NULL OR a.variant_id = s.variant_id) AND NOT a.available) AS available

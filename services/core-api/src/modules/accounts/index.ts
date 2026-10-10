@@ -29,8 +29,6 @@ import {
 } from "./handlers.ts";
 import { exportOf, loyaltyOf, orderOf, ordersOf, profileOf } from "./read.ts";
 
-export { EMAIL_MERGE_FN, emailMergeAvailable } from "./handlers.ts";
-
 type Shopper = Extract<Principal, { kind: "customer" }>;
 type SignedIn = Shopper & { sub: string };
 

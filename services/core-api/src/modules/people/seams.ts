@@ -1,10 +1,11 @@
-// Cross-module seam: finance.postFor (T-026 owns it; brief "Cross-module seams"). Resolved lazily from
+// Cross-module seams: finance.postFor and finance.reverseSource (T-026 owns them; brief "Cross-module seams"). Resolved lazily from
 // `../finance/index.ts` when that module has landed; until then a local stand-in records the call and posts
 // NOTHING. T-034 (W2 integration) wires the real one. Signature fixed by the brief:
 //   postFor(tx, rule_id, source_ref)   source_ref = 'core.<table>:<uuid>' (db/README "Context keys")
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 
 export type PostFor = (tx: Queryable, rule_id: string, source_ref: string) => Promise<unknown>;
@@ -41,4 +42,13 @@ async function resolve(): Promise<PostFor> {
 
 export async function postFor(tx: Queryable, rule_id: string, source_ref: string): Promise<void> {
   await (await resolve())(tx, rule_id, source_ref);
+}
+
+/** finance.reverseSource: the reversal of a voided payroll's entry (rule finance.reverse_payroll). No stand-in:
+ *  without finance the void is refused (`unavailable`) rather than leaving the entry standing. */
+export async function reverseSource(tx: Queryable, rule_id: "finance.reverse_payroll", source_ref: string): Promise<void> {
+  const file = join(import.meta.dirname, "..", "finance", "index.ts");
+  const mod = (await import(pathToFileURL(file).href)) as { reverseSource?: (tx: Queryable, r: string, s: string) => Promise<unknown> };
+  if (typeof mod.reverseSource !== "function") throw new ApiError("unavailable");
+  await mod.reverseSource(tx, rule_id, source_ref);
 }

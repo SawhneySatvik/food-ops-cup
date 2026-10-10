@@ -7,22 +7,12 @@ import type { CommandEnvelope } from "@munim/contracts";
 import { asSystem } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AuditEntry, CommandHandler, HandlerOutput } from "../../commit/index.ts";
-import type { Queryable } from "../../runtoken/index.ts";
 
 export const LINK = "customers.account.link.v1";
 export const PROFILE_UPDATE = "customers.profile.update.v1";
 export const CONSENT_SET = "customers.consent.set.v1";
 export const DATA_EXPORT = "customers.data.export.v1";
 export const ERASURE = "customers.erasure.request.v1";
-
-/** The definer function the migrator adds for R41's verified-email merge (requested in the T-035 report).
- *  Until it exists the merge is not attempted (fail closed): only the token claim moves guest orders. */
-export const EMAIL_MERGE_FN = "core.customer_claim_verified_email_guests()";
-
-export async function emailMergeAvailable(c: Queryable): Promise<boolean> {
-  const r = await c.query<{ ok: boolean }>(`SELECT to_regprocedure($1) IS NOT NULL AS ok`, [EMAIL_MERGE_FN]);
-  return r.rows[0]?.ok === true;
-}
 
 export interface LinkSpec {
   tenantId: string;
@@ -38,7 +28,8 @@ export interface LinkSpec {
 }
 
 /** customers.account.link.v1: create this merchant's profile on first sign-in, then claim the guest order the
- *  presented token proves, then (once the definer function exists) the guest profiles' orders by verified email. */
+ *  presented token proves, then (verified email only) the matching guest profiles' orders, reservations and bulk
+ *  orders through core.customer_claim_verified_email_guests() (0015 A10). */
 export function linkHandler(spec: LinkSpec): CommandHandler {
   return {
     type: LINK,
@@ -75,11 +66,15 @@ export function linkHandler(spec: LinkSpec): CommandHandler {
         audit.push({ entity: "core.order", entityId: o.id, before: { customer_id: o.customer_id }, after: { customer_id: spec.customerId, claimed_by: "guest_token" } });
       }
 
-      if (spec.emailVerified && spec.email !== null && (await emailMergeAvailable(c))) {
-        const moved = (await c.query<{ order_id: string; from_customer_id: string }>(
-          `SELECT order_id, from_customer_id FROM core.customer_claim_verified_email_guests()`)).rows;
-        for (const m of moved) {
-          audit.push({ entity: "core.order", entityId: m.order_id, before: { customer_id: m.from_customer_id }, after: { customer_id: spec.customerId, claimed_by: "verified_email" } });
+      if (spec.emailVerified && spec.email !== null) {
+        // One row per changed book row (moved order / reservation / bulk order, and each merged guest profile as
+        // core.customer); every one is audited (db/README "verified-email merge").
+        const changed = (await c.query<{ entity: string; entity_id: string; from_customer_id: string }>(
+          `SELECT entity, entity_id, from_customer_id FROM core.customer_claim_verified_email_guests()`)).rows;
+        for (const m of changed) {
+          audit.push(m.entity === "core.customer"
+            ? { entity: m.entity, entityId: m.entity_id, before: { merged_into: null }, after: { merged_into: spec.customerId, claimed_by: "verified_email" } }
+            : { entity: m.entity, entityId: m.entity_id, before: { customer_id: m.from_customer_id }, after: { customer_id: spec.customerId, claimed_by: "verified_email" } });
         }
       }
 

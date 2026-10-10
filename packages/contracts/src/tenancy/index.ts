@@ -135,6 +135,17 @@ export const TenancyTenantUpdateV1 = z
 /** The invitee's first sign-in: binds the verified IdP subject to the invited member row, once. */
 export const TenancyMemberBindV1 = z.strictObject({ member_id: Uuid7 });
 
+/** The owner changes another member's role and outlet scope (never their own; never a judge, whom the platform
+ *  makes). `[]` = all outlets (owner/advisor); a manager or staff member needs at least one outlet. */
+export const TenancyMemberRoleSetV1 = z.strictObject({
+  member_id: Uuid7,
+  role: MemberRole.exclude(["judge"]),
+  outlet_ids: z.array(Uuid7),
+});
+
+/** The owner deactivates another member: their sign-in stops resolving; everything they recorded stays. */
+export const TenancyMemberDeactivateV1 = z.strictObject({ member_id: Uuid7 });
+
 /** `/platform/v1/demo-sessions` (operator): an ephemeral named judge who owns a fresh demo tenant (R27). */
 export const DemoSessionStartV1 = z.strictObject({
   tenant_id: Uuid7,
@@ -227,6 +238,8 @@ export const SCHEMAS = {
   "tenancy.outlet.update.v1": TenancyOutletUpdateV1,
   "tenancy.tenant.update.v1": TenancyTenantUpdateV1,
   "tenancy.member.bind.v1": TenancyMemberBindV1,
+  "tenancy.member.role.set.v1": TenancyMemberRoleSetV1,
+  "tenancy.member.deactivate.v1": TenancyMemberDeactivateV1,
   "demo.session.start.v1": DemoSessionStartV1,
   "tenancy.storefront-key.create": StorefrontKeyCreateRequest,
   "tenancy.storefront-key.created": StorefrontKeyCreated,
@@ -273,5 +286,7 @@ export const ROUTES: readonly Route[] = [
   { surface: "public", method: "get", path: "/v1/channels", operationId: "listChannels", summary: "Sales channels", auth: "member", response: "v1.channels", status: 200 },
   { surface: "public", method: "get", path: "/v1/devices", operationId: "listDevices", summary: "POS and KDS devices", auth: "member", response: "v1.devices", status: 200 },
   { surface: "public", method: "get", path: "/v1/members", operationId: "listMembers", summary: "Members and their roles (owner only)", auth: "member", response: "v1.members", status: 200 },
+  { surface: "public", method: "post", path: "/v1/members/{id}:set-role", operationId: "setMemberRole", summary: "tenancy.member.role.set.v1 — change another member's role and outlet scope (owner)", auth: "member", command: "tenancy.member.role.set.v1", response: "command-result", status: 200, conflict: true, pathParams: [{ name: "id", uuid: true }] },
+  { surface: "public", method: "post", path: "/v1/members/{id}:deactivate", operationId: "deactivateMember", summary: "tenancy.member.deactivate.v1 — deactivate another member; their sign-in stops resolving, their records stay (owner)", auth: "member", command: "tenancy.member.deactivate.v1", response: "command-result", status: 200, conflict: true, pathParams: [{ name: "id", uuid: true }] },
   { surface: "public", method: "post", path: "/v1/storefront-keys/{id}:revoke", operationId: "revokeStorefrontKey", summary: "Revoke a storefront key; it stops resolving at once (owner)", auth: "member", response: "tenancy.storefront-key.revoked", status: 200, pathParams: [{ name: "id", uuid: true }] },
 ];

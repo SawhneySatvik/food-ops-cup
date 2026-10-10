@@ -3,8 +3,8 @@
 // Currency, FY start, zones, aggregators and tax-id formats come from the country pack, never the payload.
 import type { CommandEnvelope } from "@munim/contracts";
 import {
-  DemoSessionStartV1, TenancyBrandCreateV1, TenancyChannelCreateV1, TenancyDeviceRegisterV1, TenancyMemberBindV1,
-  TenancyMemberInviteV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyTenantUpdateV1,
+  DemoSessionStartV1, TenancyBrandCreateV1, TenancyChannelCreateV1, TenancyDeviceRegisterV1, TenancyMemberBindV1, TenancyMemberDeactivateV1,
+  TenancyMemberInviteV1, TenancyMemberRoleSetV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyTenantUpdateV1,
 } from "@munim/contracts/tenancy";
 import type { Principal } from "../../auth/resolve.ts";
 import type { CommandHandler } from "../../commit/index.ts";
@@ -19,8 +19,8 @@ const tenantOf = async (c: Queryable) => (await c.query<{ t: string }>(`SELECT c
 const countryOf = async (c: Queryable) =>
   (await c.query<{ country_code: string }>(`SELECT country_code FROM core.tenant`)).rows[0]!.country_code;
 
-/** Fixed command names (db: core.command_authority). tenancy.onboard.v1 and tenancy.member.bind.v1 are
- *  PENDING in the seed (report to the migrator): the self-serve person is not an operator. */
+/** Fixed command names (db: core.command_authority; tenancy.onboard.v1 / member.bind / role.set / deactivate
+ *  seeded by 0015 A4 — the self-serve person is not an operator). */
 export const TYPES = {
   onboard: "tenancy.onboard.v1",
   outletCreate: "tenancy.outlet.create.v1",
@@ -31,6 +31,8 @@ export const TYPES = {
   deviceRegister: "tenancy.device.register.v1",
   invite: "tenancy.member.invite.v1",
   bind: "tenancy.member.bind.v1",
+  roleSet: "tenancy.member.role.set.v1",
+  deactivate: "tenancy.member.deactivate.v1",
   demo: "demo.session.start.v1",
 } as const;
 
@@ -269,3 +271,44 @@ export const bindHandler = (who: { sub: string; email: string }): CommandHandler
     return { entityId: p.member_id, audit: [{ entity: "core.member", entityId: p.member_id, after: { bound: true, already } }] };
   },
 });
+
+type MemberRow = { role: string; outlet_ids: string[]; active: boolean };
+/** Another member of this tenant (not the caller, not a judge), with their membership. The caller changing their own
+ *  role or deactivating themselves is refused: the tenant always keeps the owner who acts. */
+async function otherMember(c: Queryable, memberId: string): Promise<MemberRow> {
+  const self = (await c.query<{ me: string }>(`SELECT current_setting('app.member_id') AS me`)).rows[0]!.me;
+  if (self === memberId) throw new ApiError("conflict");
+  const row = (await c.query<MemberRow>(
+    `SELECT ms.role, ms.outlet_ids, (m.active AND ms.active) AS active
+       FROM core.member m JOIN core.membership ms ON ms.tenant_id = m.tenant_id AND ms.member_id = m.id WHERE m.id = $1`, [memberId])).rows[0];
+  if (!row || row.role === "judge") throw new ApiError("not_found");
+  return row;
+}
+
+export const roleSetHandler: CommandHandler = {
+  type: TYPES.roleSet,
+  async run(c, cmd) {
+    const p = payload(TenancyMemberRoleSetV1, cmd);
+    if ((p.role === "manager" || p.role === "staff") && p.outlet_ids.length === 0) throw new ApiError("invalid_payload", null, { refs: ["member:outlet_ids"] });
+    if (p.outlet_ids.length) await assertOutlets(c, p.outlet_ids);
+    const before = await otherMember(c, p.member_id);
+    if (!before.active) throw new ApiError("conflict");
+    await c.query(`UPDATE core.membership SET role = $2, outlet_ids = $3 WHERE member_id = $1`, [p.member_id, p.role, p.outlet_ids]);
+    return { entityId: p.member_id, audit: [{ entity: "core.membership", entityId: p.member_id,
+      before: { role: before.role, outlet_ids: before.outlet_ids }, after: { role: p.role, outlet_ids: p.outlet_ids } }] };
+  },
+};
+
+export const deactivateHandler: CommandHandler = {
+  type: TYPES.deactivate,
+  async run(c, cmd) {
+    const p = payload(TenancyMemberDeactivateV1, cmd);
+    if (!(await otherMember(c, p.member_id)).active) throw new ApiError("conflict");
+    await c.query(`UPDATE core.member SET active = false WHERE id = $1`, [p.member_id]);
+    await c.query(`UPDATE core.membership SET active = false WHERE member_id = $1`, [p.member_id]);
+    return { entityId: p.member_id, audit: [
+      { entity: "core.member", entityId: p.member_id, before: { active: true }, after: { active: false } },
+      { entity: "core.membership", entityId: p.member_id, before: { active: true }, after: { active: false } },
+    ] };
+  },
+};

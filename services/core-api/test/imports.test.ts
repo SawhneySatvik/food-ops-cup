@@ -20,7 +20,7 @@ import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { parsePendingImports } from "../../core-worker/src/imports/index.ts";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { seedChart } from "../src/modules/finance/index.ts";
-import { localBlobStore, setBlobStore } from "../src/modules/imports/index.ts";
+import { localBlobStore } from "../src/modules/imports/index.ts";
 import { openDb } from "./db.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../core-worker/test/fixtures/imports");
@@ -33,7 +33,6 @@ let db: TestDb;
 let pools: { core: pg.Pool; svc: pg.Pool };
 let app: Hono<AppEnv>;
 let blobDir: string;
-let restoreBlobs: () => void;
 
 type Who = "owner" | "staff" | "manager";
 interface Tenant { w: World; subs: Record<Who, string>; manager: string }
@@ -99,13 +98,12 @@ beforeAll(async () => {
   T.AU = await tenant("AU");
   pools = { core: db.pool("munim_core", 8), svc: db.pool("munim_svc", 2) };
   blobDir = await mkdtemp(join(tmpdir(), "munim-imports-"));
-  restoreBlobs = setBlobStore(localBlobStore(blobDir));
   const config = { nodeEnv: "test", redact: (s: string) => s };
-  app = await createApp({ pools, idp, storefronts: async () => null, config, log: createLogger(config, () => {}) });
+  // The routes and the worker's parse job share one store, handed over as Deps (not a module global).
+  app = await createApp({ pools, idp, storefronts: async () => null, blobs: localBlobStore(blobDir), config, log: createLogger(config, () => {}) });
 });
 
 afterAll(async () => {
-  restoreBlobs?.();
   await pools?.core.end();
   await pools?.svc.end();
   await db?.stop();
@@ -215,14 +213,45 @@ describe("commit on approval: 0 book rows before, rows_ok after, under the appro
     expect(await entries("finance.post_expense", "core.expense", RUNS.get("synthetic_tally_1.csv")!.run)).toBe(3);
   });
 
-  it("POS export commit is refused until imports.run.commit.v1 is bound to orders (UNMET, migrator request) — 403 command_table_mismatch, 0 orders, draft proposed", async () => {
+  it("POS export commit (0015 A7): 4 bills → 4 completed orders + 4 tenders under the approval, each posted as a sale; staff cannot approve", async () => {
     const r = RUNS.get("synthetic_pos_1.csv")!;
-    const before = await count(`SELECT count(*) n FROM core."order" WHERE tenant_id = $1`, [T.IN.w.tenant]);
+    const mine = (sql: string) => db.admin(sql, [T.IN.w.tenant, r.run]).then((x) => x.rows);
+    const ORDERS = `SELECT o.external_ref AS bill, o.business_date::text AS bd, o.status, o.kind, o.subtotal_minor::int AS sub, o.discount_minor::int AS disc,
+                           o.tax_minor::int AS tax, o.total_minor::int AS total, o.invoice_no, o.origin ->> 'kind' AS origin
+                      FROM core."order" o WHERE o.tenant_id = $1 AND o.pricing_snapshot ->> 'import_run_id' = $2::text ORDER BY o.external_ref`;
+    // Refusal: staff may not approve an import (not in imports.run.commit.v1's allowed roles) — nothing written.
+    expect((await approve("IN", "staff", r.draft, "imports.run.commit.v1")).status).toBe(404);
+    expect(await mine(ORDERS)).toEqual([]);
     const res = await approve("IN", "owner", r.draft, "imports.run.commit.v1");
-    expect(res.status).toBe(403);
-    expect((await res.json()).error.code).toBe("command_table_mismatch");
-    expect(await count(`SELECT count(*) n FROM core."order" WHERE tenant_id = $1`, [T.IN.w.tenant])).toBe(before);
-    expect((await one<{ status: string }>(`SELECT status FROM core.draft WHERE id = $1`, [r.draft])).status).toBe("proposed");
+    expect(res.status).toBe(200);
+    // Hand-copied from synthetic_pos_1.csv (paise): the file's own figures, the bill's date, no device invoice number.
+    expect(await mine(ORDERS)).toEqual([
+      { bill: "SYN-B-0001", bd: "2026-10-01", status: "completed", kind: "dine_in", sub: 40000, disc: 0, tax: 2000, total: 42000, invoice_no: null, origin: "decision" },
+      { bill: "SYN-B-0002", bd: "2026-10-01", status: "completed", kind: "takeaway", sub: 25000, disc: 2500, tax: 1125, total: 23625, invoice_no: null, origin: "decision" },
+      { bill: "SYN-B-0003", bd: "2026-10-02", status: "completed", kind: "dine_in", sub: 100000, disc: 0, tax: 5000, total: 105000, invoice_no: null, origin: "decision" },
+      { bill: "SYN-B-0004", bd: "2026-10-02", status: "completed", kind: "takeaway", sub: 12000, disc: 0, tax: 600, total: 12600, invoice_no: null, origin: "decision" },
+    ]);
+    expect(await mine(`SELECT t.ref AS bill, t.method, t.amount_minor::int AS amount, t.origin ->> 'kind' AS origin FROM core.tender t JOIN core."order" o ON o.tenant_id = t.tenant_id AND o.id = t.order_id
+                        WHERE o.tenant_id = $1 AND o.pricing_snapshot ->> 'import_run_id' = $2::text ORDER BY t.ref`)).toEqual([
+      { bill: "SYN-B-0001", method: "cash", amount: 42000, origin: "decision" },
+      { bill: "SYN-B-0002", method: "upi", amount: 23625, origin: "decision" },
+      { bill: "SYN-B-0003", method: "card", amount: 105000, origin: "decision" },
+      { bill: "SYN-B-0004", method: "upi", amount: 12600, origin: "decision" },
+    ]);
+    // Each bill posts as a live sale does: one finance.post_order and one finance.post_tender entry, dated on the bill.
+    expect(await mine(`SELECT j.posting_rule AS rule, count(*)::int AS n, min(j.entry_date)::text AS first, max(j.entry_date)::text AS last
+                         FROM core.journal_entry j WHERE j.tenant_id = $1 AND j.origin ->> 'kind' = 'derivation'
+                          AND (j.source_id IN (SELECT id FROM core."order" WHERE pricing_snapshot ->> 'import_run_id' = $2::text)
+                            OR j.source_id IN (SELECT t.id FROM core.tender t JOIN core."order" o ON o.tenant_id = t.tenant_id AND o.id = t.order_id WHERE o.pricing_snapshot ->> 'import_run_id' = $2::text))
+                        GROUP BY 1 ORDER BY 1`)).toEqual([
+      { rule: "finance.post_order", n: 4, first: "2026-10-01", last: "2026-10-02" },
+      { rule: "finance.post_tender", n: 4, first: "2026-10-01", last: "2026-10-02" },
+    ]);
+    // A person's own imports.run.commit.v1 cannot write an order (draft-only, MB001).
+    const own = await db.withContext("munim_core", { tenant_id: T.IN.w.tenant, outlet_ids: "*", role: "owner", member_id: T.IN.w.owner, command_type: "imports.run.commit.v1" }, (c) =>
+      c.query(`INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, total_minor, currency, pricing_snapshot)
+               VALUES ($1, $2, $3, $4, 'takeaway', 'completed', 100, 100, 'INR', '{}')`, [T.IN.w.tenant, uuidv7(), T.IN.w.outlets[0], T.IN.w.channel])).then(() => "ok", (e: { code?: string }) => e.code);
+    expect(own).toBe("MB001");
   });
 
   it("a committed run cannot be committed again (its draft is already decided)", async () => {
@@ -234,6 +263,20 @@ describe("commit on approval: 0 book rows before, rows_ok after, under the appro
 });
 
 describe("documents", () => {
+  it("the blob store comes from Deps: an app composed without one refuses the upload (503 unavailable, no document); this app's store accepts it", async () => {
+    const config = { nodeEnv: "test", redact: (s: string) => s };
+    const bare = await createApp({ pools, idp, storefronts: async () => null, config, log: createLogger(config, () => {}) });
+    const bytes = Buffer.from("Txn Date,Reference\n01-10-2026,SYN-BLOB\n");
+    const req = (a: Hono<AppEnv>) => a.request("/v1/imports/documents", { method: "POST",
+      headers: { Authorization: `Bearer ${idp.sign({ sub: T.IN.subs.owner })}`, [TENANT_HEADER]: T.IN.w.tenant, "Content-Type": "application/json" },
+      body: JSON.stringify(uploadBody("bank_statement", "synthetic_blob.csv", bytes)) });
+    const refused = await req(bare);
+    expect([refused.status, ((await refused.json()) as { error: { code: string } }).error.code]).toEqual([503, "unavailable"]);
+    expect(await count(`SELECT count(*) n FROM core.document WHERE tenant_id = $1 AND filename = 'synthetic_blob.csv'`, [T.IN.w.tenant])).toBe(0);
+    expect((await req(app)).status).toBe(200);
+    expect(await count(`SELECT count(*) n FROM core.document WHERE tenant_id = $1 AND filename = 'synthetic_blob.csv'`, [T.IN.w.tenant])).toBe(1);
+  });
+
   it("re-uploading the same file returns the existing document and its run; still one document", async () => {
     const first = RUNS.get("synthetic_zomato_1.csv")!;
     const again = await upload("IN", "payout_statement", "synthetic_zomato_1.csv");

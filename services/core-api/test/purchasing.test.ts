@@ -5,7 +5,7 @@
 //   labels a simulated supplier and no real one; draft execution commits a PO under the approver's decision.
 // The inventory and finance seams are TEST-ONLY fakes that write through the guard under the seeded rules
 // (T-024 / T-026 own the real ones): assertions on movements/postings prove OUR calls (rule id, source ref, same
-// transaction), not their derivation logic. The goods-received command row is TEST-ONLY too (not yet seeded).
+// transaction), not their derivation logic. The goods-received command is the seeded row (0015 A4).
 // Synthetic data only.
 import { createLogger } from "@munim/config";
 import { CommandResult, snapRef } from "@munim/contracts";
@@ -108,14 +108,12 @@ async function setup() {
   await db.withContext("munim_core", own("inventory.ingredient.upsert.v1"), async (c) => {
     await c.query(`INSERT INTO core.ingredient (tenant_id, id, name, base_unit, tracked_by_batch) VALUES ($1, $2, 'Tomato', 'kg', false), ($1, $3, 'Paneer block', 'kg', true)`, [T.tenant, T.tomato, T.paneer]);
   });
-  await db.withContext("munim_core", own("finance.account.upsert.v1"), async (c) => {
-    await c.query(`INSERT INTO core.account (tenant_id, id, code, name, type) VALUES ($1, $2, '1400', 'Inventory', 'asset'), ($1, $3, '2150', 'Goods received not invoiced', 'liability'),
-                   ($1, $4, '1500', 'Input tax', 'asset'), ($1, $5, '2100', 'Payables', 'liability')`,
-      [T.tenant, T.acct.inventory, T.acct.grni, T.acct.inputTax, T.acct.payables]);
-  });
-  // TEST-ONLY: the goods-received command is not seeded yet (requested from the migrator).
-  await db.admin(`INSERT INTO core.command_authority (command_type, allowed_roles, scope, target_tables) VALUES ($1, ARRAY['owner','manager','staff','judge'], 'outlet',
-                  ARRAY['core.goods_received','core.grn_line','core.batch','core.purchase_order'])`, [GRN_TYPE]);
+  // The world carries the IN pack's full chart (0015 A12): inventory 1200, GRNI 2050 and supplier payables 2000 are
+  // its rows; the IN chart has no input-tax account, so the fixture adds 1500.
+  const code = async (c: string) => (await one<{ id: string }>(`SELECT id FROM core.account WHERE tenant_id = $1 AND code = $2`, [T.tenant, c])).id;
+  Object.assign(T.acct, { inventory: await code("1200"), grni: await code("2050"), payables: await code("2000") });
+  await db.withContext("munim_core", own("finance.account.upsert.v1"), (c) =>
+    c.query(`INSERT INTO core.account (tenant_id, id, code, name, type) VALUES ($1, $2, '1500', 'Input tax', 'asset')`, [T.tenant, T.acct.inputTax]));
 }
 
 const poPayload = (o: { po?: string; supplier: string; outlets: string[]; lines?: unknown[] }) => ({
@@ -350,13 +348,30 @@ describe("supplier invoices: duplicate refused, approval derives the payable", (
   it("a dispute records overbilling for the owner to send (hand: 20 kg × (31,500 − 30,000) = 30,000); a claim above the line is refused; staff refused", async () => {
     const body = (claimed: number, id = uuidv7()) => ({ dispute_id: id, supplier_invoice_id: S.inv1, basis: "overbilled", lines: [{ invoice_line_id: S.invLines[1], claimed_minor: claimed }] });
     const path = `/v1/supplier-invoices/${S.inv1}:dispute`;
+    const entries = () => db.admin<{ rule: string; reverses: boolean; total: number }>(
+      `SELECT j.posting_rule AS rule, j.reverses_id IS NOT NULL AS reverses, sum(p.amount_minor) FILTER (WHERE p.amount_minor > 0)::int AS total
+         FROM core.journal_entry j JOIN core.posting p ON p.journal_entry_id = j.id WHERE j.source_id = $1 GROUP BY j.tenant_id, j.id ORDER BY j.id`, [S.inv1]).then((r) => r.rows);
+    const status = async () => (await one<{ status: string }>(`SELECT status FROM core.supplier_invoice WHERE id = $1`, [S.inv1])).status;
     expect((await call("POST", path, "staff", env("purchasing.invoice.dispute.v1", body(30000)))).status).toBe(403);
     expect((await call("POST", path, "owner", env("purchasing.invoice.dispute.v1", body(700000)))).status).toBe(422);
+    // Refused disputes change nothing: still approved, one entry (Dr 1,030,000 + 31,500).
+    expect([await status(), await entries()]).toEqual(["approved", [{ rule: "finance.post_supplier_invoice", reverses: false, total: 1061500 }]]);
     const id = uuidv7();
     expect((await call("POST", path, "owner", env("purchasing.invoice.dispute.v1", body(30000, id)))).status).toBe(201);
     expect(await one(`SELECT total_claimed_minor::int AS t, basis, status, supplier_id, counterparty FROM core.dispute WHERE id = $1`, [id]))
       .toEqual({ t: 30000, basis: "overbilled", status: "recorded", supplier_id: T.real, counterparty: "supplier" });
     expect(await count(`SELECT count(*) n FROM core.dispute_line WHERE dispute_id = $1 AND supplier_invoice_line_id = $2`, [id, S.invLines[1]])).toBe(1);
+    // 0015 A8 + A6: the invoice is now disputed and its entry reversed (the same 1,061,500 the other way) under the
+    // reversal rule; the payable stays (schema request: the dispute command cannot write core.payable).
+    expect(await status()).toBe("disputed");
+    expect(await entries()).toEqual([
+      { rule: "finance.post_supplier_invoice", reverses: false, total: 1061500 },
+      { rule: "finance.reverse_supplier_invoice", reverses: true, total: 1061500 },
+    ]);
+    expect((await db.admin(`SELECT origin ->> 'rule_id' AS r FROM core.journal_entry WHERE source_id = $1 AND reverses_id IS NOT NULL`, [S.inv1])).rows).toEqual([{ r: "finance.reverse_supplier_invoice" }]);
+    // A second dispute on the disputed invoice records the claim and reverses nothing again.
+    expect((await call("POST", path, "owner", env("purchasing.invoice.dispute.v1", body(1000)))).status).toBe(201);
+    expect((await entries()).length).toBe(2);
   });
 });
 

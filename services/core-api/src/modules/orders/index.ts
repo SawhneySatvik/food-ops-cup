@@ -3,6 +3,7 @@
 //   POST /v1/orders                          orders.place.v1            (201)
 //   GET  /v1/orders/{id}                     the order, lines, tenders; paid / remaining by core
 //   GET  /v1/orders/{id}/receipt             the pack's bill (IN / AU tax invoice, Sec 9(5) record)
+//   POST /v1/orders/{id}:accept · :reject · :advance   orders.order.accept.v1 / .reject.v1 / .advance.v1 (status steps)
 //   POST /v1/orders/{id}:push-back           orders.promise.push_back.v1
 //   POST /v1/orders/{id}/tenders             orders.tender.record.v1
 //   POST /v1/orders/{id}/voids               orders.void.record.v1
@@ -10,11 +11,10 @@
 //   POST /v1/shifts · /v1/shifts/{id}:close  orders.shift.open.v1 / orders.shift.close.v1
 //   POST /v1/pickup-windows                  orders.pickup_window.generate.v1 (idempotent per slot)
 // Seams for other modules: placeHandler / previewIn on the caller's transaction (T-032 storefront), placeOrder /
-// previewOrder, advanceOrder / mover / orderStatusHandler (kitchen, storefront cancel, the future orders.* command).
-// No order status route yet: no orders.* status command is seeded.
+// previewOrder, advanceOrder / mover / orderStatusHandler (kitchen, storefront cancel, the POS status routes).
 import { commandEnvelopeOf, type CommandEnvelope } from "@munim/contracts";
 import {
-  OrdersPickupWindowGenerateV1, OrdersPlaceV1, OrdersPromisePushBackV1, OrdersRefundRecordV1, OrdersShiftCloseV1, OrdersShiftOpenV1, OrdersTenderRecordV1, OrdersVoidRecordV1,
+  OrdersOrderAcceptV1, OrdersOrderAdvanceV1, OrdersOrderRejectV1, OrdersPickupWindowGenerateV1, OrdersPlaceV1, OrdersPromisePushBackV1, OrdersRefundRecordV1, OrdersShiftCloseV1, OrdersShiftOpenV1, OrdersTenderRecordV1, OrdersVoidRecordV1,
 } from "@munim/contracts/orders";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember } from "../../auth/resolve.ts";
@@ -23,7 +23,7 @@ import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
-import { pushBackHandler } from "./lifecycle.ts";
+import { posStatusHandler, pushBackHandler } from "./lifecycle.ts";
 import { pickupWindowHandler, refundHandler, shiftCloseHandler, shiftOpenHandler, tenderHandler, voidHandler } from "./money.ts";
 import { authorise, placeOrder, previewOrder } from "./place.ts";
 import { orderView, receiptView } from "./read.ts";
@@ -71,15 +71,17 @@ async function outletOf(c: Context<AppEnv>, sql: string, id: string): Promise<st
 }
 const ORDER_OUTLET = `SELECT outlet_id FROM core."order" WHERE id = $1`;
 
-/** An order command: envelope parsed, path id = payload order id, role + outlet authority before the handler. */
-function orderCommand(type: string, payload: Parameters<typeof commandEnvelopeOf>[1], handler: CommandHandler) {
+/** An order command: envelope parsed, path id = payload order id, role + outlet authority before the handler.
+ *  `verb` names a `/v1/orders/{id}:<verb>` route (the id is the path segment before it). */
+function orderCommand(type: string, payload: Parameters<typeof commandEnvelopeOf>[1], handler: CommandHandler, verb?: string) {
   const Envelope = commandEnvelopeOf(type, payload);
   return async (c: Context<AppEnv>) => {
     const m = member(c);
     const env = Envelope.safeParse(await body(c));
     if (!env.success) throw new ApiError("invalid_payload");
     const p = env.data.payload as { order_id: string; amount_minor?: number | null };
-    if (p.order_id !== c.req.param("id")) throw new ApiError("invalid_payload");
+    const pathId = verb ? c.req.param("action")!.slice(0, -verb.length) : c.req.param("id");
+    if (p.order_id !== pathId) throw new ApiError("invalid_payload");
     const outlet = await outletOf(c, ORDER_OUTLET, p.order_id);
     await read(c, (db) => authorise(db, m, type, outlet, p.amount_minor ?? null));
     return run(c, m, env.data as CommandEnvelope, handler);
@@ -105,6 +107,9 @@ export const router = new Hono<AppEnv>()
   .post(`/v1/orders/:id{${ID}}/tenders`, requireMember, orderCommand("orders.tender.record.v1", OrdersTenderRecordV1, tenderHandler))
   .post(`/v1/orders/:id{${ID}}/voids`, requireMember, orderCommand("orders.void.record.v1", OrdersVoidRecordV1, voidHandler))
   .post(`/v1/orders/:id{${ID}}/refunds`, requireMember, orderCommand("orders.refund.record.v1", OrdersRefundRecordV1, refundHandler))
+  .post(`/v1/orders/:action{${ID}:accept}`, requireMember, orderCommand("orders.order.accept.v1", OrdersOrderAcceptV1, posStatusHandler("orders.order.accept.v1"), ":accept"))
+  .post(`/v1/orders/:action{${ID}:reject}`, requireMember, orderCommand("orders.order.reject.v1", OrdersOrderRejectV1, posStatusHandler("orders.order.reject.v1"), ":reject"))
+  .post(`/v1/orders/:action{${ID}:advance}`, requireMember, orderCommand("orders.order.advance.v1", OrdersOrderAdvanceV1, posStatusHandler("orders.order.advance.v1"), ":advance"))
   .post(`/v1/orders/:action{${ID}:push-back}`, requireMember, async (c) => {
     const m = member(c);
     const env = commandEnvelopeOf("orders.promise.push_back.v1", OrdersPromisePushBackV1).safeParse(await body(c));

@@ -4,14 +4,14 @@
 //     command): the payroll_draft + lines, one 'recovered' advance entry per recovery, then finance.postFor.
 // Pack scope is judged by the database (MB013 from core.payroll_pack_scope) — the preview reads the same
 // platform.country_pack row; no country code is named here.
-import { PeoplePayrollDraftCreateV1 } from "@munim/contracts/people";
+import { PeoplePayrollDraftCreateV1, PeoplePayrollDraftStatusV1 } from "@munim/contracts/people";
 import { mulDiv } from "@munim/core-domain/money";
 import { type CommandHandler, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { dbRefusal } from "./errors.ts";
 import { overtimeRows, requireAttendance } from "./overtime.ts";
-import { postFor } from "./seams.ts";
+import { postFor, reverseSource } from "./seams.ts";
 
 export interface PayrollLine {
   staff_id: string;
@@ -34,9 +34,12 @@ export async function payrollScope(c: Queryable): Promise<string | null> {
 const monthEnd = async (c: Queryable, month: string) =>
   (await c.query<{ d: string }>(`SELECT to_char(($1::date + interval '1 month - 1 day')::date, 'YYYY-MM-DD') AS d`, [month])).rows[0]!.d;
 
+/** Given less recovered; a recovery booked on a payroll that was later voided did not happen. */
 export async function outstandingAdvance(c: Queryable, staffId: string): Promise<number> {
   const r = await c.query<{ n: string }>(
-    `SELECT coalesce(sum(CASE kind WHEN 'given' THEN amount_minor ELSE -amount_minor END), 0) AS n FROM core.advance WHERE staff_id = $1`, [staffId]);
+    `SELECT coalesce(sum(CASE a.kind WHEN 'given' THEN a.amount_minor ELSE -a.amount_minor END), 0) AS n FROM core.advance a
+      WHERE a.staff_id = $1
+        AND NOT EXISTS (SELECT 1 FROM core.payroll_draft d WHERE d.tenant_id = a.tenant_id AND d.id = a.payroll_draft_id AND d.status = 'void')`, [staffId]);
   return Number(r.rows[0]!.n);
 }
 
@@ -113,6 +116,29 @@ export const payrollDraftHandler: CommandHandler = {
     return {
       entityId: p.payroll_draft_id,
       audit: [{ entity: "core.payroll_draft", entityId: p.payroll_draft_id, after: { outlet_id: p.outlet_id, period_month: p.period_month, lines: p.lines.length } }],
+    };
+  },
+};
+
+/** people.payroll_draft.status.v1 (owner): approved → paid_externally (recorded only; the entry stands) or → void
+ *  with a reason, which reverses the payroll's journal entry under finance.reverse_payroll in this transaction. */
+export const payrollStatusHandler: CommandHandler = {
+  type: "people.payroll_draft.status.v1",
+  async run(c, cmd) {
+    const p = PeoplePayrollDraftStatusV1.parse(cmd.payload);
+    if (p.status === "void" && !p.reason_code) throw new ApiError("invalid_payload", "reason_required");
+    const cur = (await c.query<{ status: string }>(`SELECT status FROM core.payroll_draft WHERE id = $1 FOR UPDATE`, [p.payroll_draft_id])).rows[0];
+    if (!cur) throw new ApiError("not_found");
+    if (cur.status !== "approved") throw new ApiError("illegal_transition");
+    try {
+      await c.query(`UPDATE core.payroll_draft SET status = $2 WHERE id = $1 AND status = 'approved'`, [p.payroll_draft_id, p.status]);
+    } catch (e) {
+      throw dbRefusal(e) ?? e;
+    }
+    if (p.status === "void") await reverseSource(c, "finance.reverse_payroll", `core.payroll_draft:${p.payroll_draft_id}`);
+    return {
+      entityId: p.payroll_draft_id,
+      audit: [{ entity: "core.payroll_draft", entityId: p.payroll_draft_id, before: { status: "approved" }, after: { status: p.status, reason_code: p.reason_code } }],
     };
   },
 };

@@ -7,7 +7,10 @@
 //   • nothing to post (every line 0, e.g. a fully discounted order) → no entry;
 //   • the entry balances per currency (checked here by core-domain, then by the deferred DB trigger, which
 //     is fired at the end of this call so an imbalance surfaces at the call site, not at the caller's COMMIT);
-//   • corrections are reversals (reverseFor), never edits.
+//   • corrections are reversals (reverseFor), never edits;
+//   • a source that leaves its posted state (an approved invoice disputed or voided, an approved payroll voided)
+//     is reversed under its own reversal rule (reverseSource, 0015 A6); re-approved, postFor re-posts it as the
+//     reversal of that reversal (db/README "Journal re-post after a reversal").
 import type { CountryPack } from "@munim/contracts/packs";
 import {
   type ChannelTreatment, channelTreatment, type ExpenseCategory, type Line, POSTING_RULES, type PostingRuleId, postExpense, postGrn, postOrder,
@@ -196,11 +199,69 @@ const existing = async (tx: Tx, rule: string, table: string, id: string) =>
   (await tx.query<{ id: string }>(
     `SELECT id FROM core.journal_entry WHERE posting_rule = $1 AND source_type = $2 AND source_id = $3 AND reverses_id IS NULL`, [rule, table, id])).rows[0]?.id ?? null;
 
+/** 0015 A6 reversal rules → the posting rule whose entry each reverses (same source table). */
+export const REVERSAL_RULES = {
+  "finance.reverse_supplier_invoice": "finance.post_supplier_invoice",
+  "finance.reverse_payroll": "finance.post_payroll",
+} as const;
+export type ReversalRuleId = keyof typeof REVERSAL_RULES;
+
+/** One source's chain under a posting rule and its reversal rule: the original entry, its reversal, the re-post
+ *  (reversing the reversal)… — each entry reverses the one before, so the chain is linear and its last entry is
+ *  the only one nothing reverses. An odd length means the source is posted; an even one, reversed. */
+async function chain(tx: Tx, rule: string, reversal: string, table: string, id: string) {
+  const r = await tx.query<{ id: string; n: string }>(
+    `SELECT je.id, count(*) OVER () AS n FROM core.journal_entry je
+      WHERE je.source_type = $3 AND je.source_id = $4 AND je.posting_rule IN ($1, $2)
+      ORDER BY NOT EXISTS (SELECT 1 FROM core.journal_entry x WHERE x.reverses_id = je.id) DESC, je.id DESC LIMIT 1`, [rule, reversal, table, id]);
+  return r.rows[0] ? { last: r.rows[0].id, posted: Number(r.rows[0].n) % 2 === 1 } : null;
+}
+
+/** Today's business date for an entry about `outletId` (the tenant's home zone for a tenant-wide entry): a reversal
+ *  or re-post is dated when it happens, in an open period, never back in the original's month. */
+async function todayFor(tx: Tx, outletId: string | null): Promise<string> {
+  const z = (await tx.query<{ tz: string; cutoff: string }>(
+    `SELECT coalesce(o.tz, t.home_tz, (SELECT f.tz FROM core.outlet f ORDER BY f.created_at, f.id LIMIT 1)) AS tz,
+            coalesce(o.business_day_cutoff, '04:00')::text AS cutoff
+       FROM core.tenant t LEFT JOIN core.outlet o ON o.tenant_id = t.tenant_id AND o.id = $1`, [outletId])).rows[0]!;
+  return businessDate(new Date(), z.tz, hhmm(z.cutoff));
+}
+
+/** The negation of entry `of` under `rule`, reversing it, dated today. */
+async function negate(tx: Tx, rule: string, table: string, sourceId: string, of: string): Promise<string> {
+  const h = (await tx.query<Header>(
+    `SELECT outlet_id, brand_id, channel_id, entry_date::text AS entry_date, (SELECT p.currency FROM core.posting p WHERE p.journal_entry_id = je.id LIMIT 1) AS currency
+       FROM core.journal_entry je WHERE id = $1`, [of])).rows[0]!;
+  const ps = await tx.query<{ account_id: string; amount_minor: string }>(`SELECT account_id, amount_minor FROM core.posting WHERE journal_entry_id = $1 ORDER BY id`, [of]);
+  const entryId = uuidv7();
+  const today = await todayFor(tx, h.outlet_id);
+  await underRule(tx, rule, `${table}:${sourceId}`, () =>
+    writeEntry(tx, entryId, { ...h, entry_date: today }, rule, table, sourceId, of, ps.rows.map((p) => ({ account_id: p.account_id, amount_minor: -n(p.amount_minor) }))));
+  return entryId;
+}
+
+/** Reverses the posted entry of a source that left its posted state, under the reversal rule (whose source state
+ *  the guard checks: invoice disputed / void, payroll void). Nothing posted, or already reversed → no new entry. */
+export async function reverseSource(tx: Tx, reversal: ReversalRuleId, sourceRef: string): Promise<PostResult> {
+  const rule = REVERSAL_RULES[reversal];
+  const src = parseSourceRef(rule, sourceRef);
+  const c = await chain(tx, rule, reversal, src.table, src.id);
+  if (!c) return { entry_id: null, created: false };
+  if (!c.posted) return { entry_id: c.last, created: false };
+  return { entry_id: await negate(tx, reversal, src.table, src.id, c.last), created: true };
+}
+
 /** The seam: post `sourceRef` ("core.<table>:<uuid>") under `rule` (a seeded finance.post_* id). */
 export async function postFor(tx: Tx, rule: string, sourceRef: string): Promise<PostResult> {
   const src = parseSourceRef(rule, sourceRef);
   const prior = await existing(tx, src.rule, src.table, src.id);
-  if (prior) return { entry_id: prior, created: false };
+  if (prior) {
+    // Reversed under its reversal rule and now back in the posted state: re-post as the reversal of the reversal.
+    const reversal = Object.entries(REVERSAL_RULES).find(([, r]) => r === src.rule)?.[0];
+    const c = reversal ? await chain(tx, src.rule, reversal, src.table, src.id) : null;
+    if (c && !c.posted) return { entry_id: await negate(tx, src.rule, src.table, src.id, c.last), created: true };
+    return { entry_id: c?.last ?? prior, created: false };
+  }
   const roles = await chartRoles(tx);
   const d = await DERIVE[src.rule](tx, src.id, await tenantPack(tx), roles.has("input_tax"));
   if (!d.lines) return { entry_id: null, created: false };

@@ -3,7 +3,9 @@
 //   imports.run.commit.v1      staged rows → book rows as the approver; the run → committed under the decision.
 //   imports.format.approve.v1  a tenant's mapping (renames + units only) → core.import_format.
 // Settlements and bank lines go through finance's seams (recordSettlement posts and reconciles); imported
-// expenses are posted with finance's postFor, exactly as finance.expense.record.v1 posts its own.
+// expenses are posted with finance's postFor, exactly as finance.expense.record.v1 posts its own. A POS export's
+// bills become completed orders on the counter channel with their tender (0015 A7), posted as a live sale is
+// (finance.post_order, finance.post_tender).
 import type { ImportKind } from "@munim/contracts/imports";
 import type { CommandHandler } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
@@ -34,6 +36,8 @@ interface StagedRow {
 }
 
 const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+const ORDER_KINDS = new Set(["dine_in", "takeaway", "pickup", "delivery"]);
+const TENDER_METHODS = new Set(["cash", "card", "upi"]);
 
 export const runCommitHandler: CommandHandler = {
   type: "imports.run.commit.v1",
@@ -54,11 +58,6 @@ export const runCommitHandler: CommandHandler = {
     if (run.control_total_minor !== null) {
       const sum = staged.reduce((a, s) => a + BigInt(s.amount_minor ?? 0), 0n);
       if (sum !== BigInt(run.control_total_minor) && !dec.reason?.trim()) throw new ApiError("invalid_payload");
-    }
-    if (run.kind === "pos_export") {
-      // Imported bills become orders + tenders, which imports.run.commit.v1 is not bound to yet (migrator request
-      // in the T-030 report). Refused before any write; the draft stays proposed.
-      throw new ApiError("command_table_mismatch", "authority_denied");
     }
     const currency = run.base_currency;
     const by = dec.decided_by;
@@ -124,6 +123,40 @@ export const runCommitHandler: CommandHandler = {
         // Each expense is posted as finance posts its own recorded expenses (finance.post_expense).
         for (const r of rows) await postFor(c, "finance.post_expense", `core.expense:${r.id}`);
         written.expenses = staged.length;
+        break;
+      }
+      case "pos_export": {
+        // The bills of another POS: completed orders on the counter channel, numbered by that POS (external_ref =
+        // the bill number; the database assigns no invoice number and keeps the bill's business date), each with
+        // the tender its payment mode names. Amounts are the file's own (parsed and checked: total = subtotal −
+        // discount + tax); there are no lines, so no stock is consumed.
+        const channel = (await c.query<{ id: string }>(
+          `SELECT id FROM core.channel WHERE kind = 'counter' AND active ORDER BY created_at, id LIMIT 1`)).rows[0];
+        if (!channel) throw new ApiError("invalid_payload");
+        for (const s of staged) {
+          const d = s.data as { bill_no: string; bill_date: string; outlet_id: string; order_type: string | null; payment_mode: string | null;
+            subtotal_minor: number; discount_minor: number; tax_minor: number; total_minor: number };
+          const orderId = uuidv7();
+          await c.query(
+            `INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, business_date, subtotal_minor, discount_minor, tax_minor, total_minor,
+                                       currency, pricing_snapshot, external_ref, created_by)
+             VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'completed', $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [orderId, d.outlet_id, channel.id, ORDER_KINDS.has(d.order_type ?? "") ? d.order_type : "takeaway", d.bill_date, d.subtotal_minor, d.discount_minor,
+             d.tax_minor, d.total_minor, currency, JSON.stringify({ source: "pos_export", import_run_id: run.id, row_no: s.row_no }), d.bill_no, by]);
+          await postFor(c, "finance.post_order", `core.order:${orderId}`);
+          const method = (d.payment_mode ?? "").toLowerCase();
+          if (TENDER_METHODS.has(method) && d.total_minor > 0) {
+            const tenderId = uuidv7();
+            // Taken at noon of the bill's date in the outlet's zone, so its posting lands on the bill's business date.
+            await c.query(
+              `INSERT INTO core.tender (tenant_id, id, outlet_id, order_id, method, amount_minor, currency, recorded_by, ref, at)
+               SELECT current_setting('app.tenant_id')::uuid, $1, o.id, $2, $3, $4, $5, $6, $7, ($8::date + time '12:00') AT TIME ZONE o.tz
+                 FROM core.outlet o WHERE o.id = $9`,
+              [tenderId, orderId, method, d.total_minor, currency, by, d.bill_no, d.bill_date, d.outlet_id]);
+            await postFor(c, "finance.post_tender", `core.tender:${tenderId}`);
+          }
+        }
+        written.orders = staged.length;
         break;
       }
       case "market_signal": {

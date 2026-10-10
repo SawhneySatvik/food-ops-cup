@@ -9,6 +9,9 @@ orders.void.record.v1
 orders.refund.record.v1
 orders.shift.open.v1
 orders.shift.close.v1
+orders.order.accept.v1
+orders.order.reject.v1
+orders.order.advance.v1
 v1.order
 v1.order.receipt
 orders.place.guest-response

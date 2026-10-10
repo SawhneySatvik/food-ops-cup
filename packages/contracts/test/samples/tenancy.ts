@@ -11,6 +11,8 @@ export const SAMPLES: Record<string, unknown> = {
   "tenancy.outlet.update.v1": { outlet_id: u(2), accepting_orders: "busy", busy_extra_min: 10, pickup_slot_min: 15, upi_vpa: "meenas@okbank", business_day_cutoff: "04:00", hours: { opens: "10:00", closes: "23:00" } },
   "tenancy.tenant.update.v1": { name: "Meena's Kitchens", home_tz: "Asia/Kolkata", complete_onboarding: true },
   "tenancy.member.bind.v1": { member_id: u(8) },
+  "tenancy.member.role.set.v1": { member_id: u(8), role: "manager", outlet_ids: [u(2)] },
+  "tenancy.member.deactivate.v1": { member_id: u(8) },
   "demo.session.start.v1": { tenant_id: u(1), member_id: u(7), outlet_id: u(2), kind: "shop", country_code: "AU", idp_sub: null, judge_label: "Judge 7f3a (demo)" },
   "tenancy.storefront-key.create": { key_id: u(9), channel_id: u(4), allowed_origins: ["https://shop.example.test"] },
   "tenancy.storefront-key.created": { key_id: u(9), channel_id: u(4), key: "sfk_synthetic_key_value_0123456789abcdef", created_at: "2026-10-10T10:00:00Z" },

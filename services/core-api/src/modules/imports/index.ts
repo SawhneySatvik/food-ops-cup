@@ -37,17 +37,14 @@ if (!g[REGISTERED]) {
   g[REGISTERED] = true;
 }
 
-// The Blob port. Deps has no blob store yet (T-034 wires one); until then the local store under .run/blobs.
-const BLOBS = Symbol.for("munim.imports.blobs");
-const gb = globalThis as unknown as Record<symbol, BlobStore | undefined>;
-export const blobs = (): BlobStore => (gb[BLOBS] ??= localBlobStore(DEFAULT_BLOB_DIR));
-/** Swap the store (tests, a hosted adapter); returns the restore function. */
-export function setBlobStore(b: BlobStore): () => void {
-  const prev = gb[BLOBS];
-  gb[BLOBS] = b;
-  return () => {
-    gb[BLOBS] = prev;
-  };
+/** A local store under the repository's `.run/blobs` — the default a composition root hands Deps and the worker
+ *  when it is given no other store. The routes read the store only from Deps. */
+export const blobs = (): BlobStore => localBlobStore(DEFAULT_BLOB_DIR);
+
+function blobStore(c: Context<AppEnv>): BlobStore {
+  const b = c.var.deps.blobs;
+  if (!b) throw new ApiError("unavailable");
+  return b;
 }
 
 type Member = Extract<Principal, { kind: "member" }>;
@@ -168,7 +165,7 @@ async function upload(c: Context<AppEnv>) {
   const sha = sha256(bytes);
   const key = blobKey(m.tenant_id, sha);
   // Content-addressed, so storing before the row exists is harmless if the transaction then fails.
-  await blobs().put(key, bytes);
+  await blobStore(c).put(key, bytes);
   const header = headerOf(bytes);
   return withContext(c.var.deps.pools.core, contextOf(m), async (db) => {
     const inserted = (await db.query<DocRow>(
@@ -195,7 +192,7 @@ async function createRun(c: Context<AppEnv>) {
     const doc = (await db.query<DocRow>(`${DOC} WHERE id = $1`, [document_id])).rows[0];
     if (!doc) throw new ApiError("not_found");
     const kind = doc.kind as ImportKind;
-    const how = await detect(db, kind, headerOf(await blobs().get(doc.storage_ref)));
+    const how = await detect(db, kind, headerOf(await blobStore(c).get(doc.storage_ref)));
     if (!how) throw new ApiError("invalid_payload");
     return c.json(runView(await startRun(db, m, { id: doc.id, kind }, how)), 201);
   });
@@ -208,7 +205,7 @@ async function proposeFormat(c: Context<AppEnv>) {
     const doc = (await db.query<DocRow>(`${DOC} WHERE id = $1`, [req.document_id])).rows[0];
     if (!doc) throw new ApiError("not_found");
     // The header comes from the stored file, never from the request: a mapping names real columns only.
-    const header = headerOf(await blobs().get(doc.storage_ref));
+    const header = headerOf(await blobStore(c).get(doc.storage_ref));
     if (!header?.length) throw new ApiError("invalid_payload");
     const payload = ImportsFormatApproveV1.safeParse({
       format_id: uuidv7(), kind: req.kind, name: req.name, header, header_signature: headerSignature(header), mapping: req.mapping,

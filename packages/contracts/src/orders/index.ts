@@ -233,6 +233,22 @@ export const OrdersShiftCloseV1 = z.strictObject({
 
 export const OrderStatus = z.enum(["placed", "accepted", "rejected", "preparing", "ready", "completed", "cancelled"]);
 
+// ── POS status commands (0015 A4, #41). Each moves one order one step, conditional on its current status, along
+// core.order_status_transition; the caller's role must reach the step's min_role. The actor is the signed-in member.
+
+/** placed → accepted. */
+export const OrdersOrderAcceptV1 = z.strictObject({ order_id: Uuid7 });
+/** placed → rejected, with a reason code (stock, loyalty and the pickup slot are given back). */
+export const OrdersOrderRejectV1 = z.strictObject({ order_id: Uuid7, reason_code: Slug });
+/** Every other step: accepted → preparing → ready → completed, or placed / accepted → cancelled (reason required).
+ *  Accepting and rejecting have their own commands. `from_status` is the optimistic guard (stale → 409). */
+export const OrdersOrderAdvanceV1 = z.strictObject({
+  order_id: Uuid7,
+  from_status: OrderStatus,
+  to_status: OrderStatus.exclude(["accepted", "rejected", "placed"]),
+  reason_code: Slug.nullable(),
+});
+
 /** core.order with its lines and tenders, as read back (row fields, R26). `paid_minor` and `remaining_minor`
  *  are computed by core from this order row and its tender/refund rows in the same read (R40 C1). */
 export const OrderView = z.strictObject({
@@ -329,6 +345,9 @@ export const SCHEMAS = {
   "orders.refund.record.v1": OrdersRefundRecordV1,
   "orders.shift.open.v1": OrdersShiftOpenV1,
   "orders.shift.close.v1": OrdersShiftCloseV1,
+  "orders.order.accept.v1": OrdersOrderAcceptV1,
+  "orders.order.reject.v1": OrdersOrderRejectV1,
+  "orders.order.advance.v1": OrdersOrderAdvanceV1,
   "v1.order": OrderView,
   "v1.order.receipt": ReceiptView,
   "orders.place.guest-response": OrdersPlaceGuestResponse,

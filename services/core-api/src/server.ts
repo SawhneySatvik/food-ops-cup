@@ -3,7 +3,7 @@
 // alone reads the founder's `.env` and redacts its secrets); the smoke test hands it embedded-Postgres URLs.
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { type Config, createLogger, type DbRole, type Logger, loadRepoConfig } from "@munim/config";
+import { type Config, createLogger, type Logger, loadRepoConfig } from "@munim/config";
 import type { Hono } from "hono";
 import pg from "pg";
 import { createApp } from "./app.ts";
@@ -12,7 +12,7 @@ import { storefrontResolver } from "./auth/resolve.ts";
 import type { PublishDeps } from "./commit/index.ts";
 import { createHttpPublisher, devhostIdp } from "./dev-root.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
-import { type BlobStore, localBlobStore, setBlobStore } from "./modules/imports/index.ts";
+import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
 import { loadRunTokenKeys, type RunTokenKeys, type SvcTx } from "./runtoken/index.ts";
 import { ensureDevRunTokenKeys } from "./runtoken/keys.ts";
@@ -60,11 +60,10 @@ export function svcTxOf(pool: pg.Pool): SvcTx {
 
 export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   const pools: Pools = { core: createPool(w.coreUrl, 10), svc: createPool(w.svcUrl, 5), ...(w.platformUrl ? { platform: createPool(w.platformUrl, 2) } : {}) };
-  if (w.blobs) setBlobStore(w.blobs);
   const keys = loadRunTokenKeys(w.keys);
   const svc = svcTxOf(pools.svc);
   const publish: PublishDeps = { publisher: createHttpPublisher({ url: w.intelUrl, serviceSecret: w.serviceSecret }), svc, keys };
-  const deps: Deps = { pools, idp: w.idp, storefronts: storefrontResolver(pools.core), publish, config: w.config, log: w.log };
+  const deps: Deps = { pools, idp: w.idp, storefronts: storefrontResolver(pools.core), publish, blobs: w.blobs ?? defaultBlobs(), config: w.config, log: w.log };
   // Keyed by this exact Deps object (a WeakMap in stream/index.ts) — never pass createApp a copy.
   configureStream(deps, {
     connect: () => new pg.Client({ connectionString: w.listenUrl, application_name: "munim_stream_listen", keepAlive: true }),
@@ -95,9 +94,7 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
     const api = await composeCoreApi({
       coreUrl: config.dbUrl("munim_core"),
       svcUrl: config.dbUrl("munim_svc"),
-      // DbRole names only munim_core / munim_svc; munim_platform's password is in db-roles.json (bootstrap-roles
-      // LOGIN_ROLES). Widening DbRole in packages/config is requested (W2 B3).
-      platformUrl: config.dbUrl("munim_platform" as DbRole),
+      platformUrl: config.dbUrl("munim_platform"),
       blobs: localBlobStore(join(config.runDir, "blobs")),
       listenUrl: config.sessionDbUrl("munim_core"),
       idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),

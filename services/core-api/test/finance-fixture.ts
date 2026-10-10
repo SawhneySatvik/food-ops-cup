@@ -186,8 +186,9 @@ export async function previewedRun(db: TestDb, fx: Fx, kind = "payout_statement"
 }
 
 /** Runs `fn` inside the approval of an imports.run.commit.v1 draft for `run`: the run flips to committed
- *  first (T-030's order), then `fn` records rows through the finance seams — all under the decision. */
-export async function inImportApproval<T>(db: TestDb, fx: Fx, run: string, fn: (c: Q) => Promise<T>): Promise<T> {
+ *  first (T-030's order), then `fn` records rows through the finance seams — all under the decision.
+ *  `commitRun: false` leaves the run previewed (the source-state refusal gates). */
+export async function inImportApproval<T>(db: TestDb, fx: Fx, run: string, fn: (c: Q) => Promise<T>, opts: { commitRun?: boolean } = {}): Promise<T> {
   const draft = uuidv7();
   await db.withContext("munim_svc", { tenant_id: fx.tenant, outlet_ids: "*" }, (c) =>
     c.query(`INSERT INTO core.draft (tenant_id, id, source, command_type, command_payload) VALUES ($1, $2, 'import', 'imports.run.commit.v1', $3)`,
@@ -197,7 +198,7 @@ export async function inImportApproval<T>(db: TestDb, fx: Fx, run: string, fn: (
     await c.query(`UPDATE core.draft SET status = 'executing', exec_txid = txid_current() WHERE id = $1`, [draft]);
     await c.query(`INSERT INTO core.decision (tenant_id, id, draft_id, verdict, final_payload, decided_by) VALUES ($1, $2, $3, 'approved', '{}', $4)`, [fx.tenant, decision, draft, fx.owner]);
     await c.query("SELECT set_config('app.decision_id', $1, true)", [decision]);
-    await c.query(`UPDATE core.import_run SET status = 'committed', decision_id = $2 WHERE id = $1`, [run, decision]);
+    if (opts.commitRun !== false) await c.query(`UPDATE core.import_run SET status = 'committed', decision_id = $2 WHERE id = $1`, [run, decision]);
     const out = await fn(c);
     await c.query(`UPDATE core.draft SET status = 'executed' WHERE id = $1`, [draft]);
     return out;

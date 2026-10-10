@@ -3,8 +3,10 @@
 // the caller's role per its `min_role` (here). Every order_event is paired with an outbox event (#80). Entering
 // `completed` derives, in the same transaction, the loyalty earn and the sale's journal entry through their
 // owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` reverses redeemed points,
-// gives the consumed stock back (W2-R6) and frees the pickup slot. No orders.* status command is seeded yet: `orderStatusHandler(type)` is bound to whichever seeded
-// command carries the move (today kitchen.ticket.advance.v1, which targets core.order + core.order_event, #41).
+// gives the consumed stock back (W2-R6, inventory's seam) and frees the pickup slot. `orderStatusHandler(type)` binds the
+// move to the seeded command that carries it: the POS's orders.order.accept.v1 / .reject.v1 / .advance.v1 (each limited
+// to its own steps here — the database binds all three to the same tables), the kitchen's kitchen.ticket.advance.v1 and
+// the shopper's storefront.order.cancel.v1 (0015 A4, #41).
 import type { CommandHandler, EventDraft, HandlerOutput } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
@@ -60,7 +62,7 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
       await asCore(c, o.outlet_id, () =>
         c.query(`UPDATE core.pickup_window SET booked = booked - 1 WHERE id = $1 AND booked > 0`, [o.pickup_window_id]));
     }
-    events.push(...(await asCore(c, o.outlet_id, () => reverseConsumption(c, move.order_id, o.outlet_id))));
+    events.push(...((await asCore(c, o.outlet_id, () => seams.reverseOrderConsumption(c, move.order_id)))?.events ?? []));
     // The order's coupon uses stay as recorded (append-only, no reversal column); a cancelled or rejected order's
     // use no longer counts towards a cap (recordCoupons in place.ts).
   }
@@ -71,29 +73,13 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
   };
 }
 
-/** W2-R6 (rule inventory.reverse_order_consumption, source state cancelled / rejected): the stock the order
- *  consumed at placement comes back as `sale_return` movements on the same ingredient and batch, once. */
-async function reverseConsumption(c: Queryable, orderId: string, outletId: string): Promise<EventDraft[]> {
-  const back = (await c.query<{ ingredient_id: string; batch_id: string | null; unit: string; qty: string }>(
-    `SELECT ingredient_id, batch_id, unit, (-sum(qty_milli))::text AS qty FROM core.stock_movement
-      WHERE ref_type = 'core.order' AND ref_id = $1 AND kind = 'sale_consumption'
-        AND NOT EXISTS (SELECT 1 FROM core.stock_movement r WHERE r.ref_type = 'core.order' AND r.ref_id = $1 AND r.kind = 'sale_return')
-      GROUP BY ingredient_id, batch_id, unit HAVING sum(qty_milli) < 0 ORDER BY ingredient_id, batch_id`, [orderId])).rows;
-  if (back.length === 0) return [];
-  const ids = back.map(() => uuidv7());
-  await underRule(c, "inventory.reverse_order_consumption", `core.order:${orderId}`, async () => {
-    for (const [i, m] of back.entries()) {
-      await c.query(
-        `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id)
-         VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, 'sale_return', 'core.order', $7)`,
-        [ids[i], outletId, m.ingredient_id, m.batch_id, m.qty, m.unit, orderId]);
-    }
-  });
-  return [{
-    type: "munim.inventory.movement.recorded.v1", subject: orderId, aggregateType: "stock_movement",
-    data: { outlet_id: outletId, movement_ids: ids, ingredient_ids: [...new Set(back.map((m) => m.ingredient_id))], kind: "sale_return", ref_type: "core.order", ref_id: orderId },
-  }];
-}
+/** The steps each POS status command may make; the kitchen's and the shopper's commands keep their own callers'
+ *  checks. A command not listed here may make any legal step. */
+const STEPS: Record<string, (from: OrderStatus, to: OrderStatus) => boolean> = {
+  "orders.order.accept.v1": (from, to) => from === "placed" && to === "accepted",
+  "orders.order.reject.v1": (from, to) => from === "placed" && to === "rejected",
+  "orders.order.advance.v1": (_from, to) => to !== "accepted" && to !== "rejected" && to !== "placed",
+};
 
 /** A handler that moves an order one status step under `type` (payload: order_id, from_status, to_status,
  *  reason_code). The actor is read from the transaction's identity, never from the payload. */
@@ -105,7 +91,23 @@ export function orderStatusHandler(type: string): CommandHandler {
       const ok = (s: unknown): s is OrderStatus => typeof s === "string" && (ORDER_STATUSES as readonly string[]).includes(s);
       if (typeof p.order_id !== "string" || !ok(p.from_status) || !ok(p.to_status)) throw new ApiError("invalid_payload");
       if (p.reason_code != null && !/^[a-z][a-z0-9_]*$/.test(p.reason_code)) throw new ApiError("invalid_payload");
+      if (STEPS[type] && !STEPS[type](p.from_status, p.to_status)) throw new ApiError("invalid_payload");
       return advanceOrder(c, { order_id: p.order_id, from_status: p.from_status, to_status: p.to_status, reason_code: p.reason_code ?? null }, await mover(c));
+    },
+  };
+}
+
+/** The POS commands' payloads (accept / reject carry no statuses) as the one status-move shape. */
+export function posStatusHandler(type: "orders.order.accept.v1" | "orders.order.reject.v1" | "orders.order.advance.v1"): CommandHandler {
+  const inner = orderStatusHandler(type);
+  return {
+    type,
+    run(c, cmd) {
+      const p = cmd.payload as { order_id: string; reason_code?: string; from_status?: string; to_status?: string };
+      const move = type === "orders.order.accept.v1" ? { order_id: p.order_id, from_status: "placed", to_status: "accepted", reason_code: null }
+        : type === "orders.order.reject.v1" ? { order_id: p.order_id, from_status: "placed", to_status: "rejected", reason_code: p.reason_code }
+        : p;
+      return inner.run(c, { ...cmd, payload: move });
     },
   };
 }

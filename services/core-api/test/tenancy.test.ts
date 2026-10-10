@@ -3,9 +3,8 @@
 //   country/currency change after onboarding → 409 country_locked (before onboarding it must fit the old pack's rows: 422);
 //   invite → first sign-in binds idp_sub exactly once; storefront key stored only as sha256, revoked → 404;
 //   manager of outlet A cannot update outlet B (MB001 → 403, twin: outlet A 200).
-// PENDING SEED (reported to the migrator): tenancy.onboard.v1 and tenancy.member.bind.v1 are not in
-// core.command_authority yet. This file inserts them into ITS OWN database clone with the shape the report
-// requests; everything else uses seeded commands. Expected values are typed by hand. Synthetic data only.
+// Every command is a seeded core.command_authority row (0015 A4 seeds tenancy.onboard.v1 and tenancy.member.bind.v1).
+// Expected values are typed by hand. Synthetic data only.
 import { createHash } from "node:crypto";
 import { createLogger } from "@munim/config";
 import { SCHEMAS } from "@munim/contracts/tenancy";
@@ -73,12 +72,6 @@ describe("onboarding requires a verified email (F2)", () => {
 
 beforeAll(async () => {
   db = await openDb();
-  // The pending seed rows (see the header). ON CONFLICT: a later migration that seeds them wins.
-  await db.admin(`INSERT INTO core.command_authority (command_type, allowed_roles, scope, target_tables) VALUES
-    ('tenancy.onboard.v1', ARRAY['owner'], 'tenant', ARRAY['core.tenant', 'core.member', 'core.membership', 'core.outlet', 'core.outlet_calendar',
-                                                           'core.brand', 'core.channel', 'core.business_policy', 'core.account']),
-    ('tenancy.member.bind.v1', ARRAY['owner', 'manager', 'staff', 'advisor', 'judge'], 'outlet', ARRAY['core.member'])
-    ON CONFLICT (command_type) DO NOTHING`);
   pools = { core: db.pool("munim_core", 8), svc: db.pool("munim_svc", 2) };
   const config = { nodeEnv: "test", redact: (s: string) => s };
   const deps = { pools, idp, storefronts: storefrontResolver(pools.core), config, log: createLogger(config, () => {}) };
@@ -140,6 +133,9 @@ describe("defaults by kind × country (operator seam: tenancy.provision.v1 is se
     expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [T])).toBe(x.accounts);
     expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1`, [T])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.membership WHERE tenant_id = $1 AND role = 'owner'`, [T])).toBe(1);
+    // W2-R4: one business policy with the loyalty defaults (1 point per 1,000 minor, 10 per point), in force today.
+    expect(await count(`SELECT count(*) n FROM core.business_policy WHERE tenant_id = $1 AND loyalty_earn_per_minor = 1000 AND loyalty_point_value_minor = 10
+                          AND valid_from = (now() AT TIME ZONE $2)::date`, [T, x.tz])).toBe(1);
     // Every book row was stamped by the operator's own command (the guard's origin), not by anything else.
     expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1 AND origin->>'command_type' = 'tenancy.provision.v1'`, [T])).toBe(x.channels);
   });
@@ -319,6 +315,48 @@ describe("members: invite → first sign-in binds idp_sub exactly once", () => {
     const byManager = await call("POST", "/v1/members:invite", tok(subA),
       env("tenancy.member.invite.v1", { member_id: uuidv7(), name: "Nope", email: "nope@example.test", role: "staff", outlet_ids: [a.outlet] }), a.tenant);
     expect(byManager.status).toBe(403);
+  });
+});
+
+describe("members: role set and deactivate (tenancy.member.role.set.v1 / .deactivate.v1, owner only)", () => {
+  it("owner promotes staff → manager (200, membership changed, audited); a manager cannot (403); the owner cannot change themselves (409); deactivate ends sign-in", async () => {
+    const a = await onboard();
+    const staff = uuidv7(), mgr = uuidv7();
+    const staffSub = `staff-${uuidv7()}`, mgrSub = `mgr-${uuidv7()}`;
+    for (const [id, sub, role, email] of [[staff, staffSub, "staff", "staff.rs@example.test"], [mgr, mgrSub, "manager", "mgr.rs@example.test"]] as const) {
+      expect((await call("POST", "/v1/members:invite", a.token,
+        env("tenancy.member.invite.v1", { member_id: id, name: `Synthetic ${role}`, email, role, outlet_ids: [a.outlet] }), a.tenant)).status).toBe(200);
+      expect((await call("POST", "/v1/members:bind", tok(sub, email), env("tenancy.member.bind.v1", { member_id: id }), a.tenant)).status).toBe(200);
+    }
+    const setRole = (token: string, member_id: string, role: string, outlet_ids: string[], path = member_id) =>
+      call("POST", `/v1/members/${path}:set-role`, token, env("tenancy.member.role.set.v1", { member_id, role, outlet_ids }), a.tenant);
+    const roleOf = (id: string) => one<{ role: string; outlet_ids: string[] }>(`SELECT role, outlet_ids FROM core.membership WHERE member_id = $1`, [id]);
+
+    // Refusals first: the manager is not the owner (guard: MB001 → 403); a manager role needs an outlet (422); the
+    // owner on themselves (409); a path that is not the payload's member (422). Nothing changes.
+    expect((await setRole(tok(mgrSub), staff, "manager", [a.outlet])).status).toBe(403);
+    expect((await setRole(a.token, staff, "manager", [])).status).toBe(422);
+    expect((await setRole(a.token, a.owner, "advisor", [])).status).toBe(409);
+    expect((await setRole(a.token, staff, "manager", [a.outlet], mgr)).status).toBe(422);
+    expect(await roleOf(staff)).toEqual({ role: "staff", outlet_ids: [a.outlet] });
+    // Accept: the owner promotes staff to manager of the same outlet.
+    expect((await setRole(a.token, staff, "manager", [a.outlet])).status).toBe(200);
+    expect(await roleOf(staff)).toEqual({ role: "manager", outlet_ids: [a.outlet] });
+    expect(await one(`SELECT entity, before, after FROM core.audit_log WHERE tenant_id = $1 AND action = 'tenancy.member.role.set.v1'`, [a.tenant]))
+      .toEqual({ entity: "core.membership", before: { role: "staff", outlet_ids: [a.outlet] }, after: { role: "manager", outlet_ids: [a.outlet] } });
+
+    const deactivate = (token: string, member_id: string) =>
+      call("POST", `/v1/members/${member_id}:deactivate`, token, env("tenancy.member.deactivate.v1", { member_id }), a.tenant);
+    // Refusals: the manager cannot (403); the owner cannot deactivate themselves (409). The manager still resolves.
+    expect((await deactivate(tok(staffSub), mgr)).status).toBe(403);
+    expect((await deactivate(a.token, a.owner)).status).toBe(409);
+    expect((await call("GET", "/v1/outlets", tok(mgrSub), undefined, a.tenant)).status).toBe(200);
+    // Accept: deactivated → the sign-in no longer resolves to a member here; a second deactivate is 409.
+    expect((await deactivate(a.token, mgr)).status).toBe(200);
+    expect(await one(`SELECT m.active AS member, ms.active AS membership FROM core.member m JOIN core.membership ms ON ms.member_id = m.id WHERE m.id = $1`, [mgr]))
+      .toEqual({ member: false, membership: false });
+    expect((await call("GET", "/v1/outlets", tok(mgrSub), undefined, a.tenant)).status).toBe(404); // no active membership here: not revealed
+    expect((await deactivate(a.token, mgr)).status).toBe(409);
   });
 });
 

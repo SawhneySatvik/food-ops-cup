@@ -253,6 +253,32 @@ export async function deriveOrderConsumption(c: Queryable, orderId: string): Pro
 // Goods received (T-025) and sale returns (T-022)
 // ---------------------------------------------------------------------------------------------------------
 
+/** Rule inventory.reverse_order_consumption (W2-R6; source state: the order cancelled / rejected): the stock the
+ *  order consumed at placement comes back as `sale_return` movements on the same ingredient, batch and unit, once.
+ *  Called by orders when the order enters cancelled / rejected, in that transaction. Refused (writes nothing) for an
+ *  order outside the source state; idempotent per order. */
+export async function reverseOrderConsumption(c: Queryable, orderId: string): Promise<DerivationResult> {
+  const nothing: DerivationResult = { derived: false, movement_ids: [], events: [], negative_on_hand: [] };
+  const order = await first<{ outlet_id: string }>(c, `SELECT outlet_id FROM core."order" WHERE id = $1`, [orderId]);
+  if (!order) throw new ApiError("not_found");
+  if (!(await inSourceState(c, "inventory.reverse_order_consumption", "core.order", orderId))) throw refused();
+  const back = (await c.query<{ ingredient_id: string; batch_id: string | null; unit: string; qty: string }>(
+    `SELECT ingredient_id, batch_id, unit, (-sum(qty_milli))::text AS qty FROM core.stock_movement
+      WHERE ref_type = 'core.order' AND ref_id = $1 AND kind = 'sale_consumption'
+        AND NOT EXISTS (SELECT 1 FROM core.stock_movement r WHERE r.ref_type = 'core.order' AND r.ref_id = $1 AND r.kind = 'sale_return')
+      GROUP BY ingredient_id, batch_id, unit HAVING sum(qty_milli) < 0 ORDER BY ingredient_id, batch_id`, [orderId])).rows;
+  if (back.length === 0) return nothing;
+  const moves: Array<{ id: string; outlet_id: string; ingredient_id: string; kind: Kind }> = [];
+  await underRule(c, "inventory.reverse_order_consumption", `core.order:${orderId}`, async () => {
+    for (const m of back) {
+      const id = await insertMovement(c, { outlet_id: order.outlet_id, ingredient_id: m.ingredient_id, batch_id: m.batch_id, qty_milli: Number(m.qty),
+        unit: m.unit, kind: "sale_return", ref_type: "core.order", ref_id: orderId });
+      moves.push({ id, outlet_id: order.outlet_id, ingredient_id: m.ingredient_id, kind: "sale_return" });
+    }
+  });
+  return { derived: true, movement_ids: moves.map((m) => m.id), events: movementEvents({ type: "core.order", id: orderId }, moves), negative_on_hand: [] };
+}
+
 /** Rule inventory.receive_grn: one receipt movement per GRN line, in the ingredient's base unit (kg → g and
  *  l → ml convert exactly; the per-base-unit cost is rounded half-up — INFERENCE), into the line's batch, at
  *  the receipt time. Idempotent per GRN. */

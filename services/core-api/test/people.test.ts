@@ -341,6 +341,53 @@ describe("payroll (IN only)", () => {
     expect(posted.length).toBe(1);
   });
 
+  it("people.payroll_draft.status.v1: manager 403, void without a reason 422; paid_externally 200 (entry stands); void 200 → the real finance reversal (Dr 3,000,000 back), recovery no longer counts, the month can be drafted again", async () => {
+    // The real finance seam for this test (the file's fake records calls only).
+    const restore = setPostFor(undefined);
+    try {
+      const status = (who: "owner" | "manager", id: string, body: Record<string, unknown>) =>
+        call("POST", `/v1/people/payroll-drafts/${id}:status`, as(who), t.tenant, env("people.payroll_draft.status.v1", { payroll_draft_id: id, ...body }));
+      const draft = async (month: string, recovery = 0) => {
+        const id = uuidv7();
+        const r = await post("owner", "/v1/people/payroll-drafts", "people.payroll_draft.create.v1", { payroll_draft_id: id, outlet_id: O0(), period_month: month, currency: "INR",
+          lines: [{ staff_id: S2, base_minor: 3000000, overtime_minor: 0, advance_recovery_minor: 0, tips_minor: 0, net_minor: 3000000 },
+            ...(recovery ? [{ staff_id: S1, base_minor: 100000, overtime_minor: 0, advance_recovery_minor: recovery, tips_minor: 0, net_minor: 100000 - recovery }] : [])] });
+        expect(r.status).toBe(200);
+        return id;
+      };
+      const entries = (id: string) => db.admin<{ rule: string; reverses: boolean; dr: number; net: number }>(
+        `SELECT j.posting_rule AS rule, j.reverses_id IS NOT NULL AS reverses, (sum(p.amount_minor) FILTER (WHERE p.amount_minor > 0))::int AS dr, sum(p.amount_minor)::int AS net
+           FROM core.journal_entry j JOIN core.posting p ON p.tenant_id = j.tenant_id AND p.journal_entry_id = j.id WHERE j.source_id = $1 GROUP BY j.tenant_id, j.id ORDER BY j.id`, [id]).then((r) => r.rows);
+      const statusOf = async (id: string) => (await one<{ status: string }>(`SELECT status FROM core.payroll_draft WHERE id = $1`, [id])).status;
+
+      const paid = await draft("2026-06-01");
+      expect((await status("manager", paid, { status: "paid_externally", reason_code: null })).status).toBe(403);
+      expect((await status("owner", paid, { status: "paid_externally", reason_code: null })).status).toBe(200);
+      expect(await statusOf(paid)).toBe("paid_externally");
+      expect(await entries(paid)).toEqual([{ rule: "finance.post_payroll", reverses: false, dr: 3000000, net: 0 }]);
+      expect((await err(await status("owner", paid, { status: "void", reason_code: "entered_twice" }))).code).toBe("illegal_transition");
+
+      // S1 owes 19,000 − 5,000 recovered in August = 14,000; July recovers 4,000 more → 10,000, until July is voided.
+      const owed = async () => (await (await call("GET", `/v1/people/payroll-preview?outlet=${O0()}&month=2026-08-01`, t.ownerSub, t.tenant)).json())
+        .lines.find((l: { staff_id: string }) => l.staff_id === S1).outstanding_advance_minor;
+      const voided = await draft("2026-07-01", 4000);
+      expect(await owed()).toBe(10000);
+      expect((await err(await status("owner", voided, { status: "void", reason_code: null }))).code).toBe("invalid_payload");
+      expect(await statusOf(voided)).toBe("approved");
+      expect((await status("owner", voided, { status: "void", reason_code: "entered_twice" })).status).toBe(200);
+      expect(await statusOf(voided)).toBe("void");
+      // Hand: the July entry Dr wages 3,100,000 (3,000,000 + 100,000), reversed in full under finance.reverse_payroll.
+      expect(await entries(voided)).toEqual([
+        { rule: "finance.post_payroll", reverses: false, dr: 3100000, net: 0 },
+        { rule: "finance.reverse_payroll", reverses: true, dr: 3100000, net: 0 },
+      ]);
+      expect(await owed()).toBe(14000);
+      await draft("2026-07-01");
+    } finally {
+      restore();
+    }
+  });
+
   it("AU tenant: payroll draft refused (MB013 → out_of_pack_scope / payroll_out_of_scope), preview refused, rosters still work", async () => {
     const w = await buildWorld(db, { country: "AU" });
     const sub = `au-owner-${uuidv7()}`;

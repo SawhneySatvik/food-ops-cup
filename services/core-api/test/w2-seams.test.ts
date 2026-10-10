@@ -98,7 +98,7 @@ describe("B6: the real finance.postFor on each owner's default path", () => {
 });
 
 describe("B3: composition and the AccountMissing refusal", () => {
-  it("a chart without the role a posting rule needs → 409 conflict (never 500, never the role in the text); nothing is written", async () => {
+  it("a chart without the role a posting rule needs → 409 chart_incomplete (never 500, never the role in the text); nothing is written", async () => {
     // A UPI tender posts to the `bank` role (account 1010, core-domain ROLES). The world carries the full chart
     // (0015 A12), so the gate deactivates 1010 for the refusal and re-activates it for the accept.
     const bank = (active: boolean) => env.db.withContext("munim_core",
@@ -111,7 +111,7 @@ describe("B3: composition and the AccountMissing refusal", () => {
     const r = await env.cmd(`/v1/orders/${p.order_id}/tenders`, "staff", "orders.tender.record.v1",
       { tender_id: tender, order_id: p.order_id, method: "upi", tendered_minor: null, amount_minor: 4200, currency: "INR", ref: "UPI-SYN-1" });
     const body = await r.json();
-    expect([r.status, body.error?.code, JSON.stringify(body).includes("bank")]).toEqual([409, "conflict", false]);
+    expect([r.status, body.error?.code, JSON.stringify(body).includes("bank")]).toEqual([409, "chart_incomplete", false]);
     expect(await env.rows(`SELECT 1 FROM core.tender WHERE id = $1`, [tender])).toEqual([]);
     // Accept: with the bank account active the same tender is recorded and posted.
     await bank(true);

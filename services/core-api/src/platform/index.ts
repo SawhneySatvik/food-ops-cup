@@ -7,7 +7,7 @@ import type pg from "pg";
 import { ConfigDraftApprove, ConfigDraftPropose, ConfigDraftReject } from "@munim/contracts/platform";
 import { requireOperator } from "../auth/resolve.ts";
 import { replayHeaders } from "../commit/index.ts";
-import { type Pools, withContext } from "../lib/db.ts";
+import { withContext } from "../lib/db.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { AppEnv } from "../lib/types.ts";
 import { approve, getDraftRow, listDrafts, propose, reject } from "./drafts.ts";
@@ -27,7 +27,7 @@ function operatorId(c: Context<AppEnv>): string {
 
 /** One munim_platform transaction as the signed-in operator. `pools.platform` is wired by server.ts. */
 function asOperator<T>(c: Context<AppEnv>, fn: (db: pg.PoolClient) => Promise<T>): Promise<T> {
-  const pool = (c.var.deps.pools as Pools & { platform?: pg.Pool }).platform;
+  const pool = c.var.deps.pools.platform;
   if (!pool) throw new ApiError("unavailable");
   return withContext(pool, { role: "operator", operator_id: operatorId(c) }, fn);
 }

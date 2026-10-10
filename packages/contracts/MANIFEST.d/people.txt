@@ -3,6 +3,7 @@ people.roster.create.v1
 people.roster.update.v1
 people.attendance.record.v1
 people.payroll_draft.create.v1
+people.payroll_draft.status.v1
 people.advance.record.v1
 people.tip_pool.record.v1
 people.training.record.v1

@@ -7,7 +7,8 @@
 //   3. another customer's order → 404 (and the paired own order → 200)
 //   4. export contains only this customer's rows
 //   5. erasure anonymises the personal fields and keeps the order rows (counts)
-//   6. verified-email merge: PENDING until the migrator's definer function exists (then: moved = fixture count)
+//   6. verified-email merge (0015 A10): 2 orders + 1 reservation move, the guest is merged; 4 audit rows = the
+//      function's returned set; an unverified email moves nothing
 //   7. ensureProfile seam: first call creates, second returns the same id, guest → 401
 import { createHash, randomBytes } from "node:crypto";
 import { createLogger } from "@munim/config";
@@ -18,7 +19,7 @@ import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, requireCustomer, storefrontResolver } from "../src/app.ts";
-import { EMAIL_MERGE_FN, ensureProfile } from "../src/modules/accounts/index.ts";
+import { ensureProfile } from "../src/modules/accounts/index.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { openDb } from "./db.ts";
 import { addCustomer, addGuestOrder, buildTenant, type Tenant } from "./world.ts";
@@ -353,39 +354,36 @@ describe("erasure", () => {
   });
 });
 
-// Collection-time probe of the migrated schema: which half of the merge gate applies.
-const probe = await openDb();
-const exists = (await probe.admin<{ ok: boolean }>(`SELECT to_regprocedure($1) IS NOT NULL AS ok`, [EMAIL_MERGE_FN])).rows[0]!.ok;
-await probe.stop();
-
-describe("verified-email merge of guest profiles (R41; needs the migrator's definer function)", () => {
-  if (!exists) console.log(`verified-email merge: PENDING — ${EMAIL_MERGE_FN} is not in the schema yet (requested from the migrator); the gate below asserts fail-closed behaviour only`);
-
-  it.runIf(!exists)("PENDING: with no definer function, a verified email moves 0 guest orders (fail closed) and records email_verified_at", async () => {
+describe("verified-email merge of guest profiles (R41, 0015 A10)", () => {
+  it("unverified moves 0; verified moves the guest's 2 orders and 1 reservation and merges the guest — one audit row per changed row", async () => {
     const email = "ravi.synthetic@example.test";
     const g = await addGuestProfile(A, email);
-    for (let i = 0; i < 2; i++) await addGuestOrder(db, A, g);
-    const sub = `acct-verified-${uuidv7()}`;
-    const r = await call("POST", "/v1/account:link", { key: A.storefrontKey, sub, email, verified: true, body: linkBody("Ravi (synthetic)") });
-    expect(r.status).toBe(200);
-    const id = ((await r.json()) as { entity_id: string }).entity_id;
-    expect(await n(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, g])).toBe(2);
-    expect(await n(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, id])).toBe(0);
-    expect(await n(`SELECT count(*) AS n FROM core.customer WHERE tenant_id = $1 AND id = $2 AND email_verified_at IS NOT NULL`, [A.tenant, id])).toBe(1);
-  });
-
-  it.runIf(exists)("verified email merges the matching guest profile's orders: moved = 2 (fixture); unverified moves 0", async () => {
-    const email = "ravi.synthetic@example.test";
-    const g = await addGuestProfile(A, email);
-    for (let i = 0; i < 2; i++) await addGuestOrder(db, A, g);
+    const orders = [(await addGuestOrder(db, A, g)).order, (await addGuestOrder(db, A, g)).order];
+    const reservation = uuidv7();
+    await db.withContext("munim_core", { tenant_id: A.tenant, outlet_ids: "*", role: "owner", member_id: A.owner, command_type: "customers.reservation.upsert.v1" }, (c) =>
+      c.query(`INSERT INTO core.reservation (tenant_id, id, outlet_id, customer_id, name, party_size, starts_at) VALUES ($1, $2, $3, $4, 'Ravi', 2, '2026-10-20T19:00:00Z')`,
+        [A.tenant, reservation, A.outlets[0], g]));
     const unverified = await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: `acct-unverified-${uuidv7()}`, email, body: linkBody("Ravi U (synthetic)") });
     expect(unverified.status).toBe(200);
     expect(await n(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, g])).toBe(2);
+
     const r = await call("POST", "/v1/account:link", { key: A.storefrontKey, sub: `acct-verified-${uuidv7()}`, email, verified: true, body: linkBody("Ravi (synthetic)") });
     expect(r.status).toBe(200);
     const id = ((await r.json()) as { entity_id: string }).entity_id;
     expect(await n(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, id])).toBe(2);
     expect(await n(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, g])).toBe(0);
+    expect(await n(`SELECT count(*) AS n FROM core.reservation WHERE tenant_id = $1 AND customer_id = $2`, [A.tenant, id])).toBe(1);
+    expect(await n(`SELECT count(*) AS n FROM core.customer WHERE tenant_id = $1 AND id = $2 AND merged_into = $3`, [A.tenant, g, id])).toBe(1);
+    // The audit entries of this command are exactly the changed rows (hand-listed: 2 orders, 1 reservation, the guest),
+    // plus the new profile itself; each moved row names the guest it came from.
+    const audit = (await db.admin<{ entity: string; entity_id: string; before: Record<string, unknown> | null }>(
+      `SELECT entity, entity_id, before FROM core.audit_log WHERE tenant_id = $1 AND action = 'customers.account.link.v1' AND entity_id = ANY ($2::text[]) ORDER BY entity, entity_id`,
+      [A.tenant, [...orders, reservation, g]])).rows;
+    expect(audit).toEqual([
+      { entity: "core.customer", entity_id: g, before: { merged_into: null } },
+      ...[...orders].sort().map((o) => ({ entity: "core.order", entity_id: o, before: { customer_id: g } })),
+      { entity: "core.reservation", entity_id: reservation, before: { customer_id: g } },
+    ]);
   });
 });
 

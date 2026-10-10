@@ -50,7 +50,7 @@ const SECRET_NAMES: readonly EnvName[] = [
 ];
 
 export type ModelMode = "recorded" | "live";
-export type DbRole = "munim_core" | "munim_svc";
+export type DbRole = "munim_core" | "munim_svc" | "munim_platform";
 
 export interface Config {
   nodeEnv: string;

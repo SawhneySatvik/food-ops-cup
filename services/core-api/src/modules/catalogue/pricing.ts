@@ -118,6 +118,13 @@ export async function loadDeals(tx: Queryable): Promise<Array<DealRow & { name_k
   });
 }
 
+/** THE rule for what is on sale, as SQL over an item row `i` and a variant id expression `v`: an item with active
+ *  variants sells only as one of its active variants; an item without sells only as itself (variant null).
+ *  itemsForSale lists exactly the pairs it admits and priceLines prices no other pair (one rule, both places). */
+export const sellableAs = (i: string, v: string) =>
+  `(CASE WHEN ${v} IS NULL THEN NOT EXISTS (SELECT 1 FROM core.variant w WHERE w.tenant_id = ${i}.tenant_id AND w.item_id = ${i}.id AND w.active)
+         ELSE EXISTS (SELECT 1 FROM core.variant w WHERE w.tenant_id = ${i}.tenant_id AND w.item_id = ${i}.id AND w.id = ${v} AND w.active) END)`;
+
 type OptionRow = { id: string; group_id: string; price_delta_minor: string; active: boolean; min_select: number; max_select: number; required: boolean };
 
 async function lineFacts(tx: Queryable, req: PriceRequest, line: PriceRequest["lines"][number], business_date: string) {
@@ -130,6 +137,9 @@ async function lineFacts(tx: Queryable, req: PriceRequest, line: PriceRequest["l
     if (!v.active) throw new ApiError("conflict");
   }
   if (!item.active) throw new ApiError("conflict");
+  // The menu's rule (sellableAs, as itemsForSale lists): an item that has active variants is sold only as one of them.
+  const sellable = (await tx.query<{ ok: boolean }>(`SELECT ${sellableAs("i", "$2::uuid")} AS ok FROM core.item i WHERE i.id = $1`, [line.item_id, line.variant_id])).rows[0];
+  if (!sellable?.ok) throw new ApiError("conflict");
   const price = (await tx.query<{ id: string; amount_minor: string; tax_class: string }>(
     `SELECT id, amount_minor, tax_class FROM core.price
       WHERE item_id = $1 AND outlet_id = $2 AND channel_kind = $3 AND (variant_id = $4 OR variant_id IS NULL)
@@ -170,14 +180,23 @@ type CouponRow = {
   valid_from: Date; valid_to: Date | null; active: boolean;
 };
 
-/** Uses so far, counted over every order of the tenant: a shopper cannot read others' coupon_use rows (0014
- *  customer_scope), so the count runs with the shopper role cleared (core's own bookkeeping read). */
-async function couponUses(tx: Queryable, coupon_id: string, customer_id: string | null) {
-  const count = async () => (await tx.query<{ all: string; mine: string }>(
-    `SELECT count(*) AS all, count(*) FILTER (WHERE customer_id = $2) AS mine FROM core.coupon_use WHERE coupon_id = $1`,
-    [coupon_id, customer_id])).rows[0]!;
-  const role = (await tx.query<{ r: string | null }>(`SELECT nullif(current_setting('app.role', true), '') AS r`)).rows[0]!.r;
-  const c = role === "customer" || role === "guest" ? await asSystem(tx, count) : await count();
+/** Uses so far, counted over every order of the tenant, except uses on orders that were cancelled or rejected (the
+ *  use row stays — append-only — but no longer counts towards a cap). A cap is tenant-wide, so the count is core's
+ *  own read for every caller: role cleared and every outlet in view for this one statement (a shopper can read
+ *  neither others' uses nor their orders; a member scoped to some outlets cannot see another outlet's cancellation),
+ *  then restored. Only the two counts leave it. orders' placement (recordCoupons) counts the same way. */
+export async function couponUses(tx: Queryable, coupon_id: string, customer_id: string | null) {
+  const prev = (await tx.query<{ o: string | null }>(`SELECT current_setting('app.outlet_ids', true) AS o`)).rows[0]!.o;
+  const c = await asSystem(tx, async () => {
+    await tx.query(`SELECT set_config('app.outlet_ids', '{*}', true)`);
+    const out = (await tx.query<{ all: string; mine: string }>(
+      `SELECT count(*) AS all, count(*) FILTER (WHERE u.customer_id = $2) AS mine FROM core.coupon_use u
+        WHERE u.coupon_id = $1
+          AND NOT EXISTS (SELECT 1 FROM core."order" o WHERE o.tenant_id = u.tenant_id AND o.id = u.order_id AND o.status IN ('cancelled', 'rejected'))`,
+      [coupon_id, customer_id])).rows[0]!;
+    await tx.query(`SELECT set_config('app.outlet_ids', $1, true)`, [prev ?? ""]);
+    return out;
+  });
   return { all: Number(c.all), mine: Number(c.mine) };
 }
 

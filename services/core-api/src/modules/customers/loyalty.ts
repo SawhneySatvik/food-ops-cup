@@ -17,11 +17,6 @@ import { asSystem } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 
-/** INFERENCE (no earn rate is seeded anywhere; a per-tenant policy column is requested): one point per 1,000 minor
- *  units of the order's net amount (subtotal − discount, before tax) — ₹10 / A$10 — and one point is worth 10 minor
- *  units at redemption. All the rate knowledge of this module lives in these two constants. */
-export const LOYALTY = { earnPerMinor: 1000, pointValueMinor: 10 } as const;
-
 export interface LoyaltyWrite {
   entry_id: string;
   points: number;
@@ -31,13 +26,28 @@ interface OrderRow {
   customer_id: string | null;
   status: string;
   net_minor: string;
+  outlet_id: string;
+  business_date: string;
 }
 
 async function orderOf(tx: Queryable, orderId: string): Promise<OrderRow> {
   const r = await tx.query<OrderRow>(
-    `SELECT customer_id, status, (subtotal_minor - discount_minor)::text AS net_minor FROM core."order" WHERE id = $1`, [orderId]);
+    `SELECT customer_id, status, (subtotal_minor - discount_minor)::text AS net_minor, outlet_id, business_date::text AS business_date
+       FROM core."order" WHERE id = $1`, [orderId]);
   if (!r.rows[0]) throw new ApiError("not_found");
   return r.rows[0];
+}
+
+/** W2-R4: the tenant's loyalty policy (core.business_policy) in force for the order's outlet on its business date —
+ *  an outlet's own row before the tenant-wide one, the latest version first. earn_per_minor = net minor units per
+ *  point (1000 = 1 point per ₹10 / A$10); point_value_minor = what a point is worth at redemption. Core's own read:
+ *  a shopper cannot read business_policy (0014 customer_scope), so the role is cleared for it. No policy → null. */
+export async function loyaltyPolicy(tx: Queryable, outletId: string, on: string): Promise<{ earn_per_minor: number; point_value_minor: number } | null> {
+  const r = await asSystem(tx, async () => (await tx.query<{ earn: string; value: string }>(
+    `SELECT loyalty_earn_per_minor AS earn, loyalty_point_value_minor AS value FROM core.business_policy
+      WHERE (outlet_id = $1 OR outlet_id IS NULL) AND valid_from <= $2::date AND (valid_to IS NULL OR valid_to > $2::date)
+      ORDER BY outlet_id NULLS LAST, valid_from DESC, created_at DESC, id DESC LIMIT 1`, [outletId, on])).rows[0]);
+  return r ? { earn_per_minor: Number(r.earn), point_value_minor: Number(r.value) } : null;
 }
 
 /** The per-customer row lock, taken first so the existence checks below cannot race. */
@@ -79,28 +89,33 @@ export async function loyaltyBalance(tx: Queryable, customerId: string): Promise
 }
 
 /** Redeem `points` against `orderId` (the order's own customer; never an argument). One redemption per order.
- *  Insufficient balance → the database raises MB011 and the caller's transaction is refused. */
-export async function loyaltyRedeem(tx: Queryable, orderId: string, points: number): Promise<LoyaltyWrite> {
+ *  Insufficient balance → the database raises MB011 and the caller's transaction is refused. `value_minor` = points ×
+ *  the policy's point value (no policy in force → refused). */
+export async function loyaltyRedeem(tx: Queryable, orderId: string, points: number): Promise<LoyaltyWrite & { value_minor: number }> {
   if (!Number.isSafeInteger(points) || points <= 0) throw new ApiError("invalid_payload");
   const order = await orderOf(tx, orderId);
   if (!order.customer_id) throw new ApiError("loyalty_refused"); // points belong to a customer; a walk-in has none
+  const policy = await loyaltyPolicy(tx, order.outlet_id, order.business_date);
+  if (!policy) throw new ApiError("loyalty_refused");
   if (!(await lockCustomer(tx, order.customer_id))) throw new ApiError("loyalty_refused");
   const dup = await tx.query(`SELECT 1 FROM core.loyalty_entry WHERE order_id = $1 AND kind = 'redeem'`, [orderId]);
   if (dup.rows[0]) throw new ApiError("conflict");
   const entry_id = await insertEntry(tx, { customer_id: order.customer_id, kind: "redeem", points: -points, order_id: orderId, reverses_id: null, note: null });
-  return { entry_id, points: -points };
+  return { entry_id, points: -points, value_minor: points * policy.point_value_minor };
 }
 
-/** Earn on a completed order: floor(net / earnPerMinor) points. A no-op (null) for an order that is not completed,
- *  has no customer, a guest (no account → "Create an account to earn points", INFERENCE), an erased profile, 0
- *  points, or that already earned. */
+/** Earn on a completed order: floor(net / the policy's earn_per_minor) points. A no-op (null) for an order that is
+ *  not completed, has no customer, a guest (no account → "Create an account to earn points", INFERENCE), an erased
+ *  profile, no policy in force, 0 points, or that already earned. */
 export async function loyaltyEarnFor(tx: Queryable, orderId: string): Promise<LoyaltyWrite | null> {
   return asSystem(tx, async () => {
     const order = await orderOf(tx, orderId);
     if (order.status !== "completed" || !order.customer_id) return null;
     const cust = await lockCustomer(tx, order.customer_id);
     if (!cust || cust.is_guest || cust.erased) return null;
-    const points = Math.floor(Number(order.net_minor) / LOYALTY.earnPerMinor);
+    const policy = await loyaltyPolicy(tx, order.outlet_id, order.business_date);
+    if (!policy) return null;
+    const points = Math.floor(Number(order.net_minor) / policy.earn_per_minor);
     if (points <= 0) return null;
     const dup = await tx.query(`SELECT 1 FROM core.loyalty_entry WHERE order_id = $1 AND kind = 'earn'`, [orderId]);
     if (dup.rows[0]) return null;

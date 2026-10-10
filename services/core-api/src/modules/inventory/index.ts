@@ -29,7 +29,7 @@ import {
 } from "./handlers.ts";
 import { listBatches, listMovements } from "./read.ts";
 
-export { consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, pickSaleBatches } from "./seams.ts";
+export { consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, pickSaleBatches, reverseOrderConsumption } from "./seams.ts";
 export type { ConsumptionResult, DerivationResult, SaleLineIn, SalePick, SalePickRefusal, SalePicks } from "./seams.ts";
 export { onNegativeOnHand, type NegativeOnHand } from "./stock.ts";
 export { bindingMrp, fefoPick } from "./fefo.ts";

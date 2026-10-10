@@ -33,6 +33,8 @@ const MESSAGES = {
   cannot_verify: "Cannot verify: a number in this proposal no longer traces to its source rows.",
   already_decided: "This proposal was already decided.",
   stale_draft: "This proposal is out of date: the numbers it relied on have changed.",
+  // Finance: the tenant's chart has no active account for a role a posting rule needs (AccountMissing).
+  chart_incomplete: "The chart of accounts is missing an account this needs. Add it in Finance settings.",
   execution_failed: "Approved, but it could not be applied. Nothing was changed.",
   unavailable: "The service is unavailable.",
   internal: "Something went wrong.",
@@ -86,6 +88,7 @@ const STATUS: Record<ErrorCode, ContentfulStatusCode> = {
   cannot_verify: 422,
   already_decided: 409,
   stale_draft: 409,
+  chart_incomplete: 409,
   execution_failed: 422,
   unavailable: 503,
   internal: 500,

@@ -6,13 +6,12 @@ import {
   PurchasingSupplierReturnCreateV1, PurchasingSupplierUpsertV1,
 } from "@munim/contracts/purchasing";
 import { mulDiv } from "@munim/core-domain/money";
-import { type CommandHandler, uuidv7 } from "../../commit/index.ts";
+import { type AuditEntry, type CommandHandler, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { seams } from "./seams.ts";
 
-/** The goods-received command. NOT seeded in core.command_authority yet (requested from the migrator, see the
- *  T-025 report): until it lands the route fails closed in a real database. */
+/** The goods-received command (seeded in core.command_authority by 0015 A4). */
 export const GRN_COMMAND = "purchasing.grn.receive.v1";
 
 const T = "current_setting('app.tenant_id')::uuid";
@@ -236,7 +235,10 @@ export const invoiceApprove: CommandHandler = {
     // recorded → approved (or disputed → approved) only; approving twice would raise a second payable.
     if (inv.status !== "recorded" && inv.status !== "disputed") throw new ApiError("conflict");
     await c.query(`UPDATE core.supplier_invoice SET status = 'approved' WHERE id = $1`, [p.supplier_invoice_id]);
-    const payable = await derivePayable(c, p.supplier_invoice_id);
+    // A dispute resolved back to approved keeps the payable it already raised; its entry, reversed by the dispute,
+    // is re-posted by finance as the reversal of that reversal.
+    const raised = await first(c, `SELECT 1 FROM core.payable WHERE source_type = 'core.supplier_invoice' AND source_id = $1`, [p.supplier_invoice_id]);
+    const payable = raised ? null : await derivePayable(c, p.supplier_invoice_id);
     await seams.postFor(c, "finance.post_supplier_invoice", `core.supplier_invoice:${p.supplier_invoice_id}`);
     return {
       entityId: p.supplier_invoice_id,
@@ -252,8 +254,10 @@ export const invoiceDispute: CommandHandler = {
   type: "purchasing.invoice.dispute.v1",
   async run(c, command) {
     const p = PurchasingInvoiceDisputeV1.parse(command.payload);
-    const inv = await first<{ supplier_id: string; currency: string }>(c, `SELECT supplier_id, currency FROM core.supplier_invoice WHERE id = $1`, [p.supplier_invoice_id]);
+    const inv = await first<{ supplier_id: string; currency: string; status: string }>(c,
+      `SELECT supplier_id, currency, status FROM core.supplier_invoice WHERE id = $1 FOR UPDATE`, [p.supplier_invoice_id]);
     if (!inv) throw bad();
+    if (inv.status === "void") throw new ApiError("conflict");
     let total = 0;
     for (const l of p.lines) {
       const row = await first<{ line_total_minor: string }>(c, `SELECT line_total_minor FROM core.supplier_invoice_line WHERE id = $1 AND supplier_invoice_id = $2`, [l.invoice_line_id, p.supplier_invoice_id]);
@@ -268,7 +272,16 @@ export const invoiceDispute: CommandHandler = {
       await c.query(`INSERT INTO core.dispute_line (tenant_id, id, dispute_id, line_no, supplier_invoice_line_id, claimed_minor, currency) VALUES (${T}, $1, $2, $3, $4, $5, $6)`,
         [uuidv7(), p.dispute_id, i + 1, l.invoice_line_id, l.claimed_minor, inv.currency]);
     }
-    return { entityId: p.dispute_id, audit: [{ entity: "core.dispute", entityId: p.dispute_id, after: { basis: p.basis, status: "recorded" } }] };
+    const audit: AuditEntry[] = [{ entity: "core.dispute", entityId: p.dispute_id, after: { basis: p.basis, status: "recorded" } }];
+    // 0015 A8: the dispute moves the invoice to disputed; an approved invoice's entry is reversed under
+    // finance.reverse_supplier_invoice (source state disputed) in this transaction. Its payable stays open
+    // (the dispute command does not write core.payable — schema request in the T-034 report).
+    if (inv.status !== "disputed") {
+      await c.query(`UPDATE core.supplier_invoice SET status = 'disputed' WHERE id = $1`, [p.supplier_invoice_id]);
+      if (inv.status === "approved") await seams.reverseSource!(c, "finance.reverse_supplier_invoice", `core.supplier_invoice:${p.supplier_invoice_id}`);
+      audit.push({ entity: "core.supplier_invoice", entityId: p.supplier_invoice_id, before: { status: inv.status }, after: { status: "disputed" } });
+    }
+    return { entityId: p.dispute_id, audit };
   },
 };
 

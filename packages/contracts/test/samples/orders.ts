@@ -47,6 +47,9 @@ export const SAMPLES: Record<string, unknown> = {
   "orders.refund.record.v1": { refund_id: u(17), order_id: u(10), tender_id: u(15), method: "card", amount_minor: 5000, currency: "INR", reason_code: "quality", note: "cold food" },
   "orders.shift.open.v1": { shift_id: u(18), outlet_id: u(2), device_id: u(5), float_minor: 500000, currency: "INR" },
   "orders.shift.close.v1": { shift_id: u(18), counted_cash_minor: 558400 },
+  "orders.order.accept.v1": { order_id: u(10) },
+  "orders.order.reject.v1": { order_id: u(10), reason_code: "out_of_stock" },
+  "orders.order.advance.v1": { order_id: u(10), from_status: "preparing", to_status: "ready", reason_code: null },
   "v1.order": {
     order_id: u(10), outlet_id: u(2), channel_id: u(4), device_id: u(5), kind: "takeaway", table_ref: null, status: "placed", business_date: "2026-10-09",
     ticket_no: 47, invoice_fy: 2026, invoice_no: 1203, promised_at: T_PG, pickup_window_id: null,

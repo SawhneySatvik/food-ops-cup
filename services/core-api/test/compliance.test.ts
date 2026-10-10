@@ -184,7 +184,8 @@ describe("temperature logs against the asset's safe range", () => {
     const wrongOutlet = await e.cmd(T, "owner", "compliance.temp.record.v1", reading(chiller, 3000, "2026-10-09T01:00:00Z", { outlet_id: e.w.outlets[1] }));
     expect([wrongOutlet.status, (await wrongOutlet.json()).error.code]).toEqual([404, "not_found"]);
     const other = await e.cmd(T, "mgr2", "compliance.temp.record.v1", reading(chiller, 3000, "2026-10-09T01:00:00Z"));
-    expect([other.status, (await other.json()).error.code]).toEqual([403, "book_write_refused"]); // outlet 2 is not their scope
+    // Outlet 2's manager cannot see outlet 1's asset at all (0015 A3 outlet RLS): 404, as for any row outside their scope.
+    expect([other.status, (await other.json()).error.code]).toEqual([404, "not_found"]);
   });
 
   it("asset range must be min < max and both or neither; the identity of an asset cannot be rewritten", async () => {

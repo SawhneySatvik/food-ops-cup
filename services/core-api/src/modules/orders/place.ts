@@ -275,16 +275,12 @@ async function recordCoupons(c: Queryable, outletId: string, orderId: string, cu
   for (const k of cart.priced.coupons) {
     const full = await asCore(c, outletId, async () => {
       await c.query(`SELECT pg_advisory_xact_lock(hashtextextended('core.coupon_use:' || $1, 0))`, [k.coupon_id]);
-      // A use on an order that was cancelled or rejected no longer counts (W2 B5: coupon_use is append-only). An
-      // order this outlet scope cannot see counts as live — the cap errs towards refusing.
-      const n = await c.query<{ global_cap: number | null; per_customer_cap: number | null; all: string; mine: string }>(
-        `WITH live AS (SELECT u.customer_id FROM core.coupon_use u WHERE u.coupon_id = $1
-                          AND NOT EXISTS (SELECT 1 FROM core."order" o WHERE o.tenant_id = u.tenant_id AND o.id = u.order_id AND o.status IN ('cancelled', 'rejected')))
-         SELECT k.global_cap, k.per_customer_cap, (SELECT count(*) FROM live) AS all, (SELECT count(*) FROM live WHERE customer_id = $2) AS mine
-           FROM core.coupon k WHERE k.id = $1`, [k.coupon_id, customerId]);
-      const row = n.rows[0];
-      if (!row) return true;
-      return (row.global_cap !== null && Number(row.all) >= row.global_cap) || (row.per_customer_cap !== null && Number(row.mine) >= row.per_customer_cap);
+      const caps = (await c.query<{ global_cap: number | null; per_customer_cap: number | null }>(
+        `SELECT global_cap, per_customer_cap FROM core.coupon WHERE id = $1`, [k.coupon_id])).rows[0];
+      if (!caps) return true;
+      // The one count catalogue's pricing uses (tenant-wide; a cancelled or rejected order's use no longer counts).
+      const n = await seams.couponUses(c, k.coupon_id, customerId);
+      return (caps.global_cap !== null && n.all >= caps.global_cap) || (caps.per_customer_cap !== null && n.mine >= caps.per_customer_cap);
     });
     if (full) throw refuse("coupon_cap_reached");
     await c.query(

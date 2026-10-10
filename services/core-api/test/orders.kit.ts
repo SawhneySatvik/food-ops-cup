@@ -76,6 +76,10 @@ export async function startEnv(country: "IN" | "AU" = "IN"): Promise<Env> {
     // The world's always-on deal would discount every line; switch it off so each fixture deal is explicit.
     await cmd("catalogue.deal.end.v1");
     await c.query(`UPDATE core.deal SET active = false WHERE tenant_id = $1`, [T]);
+    // The world's paneer tikka carries one variant; with it active the item sells only as that variant (catalogue's
+    // sellable rule). The gates sell the bare item, so the variant is retired.
+    await cmd("catalogue.item.upsert.v1");
+    await c.query(`UPDATE core.variant SET active = false WHERE item_id = $1`, [w.item]);
     await cmd("inventory.ingredient.upsert.v1");
     const ingJ = uuidv7(); const ingX = uuidv7();
     await c.query(`INSERT INTO core.ingredient (tenant_id, id, name, base_unit, tracked_by_batch) VALUES ($1, $2, 'Biscuit pack', 'pc', true), ($1, $3, 'Juice pack', 'pc', true), ($1, $4, 'Chips pack', 'pc', true)`,
@@ -315,7 +319,8 @@ async function loyaltyEntry(c: Queryable, customerId: string, kind: string, poin
 /** Fake rate: 1 point = 100 minor units. Earn: 1 point per 100 minor units of the order total. */
 export const POINT_MINOR = 100;
 
-export const FAKES: OrderSeams = {
+/** The coupon-use count (catalogue) and the stock reversal on cancel (inventory) are always the real seams. */
+export const FAKES: Omit<OrderSeams, "couponUses" | "reverseOrderConsumption"> = {
   priceLines: fakePriceLines,
   pickSaleBatches: fakePick,
   deriveOrderConsumption: fakeConsume,

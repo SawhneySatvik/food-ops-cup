@@ -17,7 +17,7 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import {
   bindHandler, brandCreateHandler, channelCreateHandler, demoHandler, deviceRegisterHandler, inviteHandler, onboardHandler,
-  outletCreateHandler, outletUpdateHandler, tenantUpdateHandler,
+  outletCreateHandler, outletUpdateHandler, tenantUpdateHandler, deactivateHandler, roleSetHandler,
 } from "./commands.ts";
 import { createKey, listKeys, revokeKey } from "./storefront-keys.ts";
 import { outletScopeOf } from "@munim/core-domain/authority";
@@ -76,6 +76,11 @@ async function memberCommand(c: Context<AppEnv>, handler: (m: MemberP) => Comman
     env, handler(m));
   return reply(c, out, status);
 }
+
+/** The path's member id must be the payload's (`/v1/members/{id}:<verb>`). */
+const samePath = (c: Context<AppEnv>, verb: string) => (e: CommandEnvelope) => {
+  if ((e.payload as { member_id?: unknown }).member_id !== c.req.param("action")!.slice(0, -verb.length)) throw new ApiError("invalid_payload");
+};
 
 const list = (table: string, cols: string, order = "created_at, id") => async (c: Context<AppEnv>) => {
   const m = memberOf(c);
@@ -166,6 +171,10 @@ export const router = new Hono<AppEnv>()
   .post("/v1/channels", requireMember, (c) => memberCommand(c, () => channelCreateHandler))
   .post("/v1/devices", requireMember, (c) => memberCommand(c, (m) => deviceRegisterHandler(m)))
   .post("/v1/members:invite", requireMember, (c) => memberCommand(c, () => inviteHandler))
+  .post(`/v1/members/:action{${ID}:set-role}`, requireMember, (c) =>
+    memberCommand(c, () => roleSetHandler, 200, samePath(c, ":set-role")))
+  .post(`/v1/members/:action{${ID}:deactivate}`, requireMember, (c) =>
+    memberCommand(c, () => deactivateHandler, 200, samePath(c, ":deactivate")))
   // ---- storefront keys ----
   .post("/v1/storefront-keys", requireMember, createKey)
   .get("/v1/storefront-keys", requireMember, listKeys)

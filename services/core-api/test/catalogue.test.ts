@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, contextOf, createApp, TENANT_HEADER, withContext } from "../src/app.ts";
 import { draftHandler } from "../src/modules/approvals/handlers.ts";
 import { DRAFT_HANDLERS } from "../src/modules/catalogue/handlers.ts";
-import { priceLines, type PriceRequest, type PriceResult } from "../src/modules/catalogue/index.ts";
+import { couponUses, itemsForSale, priceLines, type PriceRequest, type PriceResult } from "../src/modules/catalogue/index.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { openDb } from "./db.ts";
 
@@ -34,7 +34,7 @@ type Who = keyof typeof subs;
 const ids = () => ({
   ingBisc: uuidv7(), ingChips: uuidv7(), ingMilk: uuidv7(),
   A: uuidv7(), gExtras: uuidv7(), xCheese: uuidv7(), xPaneer: uuidv7(), dCheese: uuidv7(), gSpice: uuidv7(), sMild: uuidv7(), sHot: uuidv7(),
-  B: uuidv7(), vGarlic: uuidv7(), C: uuidv7(), D: uuidv7(), E: uuidv7(),
+  B: uuidv7(), vGarlic: uuidv7(), vPlain: uuidv7(), C: uuidv7(), D: uuidv7(), E: uuidv7(),
   DL1: uuidv7(), DL2: uuidv7(), DL3: uuidv7(), DL4: uuidv7(),
   F: uuidv7(), gMilk: uuidv7(), oat: uuidv7(), G: uuidv7(), DLA: uuidv7(), DLB: uuidv7(),
 });
@@ -95,7 +95,9 @@ async function addMembers() {
   });
 }
 
-/** IN fixture: A paneer tikka (options), B naan (+ garlic variant), C lassi, D/E shop SKUs; four deals; coupons. */
+/** IN fixture: A paneer tikka (options), B naan (plain and garlic variants; plain has no price row of its own and
+ *  sells at the item's 6000), C lassi, D/E shop SKUs; four deals; coupons. An item with active variants is sold only
+ *  as one of them (catalogue's one rule, sellableAs — W2 fix list C2). */
 async function inCatalogue() {
   const O1 = IN.outlets[0];
   await ok(await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", dish(I.A, "menu.t21_paneer_tikka", {
@@ -112,7 +114,8 @@ async function inCatalogue() {
     ],
   })));
   await ok(await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", dish(I.B, "menu.t21_naan", {
-    variants: [{ variant_id: I.vGarlic, name_key: "menu.t21_naan.garlic", barcode: null, active: true }],
+    variants: [{ variant_id: I.vGarlic, name_key: "menu.t21_naan.garlic", barcode: null, active: true },
+      { variant_id: I.vPlain, name_key: "menu.t21_naan.plain", barcode: null, active: true }],
   })));
   await ok(await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", dish(I.C, "menu.t21_lassi")));
   await ok(await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", sku(I.D, "shop.t21_biscuits", "8900000000017", I.ingBisc, 3000)));
@@ -213,7 +216,7 @@ describe("priceLines — 20 hand-computed carts", () => {
     expect(r.lines[0]!.option_refs).toEqual([row("option", I.xCheese), row("option", I.sHot)]);
   });
   it("3 · B × 2, buy 1 get 1 (DL2): 12000 − 6000 = 6000; tax 150 × 2; total 6300", async () => {
-    const r = await sale(IN, { at: WED_1230, lines: [line(I.B, 2)] });
+    const r = await sale(IN, { at: WED_1230, lines: [line(I.B, 2, [], I.vPlain)] });
     expect(shape(r)).toEqual([[1, 12000, 6000, 300, 6300]]);
     expect(totals(r)).toEqual({ subtotal: 12000, discount: 6000, tax: 300, total: 6300 });
     expect(r.lines[0]!.deal_refs).toEqual([row("deal", I.DL2)]);
@@ -234,7 +237,7 @@ describe("priceLines — 20 hand-computed carts", () => {
   });
   it("7 · Sunday noon: A gets DL4 5% (1245); B × 2 gets DL2 (6000 beats DL4's 600) — one deal per line, largest wins", async () => {
     // A: 24900 − 1245 = 23655; tax 591.375 → 591 × 2 = 1182; 24837. B: 6000; tax 300; 6300. Σ 31137, tax 1482, discount 7245.
-    const r = await sale(IN, { at: SUN_1200, lines: [line(I.A, 1, [I.sMild]), line(I.B, 2)] });
+    const r = await sale(IN, { at: SUN_1200, lines: [line(I.A, 1, [I.sMild]), line(I.B, 2, [], I.vPlain)] });
     expect(shape(r)).toEqual([[1, 24900, 1245, 1182, 24837], [2, 12000, 6000, 300, 6300]]);
     expect(totals(r)).toEqual({ subtotal: 36900, discount: 7245, tax: 1482, total: 31137 });
     expect(r.lines.map((l) => l.deal_refs)).toEqual([[row("deal", I.DL4)], [row("deal", I.DL2)]]);
@@ -247,7 +250,7 @@ describe("priceLines — 20 hand-computed carts", () => {
     expect(r.refusals).toEqual([]);
   });
   it("9 · SAVE10 on B × 10 = 60000, but 5 free under DL2 → 30000 after deals (< 50000) → coupon_min_spend; tax 750 × 2; total 31500", async () => {
-    const r = await sale(IN, { at: WED_1230, lines: [line(I.B, 10)], coupon_codes: ["SAVE10"] });
+    const r = await sale(IN, { at: WED_1230, lines: [line(I.B, 10, [], I.vPlain)], coupon_codes: ["SAVE10"] });
     expect(refusals(r)).toEqual([[null, "coupon_min_spend", "SAVE10"]]);
     expect(shape(r)).toEqual([[1, 60000, 30000, 1500, 31500]]);
     expect(totals(r)).toEqual({ subtotal: 60000, discount: 30000, tax: 1500, total: 31500 });
@@ -327,6 +330,35 @@ describe("priceLines — 20 hand-computed carts", () => {
     });
     expect(r.seen).toBe(0); // the shopper cannot read the other order's use …
     expect(refusals(r.priced)).toEqual([[null, "coupon_cap_reached", "CAPPED"]]); // … but the cap still counts it
+  });
+  it("couponUses: once the order carrying CAPPED's one use is cancelled, the use no longer counts — for the owner, a member scoped to another outlet and a shopper", async () => {
+    const shopper = uuidv7();
+    await db.withContext("munim_core", ownerCtx(IN, { command_type: "customers.customer.upsert.v1" }), (c) =>
+      c.query(`INSERT INTO core.customer (tenant_id, id, name, is_guest) VALUES ($1, $2, 'Synthetic Shopper 2', true)`, [IN.tenant, shopper]));
+    const asShopper = () => withContext(pools.core, contextOf({ kind: "customer", tenant_id: IN.tenant, channel_id: IN.channel, customer_id: shopper, profile: true, sub: null }, { coupon_codes: ["CAPPED"] }),
+      (c) => priceLines(c, { outlet_id: IN.outlets[0], channel_kind: "counter", at: WED_1230, lines: [line(I.C, 1)], coupon_codes: ["CAPPED"], customer_id: shopper }));
+    // A manager of outlet 2 only: the order carrying the use (outlet 1) is outside their view.
+    const asOutlet2 = () => db.withContext("munim_core", { tenant_id: IN.tenant, outlet_ids: [IN.outlets[1]], role: "manager", member_id: IN.owner },
+      (c) => couponUses(c, coupon.CAPPED, null));
+    // Refusal first: the use's order is still placed → 1 use → cap reached everywhere.
+    expect(refusals(await sale(IN, { at: WED_1230, lines: [line(I.C, 1)], coupon_codes: ["CAPPED"] }))).toEqual([[null, "coupon_cap_reached", "CAPPED"]]);
+    expect(refusals(await asShopper())).toEqual([[null, "coupon_cap_reached", "CAPPED"]]);
+    expect(await asOutlet2()).toEqual({ all: 1, mine: 0 });
+    await db.withContext("munim_core", ownerCtx(IN, { command_type: "orders.order.advance.v1" }), (c) =>
+      c.query(`UPDATE core."order" SET status = 'cancelled' WHERE id = $1 AND status = 'placed'`, [IN.orders[0]]));
+    // Accept: 0 live uses; CAPPED applies (20% of C × 1 — no refusal) for each caller; the use row itself stays.
+    expect(refusals(await sale(IN, { at: WED_1230, lines: [line(I.C, 1)], coupon_codes: ["CAPPED"] }))).toEqual([]);
+    expect(refusals(await asShopper())).toEqual([]);
+    expect(await asOutlet2()).toEqual({ all: 0, mine: 0 });
+    expect(Number((await db.admin<{ n: string }>(`SELECT count(*) AS n FROM core.coupon_use WHERE coupon_id = $1`, [coupon.CAPPED])).rows[0]!.n)).toBe(1);
+  });
+  it("one sellable rule (sellableAs): naan has active variants, so a bare naan line is refused 409 conflict and the menu never lists it bare; a variant line prices", async () => {
+    await expect(sale(IN, { at: WED_1230, lines: [line(I.B, 1)] })).rejects.toMatchObject({ code: "conflict" });
+    const menu = await db.withContext("munim_core", ownerCtx(IN), (c) => itemsForSale(c, IN.outlets[0], "counter", { item_id: I.B }));
+    expect(menu.entries.map((e) => e.variant_id).sort()).toEqual([I.vGarlic, I.vPlain].sort());
+    expect(shape(await sale(IN, { at: WED_1230, lines: [line(I.B, 1, [], I.vGarlic)] }))[0]!.slice(0, 2)).toEqual([1, 7500]);
+    // A lassi (no variants) is sold only bare: naming naan's variant on it is refused too.
+    await expect(sale(IN, { at: WED_1230, lines: [line(I.C, 1, [], I.vGarlic)] })).rejects.toMatchObject({ code: "not_found" });
   });
   it("malformed carts throw: an option of another item → 400; a required group left empty → 400; an unknown item → 404", async () => {
     await expect(sale(IN, { at: WED_1230, lines: [line(I.C, 1, [I.sMild])] })).rejects.toMatchObject({ code: "bad_request" });
@@ -446,8 +478,8 @@ describe("reads", () => {
     expect([a.price_minor, a.tax_class, a.available]).toEqual([24900, "restaurant_5", true]);
     expect(a.option_groups.map((g) => [g.name_key, g.required, g.options.map((o) => o.price_delta_minor)])).toEqual([["opt.extras", false, [3000, 5000]], ["opt.spice", true, [500, 0]]]); // by name: extra_cheese, extra_paneer; hot, mild
     expect(a.deals.map((d) => d.deal_id).sort()).toEqual([I.DL3, I.DL4].sort());
-    // B has an active variant: listed once, as the garlic variant at its own price.
-    expect(menu.entries.filter((e) => e.item_id === I.B).map((e) => [e.variant_id, e.price_minor])).toEqual([[I.vGarlic, 7500]]);
+    // B has active variants: listed as each of them (by name key), garlic at its own price, plain at the item's; never bare.
+    expect(menu.entries.filter((e) => e.item_id === I.B).map((e) => [e.variant_id, e.price_minor])).toEqual([[I.vGarlic, 7500], [I.vPlain, 6000]]);
     expect(menu.entries.find((e) => e.item_id === I.D)!.available).toBe(false); // sold out in cart 14
   });
   it("menu outside the member's outlet scope → 404", async () => {

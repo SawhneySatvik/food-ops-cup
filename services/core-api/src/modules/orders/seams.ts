@@ -73,11 +73,15 @@ export type TicketsResult = { applicable: boolean; events: EventDraft[]; audit: 
 
 export interface OrderSeams {
   priceLines(tx: Queryable, input: PriceLinesInput): Promise<PriceLinesResult>;
+  /** T-021 catalogue: a coupon's live uses (tenant-wide; uses on cancelled / rejected orders excluded). */
+  couponUses(tx: Queryable, coupon_id: string, customer_id: string | null): Promise<{ all: number; mine: number }>;
   pickSaleBatches(tx: Queryable, outlet_id: string, lines: PickInput): Promise<PickResult>;
   /** Rules inventory.consume_order / consume_sku (source: the order); `events` go into the caller's HandlerOutput. */
   deriveOrderConsumption(tx: Queryable, order_id: string): Promise<{ events?: EventDraft[] } | void>;
+  /** Rule inventory.reverse_order_consumption (W2-R6): a cancelled / rejected order's consumed stock comes back. */
+  reverseOrderConsumption(tx: Queryable, order_id: string): Promise<{ events?: EventDraft[] } | void>;
   /** Under orders.place.v1 (the customer's own command); never below zero (MB011). Returns the money value
-   *  the points were redeemed for (INFERENCE: the points→money rate is T-028's). */
+   *  the points were redeemed for (the tenant's loyalty policy, W2-R4 — customers reads it). */
   loyaltyRedeem(tx: Queryable, order_id: string, points: number): Promise<{ entry_id: string; value_minor: number }>;
   /** T-024: after the order lines exist, marks used (once) the expired-sale overrides the FEFO pick draws on
    *  (0014 #49; only where the pack allows overrides). */
@@ -91,8 +95,10 @@ export interface OrderSeams {
 type Name = keyof OrderSeams;
 const OWNER: Record<Name, string> = {
   priceLines: "catalogue",
+  couponUses: "catalogue",
   pickSaleBatches: "inventory",
   deriveOrderConsumption: "inventory",
+  reverseOrderConsumption: "inventory",
   loyaltyRedeem: "customers",
   consumeExpiredOverrides: "inventory",
   loyaltyEarnFor: "customers",
@@ -115,12 +121,18 @@ const STAND_IN: OrderSeams = {
   async priceLines() {
     throw new ApiError("unavailable");
   },
+  async couponUses() {
+    throw new ApiError("unavailable");
+  },
   async pickSaleBatches(_tx, outlet_id) {
     record("pickSaleBatches", outlet_id);
     return { picks: [], refusals: [] };
   },
   async deriveOrderConsumption(_tx, order_id) {
     record("deriveOrderConsumption", order_id);
+  },
+  async reverseOrderConsumption(_tx, order_id) {
+    record("reverseOrderConsumption", order_id);
   },
   async loyaltyRedeem() {
     throw new ApiError("unavailable");
@@ -153,17 +165,6 @@ export function setOrderSeams(s: Partial<OrderSeams>): () => void {
   };
 }
 
-/** Where an owner's landed function differs from the shape orders reads. customers.loyaltyRedeem returns
- *  {entry_id, points}; the money value of the points is that module's LOYALTY.pointValueMinor (INFERENCE rate,
- *  owned by T-028). */
-const ADAPT: Partial<Record<Name, (mod: Record<string, unknown>) => unknown>> = {
-  loyaltyRedeem: (mod) => {
-    const redeem = mod.loyaltyRedeem as ((tx: Queryable, id: string, pts: number) => Promise<{ entry_id: string }>) | undefined;
-    const rate = (mod.LOYALTY as { pointValueMinor?: unknown } | undefined)?.pointValueMinor;
-    if (typeof redeem !== "function" || typeof rate !== "number") return null;
-    return async (tx: Queryable, id: string, pts: number) => ({ entry_id: (await redeem(tx, id, pts)).entry_id, value_minor: pts * rate });
-  },
-};
 
 const real = state.real;
 async function resolve<K extends Name>(name: K): Promise<OrderSeams[K]> {
@@ -174,7 +175,7 @@ async function resolve<K extends Name>(name: K): Promise<OrderSeams[K]> {
     let fn: unknown = null;
     if (existsSync(file)) {
       const mod = (await import(pathToFileURL(file).href)) as Record<string, unknown>;
-      fn = ADAPT[name]?.(mod) ?? mod[name];
+      fn = mod[name];
     }
     real.set(name, typeof fn === "function" ? fn : null);
   }
@@ -183,8 +184,10 @@ async function resolve<K extends Name>(name: K): Promise<OrderSeams[K]> {
 
 export const seams: OrderSeams = {
   priceLines: async (...a) => (await resolve("priceLines"))(...a),
+  couponUses: async (...a) => (await resolve("couponUses"))(...a),
   pickSaleBatches: async (...a) => (await resolve("pickSaleBatches"))(...a),
   deriveOrderConsumption: async (...a) => (await resolve("deriveOrderConsumption"))(...a),
+  reverseOrderConsumption: async (...a) => (await resolve("reverseOrderConsumption"))(...a),
   loyaltyRedeem: async (...a) => (await resolve("loyaltyRedeem"))(...a),
   consumeExpiredOverrides: async (...a) => (await resolve("consumeExpiredOverrides"))(...a),
   loyaltyEarnFor: async (...a) => (await resolve("loyaltyEarnFor"))(...a),

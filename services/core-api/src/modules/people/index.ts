@@ -9,7 +9,7 @@ import {
   commandEnvelopeOf,
 } from "@munim/contracts";
 import {
-  PeopleAdvanceRecordV1, PeopleAttendanceRecordV1, PeopleCandidateUpsertV1, PeoplePayrollDraftCreateV1, PeopleRosterCreateV1,
+  PeopleAdvanceRecordV1, PeopleAttendanceRecordV1, PeopleCandidateUpsertV1, PeoplePayrollDraftCreateV1, PeoplePayrollDraftStatusV1, PeopleRosterCreateV1,
   PeopleRosterUpdateV1, PeopleStaffUpsertV1, PeopleTipPoolRecordV1, PeopleTrainingRecordV1,
 } from "@munim/contracts/people";
 import { Hono, type Context } from "hono";
@@ -24,7 +24,7 @@ import {
   advanceHandler, attendanceHandler, candidateHandler, rosterCreateHandler, rosterUpdateHandler, staffUpsertHandler, tipPoolHandler, trainingHandler,
 } from "./commands.ts";
 import { overtimeRows, requireAttendance } from "./overtime.ts";
-import { payrollDraftHandler, previewPayroll } from "./payroll.ts";
+import { payrollDraftHandler, payrollStatusHandler, previewPayroll } from "./payroll.ts";
 
 // Register once per process even if this file is loaded twice (vitest imports by path, loadRouters by URL).
 const REGISTERED = Symbol.for("munim.people.draftHandlersRegistered");
@@ -51,12 +51,16 @@ async function json(c: Context<AppEnv>): Promise<unknown> {
   }
 }
 
-function commandRoute(handler: CommandHandler, payload: Parameters<typeof commandEnvelopeOf>[1]) {
+/** `pathId`: for `/v1/…/{id}:<verb>` routes, the path id must equal the payload field it names. */
+function commandRoute(handler: CommandHandler, payload: Parameters<typeof commandEnvelopeOf>[1], pathId?: { field: string; verb: string }) {
   const Envelope = commandEnvelopeOf(handler.type, payload);
   return async (c: Context<AppEnv>) => {
     const m = member(c);
     const env = Envelope.safeParse(await json(c));
     if (!env.success) throw new ApiError("invalid_payload");
+    if (pathId && (env.data.payload as Record<string, unknown>)[pathId.field] !== c.req.param("action")!.slice(0, -pathId.verb.length)) {
+      throw new ApiError("invalid_payload");
+    }
     const actor: Actor = { kind: "member", id: m.member_id, role: m.role };
     const out = await withContext(c.var.deps.pools.core, contextOf(m), (db) =>
       executeCommand({ tx: <T>(fn: (q: Queryable) => Promise<T>) => fn(db), tenantId: m.tenant_id, actor }, env.data as Parameters<typeof executeCommand>[1], handler));
@@ -84,6 +88,8 @@ export const router = new Hono<AppEnv>()
   .post("/v1/people/rosters:update", requireMember, commandRoute(rosterUpdateHandler, PeopleRosterUpdateV1))
   .post("/v1/people/attendance", requireMember, commandRoute(attendanceHandler, PeopleAttendanceRecordV1))
   .post("/v1/people/payroll-drafts", requireMember, commandRoute(payrollDraftHandler, PeoplePayrollDraftCreateV1))
+  .post("/v1/people/payroll-drafts/:action{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:status}", requireMember,
+    commandRoute(payrollStatusHandler, PeoplePayrollDraftStatusV1, { field: "payroll_draft_id", verb: ":status" }))
   .post("/v1/people/advances", requireMember, commandRoute(advanceHandler, PeopleAdvanceRecordV1))
   .post("/v1/people/tip-pools", requireMember, commandRoute(tipPoolHandler, PeopleTipPoolRecordV1))
   .post("/v1/people/training", requireMember, commandRoute(trainingHandler, PeopleTrainingRecordV1))

@@ -14,6 +14,7 @@ export const SAMPLES: Record<string, unknown> = {
   "people.roster.update.v1": { roster_id: u(1010), cancel_roster: false, add_shifts: [], edit_shifts: [{ roster_shift_id: u(1100), starts_at: shift.starts_at, ends_at: "2026-10-12T16:00:00+05:30", role_key: "cook" }], cancel_shift_ids: [] },
   "people.attendance.record.v1": { attendance_id: u(1020), outlet_id: u(2), staff_id: u(1000), action: "clock_in", at: T, roster_shift_id: u(1100), source: "device" },
   "people.payroll_draft.create.v1": { payroll_draft_id: u(1030), outlet_id: u(2), period_month: "2026-09-01", currency: "INR", lines: [payrollLine(100000)] },
+  "people.payroll_draft.status.v1": { payroll_draft_id: u(1030), status: "void", reason_code: "entered_twice" },
   "people.advance.record.v1": { advance_id: u(1040), staff_id: u(1000), kind: "given", amount_minor: 1500000, currency: "INR", on_date: "2026-10-01", note: null },
   "people.tip_pool.record.v1": {
     tip_pool_id: u(1050), outlet_id: u(2), period_from: "2026-10-01", period_to: "2026-10-07", basis: "equal", total_minor: 20000, currency: "INR",

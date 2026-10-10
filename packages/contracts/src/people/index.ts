@@ -177,12 +177,22 @@ export const PeoplePayrollPreviewResponse = z.strictObject({
 /** What every command route in this module returns (a module-own copy: contract names are global). */
 export const PeopleCommandResult = z.strictObject({ ...CommandResult.shape });
 
+/** An approved payroll draft is marked paid outside Munim (recorded, never processed) or voided with a reason; a
+ *  void reverses its journal entry (finance.reverse_payroll) and its advance recoveries no longer count. */
+export const PeoplePayrollDraftStatusV1 = z.strictObject({
+  payroll_draft_id: Uuid7,
+  status: z.enum(["paid_externally", "void"]),
+  /** Required for a void. */
+  reason_code: Slug.nullable(),
+});
+
 export const SCHEMAS = {
   "people.staff.upsert.v1": PeopleStaffUpsertV1,
   "people.roster.create.v1": PeopleRosterCreateV1,
   "people.roster.update.v1": PeopleRosterUpdateV1,
   "people.attendance.record.v1": PeopleAttendanceRecordV1,
   "people.payroll_draft.create.v1": PeoplePayrollDraftCreateV1,
+  "people.payroll_draft.status.v1": PeoplePayrollDraftStatusV1,
   "people.advance.record.v1": PeopleAdvanceRecordV1,
   "people.tip_pool.record.v1": PeopleTipPoolRecordV1,
   "people.training.record.v1": PeopleTrainingRecordV1,
@@ -203,6 +213,8 @@ export const ROUTES: readonly Route[] = [
   command("people.roster.update.v1", "/v1/people/rosters:update", "peopleRosterUpdate", "Edit or cancel a roster"),
   command("people.attendance.record.v1", "/v1/people/attendance", "peopleAttendanceRecord", "Clock a staff member in or out"),
   command("people.payroll_draft.create.v1", "/v1/people/payroll-drafts", "peoplePayrollDraftCreate", "Record an approved payroll draft (IN only)"),
+  { ...command("people.payroll_draft.status.v1", "/v1/people/payroll-drafts/{id}:status", "peoplePayrollDraftStatus",
+    "Mark an approved payroll paid outside Munim, or void it with a reason (reverses its journal entry; owner)"), pathParams: [{ name: "id", uuid: true }] },
   command("people.advance.record.v1", "/v1/people/advances", "peopleAdvanceRecord", "Record an advance given or recovered"),
   command("people.tip_pool.record.v1", "/v1/people/tip-pools", "peopleTipPoolRecord", "Record a tip pool and its shares"),
   command("people.training.record.v1", "/v1/people/training", "peopleTrainingRecord", "Record a training completion"),

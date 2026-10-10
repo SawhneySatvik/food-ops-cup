@@ -27,7 +27,7 @@ import {
   customerExists, listBulkOrders, listCampaigns, listCouponUses, listCustomers, listReservations, listReviews, readLoyalty, type Scope,
 } from "./reads.ts";
 
-export { loyaltyBalance, loyaltyEarnFor, loyaltyRedeem, loyaltyReverseFor, LOYALTY } from "./loyalty.ts";
+export { loyaltyBalance, loyaltyEarnFor, loyaltyPolicy, loyaltyRedeem, loyaltyReverseFor } from "./loyalty.ts";
 export { readLoyalty } from "./reads.ts";
 
 // Loaded once by path (tests, T-022) and once by file URL (loadRouters): never register twice.

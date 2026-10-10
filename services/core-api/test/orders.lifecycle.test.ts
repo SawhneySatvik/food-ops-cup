@@ -156,8 +156,8 @@ describe("derivations (fixture): stock at placement (FEFO as sold), loyalty earn
 });
 
 describe("W2 B5: cancel / reject give back stock (W2-R6) and free the coupon cap; loyalty as above", () => {
-  // Fake pricing: orders' own cap check (recordCoupons) is the one that judges CAP1 here. On the real path
-  // catalogue priceLines still counts the cancelled order's use (reported for T-021/T-034).
+  // Fake pricing: orders' own cap check (recordCoupons → catalogue's couponUses, the count real pricing uses too)
+  // judges CAP1 here.
   it("2 biscuits with CAP1 (cap 1): placed −2000 pc on BIS-1; a second CAP1 order refused; cancel returns +2000 under the reversal rule and orders' cap check frees CAP1", async () => {
     // Hand: 2 × 2500 = 5000; CAP1 5% = 250 → 4750; tax 9% + 9% of 4750 = 427.5 → 428 each = 856; total 5606.
     const onHand = async () => n(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE batch_id = $1`, [env.menu.biscuitBatch]);
@@ -341,6 +341,54 @@ describe("receipts from core-domain buildReceipt", () => {
   });
 });
 
+describe("POS status routes: orders.order.accept.v1 / .reject.v1 / .advance.v1 (0015 A4), each limited to its own steps", () => {
+  const status = async (id: string) => (await env.one<{ status: string }>(`SELECT status FROM core."order" WHERE id = $1`, [id])).status;
+  const post = (who: Who, id: string, verb: string, type: string, payload: Record<string, unknown>) => env.cmd(`/v1/orders/${id}:${verb}`, who, type, payload);
+  const refusal = async (r: Awaited<ReturnType<typeof post>>) => [r.status, (await r.json()).error?.code];
+
+  it("accept: placed → accepted (200); the accept command cannot carry another step (422); a second accept is 409; another outlet's manager gets 404", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    expect(await refusal(await post("staff", id, "accept", "orders.order.accept.v1", { order_id: id, from_status: "ready", to_status: "completed" }))).toEqual([422, "invalid_payload"]);
+    expect(await refusal(await post("mgr2", id, "accept", "orders.order.accept.v1", { order_id: id }))).toEqual([404, "not_found"]);
+    expect(await refusal(await post("staff", uuidv7(), "accept", "orders.order.accept.v1", { order_id: id }))).toEqual([422, "invalid_payload"]);
+    expect(await status(id)).toBe("placed");
+    expect((await post("staff", id, "accept", "orders.order.accept.v1", { order_id: id })).status).toBe(200);
+    expect(await status(id)).toBe("accepted");
+    expect(await refusal(await post("staff", id, "accept", "orders.order.accept.v1", { order_id: id }))).toEqual([409, "illegal_transition"]);
+    // reject is placed → rejected only: an accepted order is not rejectable.
+    expect(await refusal(await post("staff", id, "reject", "orders.order.reject.v1", { order_id: id, reason_code: "out_of_stock" }))).toEqual([409, "illegal_transition"]);
+  });
+
+  it("advance: accepted → preparing → ready → completed (each 200, each event paired); it cannot accept or reject (422); a stale from_status is 409", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    const step = (from_status: string, to_status: string, reason_code: string | null = null) =>
+      post("staff", id, "advance", "orders.order.advance.v1", { order_id: id, from_status, to_status, reason_code });
+    expect(await refusal(await step("placed", "accepted"))).toEqual([422, "invalid_payload"]);
+    expect(await refusal(await step("placed", "rejected", "out_of_stock"))).toEqual([422, "invalid_payload"]);
+    expect((await post("staff", id, "accept", "orders.order.accept.v1", { order_id: id })).status).toBe(200);
+    expect(await refusal(await step("preparing", "ready"))).toEqual([409, "illegal_transition"]);
+    for (const [a, b] of [["accepted", "preparing"], ["preparing", "ready"], ["ready", "completed"]] as const) expect((await step(a, b)).status).toBe(200);
+    expect(await status(id)).toBe("completed");
+    // Every status event of this order has its outbox twin (#80): 4 moves (+ placement).
+    const ev = await n(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1 AND kind = 'status'`, [id]);
+    const ob = await n(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type = 'munim.orders.order.status_changed.v1'`, [id]);
+    expect([ev, ob]).toEqual([5, 4]);
+    expect(await n(`SELECT count(*) AS n FROM core.audit_log WHERE entity_id = $1 AND action IN ('orders.order.accept.v1', 'orders.order.advance.v1')`, [id])).toBe(4);
+  });
+
+  it("reject: placed → rejected with a reason (200); no reason → 422; cancel through advance needs a reason too", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    expect(await refusal(await post("staff", id, "reject", "orders.order.reject.v1", { order_id: id }))).toEqual([422, "invalid_payload"]);
+    expect((await post("staff", id, "reject", "orders.order.reject.v1", { order_id: id, reason_code: "out_of_stock" })).status).toBe(200);
+    expect(await status(id)).toBe("rejected");
+    const id2 = await place("staff", [{ item: env.menu.coffee }]);
+    const cancel = (reason_code: string | null) => post("staff", id2, "advance", "orders.order.advance.v1", { order_id: id2, from_status: "placed", to_status: "cancelled", reason_code });
+    expect(await refusal(await cancel(null))).toEqual([422, "invalid_payload"]);
+    expect((await cancel("customer_left")).status).toBe(200);
+    expect(await status(id2)).toBe("cancelled");
+  });
+});
+
 describe("One Guarantee clause 1 over everything this suite wrote (runs last)", () => {
   it("every orders-path book row is a person's own command or a listed derivation; every status / promise change has its audit entry; the audit chain verifies", async () => {
     // [planted write goes here in the red-proof]
@@ -377,8 +425,8 @@ describe("One Guarantee clause 1 over everything this suite wrote (runs last)", 
          FROM core."order" o WHERE o.tenant_id = $1 AND o.id <> ALL ($2::uuid[]) AND o.id <> ALL ($3::uuid[]) AND (o.status <> 'placed' OR EXISTS (
            SELECT 1 FROM core.order_event e WHERE e.order_id = o.id AND e.kind = 'promised_at'))`, [env.w.tenant, env.w.orders, rawFixtureWrites]);
     // by hand: completed (status test), rejected, completed (fixture), cancelled, pushed back, + B5: cancelled
-    // biscuits, rejected biscuits, rejected coffee
-    expect(moved.length).toBe(8);
+    // biscuits, rejected biscuits, rejected coffee, + POS routes: accepted, completed, rejected, cancelled
+    expect(moved.length).toBe(12);
     expect(moved.filter((m) => !m.audited).map((m) => m.id)).toEqual([]);
     const v = await verifyAuditChain(svcTx(env.db), env.w.tenant);
     expect([v.ok, v.firstBadSeq]).toEqual([true, null]);
