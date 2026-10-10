@@ -1,0 +1,9 @@
+compliance.licence.upsert.v1
+compliance.checklist.upsert.v1
+compliance.checklist.complete.v1
+compliance.temp.record.v1
+compliance.asset.upsert.v1
+compliance.amc.record.v1
+compliance.maintenance.schedule.v1
+compliance.maintenance.record.v1
+proposal.compliance.maintenance.schedule.v1
