@@ -73,3 +73,15 @@ export function payoutFileMany(layout: Layout, cycles: Array<{ meta: { ref: stri
 
 export const payoutFile = (layout: Layout, p: { ref: string; outlet: string; from: string; to: string; paidOn: string }, lines: PayoutLine[]): string =>
   payoutFileMany(layout, [{ meta: p, lines }]);
+
+/** A bank statement (bank_statement_v1): one UPI credit per line. Dates are dd/mm/yyyy, amounts in the major unit. */
+export function bankFile(account: string, lines: Array<{ date: string; ref: string; outlet: string; minor: number; narration: string }>, currency: string): string {
+  const rows: Array<Array<string | number>> = [["Txn Date", "Reference", "Narration", "Mode", "Payee VPA", "Amount", "Currency", "Account", "Outlet"]];
+  for (const l of lines) rows.push([dmy(l.date), l.ref, l.narration, "upi", "", major(l.minor), currency, account, l.outlet]);
+  return csv(rows);
+}
+
+/** Market signals (market_signal_v1): festivals, weather. Values are decimals with a unit, or both blank. */
+export function signalFile(rows: Array<{ on: string; kind: string; label: string; outlet: string; source: string }>): string {
+  return csv([["on_date", "kind", "label", "outlet_ref", "value", "unit", "source"], ...rows.map((r) => [r.on, r.kind, r.label, r.outlet, "", "", r.source])]);
+}

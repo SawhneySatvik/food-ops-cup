@@ -54,6 +54,9 @@ export interface HCfg {
   waste: Array<{ outlet: number; ing: Ingredient; qtyMilli: [number, number] }>;
   /** Planted waste rows (a spike, a bad day): explicit. */
   plantedWaste: Waste[];
+  /** Scales a day's baseline bill count at one outlet (a level shift, a festival, a calibrated month). The draw itself is unchanged, so a
+   *  factor of 1 leaves every other day byte-identical. */
+  dayFactor?: (date: string, outletIdx: number) => number;
 }
 export interface Waste { date: string; time: string; outlet: number; ing: Ingredient; qtyMilli: number; reason: "temperature" | "overprep" | "expired" | "damaged"; note?: string }
 
@@ -117,7 +120,7 @@ export class Plan {
     for (let d = first; d <= last; d = addDays(d, 1)) {
       for (const [oi, o] of cfg.outlets.entries()) {
         const rng = new Prng(c.seed, c.world, "bills", cfg.prefix, d, String(oi));
-        const n = Math.round(rng.int(...o.perDay) * (isoWeekday(d) >= 5 ? 1.35 : 1));
+        const n = Math.round(rng.int(...o.perDay) * (isoWeekday(d) >= 5 ? 1.35 : 1) * (cfg.dayFactor?.(d, oi) ?? 1));
         const chans = cfg.channels.filter((ch) => (!ch.outlets || ch.outlets.includes(oi)) && (!ch.kind.startsWith("aggregator:") || aggOk(d)));
         const weight = chans.reduce((a, ch) => a + ch.w, 0);
         const planted = cfg.planted.filter((p) => p.date === d && p.outlet === oi);
@@ -190,6 +193,11 @@ export class Plan {
   aggregatorBills(outletIdx: number, channel: string, from: string, to: string): Array<{ no: string; date: string; gross: number }> {
     return this.bills.filter((b) => !b.voided && b.outlet === outletIdx && b.channel === channel && b.date >= from && b.date <= to)
       .map((b) => ({ no: b.no, date: b.date, gross: b.total }));
+  }
+
+  /** What an outlet's customers paid by UPI on one date (completed bills only): the bank credits a statement would list. */
+  upiTendered(outletIdx: number, date: string): number {
+    return this.bills.filter((b) => b.outlet === outletIdx && b.date === date && !b.voided).reduce((a, b) => a + b.upi, 0);
   }
 
   /** Queue the month files of bills and one waste file; the caller flushes. */

@@ -272,14 +272,14 @@ export async function expense(c: Ctx, key: string, outletId: string, category: s
 // ---- imports (a file → parsed run → the owner approves the draft; nothing reaches the books before that) ------------
 
 export type ImportKindName = "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
-interface Queued { key: string; kind: ImportKindName; filename: string; text: string; reason: string | null }
+interface Queued { key: string; kind: ImportKindName; filename: string; text: string; reason: string | null; hold: boolean }
 const queueOf = (c: Ctx): Queued[] => ((c.s.importQueue as Queued[] | undefined) ??= []);
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
 /** Queues a file; `flushImports` uploads the queue in order, waits for the parses together (the worker parses on a timer — against
  *  `make up` that is once a minute, so one wait per batch, not one per file), then approves in the same order as the owner. */
-export function importFile(c: Ctx, key: string, kind: ImportKindName, filename: string, text: string, reason: string | null = null): void {
-  queueOf(c).push({ key, kind, filename, text, reason });
+export function importFile(c: Ctx, key: string, kind: ImportKindName, filename: string, text: string, reason: string | null = null, o: { hold?: boolean } = {}): void {
+  queueOf(c).push({ key, kind, filename, text, reason, hold: o.hold ?? false });
 }
 
 export async function flushImports(c: Ctx): Promise<void> {
@@ -308,6 +308,8 @@ export async function flushImports(c: Ctx): Promise<void> {
   }
   for (const p of pending) {
     const draft = api.alias(p.run.draft_id as string, `draft:${p.q.key}`);
+    // A held file stays previewed with its draft waiting: the owner has not approved it yet (a missing settlement, F7).
+    if (p.q.hold) continue;
     await api.cmd("owner", "/v1/drafts/{id}:approve", "drafts.approve.v1", `approve:${p.q.key}`, {
       draft_id: draft, command_type: "imports.run.commit.v1", edited_payload: null, reason: p.q.reason,
     }, { params: { id: draft } });
@@ -351,10 +353,10 @@ export async function shiftClose(c: Ctx, key: string, countedMinor: number, pers
   await c.api.cmd(persona, "/v1/shifts/{id}:close", "orders.shift.close.v1", `${key}:close`, { shift_id: c.api.id(key), counted_cash_minor: countedMinor }, { params: { id: c.api.id(key) } });
 }
 
-export async function coupon(c: Ctx, key: string, code: string, o: { bp: number; from: string; cap?: number | null }) {
+export async function coupon(c: Ctx, key: string, code: string, o: { bp: number; from: string; cap?: number | null; perCustomerCap?: number; requiresCustomer?: boolean }) {
   await c.api.cmd("owner", "/v1/catalogue/coupons", "catalogue.coupon.set.v1", `coupon:${key}`, {
     coupon_id: c.api.id(`coupon:${key}`), code, kind: "percent", value_bp: o.bp, value_minor: null, currency: c.s.currency, min_spend_minor: 0,
-    global_cap: o.cap ?? null, per_customer_cap: null, requires_customer: false, outlet_ids: [], valid_from: `${o.from}T00:00:00.000Z`, valid_to: null, active: true,
+    global_cap: o.cap ?? null, per_customer_cap: o.perCustomerCap ?? null, requires_customer: o.requiresCustomer ?? false, outlet_ids: [], valid_from: `${o.from}T00:00:00.000Z`, valid_to: null, active: true,
   });
 }
 
@@ -382,7 +384,8 @@ export async function menu(c: Ctx, biz: Business, specs: MenuSpec[], kinds: stri
   for (const s of specs) {
     const it = await item(c, s.key, { category: s.category, brand: s.brand ?? null });
     items[s.key] = it;
-    await recipe(c, it, from, s.recipe.map(([ing, qtyMilli]) => ({ ing, qtyMilli })));
+    // A dish with no recipe version is a plant (C5): sold, never costed.
+    if (s.recipe.length > 0) await recipe(c, it, from, s.recipe.map(([ing, qtyMilli]) => ({ ing, qtyMilli })));
     for (const o of biz.outlets) for (const kind of kinds) await price(c, it, o.id, kind, s.priceMinor, s.taxClass, from);
   }
   return items;
@@ -433,9 +436,16 @@ export async function countStock(c: Ctx, key: string, outletId: string, lines: A
 export interface HistorySpec {
   /** Baseline statements, one file per weekly cycle, listing the history bills of that outlet and channel (the planted window's own
    *  statements are written by the world). `bills` is the history plan's aggregator bills for a cycle. */
-  payouts: Array<{ layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number; bills: (from: string, to: string) => Array<{ no: string; date: string; gross: number }> }>;
+  payouts: Array<{
+    layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number; bills: (from: string, to: string) => Array<{ no: string; date: string; gross: number }>;
+    /** Cycle numbers (1 = the newest) uploaded but left unapproved: a statement the owner has not approved yet (a missing settlement, F7). */
+    hold?: readonly number[];
+    /** Extra lines of one cycle (an ad fee inside the cap, F8). */
+    extra?: (cycle: number, meta: { from: string; to: string }) => PayoutLine[];
+  }>;
   temp?: { outlet: OutletInfo; assetId: string; assetKey: string; milliC: number; hhmm: string };
-  rent?: { outlet: OutletInfo; amountMinor: number };
+  /** `monthly`: rent on the 1st of every calendar month from the timeline's first day to 14 days back (the default is every 30 days). */
+  rent?: { outlet: OutletInfo; amountMinor: number; monthly?: true };
 }
 
 /** Weeks before the 14-day planted window: normal payouts at the contracted rate, in-range temperature readings, rent.
@@ -452,15 +462,24 @@ export async function history(c: Ctx, spec: HistorySpec): Promise<void> {
       const lines: PayoutLine[] = p.bills(meta.from, meta.to).map((b) => ({
         kind: "order", orderRef: b.no, orderDate: b.date, gross: b.gross, commission: Math.round((b.gross * p.commissionBp) / 10000), ad: 0, promo: 0, tax: 0,
       }));
-      return { meta, lines };
+      if (lines.length > 0) lines.push(...(p.extra?.(w, meta) ?? []));
+      return { meta, lines, w };
     }).filter((x) => x.lines.length > 0);
-    if (cycles.length) importFile(c, `${p.prefix}-history`, "payout_statement", `${p.prefix}-history.csv`, payoutFileMany(p.layout, cycles));
+    const held = new Set(p.hold ?? []);
+    const normal = cycles.filter((x) => !held.has(x.w));
+    if (normal.length) importFile(c, `${p.prefix}-history`, "payout_statement", `${p.prefix}-history.csv`, payoutFileMany(p.layout, normal));
+    const waiting = cycles.filter((x) => held.has(x.w));
+    if (waiting.length) importFile(c, `${p.prefix}-held`, "payout_statement", `${p.prefix}-held.csv`, payoutFileMany(p.layout, waiting), null, { hold: true });
   }
   if (spec.temp) {
     for (let n = c.liveDays; n >= 4; n--) await tempLog(c, `${spec.temp.assetKey}h:${n}`, spec.temp.outlet.id, spec.temp.assetId, spec.temp.milliC, at(D(n), spec.temp.hhmm, spec.temp.outlet.tz));
   }
   if (spec.rent) {
-    for (let n = c.days; n >= 14; n -= 30) await expense(c, `rent:h${n}`, spec.rent.outlet.id, "rent", D(n), spec.rent.amountMinor, 0, "Synthetic Landlord LLP");
+    if (spec.rent.monthly) {
+      for (let d = addDays(D(c.days), 0); d <= D(14); d = addDays(d, 1)) {
+        if (d.endsWith("-01")) await expense(c, `rent:m${d}`, spec.rent.outlet.id, "rent", d, spec.rent.amountMinor, 0, "Synthetic Landlord LLP");
+      }
+    } else for (let n = c.days; n >= 14; n -= 30) await expense(c, `rent:h${n}`, spec.rent.outlet.id, "rent", D(n), spec.rent.amountMinor, 0, "Synthetic Landlord LLP");
   }
 }
 
@@ -492,7 +511,7 @@ async function untilOpen(c: Ctx, sfKey: string, outlet: OutletInfo): Promise<voi
 }
 
 /** A guest checks out on the public storefront (pay at the counter): guest record + order in one request. */
-export async function storefrontOrder(c: Ctx, sfKey: string | null, key: string, biz: Business, outlet: OutletInfo, it: Item, guest: { name: string; phone: string }) {
+export async function storefrontOrder(c: Ctx, sfKey: string | null, key: string, biz: Business, outlet: OutletInfo, it: Item, guest: { name: string; phone: string }, coupons: string[] = []) {
   if (sfKey === null) return;
   await untilOpen(c, sfKey, outlet);
   await c.api.storefront(sfKey, "/v1/storefront/orders", {
@@ -502,7 +521,7 @@ export async function storefrontOrder(c: Ctx, sfKey: string | null, key: string,
         order_id: c.api.id(key), outlet_id: outlet.id, channel_id: biz.channels["own_site"], brand_id: null, device_id: null, kind: "takeaway", table_ref: null,
         pickup_window_id: null, promised_at: null, external_ref: null,
         lines: [{ line_id: c.api.id(`${key}:l0`), item_id: it.id, variant_id: null, option_ids: [], qty_milli: 1000, barcode: null, note: null }],
-        coupon_codes: [], loyalty_redeem_points: 0, preview_total_minor: null, client_totals: null,
+        coupon_codes: coupons, loyalty_redeem_points: 0, preview_total_minor: null, client_totals: null,
       },
     },
     guest: {

@@ -35,3 +35,9 @@ export function daysBetween(a: string, b: string): number {
   const ms = (d: string) => Date.UTC(...(d.split("-").map(Number) as [number, number, number]).map((x, i) => (i === 1 ? x - 1 : x)) as [number, number, number]);
   return Math.round((ms(b) - ms(a)) / 86_400_000);
 }
+
+/** First day of the calendar month before the one `date` falls in (`months` = 1), or before that (2). */
+export function monthStartBefore(date: string, months = 1): string {
+  const [y, m] = date.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(y, m - 1 - months, 1)).toISOString().slice(0, 10);
+}
