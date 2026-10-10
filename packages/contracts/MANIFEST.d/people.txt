@@ -1,0 +1,14 @@
+people.staff.upsert.v1
+people.roster.create.v1
+people.roster.update.v1
+people.attendance.record.v1
+people.payroll_draft.create.v1
+people.advance.record.v1
+people.tip_pool.record.v1
+people.training.record.v1
+people.candidate.upsert.v1
+proposal.people.roster.create.v1
+proposal.people.payroll_draft.create.v1
+v1.people.command-result
+v1.people.overtime.response
+v1.people.payroll-preview.response
