@@ -75,6 +75,10 @@ const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
   buyer_identity_required: "The buyer's name or tax number is needed for this sale.",
   unknown_tax_class: "That tax class is not recognised.",
   unknown_channel: "That sales channel is not recognised.",
+  // T-090 (F10, F11 O-2). Copy carries no amount: the limit and spend are snapshot cells (intel.ai_budget_left).
+  mode_above_ceiling: "Your role cannot use this investigation mode. The owner sets the highest mode for each role.",
+  cap_above_platform_budget: "The monthly AI cap cannot be above the platform's AI budget for this month.",
+  platform_budget_missing: "The platform has not set this month's AI budget in your business currency, so a cap cannot be set yet.",
 };
 export const ERROR_CODES: readonly ErrorCode[] = CONTRACT_ERROR_CODES;
 

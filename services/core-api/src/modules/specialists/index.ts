@@ -12,7 +12,7 @@ import { contextOf, requireMember } from "../../auth/resolve.ts";
 import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
-import { getDraft } from "../approvals/read.ts";
+import { getDraft } from "../approvals/index.ts";
 import { mintSnapshot } from "../evidence/index.ts";
 import { FINDING_COLUMNS, type FindingRow, findingViews } from "../findings/index.ts";
 

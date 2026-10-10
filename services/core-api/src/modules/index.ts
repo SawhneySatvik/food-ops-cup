@@ -13,6 +13,7 @@ import type { AppEnv } from "../lib/types.ts";
 export const MODULES = [
   "tenancy",
   "specialists",
+  "ai_policy",
   "catalogue",
   "orders",
   "kitchen",
