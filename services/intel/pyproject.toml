@@ -39,6 +39,8 @@ include = [
   "munim_intel/__init__.py", "munim_intel/__main__.py", "munim_intel/app.py", "munim_intel/config.py", "munim_intel/smoke.py",
   "munim_intel/runtime/**/*.py", "munim_intel/llm/**/*.py", "munim_intel/tools/**/*.py",
   "munim_intel/decide/**/*.py", "munim_intel/trace/**/*.py",
+  "munim_intel/watch/**/*.py", "munim_intel/detect/**/*.py", "munim_intel/narrate/**/*.py", "munim_intel/mapping/**/*.py", "munim_intel/events/**/*.py",
+  "tests/watch/test_watch.py", "tests/watch/test_watch_e2e.py", "tests/watch/stack.py", "tests/watch/make_fixtures.py",
   "tests/decide/*.py", "tests/tools/*.py", "tests/trace/trace_harness.py", "tests/trace/trace_record.py", "tests/trace/test_trace_plugin.py",
   "tests/trace/test_trace_core_roundtrip.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
@@ -59,7 +61,8 @@ python_version = "3.12"
 strict = true
 files = [
   "munim_intel/__init__.py", "munim_intel/__main__.py", "munim_intel/app.py", "munim_intel/config.py", "munim_intel/smoke.py",
-  "munim_intel/runtime", "munim_intel/llm", "munim_intel/tools", "munim_intel/decide", "munim_intel/trace",
+  "munim_intel/runtime", "munim_intel/llm", "munim_intel/tools", "munim_intel/decide", "munim_intel/trace", "munim_intel/watch", "munim_intel/detect", "munim_intel/narrate", "munim_intel/mapping", "munim_intel/events",
+  "tests/watch/test_watch.py", "tests/watch/test_watch_e2e.py", "tests/watch/stack.py", "tests/watch/make_fixtures.py",
   "tests/decide", "tests/tools", "tests/trace/trace_harness.py", "tests/trace/trace_record.py", "tests/trace/test_trace_plugin.py",
   "tests/trace/test_trace_core_roundtrip.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",

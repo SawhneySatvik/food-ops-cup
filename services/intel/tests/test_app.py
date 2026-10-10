@@ -51,9 +51,11 @@ def test_events_are_acknowledged_only_with_the_secret_and_each_events_own_tenant
 
 def test_fanout_calls_need_a_valid_run_token(cfg: Config, minted: dict[str, Any]) -> None:
     client = TestClient(create_app(cfg))
-    for path in ("/watch:sweep", "/brief"):
+    run_id = minted["claims"]["valid"]["run_id"]
+    # Without a run-frame source (T-040b) a sweep fails closed: no country is guessed, nothing is detected.
+    for path, body in (("/watch:sweep", {"run_id": run_id, "status": "frame_unavailable"}), ("/brief", {"run_id": run_id})):
         ok = client.post(path, headers={"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['valid']}"})
-        assert (ok.status_code, ok.json()) == (202, {"run_id": minted["claims"]["valid"]["run_id"]})
+        assert (ok.status_code, ok.json()) == (202, body)
         expired = client.post(path, headers={"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['expired']}"})
         assert (expired.status_code, expired.json()) == (401, UNAUTHENTICATED)
 

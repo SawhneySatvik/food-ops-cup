@@ -101,7 +101,9 @@ try {
     const params = Object.keys((t.params_schema.properties ?? {}) as Json);
     const bad = params.filter((p) => FORBIDDEN_PARAM.test(p) || p in READ_EXTRA);
     if (bad.length) fail(`template ${t.id} has forbidden or reserved params ${bad.join(", ")}`);
-    const agent_exposed = t.min_role !== "operator";
+    // `intel.*` templates (track record, budget left, cost estimate; 0020) are core-consumed — desk, run-frame, plan
+    // preview — never a model tool.
+    const agent_exposed = t.min_role !== "operator" && !t.id.startsWith("intel.");
     const m = toModelSchema(t.params_schema, {}, { numbers: true });
     const props = { ...(m.schema.properties as Json), ...READ_EXTRA };
     const schema = { type: "object", properties: props, required: Object.keys(props), additionalProperties: false };

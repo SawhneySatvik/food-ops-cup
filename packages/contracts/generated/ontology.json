@@ -13974,8 +13974,8 @@
       "id": "intel.agent_track_record",
       "version": 1,
       "min_role": "manager",
-      "agent_exposed": true,
-      "tool": "read_intel_agent_track_record",
+      "agent_exposed": false,
+      "tool": null,
       "params_schema": {
         "type": "object",
         "required": [
@@ -14041,37 +14041,7 @@
           "numeric_source": "count:intel.trace_event"
         }
       ],
-      "model_schema": {
-        "type": "object",
-        "properties": {
-          "specialist": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "catalogue",
-              "kitchen",
-              "inventory_purchasing",
-              "finance",
-              "people",
-              "customers",
-              "compliance",
-              "market",
-              null
-            ]
-          },
-          "page": {
-            "type": "integer",
-            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
-          }
-        },
-        "required": [
-          "specialist",
-          "page"
-        ],
-        "additionalProperties": false
-      },
+      "model_schema": null,
       "leaves": [],
       "optional": []
     },
@@ -14079,8 +14049,8 @@
       "id": "intel.ai_budget_left",
       "version": 1,
       "min_role": "manager",
-      "agent_exposed": true,
-      "tool": "read_intel_ai_budget_left",
+      "agent_exposed": false,
+      "tool": null,
       "params_schema": {
         "type": "object",
         "required": [
@@ -14136,24 +14106,7 @@
           ]
         }
       ],
-      "model_schema": {
-        "type": "object",
-        "properties": {
-          "month": {
-            "type": "string",
-            "description": "A calendar date, YYYY-MM-DD."
-          },
-          "page": {
-            "type": "integer",
-            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
-          }
-        },
-        "required": [
-          "month",
-          "page"
-        ],
-        "additionalProperties": false
-      },
+      "model_schema": null,
       "leaves": [],
       "optional": []
     },
@@ -14161,8 +14114,8 @@
       "id": "intel.investigation_cost_estimate",
       "version": 1,
       "min_role": "manager",
-      "agent_exposed": true,
-      "tool": "read_intel_investigation_cost_estimate",
+      "agent_exposed": false,
+      "tool": null,
       "params_schema": {
         "type": "object",
         "required": [
@@ -14213,24 +14166,7 @@
           "type": "text"
         }
       ],
-      "model_schema": {
-        "type": "object",
-        "properties": {
-          "investigation_id": {
-            "type": "string",
-            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
-          },
-          "page": {
-            "type": "integer",
-            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
-          }
-        },
-        "required": [
-          "investigation_id",
-          "page"
-        ],
-        "additionalProperties": false
-      },
+      "model_schema": null,
       "leaves": [
         {
           "path": "/investigation_id",
@@ -17072,7 +17008,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "d00de29cdd5f172de7acd222fbee114d5594ca0ffe3fefea17314c74389b3c38",
+      "sha256": "e6e381fe8296777736ee68913ecfcbad3f78b1ecb48e78ad603a8e9461706bbc",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -17095,7 +17031,7 @@
         "db/migrations/0019_mc1a_templates_outlet_rls.sql": "c16ae27b28b62f651474ab3c1cd2c969fde95034b138c536a3c40fa57db088c0",
         "db/migrations/0020_mc23_threads_policy_investigations.sql": "de3a04ef4f9c95630d6a88afeb6bd01eff374ca4f147354befa76a20934f98ae",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
-        "packages/contracts/scripts/ontology.ts": "661de2ffe10c228d12219775f8b5b3e565c7d3b2cd3bd58d854f655a22495699",
+        "packages/contracts/scripts/ontology.ts": "5468907c41975c1e5b923236f25d5150c6b3c035719c643b806def3ffe15acea",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
         "packages/contracts/src/approvals/index.ts": "86364e8ea930198acc9231f52fa40dc37360d13b0bbfe4523737a2624923accd",
         "packages/contracts/src/catalogue/index.ts": "801fd856288e0178c3f9bb37a0972c4dfb24f47fca61c85507fd655949a567d9",
@@ -17144,6 +17080,6 @@
         "packages/contracts/src/tenancy/index.ts": "c7a7cda4fcc11f3b3a1b194720b45fed3795bc8b52f67be9133f89d1f5819996"
       }
     },
-    "body_sha256": "aec84043a9d4bfc8e12eb7c41136fe6e17038f2eddff37ec6ef8a73f92869b6b"
+    "body_sha256": "9e750e652ba6d7ba07f3300c11f54180dbc38dc35aa56db60295911dc67508fa"
   }
 }

@@ -69,6 +69,11 @@ def _args_model(tool: FunctionTool) -> type[BaseModel]:
 
 def _invalid_args(tool: BaseTool, args: dict[str, Any]) -> str | None:
     """An actionable error (≤ 300 chars: path and expected form, no input values), or None when the args are valid."""
+    # Generated tools (T-080) check their own model-facing schema; duck-typed so trace/ need not import tools/.
+    validate = getattr(tool, "validate_args", None)
+    if callable(validate):
+        problem: str | None = validate(args)
+        return problem
     if not isinstance(tool, FunctionTool):
         return None
     try:

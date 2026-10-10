@@ -1,0 +1,34 @@
+{
+ "request": {
+  "model": "recorded/narrate",
+  "system": "You explain one finding to the owner of a restaurant or shop in plain English, in at most two short sentences. Cite every amount, count and date by writing the cell handle you are given, in braces, exactly as given, for example {S1.r0.amount_minor}. Never write a digit, a number word, a percent sign, a currency amount or a date yourself. Do not give advice and do not name a supplier, customer or person. Reply with the sentences only.\n\nYou are an agent. Your internal name is \"narrate\".",
+  "contents": [
+   {
+    "role": "user",
+    "parts": [
+     {
+      "text": "Finding type: reconciliation_break.unapproved_ad_fee\nSeverity: high\nCells you may cite:\n- {S1.r0.unapproved_minor}: unapproved_minor\n- {S1.r0.ad_fee_minor}: ad_fee_minor\n- {S1.r0.promo_share_minor}: promo_share_minor"
+     }
+    ]
+   }
+  ],
+  "tools": [],
+  "output": [
+   null,
+   null,
+   null
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "This channel billed {S1.r0.ad_fee_minor} in ad fees although ads were never switched on, so {S1.r0.unapproved_minor} was charged without your agreement."
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

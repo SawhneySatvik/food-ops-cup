@@ -44,10 +44,10 @@ SUPPLIER = "01920000-0000-7000-8000-00000000b001"
 OUTLET = "01920000-0000-7000-8000-00000000b002"
 INGREDIENT = "01920000-0000-7000-8000-00000000b003"
 FINDING = "01920000-0000-7000-8000-00000000c001"
-# ADR-014 §5.1 / pack md §3 + §6, by hand: reads that exist today (catalogue 6, finance 7, inventory 1) + proposes.
+# ADR-014 §5.1 / pack md §3 + §6, by hand: reads that exist today (catalogue 6, finance 8 incl. margin_bridge, inventory 1) + proposes.
 TOOLSET_SIZE = {
     "catalogue": 9,
-    "finance": 10,
+    "finance": 11,
     "inventory_purchasing": 6,
     "kitchen": 2,
     "people": 2,
@@ -364,7 +364,7 @@ def test_each_specialist_toolset_is_within_its_registry_entry() -> None:
     print(f"toolsets: {sizes}")
     assert sizes == TOOLSET_SIZE
     reads = [t.name for t in build_toolset("finance", CTX, client, HandleTable(), propose=False)]
-    assert all(n.startswith("read_") for n in reads) and len(reads) == 7
+    assert all(n.startswith("read_") for n in reads) and len(reads) == 8
     # planted: a foreign template in catalogue's toolset is caught
     planted = [t.name for t in build_toolset("catalogue", CTX, client, HandleTable())] + ["read_finance_pnl"]
     assert foreign_tools("catalogue", planted) == ["read_finance_pnl"]

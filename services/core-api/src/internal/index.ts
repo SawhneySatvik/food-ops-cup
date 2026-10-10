@@ -13,7 +13,7 @@ import { ApiError } from "../lib/errors.ts";
 import type { AppEnv } from "../lib/types.ts";
 import { mintSnapshot } from "../modules/evidence/mint.ts";
 import { modelRoles } from "../platform/read.ts";
-import type { Queryable } from "../runtoken/index.ts";
+import type { OutletScope, Queryable } from "../runtoken/index.ts";
 import { authenticate, type InternalConfig, type Run, runTx } from "./auth.ts";
 import { writeDraft } from "./drafts.ts";
 import { claimEvent, claimWatch, writeAnswer, writeFinding, writeTraces } from "./writes.ts";
@@ -22,6 +22,7 @@ export { configureInternal, type InternalConfig, SERVICE_SECRET_HEADER } from ".
 
 const P = "/internal/intel/v1";
 const WATCH_WINDOW_MS = 15 * 60 * 1000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const post = (status: 200 | 201, fn: (q: Queryable, run: Run, body: unknown, cfg: InternalConfig) => Promise<object | string>) =>
   async (c: Context<AppEnv>) => {
@@ -36,11 +37,21 @@ const post = (status: 200 | 201, fn: (q: Queryable, run: Run, body: unknown, cfg
 export const router = new Hono<AppEnv>()
   .post(`${P}/:seg{events:claim}`, post(200, claimEvent))
   .post(`${P}/:seg{watch:claim}`, post(200, (q, run, body, cfg) => claimWatch(q, run, body, cfg.watchWindowMs ?? WATCH_WINDOW_MS)))
-  .post(`${P}/snapshots`, post(201, async (q, run, raw) => {
+  .post(`${P}/snapshots`, async (c) => {
+    const { run } = await authenticate(c);
+    const raw: unknown = await c.req.json().catch(() => undefined);
+    if (raw === undefined) throw new ApiError("bad_request");
     const body = MintSnapshotRequest.safeParse(raw);
     if (!body.success) throw new ApiError("invalid_payload");
-    return mintSnapshot(q, run.tenantId, { kind: "run", run_id: run.runId, scope: run.scope }, body.data.template_id, body.data.params);
-  }))
+    // T-043 (T-040 note a): a tenant-wide run (a sweep) that mints for ONE outlet mints under that outlet's scope —
+    // RLS and the stored outlet_scope both narrow — so the snapshot, and a finding cut from it, belong to that outlet
+    // and its own members can open them (a '*' snapshot is visible to all-outlet members only).
+    const one = body.data.params.outlet_id;
+    const scope: OutletScope = run.scope[0] === "*" && typeof one === "string" && UUID.test(one) ? [one] : run.scope;
+    const out = await runTx(c.var.deps, { tenantId: run.tenantId, scope }, (q) =>
+      mintSnapshot(q, run.tenantId, { kind: "run", run_id: run.runId, scope }, body.data.template_id, body.data.params));
+    return c.json(out, 201);
+  })
   .post(`${P}/findings`, post(201, writeFinding))
   .post(`${P}/drafts`, post(201, writeDraft))
   .post(`${P}/answers`, post(201, writeAnswer))

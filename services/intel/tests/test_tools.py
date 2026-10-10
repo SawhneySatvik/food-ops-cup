@@ -67,13 +67,15 @@ def scan(tools: dict[str, ToolFactory], generated: list[BaseTool] | None = None)
 
 def expected_generated() -> int:
     """Independent count: MANIFEST.d proposal lines minus the two import-only drafts (ADR-014 §5.1), plus the
-    db/tests/manifest.ts TEMPLATES list minus the one operator template (platform.spend_by_tenant)."""
+    db/tests/manifest.ts TEMPLATES list minus the operator template (platform.spend_by_tenant) and the core-consumed
+    `intel.*` templates (0020: track record, budget left, cost estimate — never model tools)."""
     lines = [n for f in (REPO / "packages/contracts/MANIFEST.d").glob("*.txt") for n in f.read_text().split()]
     proposals = [n for n in lines if n.startswith("proposal.")]
     listed = re.search(r"export const TEMPLATES = \[(.*?)\];", (REPO / "db/tests/manifest.ts").read_text(), re.S)
     assert listed is not None
     templates = re.findall(r'"([a-z_.]+)"', listed.group(1))
-    return (len(proposals) - 2) + (len(templates) - 1)
+    exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.")]
+    return (len(proposals) - 2) + len(exposed)
 
 
 def test_no_registered_tool_takes_a_tenant() -> None:

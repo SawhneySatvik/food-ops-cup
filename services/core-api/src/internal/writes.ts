@@ -50,7 +50,8 @@ export async function claimWatch(c: Queryable, run: Run, raw: unknown, windowMs:
 const FINDING_TYPE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
 /** findings — validated, or stored as an abstention. Merges into the open finding of the same dedupe_key (one open
- *  per key, 0012); a failed re-detection never overwrites a valid open finding. Outlets = the run's scope. */
+ *  per key, 0012); a failed re-detection never overwrites a valid open finding. Outlets = the run's scope; for a
+ *  tenant-wide run, the outlets of the impact snapshot (T-043 note a: one minted for one outlet), else tenant-wide. */
 export async function writeFinding(c: Queryable, run: Run, raw: unknown) {
   const req = parse(FindingsRequest, raw);
   // F8: a finding is stamped with a registered specialist (its pack); the type has the DB's dotted form.
@@ -79,11 +80,17 @@ export async function writeFinding(c: Queryable, run: Run, raw: unknown) {
       [into, req.severity, req.confidence_bp, envelope, impact!.snapshot_id, impact!.row, impact!.column]);
     return { finding_id: into, outcome: "merged", reason_code: null };
   }
+  let outlets = run.scope[0] === "*" ? [] : run.scope;
+  if (run.scope[0] === "*" && impact) {
+    const s = await c.query<{ outlet_scope: string[] }>(`SELECT outlet_scope::text[] AS outlet_scope FROM evidence.snapshot WHERE id = $1`, [impact.snapshot_id]);
+    const scope = s.rows[0]?.outlet_scope ?? ["*"];
+    if (!scope.includes("*")) outlets = scope;
+  }
   try {
     await c.query(
       `INSERT INTO intel.finding (tenant_id, id, run_id, outlet_ids, pack, type, severity, impact_snapshot_id, impact_row, impact_column, confidence_bp, envelope, dedupe_key)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [run.tenantId, id, run.runId, run.scope[0] === "*" ? [] : run.scope, req.pack, req.type, req.severity,
+      [run.tenantId, id, run.runId, outlets, req.pack, req.type, req.severity,
        impact?.snapshot_id ?? null, impact?.row ?? null, impact?.column ?? null, req.confidence_bp, envelope, req.dedupe_key]);
   } catch (e) {
     // The id, or the open finding of this key, belongs to an outlet this run cannot see.

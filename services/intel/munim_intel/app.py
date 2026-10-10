@@ -1,9 +1,9 @@
 """intel's HTTP surface (03-architecture §1.9). Every POST needs core's service secret; every run needs a run token.
 
 /health       liveness and model mode
-/events       core's publisher (CloudEvents batch): each event's run token must verify for its own tenant;
-              accepted and acknowledged — handling lands with T-043
-/watch:sweep  core-worker fan-out: token verified, acknowledged (T-043)
+/events       core's publisher (CloudEvents batch): each event's run token must verify for its own tenant; then each
+              event runs under its own token (T-043: events:claim, then the detectors watching its type)
+/watch:sweep  core-worker fan-out: every registered detector over the run's outlets (T-043)
 /brief        core-worker fan-out: token verified, acknowledged (T-054)
 /smoke        one trivial recorded ADK run through the echo tool: RunContext end to end
 
@@ -17,21 +17,28 @@ import hmac
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from google.adk.models import BaseLlm
 from pydantic import ValidationError
 
 from munim_intel.config import Config, ConfigError
 from munim_intel.contracts_gen.models import Cloudevent
+from munim_intel.events import handle_event
+from munim_intel.llm import llm_for_role
+from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
-from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, InternalClient
+from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed
 from munim_intel.smoke import smoke_run
+from munim_intel.watch import sweep
+from munim_intel.watch.frame import Frame, FrameSource, no_frame
+from munim_intel.watch.pipeline import Report
 
 log = logging.getLogger("munim_intel.app")
 
@@ -50,6 +57,7 @@ def create_app(
     *,
     now: Callable[[], float] = time.time,
     core_transport: httpx.AsyncBaseTransport | None = None,
+    frame_source: FrameSource = no_frame,
 ) -> FastAPI:
     app = FastAPI(title="munim-intel", docs_url=None, redoc_url=None, openapi_url=None)
     keys: dict[str, Ed25519PublicKey] = {}
@@ -105,18 +113,55 @@ def create_app(
         except ValidationError:
             return _error(400, "bad_request")
         try:
-            for event in batch:
-                context_for_event(event, public_key(), now=now)
+            runs = [(event, context_for_event(event, public_key(), now=now)) for event in batch]
         except RunTokenRefused as e:
             log.info("intel: /events %s", e)
             return _error(401, "unauthenticated")
-        log.info("intel: /events acknowledged %s", [e.id.root for e in batch])
+        # The detectors run inside the push request (04 §5). A failed event is logged and the rest go on: the
+        # 15-minute sweep is the trailing coverage for anything an event run missed.
+        for event, ctx in runs:
+
+            async def one(
+                client: InternalClient, frame: Frame, llm: BaseLlm | None, e: Cloudevent = event, c: RunContext = ctx
+            ) -> Report | None:
+                return await handle_event(e, c, client, frame, cfg, llm=llm)
+
+            await watch(ctx, one)
+        log.info("intel: /events handled %s", [e.id.root for e in batch])
         return JSONResponse({"accepted": len(batch)}, status_code=202)
+
+    async def watch(ctx: RunContext, work: Callable[[InternalClient, Frame, BaseLlm | None], Awaitable[Report | None]]) -> dict[str, Any]:
+        """One watcher run: its Frame (or nothing, fail closed), the narrate model when the Frame allows it, the work."""
+        frame = await frame_source(ctx)
+        if frame is None:
+            log.info("intel: run %s frame_unavailable", ctx.run_id)
+            return {"status": "frame_unavailable"}
+        client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
+        try:
+            llm: BaseLlm | None = None
+            if frame.narration == "model":
+                try:
+                    llm = await llm_for_role("narrate", cfg, client)
+                except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
+                    # Rule 11: AI surfaces degrade to the template, never to an error.
+                    log.warning("intel: run %s narrates by template: %s", ctx.run_id, type(e).__name__)
+            report = await work(client, frame, llm)
+        except (CoreError, httpx.HTTPError) as e:
+            log.error("intel: watch run %s failed: %s", ctx.run_id, type(e).__name__)
+            return {"status": "failed"}
+        finally:
+            await client.aclose()
+        return {"status": "redelivery"} if report is None else {"status": "done", **report.as_json()}
 
     @app.post("/watch:sweep")
     async def watch_sweep(request: Request) -> Response:
         ctx = run_context(request)
-        return JSONResponse({"run_id": ctx.run_id}, status_code=202)
+
+        async def run(client: InternalClient, frame: Frame, llm: BaseLlm | None) -> Report:
+            return await sweep(ctx, client, frame, cfg, llm=llm)
+
+        out = await watch(ctx, run)
+        return JSONResponse({"run_id": ctx.run_id, **out}, status_code=202)
 
     @app.post("/brief")
     async def brief(request: Request) -> Response:
