@@ -16,7 +16,9 @@
         "bank_statement",
         "pos_export",
         "tally_export",
-        "market_signal"
+        "market_signal",
+        "pos_bills",
+        "waste_log"
       ]
     },
     "name": {

@@ -3216,7 +3216,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
                 name: string;
                 header: string[];
                 header_signature: string;
@@ -3565,7 +3565,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
                 name: string;
                 header: string[];
                 header_signature: string;
@@ -5094,7 +5094,7 @@ export interface components {
         ImportsFormatApproveV1: {
             format_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
             name: string;
             header: string[];
             header_signature: string;
@@ -5112,7 +5112,7 @@ export interface components {
         ProposalImportsFormatApproveV1: {
             format_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
             name: string;
             header: string[];
             header_signature: string;
@@ -5142,7 +5142,7 @@ export interface components {
             import_run_id: components["schemas"]["Uuid7"];
             document_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
             parser: string | null;
             format_id: components["schemas"]["Uuid7"] | null;
             /** @enum {string} */
@@ -5160,7 +5160,7 @@ export interface components {
         /** V1ImportsUploadRequest */
         V1ImportsUploadRequest: {
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
             filename: string;
             media_type: string;
             content_base64: string;
@@ -5201,7 +5201,7 @@ export interface components {
         V1ImportsFormatProposeRequest: {
             document_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
             name: string;
             mapping: {
                 source: string;
@@ -5458,7 +5458,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
                 name: string;
                 header: string[];
                 header_signature: string;
