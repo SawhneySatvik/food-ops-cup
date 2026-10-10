@@ -5,6 +5,9 @@ import { cloudEvent } from "../shared/cloudevents.ts";
 import { IsoDateTime, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
 import { KitchenTicketAdvancedV1, KitchenTicketCreatedV1 } from "../kitchen/events.ts";
+import {
+  ORDER_EVENT_SCHEMAS, OrderPromiseChangedV1, OrderStatusChangedV1, RefundRecordedV1, ShiftClosedV1, ShiftOpenedV1, TenderRecordedV1, VoidRecordedV1,
+} from "../orders/events.ts";
 
 export const OrderPlacedV1 = cloudEvent(
   "munim.orders.order.placed.v1",
@@ -50,7 +53,10 @@ export const PoCommittedV1 = cloudEvent(
 );
 
 /** Every W1 event, discriminated on `type` (what intel `/events` accepts). */
-export const MunimEvent = z.discriminatedUnion("type", [OrderPlacedV1, MovementRecordedV1, PoCommittedV1, KitchenTicketCreatedV1, KitchenTicketAdvancedV1]);
+export const MunimEvent = z.discriminatedUnion("type", [
+  OrderPlacedV1, MovementRecordedV1, PoCommittedV1, KitchenTicketCreatedV1, KitchenTicketAdvancedV1,
+  OrderStatusChangedV1, OrderPromiseChangedV1, TenderRecordedV1, VoidRecordedV1, RefundRecordedV1, ShiftOpenedV1, ShiftClosedV1,
+]);
 export type MunimEvent = z.infer<typeof MunimEvent>;
 
 export const SCHEMAS = {
@@ -59,6 +65,7 @@ export const SCHEMAS = {
   "munim.purchasing.po.committed.v1": PoCommittedV1,
   "munim.kitchen.ticket.created.v1": KitchenTicketCreatedV1,
   "munim.kitchen.ticket.advanced.v1": KitchenTicketAdvancedV1,
+  ...ORDER_EVENT_SCHEMAS,
   "munim-event": MunimEvent,
 };
 export const ROUTES: readonly Route[] = [];

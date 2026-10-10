@@ -2,8 +2,8 @@
 // current status (`WHERE status = from`), legal per core.order_status_transition (trigger, MB004) and allowed to
 // the caller's role per its `min_role` (here). Every order_event is paired with an outbox event (#80). Entering
 // `completed` derives, in the same transaction, the loyalty earn and the sale's journal entry through their
-// owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` reverses redeemed points and frees the
-// pickup slot. No orders.* status command is seeded yet: `orderStatusHandler(type)` is bound to whichever seeded
+// owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` reverses redeemed points,
+// gives the consumed stock back (W2-R6) and frees the pickup slot. No orders.* status command is seeded yet: `orderStatusHandler(type)` is bound to whichever seeded
 // command carries the move (today kitchen.ticket.advance.v1, which targets core.order + core.order_event, #41).
 import type { CommandHandler, EventDraft, HandlerOutput } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
@@ -44,26 +44,55 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
     [uuidv7(), o.outlet_id, move.order_id, move.from_status, move.to_status, JSON.stringify({ kind: by.kind, id: by.id }), move.reason_code]);
 
   const source = `core.order:${move.order_id}`;
+  // Loyalty is core's own bookkeeping on the order's one outlet (asCore): a customer's own cancel has no outlet
+  // scope, so the derivation would not even see its source order.
   if (move.to_status === "completed") {
-    if (o.customer_id) await seams.loyaltyEarnFor(c, move.order_id);
+    if (o.customer_id) await asCore(c, o.outlet_id, () => seams.loyaltyEarnFor(c, move.order_id));
     await seams.postFor(c, "finance.post_order", source);
   }
+  const events: EventDraft[] = [{
+    type: "munim.orders.order.status_changed.v1", subject: move.order_id, aggregateType: "order",
+    data: { order_id: move.order_id, outlet_id: o.outlet_id, from_status: move.from_status, to_status: move.to_status },
+  }];
   if (move.to_status === "cancelled" || move.to_status === "rejected") {
-    if (o.customer_id) await seams.loyaltyReverseFor(c, move.order_id);
+    if (o.customer_id) await asCore(c, o.outlet_id, () => seams.loyaltyReverseFor(c, move.order_id));
     if (o.pickup_window_id) {
       await asCore(c, o.outlet_id, () =>
         c.query(`UPDATE core.pickup_window SET booked = booked - 1 WHERE id = $1 AND booked > 0`, [o.pickup_window_id]));
     }
+    events.push(...(await asCore(c, o.outlet_id, () => reverseConsumption(c, move.order_id, o.outlet_id))));
+    // The order's coupon uses stay as recorded (append-only, no reversal column); a cancelled or rejected order's
+    // use no longer counts towards a cap (recordCoupons in place.ts).
   }
-  const event: EventDraft = {
-    type: "munim.orders.order.status_changed.v1", subject: move.order_id, aggregateType: "order",
-    data: { order_id: move.order_id, outlet_id: o.outlet_id, from_status: move.from_status, to_status: move.to_status },
-  };
   return {
     entityId: move.order_id,
     audit: [{ entity: "core.order", entityId: move.order_id, before: { status: move.from_status }, after: { status: move.to_status } }],
-    events: [event],
+    events,
   };
+}
+
+/** W2-R6 (rule inventory.reverse_order_consumption, source state cancelled / rejected): the stock the order
+ *  consumed at placement comes back as `sale_return` movements on the same ingredient and batch, once. */
+async function reverseConsumption(c: Queryable, orderId: string, outletId: string): Promise<EventDraft[]> {
+  const back = (await c.query<{ ingredient_id: string; batch_id: string | null; unit: string; qty: string }>(
+    `SELECT ingredient_id, batch_id, unit, (-sum(qty_milli))::text AS qty FROM core.stock_movement
+      WHERE ref_type = 'core.order' AND ref_id = $1 AND kind = 'sale_consumption'
+        AND NOT EXISTS (SELECT 1 FROM core.stock_movement r WHERE r.ref_type = 'core.order' AND r.ref_id = $1 AND r.kind = 'sale_return')
+      GROUP BY ingredient_id, batch_id, unit HAVING sum(qty_milli) < 0 ORDER BY ingredient_id, batch_id`, [orderId])).rows;
+  if (back.length === 0) return [];
+  const ids = back.map(() => uuidv7());
+  await underRule(c, "inventory.reverse_order_consumption", `core.order:${orderId}`, async () => {
+    for (const [i, m] of back.entries()) {
+      await c.query(
+        `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id)
+         VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, 'sale_return', 'core.order', $7)`,
+        [ids[i], outletId, m.ingredient_id, m.batch_id, m.qty, m.unit, orderId]);
+    }
+  });
+  return [{
+    type: "munim.inventory.movement.recorded.v1", subject: orderId, aggregateType: "stock_movement",
+    data: { outlet_id: outletId, movement_ids: ids, ingredient_ids: [...new Set(back.map((m) => m.ingredient_id))], kind: "sale_return", ref_type: "core.order", ref_id: orderId },
+  }];
 }
 
 /** A handler that moves an order one status step under `type` (payload: order_id, from_status, to_status,
@@ -97,8 +126,7 @@ const PUSHABLE = new Set(["placed", "accepted", "preparing"]);
 
 /** Moves the promise later, records why, and re-judges the order's deals at the new time with the one pricing
  *  function. While the order is `placed`/`accepted` (the orders.reprice source state) a changed price is applied
- *  to the header and the snapshot under that derivation; order lines are not re-written (no UPDATE grant —
- *  the snapshot's `repriced` entry carries the new per-line breakdown). Later states keep their price. */
+ *  to the header, its lines and the snapshot under that derivation. Later states keep their price. */
 export const pushBackHandler: CommandHandler = {
   type: "orders.promise.push_back.v1",
   async run(c, cmd) {
@@ -154,8 +182,20 @@ async function rejudge(c: Queryable, orderId: string, outletId: string, channelI
       line_no: l.line_no, deal_refs: l.deal_refs, coupon_refs: l.coupon_refs, line_discount_minor: l.line_discount_minor, tax_minor: l.tax_minor,
     })),
   };
-  await underRule(c, "orders.reprice", `core.order:${orderId}`, () =>
-    c.query(`UPDATE core."order" SET subtotal_minor = $2, discount_minor = $3, tax_minor = $4, total_minor = $5, pricing_snapshot = $6 WHERE id = $1`,
-      [orderId, cart.totals.subtotal_minor, cart.totals.discount_minor, cart.totals.tax_minor, cart.totals.total_minor, JSON.stringify({ ...snap, repriced })]));
+  await underRule(c, "orders.reprice", `core.order:${orderId}`, async () => {
+    await c.query(`UPDATE core."order" SET subtotal_minor = $2, discount_minor = $3, tax_minor = $4, total_minor = $5, pricing_snapshot = $6 WHERE id = $1`,
+      [orderId, cart.totals.subtotal_minor, cart.totals.discount_minor, cart.totals.tax_minor, cart.totals.total_minor, JSON.stringify({ ...snap, repriced })]);
+    await repriceLines(c, orderId, cart.priced.lines);
+  });
   return cart.totals;
+}
+
+/** The order's lines follow its header under orders.reprice (0015 A8): unit (price + options), discount and tax
+ *  per line_no, as the one pricing function judged them. The caller has set the rule. */
+export async function repriceLines(c: Queryable, orderId: string,
+  lines: ReadonlyArray<{ line_no: number; unit_price_minor: number; options_minor: number; line_discount_minor: number; tax_minor: number }>) {
+  for (const l of lines) {
+    await c.query(`UPDATE core.order_line SET unit_price_minor = $3, line_discount_minor = $4, tax_minor = $5 WHERE order_id = $1 AND line_no = $2`,
+      [orderId, l.line_no, l.unit_price_minor + l.options_minor, l.line_discount_minor, l.tax_minor]);
+  }
 }

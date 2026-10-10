@@ -195,8 +195,8 @@ export const StorefrontReschedulePreviewResponse = z.strictObject({
 });
 
 /** Refusal reason code → D-2 copy key (`order.refuse.*`, docs/plan/screens/storefront.md O2/O3). The wire text
- *  is composed by core-api; the web app resolves the key and its parameters. `deal_changed` (R7) has no
- *  reason code yet and is not listed. */
+ *  is composed by core-api; the web app resolves the key and its parameters. `guest_cannot_change` is W2-R2
+ *  ("Call the outlet to change this order"). */
 export const STOREFRONT_REFUSAL_COPY = {
   window_full: "order.refuse.window_full",
   outlet_paused: "order.refuse.outlet_paused",
@@ -206,6 +206,7 @@ export const STOREFRONT_REFUSAL_COPY = {
   coupon_cap_reached: "order.refuse.coupon_cap",
   coupon_min_spend: "order.refuse.coupon_min_spend",
   change_window_closed: "order.refuse.change_window_closed",
+  guest_cannot_change: "order.refuse.guest_cannot_change",
 } as const satisfies Partial<Record<ReasonCode, string>>;
 
 export const SCHEMAS = {

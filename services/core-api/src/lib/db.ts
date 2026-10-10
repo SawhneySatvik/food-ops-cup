@@ -1,10 +1,13 @@
-// Two app pools (03-arch §1.2): `core` logs in as munim_core (member routes, draft execution), `svc` as
-// munim_svc (internal routes, jobs). Session/LISTEN connections belong to the stream (T-006), not here.
+// App pools (03-arch §1.2): `core` logs in as munim_core (member routes, draft execution), `svc` as
+// munim_svc (internal routes, jobs), `platform` as munim_platform (operator routes, T-031). Session/LISTEN
+// connections belong to the stream (T-006), not here.
 import pg from "pg";
 
 export interface Pools {
   core: pg.Pool;
   svc: pg.Pool;
+  /** Unset in compositions without the operator surface (gates, tools): its routes refuse with `unavailable`. */
+  platform?: pg.Pool;
 }
 
 /** The `SET LOCAL app.*` context of one transaction (03-arch §1.4; db/README "Context keys"). */

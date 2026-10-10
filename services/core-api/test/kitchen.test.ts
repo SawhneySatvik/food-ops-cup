@@ -7,6 +7,7 @@
 import { createLogger } from "@munim/config";
 import { CommandResult } from "@munim/contracts";
 import { KdsBoardResponse, PrepListResponse } from "@munim/contracts/kitchen";
+import { PACKS } from "@munim/contracts/packs";
 import { businessDate } from "@munim/core-domain/tz";
 import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
@@ -18,6 +19,7 @@ import { parseStoredEvent } from "../src/commit/outbox.ts";
 import { createTicketsFor, buildBoard, ticketColour, isLegalAdvance } from "../src/modules/kitchen/index.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";
+import { seedChart } from "../src/modules/finance/index.ts";
 import { openDb } from "./db.ts";
 
 const idp = createLocalIdp();
@@ -26,7 +28,7 @@ let pools: { core: pg.Pool; svc: pg.Pool };
 let app: Hono<AppEnv>;
 
 const T = {
-  tenant: "", owner: "", staff: "", mgr1: uuidv7(), mgr2: uuidv7(), channel: "", currency: "",
+  tenant: "", owner: "", staff: "", mgr1: uuidv7(), mgr2: uuidv7(), channel: "", currency: "", customer: "",
   outlets: ["", "", ""] as [string, string, string], shop: uuidv7(),
   itemTandoor: "", itemPlain: uuidv7(), ingredient: "", ing2: uuidv7(),
   subs: { owner: `owner-${uuidv7()}`, staff: `staff-${uuidv7()}`, mgr1: `mgr1-${uuidv7()}`, mgr2: `mgr2-${uuidv7()}` },
@@ -46,15 +48,16 @@ const count = async (sql: string, params: unknown[] = []) => Number((await one<{
 const env = (type: string, payload: unknown, key = `k-${uuidv7()}`) => ({ command_id: uuidv7(), idempotency_key: key, type, payload });
 
 /** Stand-in for T-022's orders.place.v1: inserts the order and lines, then calls THE SEAM in the same transaction. */
-async function place(o: { outlet: string; items: string[]; promised_at?: string | null; status?: string }): Promise<{ order: string; tickets: Array<{ ticket_id: string; station: string }>; applicable: boolean }> {
+async function place(o: { outlet: string; items: string[]; promised_at?: string | null; status?: string; customer?: string; total?: number }): Promise<{ order: string; tickets: Array<{ ticket_id: string; station: string }>; applicable: boolean }> {
   const order = uuidv7();
   let result!: Awaited<ReturnType<typeof createTicketsFor>>;
   const handler: CommandHandler = {
     type: "orders.place.v1",
     async run(c) {
       await c.query(
-        `INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot, promised_at)
-         VALUES ($1, $2, $3, $4, 'dine_in', $5, 1000, 0, 1000, $6, '{}', $7)`, [T.tenant, order, o.outlet, T.channel, o.status ?? "placed", T.currency, o.promised_at ?? null]);
+        `INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot, promised_at, customer_id)
+         VALUES ($1, $2, $3, $4, 'dine_in', $5, $8, 0, $8, $6, '{}', $7, $9)`,
+        [T.tenant, order, o.outlet, T.channel, o.status ?? "placed", T.currency, o.promised_at ?? null, o.total ?? 1000, o.customer ?? null]);
       for (const [i, item] of o.items.entries()) {
         await c.query(`INSERT INTO core.order_line (tenant_id, id, outlet_id, order_id, line_no, item_id, qty_milli, unit_price_minor) VALUES ($1, $2, $3, $4, $5, $6, 1000, 1000)`,
           [T.tenant, uuidv7(), o.outlet, order, i + 1, item]);
@@ -71,7 +74,12 @@ async function place(o: { outlet: string; items: string[]; promised_at?: string 
 beforeAll(async () => {
   db = await openDb();
   const w = await buildWorld(db);
-  Object.assign(T, { tenant: w.tenant, owner: w.owner, staff: w.staff, outlets: w.outlets, channel: w.channel, currency: w.currency, itemTandoor: w.item, ingredient: w.ingredient });
+  Object.assign(T, { tenant: w.tenant, owner: w.owner, staff: w.staff, outlets: w.outlets, channel: w.channel, currency: w.currency, itemTandoor: w.item, ingredient: w.ingredient, customer: w.customer });
+  // Completion through the kitchen posts the sale (W2-R9): finance needs the pack's full chart (the world seeds
+  // only cash + sales; A12 moves this into buildWorld), and earn skips guest profiles (T-028).
+  await db.withContext("munim_core", own("finance.account.upsert.v1"), (c) => seedChart(c, PACKS.IN));
+  await db.withContext("munim_core", own("customers.customer.upsert.v1"), (c) =>
+    c.query(`UPDATE core.customer SET is_guest = false, idp_sub = 'kitchen-cust-sub' WHERE id = $1`, [w.customer]));
   await db.withContext("munim_core", own("tenancy.member.invite.v1"), async (c) => {
     await c.query(`UPDATE core.member SET idp_sub = $2 WHERE id = $1`, [T.owner, T.subs.owner]);
     await c.query(`UPDATE core.member SET idp_sub = $2 WHERE id = $1`, [T.staff, T.subs.staff]);
@@ -214,7 +222,10 @@ describe("kitchen.ticket.advance.v1", () => {
     expect(await orderStatus(p.order)).toBe("ready");
     expect((await advance("staff", b, "ready", "done")).status).toBe(200);
     expect(await orderStatus(p.order)).toBe("completed");
-    const ev = (await db.admin(`SELECT from_status, to_status FROM core.order_event WHERE order_id = $1 ORDER BY at, id`, [p.order])).rows;
+    // Hops of one advance share the transaction's `at` and uuidv7 ids are not monotonic within a millisecond: order
+    // by the chain position (the hand-written expectation) after `at`.
+    const ev = (await db.admin(`SELECT from_status, to_status FROM core.order_event WHERE order_id = $1
+                                 ORDER BY at, array_position(ARRAY['placed', 'accepted', 'preparing', 'ready'], from_status::text)`, [p.order])).rows;
     expect(ev).toEqual([
       { from_status: "placed", to_status: "accepted" }, { from_status: "accepted", to_status: "preparing" },
       { from_status: "preparing", to_status: "ready" }, { from_status: "ready", to_status: "completed" },
@@ -225,6 +236,29 @@ describe("kitchen.ticket.advance.v1", () => {
     expect(evs.every((e) => (e as { d: { outlet_id: string } }).d.outlet_id === T.outlets[0])).toBe(true);
     // A done ticket cannot move again.
     expect((await advance("staff", a, "done", "done")).status).toBe(409);
+  });
+
+  it("W2-R9: completion through the kitchen goes through orders.advanceOrder — each order_event paired with its outbox event, the loyalty earn and the sale posting derived", async () => {
+    // Hand values: total 2500, tax 0 → net 2500 → earn floor(2500 / 1000) = 2 points (T-028 rate); the sale entry
+    // debits the receivable 2500 and credits sales 2500 (no tax line at 0).
+    const p = await place({ outlet: T.outlets[0], items: [T.itemTandoor], customer: T.customer, total: 2500 });
+    const t = p.tickets[0]!.ticket_id;
+    for (const [a, b] of [["queued", "preparing"], ["preparing", "ready"], ["ready", "done"]] as const) expect((await advance("staff", t, a, b)).status).toBe(200);
+    expect(await orderStatus(p.order)).toBe("completed");
+    const statusEvents = await count(`SELECT count(*) n FROM core.order_event WHERE order_id = $1 AND kind = 'status' AND from_status IS NOT NULL`, [p.order]);
+    const paired = (await db.admin(`SELECT payload->'data'->>'from_status' AS f, payload->'data'->>'to_status' AS t, payload->'data'->>'outlet_id' AS o
+                                      FROM core.outbox WHERE type = 'munim.orders.order.status_changed.v1' AND aggregateid = $1 ORDER BY seq`, [p.order])).rows;
+    expect([statusEvents, paired]).toEqual([4, [
+      { f: "placed", t: "accepted", o: T.outlets[0] }, { f: "accepted", t: "preparing", o: T.outlets[0] },
+      { f: "preparing", t: "ready", o: T.outlets[0] }, { f: "ready", t: "completed", o: T.outlets[0] },
+    ]]);
+    const earn = (await db.admin(`SELECT points::int, origin->>'rule_id' AS rule FROM core.loyalty_entry WHERE order_id = $1`, [p.order])).rows;
+    expect(earn).toEqual([{ points: 2, rule: "customers.loyalty_earn" }]);
+    const je = (await db.admin(
+      `SELECT j.origin->>'kind' AS kind, j.origin->>'rule_id' AS rule, sum(p.amount_minor) FILTER (WHERE p.amount_minor > 0)::int AS dr, sum(p.amount_minor)::int AS net
+         FROM core.journal_entry j JOIN core.posting p ON p.tenant_id = j.tenant_id AND p.journal_entry_id = j.id
+        WHERE j.source_id = $1 GROUP BY j.tenant_id, j.id`, [p.order])).rows;
+    expect(je).toEqual([{ kind: "derivation", rule: "finance.post_order", dr: 2500, net: 0 }]);
   });
 
   it("a cancelled order's ticket cannot advance (409)", async () => {
@@ -355,7 +389,8 @@ describe("kitchen is not applicable to shops", () => {
     expect({ applicable: p.applicable, tickets: p.tickets.length }).toEqual({ applicable: false, tickets: 0 });
     expect(await count(`SELECT count(*) n FROM core.kitchen_ticket WHERE outlet_id = $1`, [T.shop])).toBe(0);
     const board = await call("GET", `/v1/kitchen/board?outlet=${T.shop}`, "owner");
-    expect([board.status, (await board.json()).error.code]).toEqual([400, "bad_request"]);
+    const refusal = (await board.json()).error;
+    expect([board.status, refusal.code, refusal.reason_code]).toEqual([400, "bad_request", "not_applicable"]);
     expect((await call("GET", `/v1/kitchen/prep-list?outlet=${T.shop}&business_date=2026-10-10`, "owner")).status).toBe(400);
     const pl = await call("POST", "/v1/kitchen/prep-lists", "owner", env("kitchen.prep_list.create.v1", { prep_list_id: uuidv7(), outlet_id: T.shop, business_date: "2026-10-12", lines: [{ ingredient_id: T.ingredient, qty_milli: 1000, unit: "g" }] }));
     expect(pl.status).toBe(400);

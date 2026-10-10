@@ -4,8 +4,8 @@
 //   POST /v1/kitchen/prep-times                        kitchen.prep_time.set.v1   (draftable)
 //   POST /v1/kitchen/prep-lists                        kitchen.prep_list.create.v1 (draftable)
 //   GET  /v1/kitchen/prep-list?outlet=&business_date=  K3 state
-// Seam for T-022: `createTicketsFor(tx, order_id)`. Shops: the kitchen does not apply — routes refuse with
-// bad_request, the seam returns applicable=false.
+// Seam for T-022: `createTicketsFor(tx, order_id)`. Shops: the kitchen does not apply — routes refuse 400
+// bad_request / not_applicable, the seam returns applicable=false.
 import { commandEnvelopeOf, type CommandEnvelope } from "@munim/contracts";
 import { KitchenPrepListCreateV1, KitchenPrepTimeSetV1, KitchenTicketAdvanceV1 } from "@munim/contracts/kitchen";
 import { evaluateAuthority } from "@munim/core-domain/authority";
@@ -52,7 +52,7 @@ async function kitchenOutlet(c: Context<AppEnv>, m: Member, outlet: string | und
   const kind = await withContext(c.var.deps.pools.core, contextOf(m), async (db) =>
     (await db.query<{ kind: string }>(`SELECT kind FROM core.outlet WHERE id = $1`, [outlet])).rows[0]?.kind);
   if (!kind) throw new ApiError("not_found");
-  if (kind === "store") throw new ApiError("bad_request");
+  if (kind === "store") throw new ApiError("bad_request", "not_applicable");
   return outlet;
 }
 

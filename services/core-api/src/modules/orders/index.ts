@@ -9,8 +9,9 @@
 //   POST /v1/orders/{id}/refunds             orders.refund.record.v1   (cap binds staff: see authorise)
 //   POST /v1/shifts · /v1/shifts/{id}:close  orders.shift.open.v1 / orders.shift.close.v1
 //   POST /v1/pickup-windows                  orders.pickup_window.generate.v1 (idempotent per slot)
-// Seams for other modules: placeOrder / previewOrder (T-032), advanceOrder / orderStatusHandler (kitchen and the
-// future orders.* status command). No order status route yet: no orders.* status command is seeded.
+// Seams for other modules: placeHandler / previewIn on the caller's transaction (T-032 storefront), placeOrder /
+// previewOrder, advanceOrder / mover / orderStatusHandler (kitchen, storefront cancel, the future orders.* command).
+// No order status route yet: no orders.* status command is seeded.
 import { commandEnvelopeOf, type CommandEnvelope } from "@munim/contracts";
 import {
   OrdersPickupWindowGenerateV1, OrdersPlaceV1, OrdersPromisePushBackV1, OrdersRefundRecordV1, OrdersShiftCloseV1, OrdersShiftOpenV1, OrdersTenderRecordV1, OrdersVoidRecordV1,
@@ -27,8 +28,8 @@ import { pickupWindowHandler, refundHandler, shiftCloseHandler, shiftOpenHandler
 import { authorise, placeOrder, previewOrder } from "./place.ts";
 import { orderView, receiptView } from "./read.ts";
 
-export { advanceOrder, orderStatusHandler } from "./lifecycle.ts";
-export { placeOrder, previewOrder } from "./place.ts";
+export { advanceOrder, mover, orderStatusHandler, repriceLines } from "./lifecycle.ts";
+export { placeHandler, placeOrder, previewIn, previewOrder } from "./place.ts";
 export { setOrderSeams } from "./seams.ts";
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";

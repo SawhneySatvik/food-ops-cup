@@ -6,7 +6,8 @@
 //   GET  /v1/storefront/outlets/{outlet_id}/menu | /state | /pickup-windows
 //   POST /v1/storefront/orders:preview            POST /v1/storefront/orders
 //   GET  /v1/storefront/orders/{id}               (customer token, or X-Munim-Guest-Token for that one order)
-//   POST /v1/storefront/orders/{id}:cancel | :reschedule-preview | :reschedule   (signed-in customers)
+//   POST /v1/storefront/orders/{id}:cancel | :reschedule-preview | :reschedule   (signed-in customers; a guest-token
+//        holder is refused 403 guest_cannot_change — W2-R2)
 import { CommandEnvelope } from "@munim/contracts";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { contextOf, GUEST_TOKEN_HEADER, requireCustomer, requireGuest } from "../../auth/resolve.ts";
@@ -30,7 +31,7 @@ function customer(c: Context<AppEnv>): CustomerPrincipal {
 }
 /** A signed-in customer who has a profile at this merchant. */
 const signedIn: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (c.req.header(GUEST_TOKEN_HEADER)) throw new ApiError("forbidden"); // a guest context writes nothing (escalated)
+  if (c.req.header(GUEST_TOKEN_HEADER)) throw new ApiError("forbidden", "guest_cannot_change"); // W2-R2: guests call the outlet
   await requireCustomer(c, async () => {
     if (!customer(c).profile) throw new ApiError("not_found");
     await next();

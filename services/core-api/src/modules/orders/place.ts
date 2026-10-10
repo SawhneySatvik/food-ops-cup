@@ -54,20 +54,19 @@ function shopper(p: Principal): Shopper {
   return p;
 }
 
-async function authorityRow(c: Queryable, type: string) {
-  const r = await c.query<{ command_type: string; allowed_roles: string[]; scope: string; max_amount_minor: string | null }>(
-    `SELECT command_type, allowed_roles, scope, max_amount_minor FROM core.command_authority WHERE command_type = $1`, [type]);
+async function authorityRow(c: Queryable, type: string, role: string) {
+  const r = await c.query<{ command_type: string; allowed_roles: string[]; scope: string; max_amount_minor: string | null; cap: string | null }>(
+    `SELECT command_type, allowed_roles, scope, coalesce(role_caps ->> $2, max_amount_minor::text) AS cap, max_amount_minor
+       FROM core.command_authority WHERE command_type = $1`, [type, role]);
   const row = r.rows[0];
-  return row ? { ...row, max_amount_minor: row.max_amount_minor === null ? null : Number(row.max_amount_minor) } : null;
+  return row ? { command_type: row.command_type, allowed_roles: row.allowed_roles, scope: row.scope, max_amount_minor: row.cap === null ? null : Number(row.cap) } : null;
 }
 
-/** Role + outlet scope (+ amount cap) from core.command_authority before anything runs (the guard is the
- *  backstop; it does not read caps). A row's `max_amount_minor` caps STAFF only — managers and owners are
- *  uncapped (pos.md P6: "Refunds above {money} need a manager"). INFERENCE: core-domain evaluateAuthority
- *  applies one cap to every role, which cannot express that; a per-role cap shape is requested. */
+/** Role + outlet scope + amount cap from core.command_authority before anything runs (the guard is the backstop;
+ *  it does not read caps). The cap is the caller's role's entry in `role_caps` (W2-R3: e.g. refunds — staff
+ *  50000, manager 500000, owner and judge absent = uncapped), else the row's own `max_amount_minor`. */
 export async function authorise(c: Queryable, p: Extract<Principal, { kind: "member" }>, type: string, outletId: string, amount: number | null = null): Promise<void> {
-  const found = await authorityRow(c, type);
-  const row = found && (p.role === "staff" ? found : { ...found, max_amount_minor: null });
+  const row = await authorityRow(c, type, p.role);
   const v = row && evaluateAuthority(
     { command_type: type, role: p.role, outlet_scope: p.outlet_ids === "*" ? ["*"] : p.outlet_ids, target_outlet_id: outletId, amount_minor: amount }, [row]);
   if (!v?.allow) throw new ApiError("forbidden", "authority_denied");
@@ -89,28 +88,33 @@ const cartLines = (lines: Array<{ item_id: string; variant_id: string | null; op
 
 // ── Preview ────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The `previewOrder` seam (T-032 storefront calls it too). WRITES NOTHING: a READ ONLY transaction, and it is
- *  asserted that no transaction id was assigned. */
+/** The `previewOrder` route: WRITES NOTHING — a READ ONLY transaction, and it is asserted that no transaction id
+ *  was assigned. */
 export async function previewOrder(ctx: OrdersCtx, request: unknown) {
   const p = shopper(ctx.principal);
   const parsed = OrdersPreviewRequest.safeParse(request);
   if (!parsed.success) throw new ApiError("invalid_payload");
-  const req = parsed.data;
-  if (p.kind === "customer" && req.channel_id !== p.channel_id) throw new ApiError("not_found");
-  const db = contextOf(p, { coupon_codes: req.coupon_codes });
-  return withContext(ctx.deps.pools.core, db, async (c) => {
+  return withContext(ctx.deps.pools.core, contextOf(p, { coupon_codes: parsed.data.coupon_codes }), async (c) => {
     await c.query("SET TRANSACTION READ ONLY");
-    if (p.kind === "member") await authorise(c, p, "orders.place.v1", req.outlet_id);
-    await loadOutlet(c, req.outlet_id);
-    const channel = await loadChannel(c, req.channel_id);
-    const at = await judgedAt(c, req.outlet_id, req.promised_at, req.pickup_window_id);
-    const cart = await priceCart(c, { outlet_id: req.outlet_id, channel_kind: channel.kind, at, lines: cartLines(req.lines), coupon_codes: req.coupon_codes,
-      customer_id: p.kind === "customer" ? p.customer_id : null });
-    const out = previewBody(cart, at);
+    const out = await previewIn(c, p, parsed.data);
     const tx = await c.query<{ x: string | null }>(`SELECT txid_current_if_assigned()::text AS x`);
     if (tx.rows[0]!.x !== null) throw new ApiError("internal");
     return out;
   });
+}
+
+/** The preview on the CALLER's transaction (T-032 storefront: its checkout preview and the reschedule re-price,
+ *  which already holds the order's row lock). Reads only — the same pricing placement runs. */
+export async function previewIn(c: Queryable, principal: Principal, req: ReturnType<typeof OrdersPreviewRequest.parse>) {
+  const p = shopper(principal);
+  if (p.kind === "customer" && req.channel_id !== p.channel_id) throw new ApiError("not_found");
+  if (p.kind === "member") await authorise(c, p, "orders.place.v1", req.outlet_id);
+  await loadOutlet(c, req.outlet_id);
+  const channel = await loadChannel(c, req.channel_id);
+  const at = await judgedAt(c, req.outlet_id, req.promised_at, req.pickup_window_id);
+  const cart = await priceCart(c, { outlet_id: req.outlet_id, channel_kind: channel.kind, at, lines: cartLines(req.lines), coupon_codes: req.coupon_codes,
+    customer_id: p.kind === "customer" ? p.customer_id : null });
+  return previewBody(cart, at);
 }
 
 function previewBody(cart: PricedCart, at: string) {
@@ -271,10 +275,12 @@ async function recordCoupons(c: Queryable, outletId: string, orderId: string, cu
   for (const k of cart.priced.coupons) {
     const full = await asCore(c, outletId, async () => {
       await c.query(`SELECT pg_advisory_xact_lock(hashtextextended('core.coupon_use:' || $1, 0))`, [k.coupon_id]);
+      // A use on an order that was cancelled or rejected no longer counts (W2 B5: coupon_use is append-only). An
+      // order this outlet scope cannot see counts as live — the cap errs towards refusing.
       const n = await c.query<{ global_cap: number | null; per_customer_cap: number | null; all: string; mine: string }>(
-        `SELECT k.global_cap, k.per_customer_cap,
-                (SELECT count(*) FROM core.coupon_use u WHERE u.coupon_id = k.id) AS all,
-                (SELECT count(*) FROM core.coupon_use u WHERE u.coupon_id = k.id AND u.customer_id = $2) AS mine
+        `WITH live AS (SELECT u.customer_id FROM core.coupon_use u WHERE u.coupon_id = $1
+                          AND NOT EXISTS (SELECT 1 FROM core."order" o WHERE o.tenant_id = u.tenant_id AND o.id = u.order_id AND o.status IN ('cancelled', 'rejected')))
+         SELECT k.global_cap, k.per_customer_cap, (SELECT count(*) FROM live) AS all, (SELECT count(*) FROM live WHERE customer_id = $2) AS mine
            FROM core.coupon k WHERE k.id = $1`, [k.coupon_id, customerId]);
       const row = n.rows[0];
       if (!row) return true;

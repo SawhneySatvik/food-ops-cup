@@ -2,8 +2,7 @@
 // outbox events in the same transaction, so shopper feeds (`order:<id>`) and the kitchen stream wake on
 // `munim_outbox`. Data: ids and categorical fields only — never amounts, reasons or free text.
 // Each carries data.outlet_id (stream `kds:` topics and the narrowest run scope, ruling #18).
-// NOT yet in the outbox type map: core-api's commit/outbox.ts reads only `@munim/contracts/events` SCHEMAS —
-// wiring these there (as kitchen/events.ts is) is a T-022 report request.
+// Registered in `@munim/contracts/events` SCHEMAS (the outbox type map) and the MunimEvent union (W2 B1).
 import { z } from "zod";
 import { cloudEvent } from "../shared/cloudevents.ts";
 import { Slug, Uuid7 } from "../shared/primitives.ts";

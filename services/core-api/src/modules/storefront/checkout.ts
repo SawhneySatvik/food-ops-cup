@@ -72,7 +72,7 @@ export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body
   return withContext(deps.pools.core, contextOf(principal, { coupon_codes: request.coupon_codes }), async (c) => {
     await channelKind(c, principal.channel_id); // a key on no shopper channel is no storefront: 404
     const outlet = await outletRow(c, request.outlet_id);
-    const priced = await seam("previewOrder")(cmdCtx(principal, c), request);
+    const priced = await seam("previewOrder")(c, principal, request);
     const own = await ownRefusals(c, { outlet, pickup_window_id: request.pickup_window_id, promised_at: request.promised_at, lines: request.lines });
     return { ...priced, refusals: [...own, ...priced.refusals] };
   });
@@ -102,7 +102,7 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
     who = { ...principal, customer_id: await seam("ensureProfile")(c0, req.contact), profile: true };
   }
   const token = signedIn ? null : randomBytes(32).toString("base64url");
-  const hash = token ? createHash("sha256").update(token, "utf8").digest() : null;
+  const hash = token ? createHash("sha256").update(token, "utf8").digest("hex") : null;
   const outbox: OutboxRow[] = [];
 
   const result = await withContext(deps.pools.core, contextOf(who, { coupon_codes: req.order.payload.coupon_codes }), async (c) => {
@@ -127,7 +127,7 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
       outbox.push(...g.outbox);
       await setRole(c, "customer"); // executeCommand clears the shopper role after its bookkeeping
     }
-    const out = await seam("placeOrder")(ctx, command, { guest_access_hash: hash });
+    const out = await seam("placeOrder")(ctx, who, command, hash);
     outbox.push(...out.outbox);
     await setRole(c, "customer");
     const row = (

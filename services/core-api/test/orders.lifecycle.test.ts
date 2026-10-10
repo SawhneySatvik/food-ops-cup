@@ -3,19 +3,13 @@
 // cash rounding, voids, refunds within authority, shift close variance, receipts (IN tax invoice, Sec 9(5) record).
 // Every expected value is hand-written. Seams: local fakes (orders.kit.ts).
 import { localTime } from "@munim/core-domain/tz";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executeCommand, verifyAuditChain } from "../src/commit/index.ts";
 import { svcTx } from "../src/commit/testkit.ts";
 import { withContext } from "../src/lib/db.ts";
 import { orderStatusHandler } from "../src/modules/orders/lifecycle.ts";
 import { placeOrder } from "../src/modules/orders/place.ts";
 import { type Env, installFakes, placePayload, POINT_MINOR, postCalls, startEnv, uuidv7, type Who } from "./orders.kit.ts";
-
-vi.mock("@munim/contracts/events", async (orig) => {
-  const actual = await orig<typeof import("@munim/contracts/events")>();
-  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
-  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
-});
 
 let env: Env;
 let undo: () => void;
@@ -161,6 +155,42 @@ describe("derivations (fixture): stock at placement (FEFO as sold), loyalty earn
   });
 });
 
+describe("W2 B5: cancel / reject give back stock (W2-R6) and free the coupon cap; loyalty as above", () => {
+  // Fake pricing: orders' own cap check (recordCoupons) is the one that judges CAP1 here. On the real path
+  // catalogue priceLines still counts the cancelled order's use (reported for T-021/T-034).
+  it("2 biscuits with CAP1 (cap 1): placed −2000 pc on BIS-1; a second CAP1 order refused; cancel returns +2000 under the reversal rule and orders' cap check frees CAP1", async () => {
+    // Hand: 2 × 2500 = 5000; CAP1 5% = 250 → 4750; tax 9% + 9% of 4750 = 427.5 → 428 each = 856; total 5606.
+    const onHand = async () => n(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE batch_id = $1`, [env.menu.biscuitBatch]);
+    const before = await onHand();
+    const first = await place("staff", [{ item: env.menu.biscuits, qty: 2000 }], { coupon_codes: ["CAP1"] });
+    expect(await n(`SELECT total_minor AS n FROM core."order" WHERE id = $1`, [first])).toBe(5606);
+    expect(await onHand()).toBe(before - 2000);
+    const second = await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.coffee }], { coupon_codes: ["CAP1"] }));
+    expect([second.status, (await second.json()).error.reason_code]).toEqual([409, "coupon_cap_reached"]);
+
+    expect(await advance("staff", first, "placed", "cancelled", "customer_asked")).toBe("ok");
+    expect(await onHand()).toBe(before);
+    const back = await env.rows<{ kind: string; qty: string; rule: string }>(
+      `SELECT kind, qty_milli::text AS qty, origin ->> 'rule_id' AS rule FROM core.stock_movement WHERE ref_id = $1 ORDER BY qty_milli`, [first]);
+    expect(back).toEqual([{ kind: "sale_consumption", qty: "-2000", rule: "inventory.consume_sku" }, { kind: "sale_return", qty: "2000", rule: "inventory.reverse_order_consumption" }]);
+    const ev = await env.rows<{ kind: string }>(`SELECT payload -> 'data' ->> 'kind' AS kind FROM core.outbox WHERE type = 'munim.inventory.movement.recorded.v1' AND payload -> 'data' ->> 'ref_id' = $1 ORDER BY seq`, [first]);
+    expect(ev.map((e) => e.kind)).toContain("sale_return");
+
+    const third = await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.coffee }], { coupon_codes: ["CAP1"] }));
+    expect(third.status).toBe(201);
+    expect(await n(`SELECT count(*) AS n FROM core.coupon_use WHERE coupon_id = $1`, [env.menu.cap1])).toBe(2); // the cancelled order's use stays recorded
+  });
+
+  it("reject (placed → rejected) gives the stock back too; an order with no consumption writes no reversal", async () => {
+    const id = await place("staff", [{ item: env.menu.biscuits }]);
+    expect(await advance("staff", id, "placed", "rejected", "out_of_stock")).toBe("ok");
+    expect(await n(`SELECT coalesce(sum(qty_milli), 0) AS n FROM core.stock_movement WHERE ref_id = $1`, [id])).toBe(0);
+    const coffee = await place("staff", [{ item: env.menu.coffee }]); // a dish with no recipe rows: nothing consumed
+    expect(await advance("staff", coffee, "placed", "rejected", "out_of_stock")).toBe("ok");
+    expect(await n(`SELECT count(*) AS n FROM core.stock_movement WHERE ref_id = $1`, [coffee])).toBe(0);
+  });
+});
+
 describe("push-back re-judges deals (rule 9)", () => {
   it("a deal open at the first promise and closed at the new one: the order is re-priced under orders.reprice", async () => {
     const at1 = new Date(Date.now() + 2 * 3600_000);
@@ -179,6 +209,9 @@ describe("push-back re-judges deals (rule 9)", () => {
     // Deal closed at at2: 20000 + 2 × 500 → 21000.
     const o = await env.one<Record<string, string>>(`SELECT subtotal_minor, discount_minor, tax_minor, total_minor, promised_at FROM core."order" WHERE id = $1`, [id]);
     expect([o.subtotal_minor, o.discount_minor, o.tax_minor, o.total_minor].map(Number)).toEqual([20000, 0, 1000, 21000]);
+    // Its line follows (0015 A8): 4000 deal discount and 800 tax at placement → 0 and 1000.
+    expect(await env.rows(`SELECT unit_price_minor::int AS u, line_discount_minor::int AS d, tax_minor::int AS t FROM core.order_line WHERE order_id = $1`, [id]))
+      .toEqual([{ u: 20000, d: 0, t: 1000 }]);
     expect(new Date(o.promised_at!).toISOString()).toBe(at2.toISOString());
     expect(await n(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1 AND kind = 'promised_at' AND reason = 'kitchen_busy'`, [id])).toBe(1);
     expect(await n(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type = 'munim.orders.order.promise_changed.v1'`, [id])).toBe(1);
@@ -228,22 +261,18 @@ describe("voids and refunds with reason, within authority", () => {
     expect((await env.cmd(`/v1/orders/${id}/voids`, "mgr1", "orders.void.record.v1", { void_id: uuidv7(), order_id: id, order_line_id: null, reason_code: "customer_left", note: "walked out" })).status).toBe(409);
   });
 
-  it("staff refund: denied by role as seeded; with staff allowed and a 5000 cap (clone only): below cap 200, above cap 403, manager above cap 200", async () => {
-    const id = await place("staff", [{ item: env.menu.thali }]); // total 21000
+  it("W2-R3 refund caps from command_authority.role_caps (seeded staff 50000, manager 500000, owner uncapped): staff at the cap 200, above it 403; more than is left 422", async () => {
+    const id = await place("staff", [{ item: env.menu.thali, qty: 3000 }]); // hand: 3 × 20000 = 60000 + 2 × 1500 tax = 63000
     const tender = uuidv7();
-    await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: tender, order_id: id, method: "card", tendered_minor: null, amount_minor: 21000, currency: "INR", ref: "APPR-1" });
+    await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: tender, order_id: id, method: "card", tendered_minor: null, amount_minor: 63000, currency: "INR", ref: "APPR-1" });
     const refund = (who: Who, amount: number) => env.cmd(`/v1/orders/${id}/refunds`, who, "orders.refund.record.v1",
       { refund_id: uuidv7(), order_id: id, tender_id: tender, method: "card", amount_minor: amount, currency: "INR", reason_code: "quality", note: "cold" });
-    const seeded = await refund("staff", 1000);
-    expect([seeded.status, (await seeded.json()).error.reason_code]).toEqual([403, "authority_denied"]);
-    // Pending migrator request: staff in allowed_roles + the cap. Applied to this test clone only.
-    await env.db.admin(`UPDATE core.command_authority SET allowed_roles = allowed_roles || ARRAY['staff'], max_amount_minor = 5000 WHERE command_type = 'orders.refund.record.v1'`);
-    expect((await refund("staff", 4000)).status).toBe(200);
-    const above = await refund("staff", 6000);
+    const above = await refund("staff", 50001);
     expect([above.status, (await above.json()).error.reason_code]).toEqual([403, "authority_denied"]);
-    expect((await refund("mgr1", 6000)).status).toBe(200);
-    // More than was paid less earlier refunds (21000 − 10000 = 11000 left) is refused.
-    expect((await refund("mgr1", 11001)).status).toBe(422);
+    expect((await refund("staff", 50000)).status).toBe(200);
+    // 63000 − 50000 = 13000 left: a manager (cap 500000) asking 13001 is refused as more than was paid, 13000 is accepted.
+    expect((await refund("mgr1", 13001)).status).toBe(422);
+    expect((await refund("mgr1", 13000)).status).toBe(200);
     expect(await n(`SELECT count(*) AS n FROM core.refund WHERE order_id = $1`, [id])).toBe(2);
     expect(postCalls.filter((c) => c.rule === "finance.post_refund" && c.source.startsWith("core.refund:")).length).toBeGreaterThanOrEqual(2);
   });
@@ -347,8 +376,9 @@ describe("One Guarantee clause 1 over everything this suite wrote (runs last)", 
                         AND (a.actor ->> 'id') IS NOT NULL) AS audited
          FROM core."order" o WHERE o.tenant_id = $1 AND o.id <> ALL ($2::uuid[]) AND o.id <> ALL ($3::uuid[]) AND (o.status <> 'placed' OR EXISTS (
            SELECT 1 FROM core.order_event e WHERE e.order_id = o.id AND e.kind = 'promised_at'))`, [env.w.tenant, env.w.orders, rawFixtureWrites]);
-    // by hand: completed (status test), rejected, completed (fixture), cancelled, pushed back
-    expect(moved.length).toBe(5);
+    // by hand: completed (status test), rejected, completed (fixture), cancelled, pushed back, + B5: cancelled
+    // biscuits, rejected biscuits, rejected coffee
+    expect(moved.length).toBe(8);
     expect(moved.filter((m) => !m.audited).map((m) => m.id)).toEqual([]);
     const v = await verifyAuditChain(svcTx(env.db), env.w.tenant);
     expect([v.ok, v.firstBadSeq]).toEqual([true, null]);

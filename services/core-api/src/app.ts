@@ -1,5 +1,6 @@
 // The core-api Hono app. Dependencies are injected (server.ts builds them from config; gates pass embedded-
 // Postgres pools and idp-local), so no gate ever reads `.env`.
+import { AccountMissing } from "@munim/core-domain/finance";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { CommandTypeMismatch, IdempotencyConflict } from "./commit/index.ts";
@@ -41,6 +42,9 @@ export async function createApp(deps: Deps): Promise<Hono<AppEnv>> {
     if (err instanceof CommandTypeMismatch) return c.json(errorBody("command_type_mismatch"), 422);
     const refused = fromSqlState(err);
     if (refused) return c.json(errorBody(refused.code, refused.reason_code), refused.status);
+    // The tenant's chart has no account for a role a posting rule needs: the write is refused as a whole. The
+    // error's own text names the role and is not used; a dedicated code is requested from lib/errors (W2 B3).
+    if (err instanceof AccountMissing) return c.json(errorBody("conflict"), 409);
     if (err instanceof HTTPException && err.status < 500) {
       return c.json(errorBody(err.status === 401 ? "unauthenticated" : err.status === 404 ? "not_found" : "bad_request"), err.status === 401 || err.status === 404 ? err.status : 400);
     }

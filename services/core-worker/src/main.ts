@@ -8,18 +8,22 @@
 //   Minter     mintRunToken on munim_svc; the fan-out calls its `end` (endRun) as soon as intel's call returns —
 //              orchestrator ruling 10 Oct: fan-out tokens live only as long as the call.
 //   Intel      intelHttp → intel's base URL with the service secret.
-import { resolve } from "node:path";
+//   Imports    importParseJob (T-030) on the same munim_svc pool, reading uploads from the blob store core-api
+//              writes (both entries build it from config.runDir).
+import { join, resolve } from "node:path";
 import type pg from "pg";
 import { createLogger, loadRepoConfig } from "../../../packages/config/src/index.ts";
 import { createRowPublisher, outboxRowToCloudEvent, type Publisher as EventPublisher } from "../../core-api/src/commit/outbox.ts";
 import { createHttpPublisher } from "../../core-api/src/dev-root.ts";
 import { loadContracts } from "../../core-api/src/lib/contracts.ts";
 import { createPool } from "../../core-api/src/lib/db.ts";
+import { blobs as defaultBlobs, type BlobStore, localBlobStore } from "../../core-api/src/modules/imports/index.ts";
 import { endRun, loadRunTokenKeys, mintRunToken, type RunTokenKeys, type SvcTx } from "../../core-api/src/runtoken/index.ts";
 import { ensureDevRunTokenKeys } from "../../core-api/src/runtoken/keys.ts";
 import { svcTxOf } from "../../core-api/src/server.ts";
 import { jsonLog, PoisonRowError, type Clock, type Log, type OutboxRow, type Publisher, type RunTokenMinter } from "./ports.ts";
 import { intelHttp } from "./fanout.ts";
+import { importParseJob } from "./imports/index.ts";
 import { runUntilSignal } from "./process.ts";
 import { Worker } from "./worker.ts";
 
@@ -29,6 +33,8 @@ export interface WorkerWiring {
   keys: { privateKeyPem: string; publicKeyPem: string };
   intelUrl: string;
   serviceSecret: string;
+  /** Where uploaded documents' bytes live; unset → the imports module's default local store. */
+  blobs?: BlobStore;
   log?: Log;
   clock?: Clock;
 }
@@ -74,6 +80,7 @@ export function composeWorker(w: WorkerWiring): { worker: Worker; pool: pg.Pool;
     log,
     ...(w.clock ? { clock: w.clock } : {}),
   });
+  worker.cron.add(importParseJob({ pool, blobs: w.blobs ?? defaultBlobs(), log }));
   return { worker, pool, close: () => pool.end() };
 }
 
@@ -89,6 +96,7 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
       keys: ensureDevRunTokenKeys(config.runTokenKeyDir),
       intelUrl: config.intelUrl,
       serviceSecret: config.serviceSecret(),
+      blobs: localBlobStore(join(config.runDir, "blobs")),
     });
     // runUntilSignal ends the Worker's pool and exits; the publisher/minter pool closes with the process.
     await runUntilSignal(worker, jsonLog);

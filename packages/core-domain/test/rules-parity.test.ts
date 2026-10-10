@@ -8,11 +8,6 @@ import { DERIVATION_RULES, RULE_IDS } from "../rules.ts";
 const MIGRATIONS = fileURLToPath(new URL("../../../db/migrations/", import.meta.url));
 // Rules the database allow-lists whose deterministic code lives elsewhere or lands later.
 const NOT_IN_CORE_DOMAIN_YET: Record<string, string> = {
-  "finance.post_order": "T-026",
-  "finance.post_tender": "T-026",
-  "finance.post_grn": "T-026",
-  "finance.post_supplier_invoice": "T-026",
-  "finance.post_settlement": "T-026",
   "purchasing.payable_from_invoice": "T-025",
   "inventory.receive_grn": "T-024",
   "inventory.record_waste": "T-024",
@@ -23,13 +18,15 @@ const NOT_IN_CORE_DOMAIN_YET: Record<string, string> = {
   "customers.loyalty_earn": "T-028",
   "customers.loyalty_reverse": "T-028",
   // 0014 (W1 fix cycle 1)
-  "finance.post_refund": "T-026",
-  "finance.post_expense": "T-026",
-  "finance.post_payroll": "T-026",
-  "finance.reconcile_settlement": "T-026",
   "finance.reconcile_bank": "T-026",
   "finance.reconcile_order": "T-026",
   "orders.reprice": "T-022",
+  // 0015 (W2 fix, Batch A)
+  "inventory.reverse_order_consumption": "T-022", // written by orders on cancel / reject (W2-R6, B5)
+  "finance.reverse_supplier_invoice": "T-026",
+  "finance.reverse_payroll": "T-026",
+  "finance.post_advance": "T-026",
+  "customers.merge_verified_email": "T-035",
 };
 
 function seededRows(): Array<{ rule_id: string; source_table: string; target_table: string }> {
@@ -53,7 +50,8 @@ describe("derivation rule-id parity with core.derivation_rule", () => {
   });
 
   it("every core-domain rule has its seeded (rule, source, target) row, and none is also listed as pending", () => {
-    expect(RULE_IDS.length).toBeGreaterThanOrEqual(2);
+    // Floor = inventory 2 + finance 8 posting rules + reconcile_settlement (counted by hand 10 Oct, B7).
+    expect(new Set(RULE_IDS).size).toBeGreaterThanOrEqual(11);
     for (const r of DERIVATION_RULES) expect(rows).toContainEqual({ ...r });
     expect(RULE_IDS.filter((id) => id in NOT_IN_CORE_DOMAIN_YET)).toEqual([]);
   });

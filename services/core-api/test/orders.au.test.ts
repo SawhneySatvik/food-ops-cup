@@ -1,14 +1,8 @@
 // T-022 gates on an AU tenant (the project's gate table: IN and AU golden receipts and tax totals; ruling #59 AU 5¢
 // cash rounding). AU pack: gst_10 one component of 10%, prices INCLUSIVE, tax = round(gross × 1000 / 11000).
 // Expected values are hand-written. Seams: local fakes (orders.kit.ts).
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type Env, installFakes, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
-
-vi.mock("@munim/contracts/events", async (orig) => {
-  const actual = await orig<typeof import("@munim/contracts/events")>();
-  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
-  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
-});
 
 let env: Env;
 let undo: () => void;

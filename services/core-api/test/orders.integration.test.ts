@@ -1,20 +1,15 @@
 // T-022 × landed seams (evidence for T-034, not a hand-value gate): the same placement → completion path with NO
 // fakes — catalogue priceLines, inventory picks / consumption, customers loyalty, finance postFor and kitchen
 // tickets as their lanes wrote them. Asserts which derived rows exist and under which rule, plus the pairing (#80).
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { executeCommand } from "../src/commit/index.ts";
+import { contextOf } from "../src/auth/resolve.ts";
 import { withContext } from "../src/lib/db.ts";
 import { orderStatusHandler } from "../src/modules/orders/lifecycle.ts";
 import { placeOrder } from "../src/modules/orders/place.ts";
 import { PACKS } from "@munim/contracts/packs";
 import { seedChart } from "../src/modules/finance/index.ts";
 import { type Env, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
-
-vi.mock("@munim/contracts/events", async (orig) => {
-  const actual = await orig<typeof import("@munim/contracts/events")>();
-  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
-  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
-});
 
 let env: Env;
 beforeAll(async () => {
@@ -56,6 +51,24 @@ describe("orders over the landed seams (no fakes)", () => {
     const ev = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1`, [id]);
     const ob = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type LIKE 'munim.orders.order.%'`, [id]);
     expect(Number(ob.n)).toBe(Number(ev.n));
+  });
+
+  it("W2 B5 on the real seams: the customer's own cancel (storefront.order.cancel.v1) gives back the 20 redeemed points and the 2 biscuits", async () => {
+    const principal = { kind: "customer" as const, tenant_id: env.w.tenant, channel_id: env.menu.pickupChannel, customer_id: env.w.customer, profile: true, sub: "cust-sub" };
+    const payload = placePayload(env, [{ item: env.menu.biscuits, qty: 2000 }], { channel_id: env.menu.pickupChannel, device_id: null, kind: "pickup", loyalty_redeem_points: 20 });
+    await placeOrder({ deps: { pools: env.pools, log: () => {} }, principal }, { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "orders.place.v1", payload });
+    const id = payload.order_id;
+    await executeCommand({ tx: (fn) => withContext(env.pools.core, contextOf(principal), fn), tenantId: env.w.tenant, actor: { kind: "customer", id: env.w.customer, role: "customer" } },
+      { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "storefront.order.cancel.v1", payload: { order_id: id, from_status: "placed", to_status: "cancelled", reason_code: "customer_cancelled" } },
+      orderStatusHandler("storefront.order.cancel.v1"));
+    // Hand: redeemed −20 at placement, +20 back under the reversal rule.
+    const pts = await env.rows<{ kind: string; points: number; rule: string | null }>(
+      `SELECT kind, points::int AS points, origin ->> 'rule_id' AS rule FROM core.loyalty_entry WHERE order_id = $1 ORDER BY seq`, [id]);
+    expect(pts).toEqual([{ kind: "redeem", points: -20, rule: null }, { kind: "reverse", points: 20, rule: "customers.loyalty_reverse" }]);
+    // Hand: 2 biscuits (2000 pc) consumed, the same 2000 returned on the same batch.
+    const moves = await env.rows<{ kind: string; qty: number; rule: string }>(
+      `SELECT kind, qty_milli::int AS qty, origin ->> 'rule_id' AS rule FROM core.stock_movement WHERE ref_id = $1 ORDER BY qty_milli`, [id]);
+    expect(moves).toEqual([{ kind: "sale_consumption", qty: -2000, rule: "inventory.consume_sku" }, { kind: "sale_return", qty: 2000, rule: "inventory.reverse_order_consumption" }]);
   });
 
   it("C7 with the pack flag on (test clone only): expired-only stock is refused without an override; a manager's override bound to the cart line is consumed once at placement and cited by the movement", async () => {

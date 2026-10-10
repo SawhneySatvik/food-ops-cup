@@ -66,7 +66,7 @@ export async function accepting(c: Queryable, outlet: OutletRow, at: Date = now(
 
 export async function menu(c: Queryable, outlet: OutletRow, kind: StorefrontKind) {
   const at = now();
-  const entries = await seam("itemsForSale")(c, outlet.id, kind);
+  const entries = await seam("itemsForSale")(c, outlet.id, kind, { at });
   const byItem = new Map<string, SaleEntry[]>();
   for (const e of entries) byItem.set(e.item_id, [...(byItem.get(e.item_id) ?? []), e]);
   const items = [...byItem.values()].map((es) => {
@@ -76,7 +76,10 @@ export async function menu(c: Queryable, outlet: OutletRow, kind: StorefrontKind
       item_id: base.item_id, name_key: base.name_key, category: base.category, kind: base.kind,
       available: es.some((e) => e.available), price_minor: variants.length ? null : base.price_minor, currency: base.currency,
       variants: variants.map((e) => ({ variant_id: e.variant_id!, name_key: e.variant_name_key!, available: e.available, price_minor: e.price_minor })),
-      option_groups: base.option_groups,
+      option_groups: base.option_groups.map((g) => ({
+        option_group_id: g.option_group_id, name_key: g.name_key, min_select: g.min_select, max_select: g.max_select, required: g.required,
+        options: g.options.map((o) => ({ option_id: o.option_id, name_key: o.name_key, price_delta_minor: o.price_delta_minor })),
+      })),
     };
   });
   const deals = await c.query<{ deal_id: string; name_key: string; kind: string; windows: unknown[]; valid_from: string; valid_to: string | null }>(

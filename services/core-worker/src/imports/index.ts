@@ -2,7 +2,7 @@
 // munim_svc — no book grants — so parsing can stage, quarantine and draft, never commit. For each active
 // tenant, each run still `parsing` is parsed in its own transaction (`parseRun` in core-api's imports module);
 // `FOR UPDATE … SKIP LOCKED` there lets two workers share the queue without parsing a run twice.
-// Wiring: Worker (worker.ts, b-7) adds `importParseJob(...)` to its cron registry — reported for T-034.
+// Wiring: composeWorker (main.ts) adds `importParseJob(...)` to the Worker's cron registry (W2 B3).
 import type pg from "pg";
 import { withContext } from "../../../core-api/src/lib/db.ts";
 import { type BlobStore, parseRun } from "../../../core-api/src/modules/imports/index.ts";

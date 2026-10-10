@@ -1,7 +1,9 @@
 // The shopper's own order: read, cancel, reschedule (+ its write-nothing preview).
 //   read:       a signed-in customer (own orders) or a guest-token holder (that one order) — anything else is 404.
-//   cancel / reschedule: signed-in customers only. A guest context writes nothing (0014 guest_scope refuses every
-//   write) and carries no customer_id (ruling 10 Oct 03:55); whether a token holder may act is escalated, not decided.
+//   cancel / reschedule: signed-in customers only. A guest is refused `guest_cannot_change` ("Call the outlet to
+//   change this order", W2-R2); a guest context writes nothing (0014 guest_scope).
+//   The status move is orders.advanceOrder's (W2-R9): the paired outbox event (#80), the loyalty reversal and the
+//   pickup slot release happen there, in this transaction.
 //   Windows (INFERENCE: G-SF-1 has no definition, screen O3 reads "window − elapsed"): minutes after
 //   core.order.created_at, per core.outlet.cancel_window_min / reschedule_window_min; only a `placed` order is
 //   changeable online (the transition table lets a customer cancel only from placed).
@@ -9,12 +11,13 @@ import type { CommandEnvelope } from "@munim/contracts";
 import { OrdersPreviewResponse } from "@munim/contracts/orders";
 import { StorefrontOrderCancelV1, StorefrontOrderRescheduleV1, StorefrontReschedulePreviewRequest } from "@munim/contracts/storefront";
 import { contextOf, type Principal } from "../../auth/resolve.ts";
-import { executeCommand, publishCommitted, uuidv7, type CommandContext, type CommandHandler, type ExecuteResult } from "../../commit/index.ts";
+import { executeCommand, publishCommitted, uuidv7, type CommandHandler, type ExecuteResult } from "../../commit/index.ts";
 import { asSystem, withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Deps } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
-import { now, optionalSeam, seam } from "./config.ts";
+import { advanceOrder, repriceLines } from "../orders/index.ts";
+import { now, seam } from "./config.ts";
 import { type CustomerPrincipal, refused } from "./checkout.ts";
 import { outletRow, ownRefusals } from "./read.ts";
 
@@ -98,20 +101,10 @@ export function cancelHandler(who: CustomerPrincipal, order_id: string): Command
       if (p.order_id !== order_id) throw new ApiError("bad_request");
       const o = await lockOrder(c, order_id, true);
       changeable(o, o.cancel_window_min);
-      await c.query(`UPDATE core."order" SET status = 'cancelled' WHERE id = $1`, [order_id]);
-      await c.query(
-        `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor, reason)
-         VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'status', 'placed', 'cancelled', $4, $5)`,
-        [uuidv7(), o.outlet_id, order_id, actorOf(who), p.reason]);
-      if (o.pickup_window_id) {
-        await c.query(`UPDATE core.pickup_window SET booked = booked - 1 WHERE id = $1 AND booked > 0`, [o.pickup_window_id]);
-      }
-      // Points, coupon use and consumption are reversed by their owners' derivations in this same transaction.
-      await optionalSeam("loyaltyReverseFor")?.(c, order_id);
-      return {
-        entityId: order_id,
-        audit: [{ entity: "core.order", entityId: order_id, before: { status: "placed" }, after: { status: "cancelled" } }],
-      };
+      // The shopper's own words are kept as the event's reason; with none, a fixed code. Coupon-use and stock
+      // reversals wait on their schema/rules (W2-R6, B5 — reported).
+      return advanceOrder(c, { order_id, from_status: "placed", to_status: "cancelled", reason_code: p.reason ?? "customer_cancelled" },
+        { kind: "customer", id: who.customer_id, role: "customer" });
     },
   };
 }
@@ -130,16 +123,15 @@ async function repricingInputs(deps: Deps, who: CustomerPrincipal, order_id: str
   });
 }
 
-/** INFERENCE: order_line.options holds the chosen options as objects carrying `option_id`. */
-const optionIds = (options: unknown): string[] =>
-  Array.isArray(options) ? options.map((x) => (x as { option_id?: string }).option_id).filter((x): x is string => typeof x === "string") : [];
+/** order_line.options as orders writes it: the chosen option ids (orders/place.ts). */
+const optionIds = (options: unknown): string[] => (Array.isArray(options) ? options.filter((x): x is string => typeof x === "string") : []);
 
 async function priceAt(
-  ctx: CommandContext, c: Queryable, o: Locked, lines: Array<{ item_id: string; variant_id: string | null; options: unknown; qty_milli: string }>,
+  who: CustomerPrincipal, c: Queryable, o: Locked, lines: Array<{ item_id: string; variant_id: string | null; options: unknown; qty_milli: string }>,
   codes: string[], to: { pickup_window_id: string | null; promised_at: string },
 ) {
   const { channel_id: channel, kind } = (await c.query<{ channel_id: string; kind: string }>(`SELECT channel_id, kind FROM core."order" WHERE id = $1`, [o.id])).rows[0]!;
-  return seam("previewOrder")(ctx, {
+  return seam("previewOrder")(c, who, {
     outlet_id: o.outlet_id, channel_id: channel, brand_id: null, kind: kind as "pickup", pickup_window_id: to.pickup_window_id, promised_at: to.promised_at,
     coupon_codes: codes, loyalty_redeem_points: 0,
     lines: lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id, option_ids: optionIds(l.options), qty_milli: Number(l.qty_milli), barcode: null })),
@@ -151,8 +143,7 @@ export async function reschedulePreview(deps: Deps, who: CustomerPrincipal, orde
   const req = parse(StorefrontReschedulePreviewRequest, body);
   const { o, lines, codes } = await repricingInputs(deps, who, order_id);
   return withContext(deps.pools.core, contextOf(who, { coupon_codes: codes }), async (c) => {
-    const ctx: CommandContext = { tx: (fn) => fn(c), tenantId: who.tenant_id, actor: { kind: "customer", id: who.customer_id, role: "customer" } };
-    const priced = await priceAt(ctx, c, o, lines, codes, req);
+    const priced = await priceAt(who, c, o, lines, codes, req);
     const outlet = await outletRow(c, o.outlet_id);
     const own = await ownRefusals(c, { outlet, pickup_window_id: req.pickup_window_id, promised_at: req.promised_at, lines: lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id })) });
     // The order's own current window is already counted in `booked`; staying in it is not a capacity problem.
@@ -179,8 +170,7 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string, code
       const blocking = own.find((r) => !(r.reason_code === "window_full" && p.pickup_window_id === o.pickup_window_id));
       if (blocking) throw refused(blocking.reason_code);
 
-      const ctx: CommandContext = { tx: (fn) => fn(c), tenantId: who.tenant_id, actor: { kind: "customer", id: who.customer_id, role: "customer" } };
-      const priced = await priceAt(ctx, c, o, lines, codes, p);
+      const priced = await priceAt(who, c, o, lines, codes, p);
       const bad = priced.refusals[0];
       if (bad) throw refused(bad.reason_code);
       // The person confirms the re-priced total they saw; a deal that stopped (or started) applying at the new
@@ -199,12 +189,13 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string, code
         `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_promised_at, to_promised_at, actor, reason)
          VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'promised_at', $4, $5, $6, 'customer_rescheduled')`,
         [uuidv7(), o.outlet_id, order_id, o.promised_at, p.promised_at, actorOf(who)]);
-      // The money columns move only under the seeded pricing rule `orders.reprice`, for this order alone.
+      // The money columns (header and lines) move only under the seeded pricing rule `orders.reprice`, for this order alone.
       await c.query(`SELECT set_config('app.posting_rule', 'orders.reprice', true), set_config('app.source_ref', $1, true)`, [`core.order:${order_id}`]);
       await c.query(
         `UPDATE core."order" SET subtotal_minor = $2, discount_minor = $3, tax_minor = $4, total_minor = $5, pricing_snapshot = $6 WHERE id = $1`,
         [order_id, priced.subtotal_minor, priced.discount_minor, priced.tax_minor, priced.total_minor,
          { priced_at: priced.priced_at, tax_rule: priced.tax_rule, lines: priced.lines, repriced_for: p.promised_at }]);
+      await repriceLines(c, order_id, priced.lines);
       await c.query(`SELECT set_config('app.posting_rule', '', true), set_config('app.source_ref', '', true)`);
       return {
         entityId: order_id,
@@ -213,6 +204,9 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string, code
           before: { promised_at: o.promised_at ? iso(o.promised_at) : null, total_minor: o.total_minor },
           after: { promised_at: p.promised_at, total_minor: priced.total_minor },
         }],
+        // #80: the promised_at order_event is paired with its outbox event (shopper feed and KDS wake on it).
+        events: [{ type: "munim.orders.order.promise_changed.v1", subject: order_id, aggregateType: "order",
+          data: { order_id, outlet_id: o.outlet_id, reason_code: "customer_rescheduled" } }],
       };
     },
   };

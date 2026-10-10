@@ -1,9 +1,9 @@
 // core-api entry (`node src/server.ts`) and its composition. `composeCoreApi` builds the dependencies from
 // connection strings and keys it is handed — the entry block below takes them from the config module (which
 // alone reads the founder's `.env` and redacts its secrets); the smoke test hands it embedded-Postgres URLs.
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { type Config, createLogger, type Logger, loadRepoConfig } from "@munim/config";
+import { type Config, createLogger, type DbRole, type Logger, loadRepoConfig } from "@munim/config";
 import type { Hono } from "hono";
 import pg from "pg";
 import { createApp } from "./app.ts";
@@ -12,6 +12,7 @@ import { storefrontResolver } from "./auth/resolve.ts";
 import type { PublishDeps } from "./commit/index.ts";
 import { createHttpPublisher, devhostIdp } from "./dev-root.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
+import { type BlobStore, localBlobStore, setBlobStore } from "./modules/imports/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
 import { loadRunTokenKeys, type RunTokenKeys, type SvcTx } from "./runtoken/index.ts";
 import { ensureDevRunTokenKeys } from "./runtoken/keys.ts";
@@ -22,6 +23,11 @@ export interface CoreApiWiring {
   coreUrl: string;
   /** munim_svc app pool (transaction pooler). */
   svcUrl: string;
+  /** munim_platform app pool (transaction pooler) for the operator routes; unset → they refuse `unavailable`. */
+  platformUrl?: string;
+  /** Uploaded documents' bytes; the worker's import parse job must be handed the same store. Unset → the
+   *  imports module's default local store. */
+  blobs?: BlobStore;
   /** munim_core on a session-mode connection, for the stream's LISTEN (a transaction pooler drops NOTIFY). */
   listenUrl: string;
   idp: IdP;
@@ -53,7 +59,8 @@ export function svcTxOf(pool: pg.Pool): SvcTx {
 }
 
 export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
-  const pools: Pools = { core: createPool(w.coreUrl, 10), svc: createPool(w.svcUrl, 5) };
+  const pools: Pools = { core: createPool(w.coreUrl, 10), svc: createPool(w.svcUrl, 5), ...(w.platformUrl ? { platform: createPool(w.platformUrl, 2) } : {}) };
+  if (w.blobs) setBlobStore(w.blobs);
   const keys = loadRunTokenKeys(w.keys);
   const svc = svcTxOf(pools.svc);
   const publish: PublishDeps = { publisher: createHttpPublisher({ url: w.intelUrl, serviceSecret: w.serviceSecret }), svc, keys };
@@ -68,7 +75,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
     app, deps, publish, svc, keys,
     async close() {
       await closeStream(deps);
-      await Promise.all([pools.core.end(), pools.svc.end()]);
+      await Promise.all([pools.core.end(), pools.svc.end(), pools.platform?.end()]);
     },
   };
 }
@@ -88,8 +95,12 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
     const api = await composeCoreApi({
       coreUrl: config.dbUrl("munim_core"),
       svcUrl: config.dbUrl("munim_svc"),
+      // DbRole names only munim_core / munim_svc; munim_platform's password is in db-roles.json (bootstrap-roles
+      // LOGIN_ROLES). Widening DbRole in packages/config is requested (W2 B3).
+      platformUrl: config.dbUrl("munim_platform" as DbRole),
+      blobs: localBlobStore(join(config.runDir, "blobs")),
       listenUrl: config.sessionDbUrl("munim_core"),
-      idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL") }),
+      idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
       config,
       log,
       keys: ensureDevRunTokenKeys(config.runTokenKeyDir),

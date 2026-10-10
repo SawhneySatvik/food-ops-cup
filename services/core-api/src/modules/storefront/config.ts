@@ -1,23 +1,26 @@
-// Module wiring. The cross-module seams (W2-LANE-BRIEF) are injected here by T-034 (or a gate): none is
-// imported from another module's directory, so this module builds and tests before the others land. A seam that
-// is not wired makes the route refuse with `unavailable` — never a guess.
+// Module wiring. The cross-module seams (W2-LANE-BRIEF) default to their owners' real functions, imported through
+// each owner's index.ts (W2 B4): orders' pricing and placement on storefront's own transaction (so guest checkout
+// stays ONE transaction), catalogue's menu, accounts' first-sign-in profile. A gate may replace one with
+// `configureStorefront`; the default path has no fakes.
 import type { CommandEnvelope } from "@munim/contracts";
 import type { OrdersPreviewRequest, OrdersPreviewResponse } from "@munim/contracts/orders";
+import type { Context } from "hono";
+import { type CommandContext, executeCommand, type ExecuteResult } from "../../commit/index.ts";
+import type { AppEnv } from "../../lib/types.ts";
+import type { Queryable } from "../../runtoken/index.ts";
+import { ensureProfile } from "../accounts/index.ts";
+import { itemsForSale } from "../catalogue/index.ts";
+import { placeHandler, previewIn } from "../orders/index.ts";
+import type { CustomerPrincipal } from "./checkout.ts";
 type PreviewRequest = ReturnType<typeof OrdersPreviewRequest.parse>;
 type PreviewResponse = ReturnType<typeof OrdersPreviewResponse.parse>;
-import type { Context } from "hono";
-import type { CommandContext, ExecuteResult } from "../../commit/index.ts";
-import type { AppEnv } from "../../lib/types.ts";
-import { ApiError } from "../../lib/errors.ts";
-import type { Queryable } from "../../runtoken/index.ts";
 
-/** One entry of T-021's `itemsForSale` (catalogue/menu.ts `MenuEntry`, read from the source): an item, or one of
- *  its active variants, with the price row in force for the outlet and channel kind. Only the fields storefront
- *  serves are named here. */
+/** One entry of T-021's `itemsForSale` (catalogue/menu.ts `MenuEntry`): an item, or one of its active variants,
+ *  with the price row in force for the outlet and channel kind. Only the fields storefront serves are named. */
 export interface SaleEntry {
   item_id: string;
   variant_id: string | null;
-  kind: "dish" | "sku" | "combo";
+  kind: string;
   name_key: string;
   variant_name_key: string | null;
   category: string;
@@ -35,25 +38,30 @@ export interface SaleEntry {
 }
 
 export interface Seams {
-  /** T-021 catalogue. */
-  itemsForSale(tx: Queryable, outlet_id: string, channel_kind: string): Promise<SaleEntry[]>;
-  /** T-022 orders: core's one pricing function; writes nothing. */
-  previewOrder(ctx: CommandContext, request: PreviewRequest): Promise<PreviewResponse>;
-  /** T-022 orders: place under executeCommand (the caller's `ctx.tx` may be an outer transaction). The order's
-   *  `guest_access_hash` (sha256 bytes of the one-time token) must be stored on the order row it inserts —
-   *  SEAM GAP: the brief's `placeOrder(ctx, command)` has no parameter for it, so it is the third argument. */
-  placeOrder(ctx: CommandContext, command: CommandEnvelope, opts: { guest_access_hash: Buffer | null }): Promise<ExecuteResult>;
-  /** T-035 accounts (accounts/index.ts): first sign-in at this merchant creates the profile by the customer's own
+  /** T-021 catalogue, judged at the storefront's clock. */
+  itemsForSale(tx: Queryable, outlet_id: string, channel_kind: string, opts: { at: Date }): Promise<SaleEntry[]>;
+  /** T-022 orders: core's one pricing function on the caller's transaction; writes nothing. */
+  previewOrder(c: Queryable, principal: CustomerPrincipal, request: PreviewRequest): Promise<PreviewResponse>;
+  /** T-022 orders: orders.place.v1 under `ctx` (storefront's transaction, after the guest's own command).
+   *  `guestAccessHash` = hex sha256 of the one-time token storefront issued; null for a signed-in customer. */
+  placeOrder(ctx: CommandContext, principal: CustomerPrincipal, command: CommandEnvelope, guestAccessHash: string | null): Promise<ExecuteResult>;
+  /** T-035 accounts: first sign-in at this merchant creates the profile by the customer's own
    *  customers.account.link.v1 in its OWN committed transaction, so it is called before the placement
    *  transaction. Returns the profile's customer_id. */
   ensureProfile(c: Context<AppEnv>, seed: { name: string; phone: string | null }): Promise<string>;
-  /** T-028 customers: derived loyalty reversal on cancel, inside the cancel transaction. Optional. */
-  loyaltyReverseFor?(tx: Queryable, order_id: string): Promise<void>;
 }
+
+const REAL: Seams = {
+  itemsForSale: async (tx, outlet_id, channel_kind, opts) => (await itemsForSale(tx, outlet_id, channel_kind, opts)).entries,
+  previewOrder: previewIn,
+  placeOrder: (ctx, principal, command, guestAccessHash) => executeCommand(ctx, command, placeHandler(principal, guestAccessHash)),
+  ensureProfile,
+};
 
 export interface StorefrontConfig {
   /** The module's only clock, so deal windows and change windows are deterministic in gates. */
   clock: () => Date;
+  /** Overrides only; a seam not named here is its owner's real function. */
   seams: Partial<Seams>;
 }
 
@@ -72,9 +80,6 @@ export function resetStorefront(): void {
 }
 export const now = () => state.clock();
 
-export function seam<K extends keyof Seams>(name: K): NonNullable<Seams[K]> {
-  const s = state.seams[name];
-  if (!s) throw new ApiError("unavailable");
-  return s as NonNullable<Seams[K]>;
+export function seam<K extends keyof Seams>(name: K): Seams[K] {
+  return (state.seams[name] ?? REAL[name]) as Seams[K];
 }
-export const optionalSeam = <K extends "loyaltyReverseFor">(name: K) => state.seams[name];

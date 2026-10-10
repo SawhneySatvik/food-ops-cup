@@ -4,3 +4,10 @@ munim.purchasing.po.committed.v1
 munim.kitchen.ticket.created.v1
 munim.kitchen.ticket.advanced.v1
 munim-event
+munim.orders.order.status_changed.v1
+munim.orders.order.promise_changed.v1
+munim.orders.tender.recorded.v1
+munim.orders.void.recorded.v1
+munim.orders.refund.recorded.v1
+munim.orders.shift.opened.v1
+munim.orders.shift.closed.v1

@@ -1,11 +1,13 @@
 // Kitchen tickets (T-023): creation with the order (the seam T-022 calls), the advance command, the KDS board.
-// kitchen_ticket is operational; the order status it drives is a book (core.order / order_event), written under
-// kitchen.ticket.advance.v1 whose target_tables name exactly those two tables (0007).
+// kitchen_ticket is operational; the order status it drives is a book (core.order / order_event), moved only by
+// orders.advanceOrder (W2-R9) inside kitchen.ticket.advance.v1, whose target_tables name exactly those two tables
+// (0007) — so a completion here derives the loyalty earn and the sale posting and pairs each order_event (#80).
 import type { EventDraft, AuditEntry, CommandHandler, HandlerOutput } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
 import { asSystem } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
+import { advanceOrder, mover } from "../orders/index.ts";
 import { DEFAULT_STATION, impliedOrderStatus, isLegalAdvance, ORDER_CHAIN, ticketColour, type OrderChainStatus, type TicketStatus } from "./rules.ts";
 
 export interface CreatedTicket {
@@ -116,26 +118,19 @@ export const advanceHandler: CommandHandler = {
     const all = (await c.query<{ status: TicketStatus }>(`SELECT status FROM core.kitchen_ticket WHERE order_id = $1`, [t.order_id])).rows.map((r) => r.status);
     const target = impliedOrderStatus(all);
     const audit: AuditEntry[] = [{ entity: "core.kitchen_ticket", entityId: p.ticket_id, before: { status: p.from_status }, after: { status: p.to_status } }];
+    const events: EventDraft[] = [{ type: "munim.kitchen.ticket.advanced.v1", subject: p.ticket_id, aggregateType: "kitchen_ticket",
+      data: { ticket_id: p.ticket_id, order_id: t.order_id, outlet_id: t.outlet_id, station: t.station, status: p.to_status, from_status: p.from_status } }];
     const from = ORDER_CHAIN.indexOf(ord.rows[0].status as OrderChainStatus);
     const to = target ? ORDER_CHAIN.indexOf(target) : -1;
     if (from >= 0 && to > from) {
+      const by = await mover(c);
       for (let i = from; i < to; i++) {
-        const [a, b] = [ORDER_CHAIN[i]!, ORDER_CHAIN[i + 1]!];
-        await c.query(`UPDATE core."order" SET status = $2 WHERE id = $1`, [t.order_id, b]);
-        await c.query(
-          `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor)
-           VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'status', $4, $5,
-                   jsonb_build_object('kind', 'member', 'id', current_setting('app.member_id', true)))`,
-          [uuidv7(), t.outlet_id, t.order_id, a, b]);
-        audit.push({ entity: "core.order", entityId: t.order_id, before: { status: a }, after: { status: b } });
+        const hop = await advanceOrder(c, { order_id: t.order_id, from_status: ORDER_CHAIN[i]!, to_status: ORDER_CHAIN[i + 1]!, reason_code: null }, by);
+        audit.push(...hop.audit);
+        events.push(...(hop.events ?? []));
       }
     }
-    return {
-      entityId: p.ticket_id,
-      audit,
-      events: [{ type: "munim.kitchen.ticket.advanced.v1", subject: p.ticket_id, aggregateType: "kitchen_ticket",
-        data: { ticket_id: p.ticket_id, order_id: t.order_id, outlet_id: t.outlet_id, station: t.station, status: p.to_status, from_status: p.from_status } }],
-    };
+    return { entityId: p.ticket_id, audit, events };
   },
 };
 

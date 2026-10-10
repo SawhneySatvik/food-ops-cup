@@ -2,17 +2,9 @@
 // SGST 2.5%, goods_18 = 9% + 9%, each component rounded half-up per line; prices exclusive), never computed by
 // the code under test. Seams: local fakes (orders.kit.ts) — catalogue/inventory/customers/finance not landed.
 import { createHash } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { placeOrder } from "../src/modules/orders/place.ts";
 import { type Env, installFakes, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
-
-// The outbox type map reads only @munim/contracts/events; orders' event schemas wait on that wiring (report
-// request #1). This test-only mock adds exactly ORDER_EVENT_SCHEMAS, as the requested wiring would.
-vi.mock("@munim/contracts/events", async (orig) => {
-  const actual = await orig<typeof import("@munim/contracts/events")>();
-  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
-  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
-});
 
 let env: Env;
 let undo: () => void;
