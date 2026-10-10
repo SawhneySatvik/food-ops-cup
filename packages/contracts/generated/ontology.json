@@ -16169,7 +16169,8 @@
         "finance.tender_vs_bank",
         "finance.pnl",
         "finance.gst_check",
-        "finance.close_status"
+        "finance.close_status",
+        "finance.margin_bridge"
       ],
       "templates_pending": [],
       "draftables": [
@@ -16260,7 +16261,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "d89712e0d99b41db325ac66d788fae01ee4cd76c0ea7db0f9255a58feb0a64b8",
+      "sha256": "966a35d9eae97f76090094529a9ef396bbd2911fc5fbd894f3966135a69c32a2",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -16294,7 +16295,7 @@
         "packages/contracts/src/imports/index.ts": "7c02338c7d4b2ab7b7cdb34074224c8aeabe673f90e059f3f707df87cb718942",
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "b0a29fed9fa29f8e9b3f862619c71d5b803f82a9c917aab2e5d49523c97ffb74",
-        "packages/contracts/src/intel/specialists.ts": "741e19823c34318e826764821e24eb74fbb6d5fbc73136e34d3f0f67dd41d2b4",
+        "packages/contracts/src/intel/specialists.ts": "3056cfa4a3ae59b68997d794b75569fec51441a7460da1e3b698cf301e8a0a00",
         "packages/contracts/src/internal/index.ts": "cbf559e0c41f96c6379a32afe5525e4d5c933e3b090a03acd02a0ca7b43fc2cc",
         "packages/contracts/src/inventory/index.ts": "f143368409ece4afea8ee531d71e866191aea6291e933d54047866dbd6812241",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
@@ -16331,6 +16332,6 @@
         "packages/contracts/src/tenancy/index.ts": "c7a7cda4fcc11f3b3a1b194720b45fed3795bc8b52f67be9133f89d1f5819996"
       }
     },
-    "body_sha256": "5deb5ef742ce21e3fe45a065f06866d44a1ea052e610a5cbd5aca158a2f7f086"
+    "body_sha256": "0407fd40cc03c263cfc4fd7430f189ed89d828c638b64bd86a2e599b74563592"
   }
 }

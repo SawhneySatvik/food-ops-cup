@@ -76,7 +76,7 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       "desk.finance",
       ["finance", "accounts", "accounting"],
       ["finance.unapproved_ad_fee", "finance.short_payout", "finance.missing_payout", "finance.tender_gap", "finance.gst_mismatch"],
-      ["finance.unapproved_deductions", "finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.pnl", "finance.gst_check", "finance.close_status"],
+      ["finance.unapproved_deductions", "finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.pnl", "finance.gst_check", "finance.close_status", "finance.margin_bridge"],
       ["finance.dispute.draft.v1", "finance.journal.adjust.v1", "finance.period.close.v1"],
     ),
     e(
