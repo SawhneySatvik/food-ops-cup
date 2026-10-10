@@ -15,16 +15,25 @@ BEGIN
 END $$;
 
 -- Owns schemas and every object; migrations only, never at runtime.
-ALTER ROLE munim_migrator    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+ALTER ROLE munim_migrator    NOLOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 -- Owns exactly core.outbox_claim(), core.active_tenants(), platform.tenant_registry (gate: definer owners).
-ALTER ROLE munim_crosstenant NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION BYPASSRLS;
+ALTER ROLE munim_crosstenant NOLOGIN NOCREATEDB NOCREATEROLE NOREPLICATION BYPASSRLS;
 -- Owns intel_ro views (M-B); NOBYPASSRLS so base-table policies apply through the views.
-ALTER ROLE munim_view_owner  NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE munim_view_owner  NOLOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 -- Runtime roles. Passwords are set outside migrations (deployment secret; the test harness sets its own).
-ALTER ROLE munim_core        LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE munim_svc         LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE munim_platform    LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE munim_intel_ro    LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE munim_core        LOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE munim_svc         LOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE munim_platform    LOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE munim_intel_ro    LOGIN NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+
+-- NOSUPERUSER is not stated above: on PG16+ only a superuser may name SUPERUSER/NOSUPERUSER at all, so it fails on
+-- hosted the dev host (42501). A role created by CREATE ROLE is NOSUPERUSER by default; assert it instead.
+DO $$
+DECLARE bad text;
+BEGIN
+  SELECT string_agg(rolname, ', ') INTO bad FROM pg_catalog.pg_roles WHERE rolname LIKE 'munim\_%' AND rolsuper;
+  IF bad IS NOT NULL THEN RAISE EXCEPTION '0001: munim role(s) are superusers: %', bad; END IF;
+END $$;
 
 -- The admin must be able to SET ROLE munim_migrator (PG16+ does not grant SET to a non-superuser creator by
 -- default). munim_migrator must be able to hand objects to the two owner roles (ALTER … OWNER needs it).

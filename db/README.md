@@ -295,6 +295,11 @@ Gates run on embedded PostgreSQL 18.4. None of the following has been run on the
    non-RLS registry).
 2. **`GRANT munim_migrator TO CURRENT_USER`** and `SET LOCAL ROLE munim_migrator` from `postgres`.
    *Fallback:* run 0002+ without the role switch and `REASSIGN OWNED` afterwards.
+2a. **`NOSUPERUSER` in `ALTER ROLE`** (measured on hosted PG 17.11, 42501): on PG16+ only a superuser may name
+   SUPERUSER/NOSUPERUSER at all. 0001 therefore omits the clause (CREATE ROLE already defaults to NOSUPERUSER)
+   and asserts `rolsuper = false` for every `munim_*` role in a DO block instead, which needs no privilege.
+   The other attributes 0001 sets (NOLOGIN/LOGIN, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOBYPASSRLS,
+   BYPASSRLS, INHERIT) were probed OK on hosted. `make dev-db` probes the full set (item 0 in its output).
 3. **`ALTER DEFAULT PRIVILEGES FOR ROLE munim_migrator`** (needs membership — granted in 0001).
 4. **`btree_gist`** (exclusion constraints on `recipe_version`, `price`, `prep_time`): listed as available
    on the dev host and Cloud SQL, not probed. *Fallback:* a trigger that takes `pg_advisory_xact_lock` on the key
