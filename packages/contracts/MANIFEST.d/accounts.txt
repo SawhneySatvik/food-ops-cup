@@ -1,0 +1,10 @@
+customers.account.link.v1
+customers.profile.update.v1
+customers.consent.set.v1
+customers.data.export.v1
+customers.erasure.request.v1
+v1.account.profile
+v1.account.orders
+v1.account.order
+v1.account.loyalty
+v1.account.export
