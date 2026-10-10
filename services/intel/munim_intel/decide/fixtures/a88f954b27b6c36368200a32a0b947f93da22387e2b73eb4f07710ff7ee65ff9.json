@@ -1,0 +1,97 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "{\"header\":\"Rate\",\"headers\":[\"Bill No\",\"Bill Date\",\"Outlet Name\",\"Item Code\",\"Qty\",\"Rate\",\"Line Amount\",\"Remarks\"]}"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/router",
+  "output": [
+   {
+    "enum": [
+     "A",
+     "B",
+     "C",
+     "D",
+     "E",
+     "F",
+     "G",
+     "H",
+     "I",
+     "J",
+     "K",
+     "L",
+     "M",
+     "N",
+     "O",
+     "P",
+     "Q",
+     "R",
+     "S",
+     "T",
+     "U",
+     "V",
+     "W",
+     "X",
+     "Y",
+     "Z"
+    ],
+    "type": "STRING"
+   },
+   null,
+   "text/x.enum"
+  ],
+  "system": "A pos bills file is being imported. Pick the field that the column named in `header` is a plain rename of, judging only by the header text and the other headers in `headers`. Pick ignore when no field fits or the column would need any calculation.\n\nAnswer with exactly one code.\nA = bill_no\nB = bill_date\nC = bill_time\nD = outlet\nE = channel\nF = brand\nG = order_type\nH = customer_phone\nI = bill_status\nJ = item_code\nK = variant_code\nL = qty\nM = unit_price\nN = tax_class\nO = line_discount\nP = line_total\nQ = void_reason\nR = cash\nS = card\nT = upi\nU = refund\nV = refund_mode\nW = refund_reason\nX = refund_date\nY = currency\nZ = ignore",
+  "tools": []
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "M"
+     }
+    ],
+    "role": "model"
+   },
+   "logprobs_result": {
+    "chosen_candidates": [
+     {
+      "log_probability": -0.21072103131565253,
+      "token": "M"
+     }
+    ],
+    "top_candidates": [
+     {
+      "candidates": [
+       {
+        "log_probability": -0.21072103131565253,
+        "token": "M"
+       },
+       {
+        "log_probability": -2.3538783873815965,
+        "token": "A"
+       },
+       {
+        "log_probability": -2.8647040111475874,
+        "token": "B"
+       },
+       {
+        "log_probability": -3.2701691192557516,
+        "token": "\n"
+       }
+      ]
+     }
+    ]
+   },
+   "usage_metadata": {
+    "prompt_token_count": 263
+   }
+  }
+ ]
+}

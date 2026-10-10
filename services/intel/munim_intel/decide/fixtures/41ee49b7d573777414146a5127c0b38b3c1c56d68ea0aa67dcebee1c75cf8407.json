@@ -1,0 +1,77 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "{\"country\":\"IN\",\"outlet_kinds\":[\"restaurant\"],\"question\":\"@Finance show me last week's payouts from the delivery apps\"}"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/router",
+  "output": [
+   {
+    "enum": [
+     "A",
+     "B",
+     "C",
+     "D",
+     "E",
+     "F"
+    ],
+    "type": "STRING"
+   },
+   null,
+   "text/x.enum"
+  ],
+  "system": "You route a restaurant or shop owner's question inside a back-office system. Pick the one path that fits.\nlookup: read back figures or a list that already exist (sales, stock, who is on shift).\nexplain: say why something happened or what a finding means, in one pass.\ninvestigate: dig into a cause step by step across several areas or periods.\ndraft_request: asks the system to prepare a change or action for a person to approve (order stock, set a price, make a roster, dispute a payout).\ncertification_request: asks the system to certify, guarantee, attest or sign off that books, tax or compliance are correct.\nout_of_scope: not about this business, its data or its operations.\nA leading @Name addresses a team member; route by what is asked, not by who is addressed.\n\nAnswer with exactly one code.\nA = lookup\nB = explain\nC = investigate\nD = draft_request\nE = certification_request\nF = out_of_scope",
+  "tools": []
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "A"
+     }
+    ],
+    "role": "model"
+   },
+   "logprobs_result": {
+    "chosen_candidates": [
+     {
+      "log_probability": -0.21072103131565253,
+      "token": "A"
+     }
+    ],
+    "top_candidates": [
+     {
+      "candidates": [
+       {
+        "log_probability": -0.21072103131565253,
+        "token": "A"
+       },
+       {
+        "log_probability": -2.3538783873815965,
+        "token": "B"
+       },
+       {
+        "log_probability": -2.8647040111475874,
+        "token": "C"
+       },
+       {
+        "log_probability": -3.2701691192557516,
+        "token": "\n"
+       }
+      ]
+     }
+    ]
+   },
+   "usage_metadata": {
+    "prompt_token_count": 307
+   }
+  }
+ ]
+}
