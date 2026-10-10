@@ -14,6 +14,7 @@ export const MODULES = [
   "tenancy",
   "specialists",
   "ai_policy",
+  "threads",
   "catalogue",
   "orders",
   "kitchen",
