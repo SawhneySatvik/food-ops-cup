@@ -326,10 +326,11 @@ describe("R1-m4 / R1-M1 — merge moves coupon uses; erasure reaches merged gues
       { entity: "core.customer", entity_id: guest, from_customer_id: guest },
       { entity: "core.order", entity_id: guestOrder, from_customer_id: guest },
     ]);
-    const after = await one<{ cu: string; h: string | null; o: { kind: string; rule_id: string } }>(`SELECT
+    const after = await one<{ cu: string; h: string | null; o: { kind: string; command_type: string } }>(`SELECT
       (SELECT customer_id::text FROM core.coupon_use WHERE id = $1) cu, (SELECT guest_access_hash::text FROM core."order" WHERE id = $2) h,
       (SELECT origin FROM core.coupon_use WHERE id = $1) o`, [guestCoupon, guestOrder]);
-    expect([after.cu, after.h, after.o.kind, after.o.rule_id]).toEqual([me, null, "derivation", "customers.merge_verified_email"]);
+    // 0017 (O1): the coupon use keeps its creation origin (placement); the move is traced by its audit entry.
+    expect([after.cu, after.h, after.o.kind, after.o.command_type]).toEqual([me, null, "command", "orders.place.v1"]);
   });
 
   test("erasing merged guests: before the profile is erased → MB001; another customer → MB001; outside the erasure command → MB001; munim_svc → 42501", async () => {
@@ -346,11 +347,13 @@ describe("R1-m4 / R1-M1 — merge moves coupon uses; erasure reaches merged gues
       (await c.query(`UPDATE core.customer SET name = NULL WHERE tenant_id = $1 AND id = $2`, [A.tenant, guest])).rowCount);
     expect(before).toBe(0); // the customer's own context cannot even see the guest profile (customer_scope)
     const erased = await eraseGuests(cust(me, "customers.erasure.request.v1"), me);
-    const row = await one<{ name: string | null; email: string | null; phone: string | null; erased: boolean; merged: string; o: { rule_id: string } }>(
+    const row = await one<{ name: string | null; email: string | null; phone: string | null; erased: boolean; merged: string; o: { kind: string } }>(
       `SELECT name, email, phone, erased_at IS NOT NULL erased, merged_into::text merged, origin o FROM core.customer WHERE id = $1`, [guest]);
     console.log(`R1-M1 erase merged guests: returned ${JSON.stringify(erased)}; guest row ${JSON.stringify(row)}`);
     expect(erased).toEqual([{ entity: "core.customer", entity_id: guest }]);
-    expect(row).toEqual({ name: null, email: null, phone: null, erased: true, merged: me, o: expect.objectContaining({ rule_id: "customers.erase_merged_guests" }) });
+    // 0017 (O1): the guest profile keeps its creation origin through the merge and the erasure.
+    expect(row).toEqual({ name: null, email: null, phone: null, erased: true, merged: me,
+      o: expect.objectContaining({ kind: "command", command_type: "customers.customer.upsert.v1" }) });
     expect(await eraseGuests(cust(me, "customers.erasure.request.v1"), me)).toEqual([]); // nothing left
   });
 

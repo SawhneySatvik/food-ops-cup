@@ -198,12 +198,15 @@ describe("#30 F3 — order money frozen after placement; origin not re-stamped",
     expect(before).toMatchObject({ kind: "command", command_type: "orders.place.v1" });
   });
 
-  test("orders.reprice on an accepted order → accepted and origin re-stamped; on a completed order → MB001 (source state)", async () => {
+  // 0017 (O1): origin is creation provenance, never re-stamped — the re-price keeps the placement origin.
+  test("orders.reprice on an accepted order → accepted, origin kept; on a completed order → MB001 (source state)", async () => {
     const reprice = (order: string) => db.withContext("munim_core",
       { tenant_id: A.tenant, outlet_ids: "*", posting_rule: "orders.reprice", source_ref: `core.order:${order}` }, (c) =>
         c.query(`UPDATE core."order" SET discount_minor = 1600, total_minor = 32000 WHERE tenant_id = $1 AND id = $2 RETURNING origin`, [A.tenant, order]))
       .then((r) => r.rows[0]!.origin, (e: { code: string }) => e);
-    expect(await reprice(A.orders[1])).toEqual({ kind: "derivation", rule_id: "orders.reprice", source_ref: `core.order:${A.orders[1]}` });
+    const before = (await db.admin(`SELECT origin FROM core."order" WHERE id = $1`, [A.orders[1]])).rows[0]!.origin;
+    expect(before).toMatchObject({ kind: "command", command_type: "orders.place.v1" });
+    expect(await reprice(A.orders[1])).toEqual(before);
     for (const to of ["preparing", "ready", "completed"]) {
       await db.withContext("munim_core", ownerCtx(A, { command_type: "kitchen.ticket.advance.v1" }), (c) =>
         c.query(`UPDATE core."order" SET status = $3 WHERE tenant_id = $1 AND id = $2`, [A.tenant, A.orders[1], to]));

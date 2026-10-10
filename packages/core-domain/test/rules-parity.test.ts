@@ -28,6 +28,8 @@ const NOT_IN_CORE_DOMAIN_YET: Record<string, string> = {
   "customers.merge_verified_email": "T-035",
   // 0016 (W2 fix cycle 1)
   "customers.erase_merged_guests": "T-035", // the definer core.customer_erase_merged_guests (R1-M1)
+  // 0017 (W2 fix cycle 2)
+  "customers.claim_guest_token": "T-035", // the definer core.customer_claim_guest_token (R41 erasure gap)
 };
 
 function seededRows(): Array<{ rule_id: string; source_table: string; target_table: string }> {

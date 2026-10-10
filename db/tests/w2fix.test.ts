@@ -554,8 +554,9 @@ describe("A10 — core.customer_claim_verified_email_guests() (R41)", () => {
       (SELECT count(*)::int FROM core."order" WHERE tenant_id = $4 AND customer_id = $5) b`,
       [A.tenant, me, guest, B.tenant, bGuest]);
     expect(after).toEqual({ mine: 2, left: 0, resv: 1, bulk: 1, merged: me, loyalty: 1, b: 1 });
-    const origin = await one<{ o: { kind: string; rule_id: string } }>(`SELECT origin o FROM core."order" WHERE id = $1`, [guestOrders[0]]);
-    expect(origin.o).toMatchObject({ kind: "derivation", rule_id: "customers.merge_verified_email" });
+    // 0017 (O1): the move keeps the order's creation origin (placement); the merge is traced by its audit entries.
+    const origin = await one<{ o: { kind: string; command_type: string } }>(`SELECT origin o FROM core."order" WHERE id = $1`, [guestOrders[0]]);
+    expect(origin.o).toMatchObject({ kind: "command", command_type: "orders.place.v1" });
     expect(await claim(linkCtx(me))).toEqual([]); // merged guests are not taken twice
   });
 

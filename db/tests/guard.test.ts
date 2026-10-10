@@ -247,6 +247,11 @@ describe("branch 3 — allow-listed derivation of an existing book row", () => {
       ["finance.post_loyalty_redemption", "core.order", "core.posting"],
       ["customers.merge_verified_email", "core.customer", "core.coupon_use"],
       ["customers.erase_merged_guests", "core.customer", "core.customer"],
+      // 0017: coupon discount follows a re-price (R2-S3-7); the guest-token claim (C1)
+      ["orders.reprice", "core.order", "core.coupon_use"],
+      ["customers.claim_guest_token", "core.customer", "core.order"],
+      ["customers.claim_guest_token", "core.customer", "core.coupon_use"],
+      ["customers.claim_guest_token", "core.customer", "core.customer"],
     ];
     const got = r.rows.map((x) => [x.rule_id, x.source_table, x.target_table, x.s, x.t]).sort((a, b) => a.join().localeCompare(b.join()));
     expect(got).toEqual(rules.map(([a, b, c]) => [a, b, c, "munim:book", "munim:book"]).sort((a, b) => a.join().localeCompare(b.join())));

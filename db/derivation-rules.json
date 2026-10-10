@@ -215,11 +215,12 @@
       "source_table": "core.order",
       "target_tables": [
         "core.order",
-        "core.order_line"
+        "core.order_line",
+        "core.coupon_use"
       ],
       "source_state": "s.status IN ('placed', 'accepted')",
       "seeded_in": "0014",
-      "implemented_by": "T-022 / T-003 (pricing)"
+      "implemented_by": "T-022 / T-003 (pricing); core.coupon_use discount_minor of the source order only since 0017 (R2-S3-7)"
     },
     {
       "rule_id": "finance.reconcile_settlement",
@@ -328,6 +329,18 @@
       "source_state": "s.erased_at IS NOT NULL AND current_user = 'munim_crosstenant'",
       "seeded_in": "0016",
       "implemented_by": "0016 core.customer_erase_merged_guests(uuid) (f-3, R1-M1)"
+    },
+    {
+      "rule_id": "customers.claim_guest_token",
+      "source_table": "core.customer",
+      "target_tables": [
+        "core.order",
+        "core.coupon_use",
+        "core.customer"
+      ],
+      "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.idp_sub IS NOT NULL AND s.erased_at IS NULL AND s.merged_into IS NULL AND current_user = 'munim_crosstenant'",
+      "seeded_in": "0017",
+      "implemented_by": "0017 core.customer_claim_guest_token() (m-5, R41)"
     }
   ]
 }

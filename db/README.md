@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (16 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (17 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -25,7 +25,9 @@ needs a committed run, outlet RLS on compliance/goal tables, W2 command rows, re
 POS-export imports, order-line pricing freeze, loyalty policy, verified-email merge, model-role defaults), 0016 W2 fix
 cycle 1 (order_event.seq, loyalty reversal by refund, redemption posting rule, reconcile rules need a committed run,
 pricing freezes read the reprice source state, guest hash cleared on claim, merge moves coupon uses, erasure of merged
-guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the payable) — gates see 15 applied.
+guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the payable), 0017 W2 fix cycle 2 (origin
+never re-stamped, re-approval re-opens the payable, the guest-token claim merges an emptied guest profile, coupon discount
+follows a re-price) — gates see 16 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -124,8 +126,10 @@ Since 0014 (W1 fix cycle 1), on top of the 0007 binding:
   `command_authority.customer_target_tables`; NEW must be the customer's own (`app.customer_id`), OLD the customer's
   own or a guest order whose `guest_access_hash` = `decode(app.guest_access_hash, 'hex')` (how
   `customers.account.link.v1` claims a guest order). Tenders are never customer writes.
-- **Origin (F3).** Stamped on INSERT; an UPDATE keeps it unless a derivation rule admits it. `core."order"` money
-  columns change only under `app.posting_rule = 'orders.reprice'` + `app.source_ref = 'core.order:<id>'`.
+- **Origin (F3, 0017).** `origin` is **creation** provenance: stamped on INSERT and **never re-stamped by an UPDATE, in
+  any branch** — own command, decision or derivation (0014–0016 re-stamped it under a derivation; 0017 O1 removed that).
+  Every later change traces through `core.audit_log` only (project gotcha 34). `core."order"` money columns change only
+  under `app.posting_rule = 'orders.reprice'` + `app.source_ref = 'core.order:<id>'`.
 - **Derivation source state (#21).** `core.derivation_rule.source_state` must hold for the source row (e.g. invoice
   `approved`, order `completed`, settlement's import `committed`). The full list is `db/derivation-rules.json`
   (exported as `@munim/db/derivation-rules.json`; the gate asserts DB = file).
@@ -182,7 +186,8 @@ second post (no `reverses_id`) is still 23505.
 - **Pricing freezes.** `core."order"` and `core.order_line` money changes need `app.posting_rule = 'orders.reprice'`,
   `app.source_ref = 'core.order:<id>'` **and** the order in that rule's `source_state` (placed / accepted), whichever
   guard branch admitted the write.
-- **D2.** `purchasing.invoice.dispute.v1` lists `core.payable` (open → disputed).
+- **D2.** `purchasing.invoice.dispute.v1` lists `core.payable` (open → disputed). Not narrowed: the dispute command may make
+  any payable change `book_status_transition` allows (see 0017 P1 for the narrowed approve side).
 - **Unit cost per 1000 base units (R2-S2-8).** `core.stock_movement` and `core.supplier_return_line` carry
   **`unit_cost_per_1000_minor`** = the cost of 1000 units of the row's `unit`, in minor units (₹410.01/kg → 41001 per
   1000 g). Value = round(`qty_milli` × `unit_cost_per_1000_minor` / 1 000 000). Write it instead of a per-unit
@@ -198,6 +203,41 @@ second post (no `reverses_id`) is still 23505.
   `created_by` NULL and one `core.audit_log` entry each (`actor = {"kind": "migration", "id": "0016_w2_fix_cycle_1"}`,
   action `db.migration.backfill`). The D1 policy is tenant-wide with the column defaults, valid from the earlier of the
   tenant's creation date and its first order's business date (tenant zone) — INFERENCE.
+
+**W2 fix cycle 2 (0017) — shapes other lanes code against.**
+- **O1 — origin never re-stamped.** The guard's derivation branch keeps `OLD.origin` on UPDATE (re-issued; nothing else in
+  the guard changed). A re-price, merge or erasure leaves every row's creation origin as it was; audit those changes.
+- **P1 — re-approval re-opens the payable.** `purchasing.invoice.approve.v1` lists `core.payable`. Trigger
+  `core.payable.under_invoice_approve` narrows it: under that command (own, or the command type of the approved draft
+  executing in this transaction) a payable may only be inserted by `purchasing.payable_from_invoice` (as before), or moved
+  `disputed → open` with no other column changed **after** its source invoice is `approved` in the same transaction. Anything
+  else → MB001 (`paid`/`void`, a `paid_on` change, a re-open while the invoice is still disputed, an own-command insert).
+  core-api, in the approve handler after `UPDATE core.supplier_invoice SET status = 'approved'` of a previously disputed
+  invoice: `UPDATE core.payable SET status = 'open' WHERE source_type = 'core.supplier_invoice' AND source_id = $1 AND
+  status = 'disputed' RETURNING id`, one audit entry per row (`before {status: disputed}`, `after {status: open}`).
+- **C1 — guest-token claim.** `SELECT entity, entity_id, from_customer_id FROM core.customer_claim_guest_token()` — no
+  arguments; SECURITY DEFINER (owner munim_crosstenant), EXECUTE munim_core only. Call it **instead of** the direct
+  `UPDATE core."order" SET customer_id …` inside `customers.account.link.v1`, in the customer's own context
+  (`app.role = 'customer'`, `app.customer_id`, `app.command_type = 'customers.account.link.v1'`,
+  `app.guest_access_hash = hex(sha256(token))`); otherwise MB001 (no hash, wrong command, a member role). It returns **0 rows**
+  (answer `not_found`) unless the caller's profile is signed in (`idp_sub`), live, not a guest and not merged, exactly one
+  order carries the hash, and that order has no customer or a live, unmerged, token-only guest profile (an order on a
+  signed-in profile never moves — the check core-api did with `asSystem`). Then, under the rule
+  `customers.claim_guest_token` (source `core.customer:<caller>`, holds only as `current_user = munim_crosstenant`):
+  the order moves to the caller (hash cleared by 0016), that order's coupon uses held by the guest move with it, and — when
+  the guest profile has no order, reservation or bulk order left — the guest is marked `merged_into` = caller, so
+  `core.customer_erase_merged_guests(caller)` erases it with the caller (R41). Rows, ordered by (entity, entity_id), one
+  audit entry each: `('core.order', order_id, previous customer_id or NULL)`, `('core.coupon_use', id, guest)` per moved
+  coupon use, `('core.customer', guest, guest)` when merged (audit `before {merged_into: null}`, `after {merged_into:
+  caller}`). Loyalty rows stay on the guest. A second call with the same token returns 0 rows.
+- **R2-S3-7 — coupon discount follows a re-price.** Rule row `('orders.reprice', 'core.order', 'core.coupon_use')` (state as
+  the rule's other rows); `GRANT UPDATE (discount_minor) ON core.coupon_use TO munim_core` (that column only). Trigger
+  `core.coupon_use.pricing_frozen`: `discount_minor` changes only under `app.posting_rule = 'orders.reprice'` with
+  `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
+  write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
+  'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0018` per item and requires `tests/w2fixcycle2.test.ts` to exit
+  non-zero naming that item's tests (the plant is removed after each run).
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
@@ -253,12 +293,15 @@ cross-tenant either): inside `customers.erasure.request.v1` only, by the custome
 otherwise). Sets `erased_at` on every live guest profile `merged_into` it (`core.customer_erasure` blanks their personal
 columns) through the rule `customers.erase_merged_guests` (source = the erased profile, `current_user` clause as above).
 Returns one `core.customer` row per erased guest, ordered by id, for the caller's audit entries.
-Definer objects: 7 (6 functions + `platform.tenant_registry`).
+`core.customer_claim_guest_token() → (entity text, entity_id uuid, from_customer_id uuid)` (0017 C1, R41; not cross-tenant):
+the guest-token claim of `customers.account.link.v1` — see "W2 fix cycle 2" below.
+Definer objects: 8 (7 functions + `platform.tenant_registry`).
 
 **Guest orders.** `core."order".guest_access_hash` = sha256 (32 bytes) of a random token returned once at placement.
 Since 0016 the database clears it whenever the order's `customer_id` changes (the token claim in
 `customers.account.link.v1`, the verified-email merge): a claimed order is reached through the profile, never the token.
-munim_core has no UPDATE on the column.
+munim_core has no UPDATE on the column. Since 0017 the token claim is `core.customer_claim_guest_token()` (it must read the
+hash before the move clears it).
 
 **Customer requests (F4, 0014) — core-api must follow this.** Every tenant table carries a RESTRICTIVE
 `customer_scope` policy: with `app.role = 'customer'` a context sees its own customer row, orders (own, or by
