@@ -149,3 +149,14 @@ describe("read shapes parse with the published contracts", () => {
     expect(g.items.some((x) => x.metric === "orders" && x.currency === null)).toBe(true);
   });
 });
+
+describe("malformed command envelope (R3-M6)", () => {
+  it("valid JSON that is not an envelope is 422 invalid_payload; a body that is not JSON is 400 bad_request", async () => {
+    const bad = await e.call("POST", "/v1/goals", "owner", { nope: 1 });
+    expect(bad.status).toBe(422);
+    expect((await bad.json()).error.code).toBe("invalid_payload");
+    const none = await e.call("POST", "/v1/goals", "owner");
+    expect(none.status).toBe(400);
+    expect((await none.json()).error.code).toBe("bad_request");
+  });
+});

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { loadRegistry, pascal } from "../src/registry.ts";
 import { IdempotencyKey } from "../src/shared/command.ts";
-import { REPLAYED_HEADER, STOREFRONT_KEY_HEADER, TENANT_HEADER } from "../src/shared/primitives.ts";
+import { GUEST_TOKEN_HEADER, REPLAYED_HEADER, STOREFRONT_KEY_HEADER, TENANT_HEADER } from "../src/shared/primitives.ts";
 import { DRAFT_PAYLOAD_META, type DraftPayloadKind, draftable, draftableTypes } from "../src/shared/draftables.ts";
 import type { Route, Surface } from "../src/shared/routes.ts";
 import { outputsDigest, PKG, REPO, STAMP_FILE, sourcesDigest, type Stamp } from "./stamp.ts";
@@ -84,7 +84,9 @@ for (const [name, , module] of reg.schemas) {
 }
 const ref = (name: string) => ({ $ref: `#/components/schemas/${pascal(name)}` });
 const UUID_PARAM = (components.Uuid7 as Json) ?? { type: "string" };
-const ERRORS: Record<string, string> = { "401": "Unauthenticated", "403": "Not allowed", "404": "Not found", "422": "Validation failed" };
+// 400 = a body that is not JSON, a bad query/path value or a missing header; 422 = valid JSON that is not a valid
+// command/payload (`invalid_payload`). Both can come from any operation (R3-M6).
+const ERRORS: Record<string, string> = { "400": "Bad request", "401": "Unauthenticated", "403": "Not allowed", "404": "Not found", "422": "Validation failed" };
 const idempotencyKey = (() => {
   const { $schema: _s, ...k } = toJson(IdempotencyKey);
   return k;
@@ -126,7 +128,7 @@ function operation(r: Route): Json {
   return {
     operationId: r.operationId,
     summary: r.summary,
-    security: SECURITY[r.auth],
+    security: r.guest ? [...SECURITY[r.auth], { storefrontKey: [], guestToken: [] }] : SECURITY[r.auth],
     ...(parameters.length ? { parameters } : {}),
     ...(body ? { requestBody: body } : {}),
     responses: {
@@ -158,6 +160,7 @@ function openapi(surface: Surface | "all", schemas: Record<string, Json>): Json 
         tenantHeader: { type: "apiKey", in: "header", name: TENANT_HEADER, description: "The tenant a member acts in (with memberToken)" },
         storefrontKey: { type: "apiKey", in: "header", name: STOREFRONT_KEY_HEADER, description: "Public storefront key; resolves the tenant and channel" },
         customerToken: { type: "http", scheme: "bearer", description: "IdP ID token of a customer (optional on storefront routes)" },
+        guestToken: { type: "apiKey", in: "header", name: GUEST_TOKEN_HEADER, description: "Guest access token of one order (returned once when the guest places it); with storefrontKey, on routes that mark guest access" },
       },
     },
   };
@@ -188,6 +191,7 @@ export type MunimClient = Client<paths>;
 export const TENANT_HEADER = ${JSON.stringify(TENANT_HEADER)};
 export const STOREFRONT_KEY_HEADER = ${JSON.stringify(STOREFRONT_KEY_HEADER)};
 export const REPLAYED_HEADER = ${JSON.stringify(REPLAYED_HEADER)};
+export const GUEST_TOKEN_HEADER = ${JSON.stringify(GUEST_TOKEN_HEADER)};
 
 type Lazy = string | (() => string | Promise<string>);
 const value = async (v: Lazy) => (typeof v === "function" ? v() : v);
@@ -200,6 +204,8 @@ export type MunimClientOptions = {
   tenantId?: Lazy;
   /** Storefront calls: the public storefront key (sent as X-Munim-Storefront-Key). */
   storefrontKey?: Lazy;
+  /** Guest order tracking: the order's guest access token (sent as X-Munim-Guest-Token, with storefrontKey). */
+  guestToken?: Lazy;
   fetch?: typeof fetch;
 };
 
@@ -211,6 +217,7 @@ export function createMunimClient(opts: MunimClientOptions): MunimClient {
       if (opts.token) request.headers.set("Authorization", \`Bearer \${await opts.token()}\`);
       if (opts.tenantId !== undefined) request.headers.set(TENANT_HEADER, await value(opts.tenantId));
       if (opts.storefrontKey !== undefined) request.headers.set(STOREFRONT_KEY_HEADER, await value(opts.storefrontKey));
+      if (opts.guestToken !== undefined) request.headers.set(GUEST_TOKEN_HEADER, await value(opts.guestToken));
       return request;
     },
   });

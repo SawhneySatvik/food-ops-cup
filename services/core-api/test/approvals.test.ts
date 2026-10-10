@@ -148,11 +148,14 @@ async function draft(command_type: string, payload: Record<string, unknown>, bas
   return id;
 }
 
+/** A date `n` days from today (UTC), so no draft here goes stale as the calendar moves (R3-M4). */
+const inDays = (n: number): string => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
 let priceSnap: string;
 const suggested = () => snapRef(priceSnap, 0, "suggested_minor");
 /** Drafts with a valid registered payload (the ones the contract read schemas can parse). */
 const contractDrafts = new Set<string>();
-async function priceDraft(channel = "counter", validFrom = "2026-11-01", o: { outlets?: string[]; ref?: string; price?: string } = {}) {
+async function priceDraft(channel = "counter", validFrom = inDays(30), o: { outlets?: string[]; ref?: string; price?: string } = {}) {
   const price = o.price ?? uuidv7();
   const ref = o.ref ?? suggested();
   const payload: Record<string, unknown> = {
@@ -250,7 +253,7 @@ describe("authority and scope", () => {
   });
 
   it("F5: a tenant-wide draft (outlet_ids '{}') needs '*': owner → 200; advisor ('*', no approve role) → 403; outlet manager → 404 (RLS)", async () => {
-    const d = await priceDraft("aggregator:swiggy", "2026-11-01", { outlets: [] });
+    const d = await priceDraft("aggregator:swiggy", inDays(30), { outlets: [] });
     expect((await approve("mgr1", d.id)).status).toBe(404); // RLS: an empty outlet set overlaps no outlet scope
     const adv = await approve("advisor", d.id);
     expect([adv.status, (await adv.json()).error]).toEqual([403, { code: "forbidden", message: expect.any(String), reason_code: "authority_denied" }]);
@@ -262,7 +265,7 @@ describe("authority and scope", () => {
 
   it("ruling #18: a draft citing an outlet-scoped run's snapshot → that outlet's manager verifies and approves (200)", async () => {
     const snap = await mint("test.price_suggestion", { item_id: T.item }, [T.outlets[0]]);
-    const d = await priceDraft("aggregator:zomato", "2026-11-01", { ref: snapRef(snap, 0, "suggested_minor") });
+    const d = await priceDraft("aggregator:zomato", inDays(30), { ref: snapRef(snap, 0, "suggested_minor") });
     const view = DraftDetailResponse.parse(await (await call("GET", `/v1/drafts/${d.id}`, "mgr1")).json());
     expect([view.draft.resolved_refs.length, view.unverified_refs]).toEqual([1, []]);
     const ok = await approve("mgr1", d.id);
@@ -381,7 +384,7 @@ describe("based_on re-check", () => {
 
 describe("reject", () => {
   it("without a reason → 422; with a reason → 200, decision rejected, 0 handler runs", async () => {
-    const d = await priceDraft("counter", "2027-01-01");
+    const d = await priceDraft("counter", inDays(90));
     const before = await executions();
     const body = (reason?: string) => ({ command_id: uuidv7(), idempotency_key: `reject-${uuidv7()}`, type: "drafts.reject.v1", payload: { draft_id: d.id, ...(reason === undefined ? {} : { reason }) } });
     const missing = await call("POST", `/v1/drafts/${d.id}:reject`, "owner", body());
@@ -402,7 +405,7 @@ describe("reject", () => {
 
 describe("idempotency", () => {
   it("a replayed approve (same key) → the same bytes and 1 execution; the same key with a different request → 409", async () => {
-    const d = await priceDraft("aggregator:zomato", "2027-06-01");
+    const d = await priceDraft("aggregator:zomato", inDays(240));
     const body = approveBody(d.id, "catalogue.price.set.v1", null, `approve-replay-${uuidv7()}`);
     const before = await executions();
     const first = await approve("owner", d.id, body);
@@ -426,8 +429,8 @@ describe("idempotency", () => {
 
   it("F8: the same key reused on a second draft with an identical command → 409, the second draft untouched", async () => {
     const price = uuidv7();
-    const a = await priceDraft("aggregator:swiggy", "2027-02-01", { price });
-    const b = await priceDraft("aggregator:swiggy", "2027-02-01", { price });
+    const a = await priceDraft("aggregator:swiggy", inDays(120), { price });
+    const b = await priceDraft("aggregator:swiggy", inDays(120), { price });
     const body = approveBody(a.id, "catalogue.price.set.v1", null, `approve-reuse-${uuidv7()}`);
     expect((await approve("owner", a.id, body)).status).toBe(200);
     const reused = await approve("owner", b.id, { ...body, payload: { ...body.payload, draft_id: b.id } });
@@ -457,7 +460,7 @@ describe("registry", () => {
 describe("execution failure", () => {
   it("a book refusal during execution → 422 execution_failed, draft failed, nothing written", async () => {
     // Overlaps the price the first test wrote (same item, outlet, channel, open-ended validity).
-    const d = await priceDraft("counter", "2026-11-01");
+    const d = await priceDraft("counter", inDays(30));
     const r = await approve("owner", d.id);
     expect(r.status).toBe(422);
     expect((await refusal(r)).error.code).toBe("execution_failed");

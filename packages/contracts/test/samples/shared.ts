@@ -66,5 +66,5 @@ export const SAMPLES: Record<string, unknown> = {
   "command-envelope": { command_id: u(12), idempotency_key: "pos-1-000123", type: "kitchen.ticket.advance.v1", payload: { ticket_id: u(11), from_status: "queued", to_status: "preparing" } },
   "command-result": { command_id: u(12), type: "orders.place.v1", entity_id: u(10), committed_at: T_PG },
   snapshot: { ...snapshot, run_id: null, minted_by_member_id: u(8) },
-  error: { error: { code: "already_claimed", message: "Event already claimed", reason_code: null } },
+  error: { error: { code: "conflict", message: "This changed since you loaded it.", reason_code: null } },
 };

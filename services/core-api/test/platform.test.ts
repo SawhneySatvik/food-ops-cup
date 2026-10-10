@@ -5,7 +5,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createLogger } from "@munim/config";
 import { uuidv7, type TestDb } from "@munim/db";
-import { ROUTES } from "@munim/contracts/platform";
+import { Snapshot } from "@munim/contracts";
+import { ROUTES, SCHEMAS } from "@munim/contracts/platform";
 import { TenancyProvisionV1, ROUTES as TENANCY_ROUTES } from "@munim/contracts/tenancy";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -13,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, storefrontResolver, TENANT_HEADER } from "../src/app.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { setProvisionTenant } from "../src/platform/index.ts";
+import { isTenancyModuleAbsent } from "../src/platform/provision.ts";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 
@@ -242,14 +244,28 @@ describe("tenants:provision", () => {
     const au = await db.admin("SELECT actor FROM core.audit_log WHERE tenant_id = $1", [tid]);
     expect(au.rows[0]!.actor).toMatchObject({ kind: "operator", id: opId1 });
   });
-  it("same key + different body is a 409; an unpublished country pack is refused; a malformed body is 400", async () => {
+  it("same key + different body is a 409; an unpublished country pack is refused; a malformed envelope is 422 invalid_payload, a non-JSON body 400", async () => {
     const tid = uuidv7();
     expect((await call("POST", "/platform/v1/tenants:provision", OP1, cmd(tid, "same-key-1"))).status).toBe(201);
     const other = cmd(tid, "same-key-1");
     expect((await call("POST", "/platform/v1/tenants:provision", OP1, { ...other, payload: { ...other.payload, name: "Different" } })).status).toBe(409);
     const zz = cmd(uuidv7());
     expect((await call("POST", "/platform/v1/tenants:provision", OP1, { ...zz, payload: { ...zz.payload, country_code: "ZZ" } })).status).toBe(422);
-    expect((await call("POST", "/platform/v1/tenants:provision", OP1, { nope: 1 })).status).toBe(400);
+    const bad = await call("POST", "/platform/v1/tenants:provision", OP1, { nope: 1 });
+    expect(bad.status).toBe(422);
+    expect((await bad.json()).error.code).toBe("invalid_payload");
+    const notJson = await app.request("/platform/v1/tenants:provision", { method: "POST", headers: { Authorization: `Bearer ${idp.sign({ sub: OP1 })}`, "Content-Type": "application/json" }, body: "{" });
+    expect(notJson.status).toBe(400);
+  });
+  // R3-m8: only "the tenancy module file is absent" maps to unavailable; anything else (a broken import inside it) is loud.
+  it("isTenancyModuleAbsent: the module's own absence yes; a nested missing import, a package, a syntax error no", () => {
+    const spec = "../modules/tenancy/index.ts";
+    const missing = (target: string) => Object.assign(new Error(`Cannot find module '${target}' imported from /x/provision.ts`), { code: "ERR_MODULE_NOT_FOUND" });
+    expect(isTenancyModuleAbsent(missing("/repo/services/core-api/src/modules/tenancy/index.ts"), spec)).toBe(true);
+    expect(isTenancyModuleAbsent(missing("/repo/services/core-api/src/modules/tenancy/commands.ts"), spec)).toBe(false);
+    expect(isTenancyModuleAbsent(Object.assign(new Error("Cannot find package 'zod' imported from /x"), { code: "ERR_MODULE_NOT_FOUND" }), spec)).toBe(false);
+    expect(isTenancyModuleAbsent(new SyntaxError("Unexpected token"), spec)).toBe(false);
+    expect(isTenancyModuleAbsent(null, spec)).toBe(false);
   });
 });
 
@@ -264,6 +280,7 @@ describe("operator snapshots (R40 C4)", () => {
     const r = await call("POST", "/platform/v1/snapshots", OP1, { tenant_id: A.tenant, template_id: "platform.tenant_outlets", params: {} });
     expect(r.status).toBe(201);
     const s = await r.json();
+    Snapshot.parse(s); // R3-M5: the published `snapshot` schema accepts the real response
     expect(s).toMatchObject({ minted_by_operator_id: opId1, run_id: null, minted_by_member_id: null, row_count: 1, rows: [{ outlets: 3 }] });
     const stored = await db.admin("SELECT minted_by_operator_id, rows FROM evidence.snapshot WHERE tenant_id = $1 AND id = $2", [A.tenant, s.snapshot_id]);
     expect(stored.rows[0]).toMatchObject({ minted_by_operator_id: opId1, rows: [{ outlets: 3 }] });
@@ -314,5 +331,35 @@ describe("access", () => {
     for (const b of bodies) for (const s of secrets) expect(b).not.toContain(s);
     // the only tenant fact is the registry row: name/country/status
     expect(bodies[0]).toContain("Synthetic Tenant");
+  });
+});
+
+// R3-M5: every platform read and the draft views parse with their published (strict) schemas, each with rows to prove it.
+describe("platform responses parse with the published contracts", () => {
+  it.each([
+    ["/platform/v1/tenants", "platform.tenants"],
+    ["/platform/v1/country-packs", "platform.country-packs"],
+    ["/platform/v1/plans", "platform.plans"],
+    ["/platform/v1/feature-flags", "platform.feature-flags"],
+    ["/platform/v1/budgets", "platform.budgets"],
+    ["/platform/v1/model-roles", "platform.model-roles"],
+    ["/platform/v1/operators", "platform.operators"],
+    ["/platform/v1/config-drafts?status=all", "platform.config-drafts"],
+  ] as const)("%s", async (path, schema) => {
+    const r = await call("GET", path, OP1);
+    expect(r.status).toBe(200);
+    const body = SCHEMAS[schema].parse(await r.json());
+    expect(body.items.length).toBeGreaterThan(0);
+  });
+  it("a config draft and a country-pack detail", async () => {
+    const created = await propose("model_role:vision", { provider: "gemini", model_id: "gemini-3-flash" });
+    expect(created.status).toBe(201);
+    const d = SCHEMAS["platform.config-draft"].parse(await created.json());
+    expect(SCHEMAS["platform.config-draft"].parse(await (await call("GET", `/platform/v1/config-drafts/${d.id}`, OP1)).json()).id).toBe(d.id);
+    const packs = SCHEMAS["platform.country-packs"].parse(await (await call("GET", "/platform/v1/country-packs", OP1)).json()).items;
+    const p = packs[0]!;
+    const detail = await call("GET", `/platform/v1/country-packs/${p.code}/${p.version}`, OP1);
+    expect(detail.status).toBe(200);
+    expect(SCHEMAS["platform.country-pack-detail"].parse(await detail.json()).code).toBe(p.code);
   });
 });

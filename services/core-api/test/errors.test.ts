@@ -1,15 +1,18 @@
 // B13: every storefront refusal code and every W2 reason code has its own fixed message (not the generic
 // code text), and the contract accepts it as a reason code.
-import { ReasonCode, W2_REASON_CODES } from "@munim/contracts";
+import { COMMAND_REASON_CODES, PACK_RULE_REASON_CODES, ReasonCode, STOREFRONT_REASON_CODES, W2_REASON_CODES } from "@munim/contracts";
 import { STOREFRONT_REFUSAL_COPY } from "@munim/contracts/storefront";
 import { describe, expect, it } from "vitest";
 import { errorBody } from "../src/lib/errors.ts";
 
 describe("reason-code messages", () => {
-  const codes = [...new Set([...Object.keys(STOREFRONT_REFUSAL_COPY), ...W2_REASON_CODES])] as ReasonCode[];
+  // Every refusal a core command or the storefront can attach (R3-M8): totality over the four reason-code lists.
+  const codes = [...new Set([...Object.keys(STOREFRONT_REFUSAL_COPY), ...STOREFRONT_REASON_CODES, ...COMMAND_REASON_CODES, ...PACK_RULE_REASON_CODES, ...W2_REASON_CODES])] as ReasonCode[];
   it("each has a message distinct from the generic conflict text", () => {
     for (const named of ["window_full", "outlet_paused", "item_sold_out", "deal_rejudged", "coupon_invalid", "coupon_cap_reached", "coupon_min_spend", "change_window_closed",
-      "not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change"]) expect(codes).toContain(named);
+      "not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change",
+      "coupon_expired", "coupon_out_of_scope", "price_above_mrp", "expired_batch", "preview_total_changed", "unit_mismatch", "tax_id_missing", "period_closed", "model_blocked"]) expect(codes).toContain(named);
+    expect(codes.length).toBeGreaterThanOrEqual(26);
     for (const r of codes) {
       expect(ReasonCode.safeParse(r).success).toBe(true);
       const m = errorBody("conflict", r).error.message;

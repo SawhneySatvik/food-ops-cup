@@ -1,12 +1,16 @@
 // Compile-time proof that the generated client is typed (checked by `tsc -p .` in `make typecheck`).
 // Each @ts-expect-error must fire; if the generated types degraded to `any`, tsc reports the directive
 // as unused and the typecheck goes red.
-import { createMunimClient, isReplayed, TENANT_HEADER, type Schemas } from "../src/index.ts";
+import { createMunimClient, GUEST_TOKEN_HEADER, isReplayed, TENANT_HEADER, type Schemas } from "../src/index.ts";
 
 const client = createMunimClient({ baseUrl: "http://localhost:8080", token: () => "token", tenantId: "0199e0a0-0000-7000-8000-000000000001" });
 const guest = createMunimClient({ baseUrl: "http://localhost:8080", storefrontKey: () => "sf_live_example" });
 const header: "X-Munim-Tenant" = TENANT_HEADER;
-void guest, header;
+const tracker = createMunimClient({ baseUrl: "http://localhost:8080", storefrontKey: "sf_live_example", guestToken: () => "guest-token" });
+const guestHeader: "X-Munim-Guest-Token" = GUEST_TOKEN_HEADER;
+// @ts-expect-error guestToken is a string or a function returning one, never a number
+createMunimClient({ baseUrl: "http://localhost:8080", guestToken: 7 });
+void guest, header, tracker, guestHeader;
 const id = "0199e0a0-0000-7000-8000-000000000384";
 const provision = {
   command_id: id,

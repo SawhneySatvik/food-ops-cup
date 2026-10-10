@@ -50,6 +50,9 @@ export const STOREFRONT_REASON_CODES = [
   "coupon_cap_reached",
   "coupon_min_spend",
   "change_window_closed",
+  // Appended (R3-M8): a coupon outside its dates / its outlet or customer scope, told apart from an unknown one.
+  "coupon_expired",
+  "coupon_out_of_scope",
 ] as const;
 
 /** Book-rule refusals from core commands (R40 C1, C7; period close; platform model kill switch). */

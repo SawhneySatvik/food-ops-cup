@@ -30,8 +30,11 @@ function member(c: Context<AppEnv>) {
 
 const post = (handler: CommandHandler) => async (c: Context<AppEnv>) => {
   const m = member(c);
-  const env = CommandEnvelope.safeParse(await c.req.json().catch(() => null));
-  if (!env.success) throw new ApiError("bad_request");
+  // Not JSON at all = 400; valid JSON that is not a command envelope = 422 invalid_payload (shared/error.ts).
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  if (raw === undefined) throw new ApiError("bad_request");
+  const env = CommandEnvelope.safeParse(raw);
+  if (!env.success) throw new ApiError("invalid_payload");
   const { pools, publish } = c.var.deps;
   const out = await executeCommand(
     { tx: (fn) => withContext(pools.core, contextOf(m), fn), tenantId: m.tenant_id, actor: { kind: "member", id: m.member_id, role: m.role },

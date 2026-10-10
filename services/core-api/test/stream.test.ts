@@ -20,6 +20,7 @@ import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
+import { createMunimClient } from "../../../packages/sdk/src/gen/client.ts";
 import { openStream, type StreamEvent } from "../../../packages/sdk/src/stream.ts";
 import { type AppEnv, contextOf, createApp, type Deps, requireMember, STOREFRONT_KEY_HEADER, TENANT_HEADER, withContext } from "../src/app.ts";
 import { GUEST_TOKEN_HEADER, type Storefront } from "../src/auth/resolve.ts";
@@ -536,12 +537,10 @@ describe("inbox and trace channels", () => {
     expect(Object.keys(mgr.msgs[1]!.data).sort()).toEqual(["outlet_ids", "pack", "severity", "status", "type", "updated_at"]);
   });
 
-  it("trace:<run> streams intel.trace_event rows in seq order (skipped loudly if the table is absent)", async (ctx) => {
+  it("trace:<run> streams intel.trace_event rows in seq order", async () => {
+    // No silent skip (R3-m3): the table ships in 0012; if it is missing this test fails instead of passing empty.
     const exists = (await db.admin<{ ok: boolean }>(`SELECT to_regclass('intel.trace_event') IS NOT NULL AS ok`)).rows[0]!.ok;
-    if (!exists) {
-      console.warn("SKIPPED: intel.trace_event does not exist (0012 not applied) — trace delivery is untested");
-      ctx.skip();
-    }
+    expect(exists).toBe(true);
     const run = randomUUID();
     await db.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, (c) =>
       c.query(`INSERT INTO intel.run (tenant_id, id, trigger, actor, outlet_scope, expires_at) VALUES ($1, $2, 'brief', 'brief', '{*}', now() + interval '1 hour')`, [A.tenant, run]));
@@ -803,5 +802,21 @@ describe("G5 · SDK reader", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.Authorization).toBeUndefined();
     expect(calls[0]![GUEST_TOKEN_HEADER]).toBe("guest-token-0123456789");
+  });
+});
+
+describe("SDK guestToken option (R3-M6)", () => {
+  it("sends X-Munim-Guest-Token and the storefront key on every request, from a string or a function", async () => {
+    const seen: Array<Headers> = [];
+    const fetchSpy = (async (req: Request) => {
+      seen.push(req.headers);
+      return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+    }) as unknown as typeof fetch;
+    const c = createMunimClient({ baseUrl: "http://sdk.test", storefrontKey: "sf_k", guestToken: async () => "guest-abc", fetch: fetchSpy });
+    await c.GET("/v1/storefront/outlets", {});
+    await createMunimClient({ baseUrl: "http://sdk.test", guestToken: "plain", fetch: fetchSpy }).GET("/v1/tenant", {});
+    expect(seen.map((h) => h.get(GUEST_TOKEN_HEADER))).toEqual(["guest-abc", "plain"]);
+    expect(seen[0]!.get(STOREFRONT_KEY_HEADER)).toBe("sf_k");
+    expect(seen[1]!.get(STOREFRONT_KEY_HEADER)).toBeNull();
   });
 });

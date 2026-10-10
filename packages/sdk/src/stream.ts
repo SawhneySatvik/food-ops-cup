@@ -111,8 +111,9 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /** Opens the stream and keeps it open until closed, aborted or refused. */
-/** core-api's guest header (auth/resolve.ts GUEST_TOKEN_HEADER; checked end-to-end by core-api's stream gate). */
-export const GUEST_TOKEN_HEADER = "X-Munim-Guest-Token";
+// Same header as the generated client's exported GUEST_TOKEN_HEADER (kept private here so the two exports never collide in
+// index.ts); core-api's stream gate checks it end-to-end.
+const GUEST_TOKEN_HEADER = "X-Munim-Guest-Token";
 
 export function openStream(opts: StreamOptions): StreamHandle {
   if ((opts.token === undefined) === (opts.guestToken === undefined)) throw new TypeError("openStream: set exactly one of token / guestToken");

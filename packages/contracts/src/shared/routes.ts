@@ -20,6 +20,9 @@ export type Route = {
   status: 200 | 201;
   pathParams?: Array<{ name: string; uuid: boolean }>;
   query?: QueryParam[];
+  /** storefront routes only: also reachable with a guest access token (`X-Munim-Guest-Token`, the one order whose
+   *  token it is) instead of a customer token. The generator documents the `guestToken` alternative. */
+  guest?: boolean;
   /** Extra non-2xx statuses this route documents beyond the shared 401/403/404/422. */
   conflict?: boolean;
   /** Schema name of this route's 409/422 body when it extends the shared `error` body. */

@@ -5,7 +5,14 @@ import { z } from "zod";
 import { IsoDateTime, OutletScope, Slug, Uuid7 } from "./primitives.ts";
 
 export const ColumnType = z.enum(["integer", "numeric", "text", "date", "timestamptz", "boolean", "uuid"]);
-export const SnapshotColumn = z.strictObject({ name: z.string().regex(/^[a-z_][a-z0-9_]*$/), type: ColumnType });
+/** `numeric_source` is the template's declared lineage for a numeric column ('core.<table>.<column>' or a
+ *  'count:'/'sum:' form, 0003): core-api returns the template's column objects as they are, so the contract names it
+ *  (R3-M5: the strict schema rejected every real snapshot response). */
+export const SnapshotColumn = z.strictObject({
+  name: z.string().regex(/^[a-z_][a-z0-9_]*$/),
+  type: ColumnType,
+  numeric_source: z.string().nullable().optional(),
+});
 export const Cell = z.union([z.string(), z.int(), z.boolean(), z.null()]);
 export const TemplateParams = z.record(
   z.string().regex(/^[a-z_][a-z0-9_]*$/),

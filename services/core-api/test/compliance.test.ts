@@ -335,3 +335,14 @@ describe("read shapes parse with the published contracts", () => {
     expect(body.items.length).toBeGreaterThan(0);
   });
 });
+
+describe("malformed command envelope (R3-M6)", () => {
+  it("valid JSON that is not an envelope is 422 invalid_payload; a body that is not JSON is 400 bad_request", async () => {
+    const bad = await e.call("POST", "/v1/compliance/licences", "owner", { nope: 1 });
+    expect(bad.status).toBe(422);
+    expect((await bad.json()).error.code).toBe("invalid_payload");
+    const none = await e.call("POST", "/v1/compliance/licences", "owner");
+    expect(none.status).toBe(400);
+    expect((await none.json()).error.code).toBe("bad_request");
+  });
+});

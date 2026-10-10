@@ -26,6 +26,21 @@ export function pascal(name: string): string {
     .join("");
 }
 
+/** Throws on a repeated operationId or a repeated "METHOD path" (path parameters compared as `{}`, so `{id}` and
+ *  `{order_id}` collide). Last-wins in the generator's `paths` map would otherwise hide the loser (R3-m1). */
+export function assertUniqueRoutes(routes: readonly Route[]): void {
+  const ops = new Set<string>();
+  const keys = new Map<string, string>();
+  for (const r of routes) {
+    if (ops.has(r.operationId)) throw new Error(`duplicate operationId '${r.operationId}'`);
+    ops.add(r.operationId);
+    const key = `${r.method.toUpperCase()} ${r.path.replace(/\{[^}]+\}/g, "{}")}`;
+    const prev = keys.get(key);
+    if (prev) throw new Error(`route ${key} is declared by both '${prev}' and '${r.operationId}'`);
+    keys.set(key, r.operationId);
+  }
+}
+
 export function moduleNames(): string[] {
   return readdirSync(SRC, { withFileTypes: true })
     .filter((d) => d.isDirectory() && existsSync(join(SRC, d.name, "index.ts")))
@@ -70,7 +85,6 @@ export async function loadRegistry(): Promise<Registry> {
     const hit = schemas.find(([n]) => n === `proposal.${t}`);
     if (!hit || hit[1] !== draftable(t)!.proposal) throw new Error(`draftable '${t}' must publish SCHEMAS['proposal.${t}'] = its .proposal`);
   }
-  const ops = routes.map((r) => r.operationId);
-  if (new Set(ops).size !== ops.length) throw new Error("duplicate operationId across modules");
+  assertUniqueRoutes(routes);
   return { modules, schemas, routes };
 }

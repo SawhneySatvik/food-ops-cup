@@ -1,10 +1,11 @@
 // The one error body (packages/contracts/src/shared/error.ts: {error: {code, message, reason_code}}).
 // `message` comes from the fixed table below, chosen by code — never from an exception, SQL error or model
 // output (One Guarantee: error channels carry no untrusted text).
-import type { ErrorResponse, ReasonCode } from "@munim/contracts";
+import { ERROR_CODES as CONTRACT_ERROR_CODES, type ErrorCode, type ErrorResponse, type ReasonCode } from "@munim/contracts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-const MESSAGES = {
+// `Record<ErrorCode, string>` (the contracts enum): a code missing here, or one not in the enum, fails typecheck.
+const MESSAGES: Record<ErrorCode, string> = {
   bad_request: "The request is not valid.",
   unauthenticated: "Sign in again.",
   forbidden: "You are not allowed to do this.",
@@ -38,8 +39,8 @@ const MESSAGES = {
   execution_failed: "Approved, but it could not be applied. Nothing was changed.",
   unavailable: "The service is unavailable.",
   internal: "Something went wrong.",
-} as const;
-export type ErrorCode = keyof typeof MESSAGES;
+};
+export type { ErrorCode };
 
 /** Fixed customer-facing text for the refusals a shopper or counter sees (storefront O2/O3 copy, B13). Chosen by
  *  reason code; parameters ({item}, {time}…) are resolved by the web app from the `order.refuse.*` keys. */
@@ -51,6 +52,8 @@ const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
   coupon_invalid: "This coupon is not valid.",
   coupon_cap_reached: "This coupon has reached its limit.",
   coupon_min_spend: "Spend a little more to use this coupon.",
+  coupon_expired: "This coupon has expired.",
+  coupon_out_of_scope: "This coupon does not apply to this order.",
   change_window_closed: "It's too late to change this order online. Please call the outlet.",
   not_applicable: "This does not apply here.",
   item_unavailable: "This item is not available.",
@@ -58,8 +61,18 @@ const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
   deal_changed: "A deal was updated. Please review your cart.",
   duplicate_invoice: "This supplier invoice number was already recorded.",
   guest_cannot_change: "Call the outlet to change this order",
+  price_above_mrp: "This price is above the printed maximum retail price.",
+  expired_batch: "This stock is past its expiry date and cannot be sold.",
+  preview_total_changed: "The total changed since the preview. Review it and try again.",
+  unit_mismatch: "The unit does not match the ingredient's base unit.",
+  tax_id_missing: "A tax registration number is needed for this.",
+  period_closed: "That period is closed; post it in an open period.",
+  model_blocked: "AI is switched off for this business.",
+  buyer_identity_required: "The buyer's name or tax number is needed for this sale.",
+  unknown_tax_class: "That tax class is not recognised.",
+  unknown_channel: "That sales channel is not recognised.",
 };
-export const ERROR_CODES = Object.keys(MESSAGES) as ErrorCode[];
+export const ERROR_CODES: readonly ErrorCode[] = CONTRACT_ERROR_CODES;
 
 const STATUS: Record<ErrorCode, ContentfulStatusCode> = {
   bad_request: 400,

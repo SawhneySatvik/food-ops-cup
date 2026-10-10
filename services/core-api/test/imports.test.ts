@@ -10,7 +10,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "@munim/config";
-import { ImportRunRowsResponse, ImportRunView, ImportsUploadResponse } from "@munim/contracts/imports";
+import { ImportRunRowsResponse, ImportRunView, ImportsFormatProposeResponse, ImportsRunsResponse, ImportsUploadResponse } from "@munim/contracts/imports";
 import { PACKS } from "@munim/contracts/packs";
 import { buildWorld, type TestDb, uuidv7, type World } from "@munim/db";
 import type { Hono } from "hono";
@@ -361,7 +361,7 @@ describe("mapping drafts: column renames + units only (R28)", () => {
   it("accepts renames + units: approved → saved under the decision; the layout then parses (2 ready, row 4 quarantined)", async () => {
     const res = await propose(good);
     expect(res.status).toBe(201);
-    const { draft_id } = await res.json();
+    const { draft_id } = ImportsFormatProposeResponse.parse(await res.json());
     const before = await formats();
     expect((await approve("IN", "owner", draft_id, "imports.format.approve.v1")).status).toBe(200);
     expect(await formats()).toBe(before + 1);
@@ -374,6 +374,7 @@ describe("mapping drafts: column renames + units only (R28)", () => {
     expect(created.status).toBe(201);
     const run = ImportRunView.parse(await created.json());
     expect(run).toMatchObject({ format_id: f.id, parser: null, status: "parsing" });
+    expect(ImportsRunsResponse.parse(await (await call("IN", "owner", "GET", "/v1/imports/runs")).json()).runs.map((r) => r.import_run_id)).toContain(run.import_run_id);
     expect(await parse("IN")).toMatchObject({ previewed: 1, failed: 0 });
     const rows = ImportRunRowsResponse.parse(await (await call("IN", "owner", "GET", `/v1/imports/runs/${run.import_run_id}/rows`)).json());
     expect(rows.staged.map((s) => [s.row_no, s.amount_minor])).toEqual([[2, 15000], [3, -2000]]);

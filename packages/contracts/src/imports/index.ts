@@ -101,7 +101,8 @@ export const ImportsRunsResponse = z.strictObject({ runs: z.array(ImportRunView)
 export const StagedRow = z.strictObject({
   row_no: z.int().positive(),
   target_table: z.string(),
-  data: z.record(z.string(), z.unknown()),
+  /** A parsed row: flat column -> scalar (renames + units only, R28; no nested values). */
+  data: z.record(z.string(), z.union([z.string(), z.int(), z.boolean(), z.null()])),
   amount_minor: MinorAmount.nullable(),
   external_ref: z.string().nullable(),
 });
