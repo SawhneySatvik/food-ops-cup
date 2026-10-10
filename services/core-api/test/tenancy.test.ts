@@ -53,6 +53,9 @@ async function onboard(o: { kind?: string; country?: string; outlet?: Record<str
   const b: Biz = { tenant: uuidv7(), owner: uuidv7(), outlet: uuidv7(), sub, email, token: tok(sub, email) };
   const r = await call("POST", "/v1/onboarding", b.token, onboardBody(b, o));
   expect(r.status).toBe(201);
+  // R1-m6: core mints the tenant id; the one sent in the payload is ignored.
+  b.tenant = (await r.json()).entity_id;
+  expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(1);
   return b;
 }
 
@@ -64,9 +67,13 @@ describe("onboarding requires a verified email (F2)", () => {
     const refused = await call("POST", "/v1/onboarding", b.token, body);
     expect(refused.status).toBe(422);
     expect((await refused.json()).error.code).toBe("invalid_payload");
-    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(0);
-    expect((await call("POST", "/v1/onboarding", tok(sub, email, true), body)).status).toBe(201);
-    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(1);
+    // The tenant id is minted by core, so "no tenant exists" is read off the person: no member row for this sign-in.
+    expect(await count(`SELECT count(*) n FROM core.member WHERE idp_sub = $1`, [sub])).toBe(0);
+    const made = await call("POST", "/v1/onboarding", tok(sub, email, true), body);
+    expect(made.status).toBe(201);
+    const minted = (await made.json()).entity_id as string;
+    expect(await count(`SELECT count(*) n FROM core.member WHERE idp_sub = $1 AND tenant_id = $2`, [sub, minted])).toBe(1);
+    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [minted])).toBe(1);
   });
 });
 
@@ -93,12 +100,12 @@ describe("defaults by kind × country (operator seam: tenancy.provision.v1 is se
   const IN_AGG = ["aggregator:swiggy", "aggregator:zomato"];
   const AU_AGG = ["aggregator:doordash", "aggregator:ubereats"];
   const cases = [
-    { kind: "restaurant", country: "IN", channels: 6, devices: 2, outletKind: "restaurant", prep: 15, lead: 20, agg: IN_AGG, cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 21 },
-    { kind: "cloud_kitchen", country: "IN", channels: 4, devices: 2, outletKind: "cloud_kitchen", prep: 20, lead: 30, agg: IN_AGG, cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 21 },
-    { kind: "shop", country: "IN", channels: 3, devices: 1, outletKind: "store", prep: 5, lead: 15, agg: [], cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 21 },
-    { kind: "restaurant", country: "AU", channels: 6, devices: 2, outletKind: "restaurant", prep: 15, lead: 20, agg: AU_AGG, cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 22 },
-    { kind: "cloud_kitchen", country: "AU", channels: 4, devices: 2, outletKind: "cloud_kitchen", prep: 20, lead: 30, agg: AU_AGG, cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 22 },
-    { kind: "shop", country: "AU", channels: 3, devices: 1, outletKind: "store", prep: 5, lead: 15, agg: [], cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 22 },
+    { kind: "restaurant", country: "IN", channels: 6, devices: 2, outletKind: "restaurant", prep: 15, lead: 20, agg: IN_AGG, cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 22 },
+    { kind: "cloud_kitchen", country: "IN", channels: 4, devices: 2, outletKind: "cloud_kitchen", prep: 20, lead: 30, agg: IN_AGG, cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 22 },
+    { kind: "shop", country: "IN", channels: 3, devices: 1, outletKind: "store", prep: 5, lead: 15, agg: [], cur: "INR", fy: 4, tz: "Asia/Kolkata", accounts: 22 },
+    { kind: "restaurant", country: "AU", channels: 6, devices: 2, outletKind: "restaurant", prep: 15, lead: 20, agg: AU_AGG, cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 23 },
+    { kind: "cloud_kitchen", country: "AU", channels: 4, devices: 2, outletKind: "cloud_kitchen", prep: 20, lead: 30, agg: AU_AGG, cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 23 },
+    { kind: "shop", country: "AU", channels: 3, devices: 1, outletKind: "store", prep: 5, lead: 15, agg: [], cur: "AUD", fy: 7, tz: "Australia/Melbourne", accounts: 23 },
   ] as const;
 
   it.each(cases)("$kind / $country → expected rows", async (x) => {
@@ -129,7 +136,7 @@ describe("defaults by kind × country (operator seam: tenancy.provision.v1 is se
     expect(await count(`SELECT count(*) n FROM core.device WHERE tenant_id = $1 AND kind = 'pos' AND invoice_series = 'POS1'`, [T])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.outlet_calendar WHERE tenant_id = $1 AND kind = 'weekly' AND opens_at = '09:00' AND closes_at = '22:00'`, [T])).toBe(7);
     expect(await count(`SELECT count(*) n FROM core.brand WHERE tenant_id = $1`, [T])).toBe(1);
-    // chart: the pack's accounts (IN 16, AU 17) + the 5 structural ones the packs do not define
+    // chart: the pack's accounts, hand-counted from IN.json / AU.json (IN 22, AU 23); the 5 structural codes (1110, 1250, 2050, 4900, 6900) are all in the packs already
     expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [T])).toBe(x.accounts);
     expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1`, [T])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.membership WHERE tenant_id = $1 AND role = 'owner'`, [T])).toBe(1);
@@ -146,17 +153,17 @@ describe("POST /v1/onboarding", () => {
     const a = await onboard({ kind: "restaurant", country: "IN", outlet: { tax_ids: { FSSAI: IN_FSSAI } } });
     expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1`, [a.tenant])).toBe(6);
     expect(await count(`SELECT count(*) n FROM core.device WHERE tenant_id = $1`, [a.tenant])).toBe(2);
-    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [a.tenant])).toBe(21);
+    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [a.tenant])).toBe(22);
     expect(await count(`SELECT count(*) n FROM core.outlet WHERE tenant_id = $1 AND tax_ids->>'FSSAI' = $2`, [a.tenant, IN_FSSAI])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1 AND id = $2 AND idp_sub = $3 AND email = $4`, [a.tenant, a.owner, a.sub, a.email])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1 AND onboarded_at IS NOT NULL AND created_by = $2`, [a.tenant, a.owner])).toBe(1);
     // The audit entry names the person who asked, not an operator.
     expect(await count(`SELECT count(*) n FROM core.audit_log WHERE tenant_id = $1 AND actor->>'id' = $2 AND actor->>'kind' = 'member'`, [a.tenant, a.owner])).toBe(3);
-    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1 AND origin->>'command_type' = 'tenancy.onboard.v1'`, [a.tenant])).toBe(21);
+    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1 AND origin->>'command_type' = 'tenancy.onboard.v1'`, [a.tenant])).toBe(22);
     const s = await onboard({ kind: "shop", country: "AU", outlet: { tax_ids: { ABN: "12345678901" } } });
     expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1`, [s.tenant])).toBe(3);
     expect(await count(`SELECT count(*) n FROM core.device WHERE tenant_id = $1`, [s.tenant])).toBe(1);
-    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [s.tenant])).toBe(22);
+    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [s.tenant])).toBe(23);
     expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1 AND base_currency = 'AUD' AND fy_start_month = 7`, [s.tenant])).toBe(1);
     // requireMember works on the very next request.
     expect((await call("GET", "/v1/tenant", a.token, undefined, a.tenant)).status).toBe(200);
@@ -171,38 +178,62 @@ describe("POST /v1/onboarding", () => {
     expect([first.status, second.status]).toEqual([201, 201]);
     expect(second.headers.get("X-Munim-Replayed")).toBe("true");
     expect(first.headers.get("X-Munim-Replayed")).toBeNull();
-    expect(await second.text()).toBe(await first.text());
-    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(1);
-    expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1`, [b.tenant])).toBe(6);
+    const firstText = await first.text();
+    expect(await second.text()).toBe(firstText);
+    // R1-m6: a replay returns the same minted id, and it is not the client's.
+    const minted = JSON.parse(firstText).entity_id as string;
+    expect(minted).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(minted).not.toBe(b.tenant);
+    expect((await (await call("POST", "/v1/onboarding", b.token, body)).json()).entity_id).toBe(minted);
+    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [minted])).toBe(1);
+    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(0);
+    expect(await count(`SELECT count(*) n FROM core.member WHERE idp_sub = $1`, [b.sub])).toBe(1);
+    expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1`, [minted])).toBe(6);
+    // The same person with a NEW idempotency key gets a new tenant of their own.
+    const again = await call("POST", "/v1/onboarding", b.token, onboardBody({ tenant: b.tenant, owner: uuidv7(), outlet: uuidv7() }, { key: `retry2-${uuidv7()}` }));
+    expect(again.status).toBe(201);
+    expect((await again.json()).entity_id).not.toBe(minted);
   });
 
-  it("an existing tenant id with a fresh key is refused 409 and changes nothing (no takeover)", async () => {
+  it("R1-m6: sending an existing tenant's id is not a takeover and not an error — 201, a fresh tenant of the caller's own, same response shape", async () => {
     const a = await onboard();
     const before = await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1`, [a.tenant]);
+    const fresh = await call("POST", "/v1/onboarding", tok(`f-${uuidv7()}`, "f@example.test"), onboardBody({ tenant: uuidv7(), owner: uuidv7(), outlet: uuidv7() }));
+    expect(fresh.status).toBe(201);
+    const freshBody = await fresh.json();
+    const sub = `x-${uuidv7()}`;
     const intruder = { tenant: a.tenant, owner: uuidv7(), outlet: uuidv7() };
-    const r = await call("POST", "/v1/onboarding", tok(`x-${uuidv7()}`, "x@example.test"), onboardBody(intruder));
-    expect(r.status).toBe(409);
+    const r = await call("POST", "/v1/onboarding", tok(sub, "x@example.test"), onboardBody(intruder));
+    expect(r.status).toBe(201);
+    const body = await r.json();
+    expect(Object.keys(body).sort()).toEqual(Object.keys(freshBody).sort());
+    expect(body.entity_id).not.toBe(a.tenant);
     expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1`, [a.tenant])).toBe(before);
+    expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1 AND idp_sub = $2 AND id = $3`, [body.entity_id, sub, intruder.owner])).toBe(1);
   });
 
   it("refusals paired with accepts: bad FSSAI 422 (0 rows), missing FSSAI accepted; zone outside the pack 422; unknown country 422; no token 401", async () => {
     const bad = { tenant: uuidv7(), owner: uuidv7(), outlet: uuidv7() };
-    const t = tok(`o-${uuidv7()}`, "bad@example.test");
+    const sub = `o-${uuidv7()}`;
+    const t = tok(sub, "bad@example.test");
+    const nobody = () => count(`SELECT count(*) n FROM core.member WHERE idp_sub = $1`, [sub]);
     const r1 = await call("POST", "/v1/onboarding", t, onboardBody(bad, { outlet: { tax_ids: { FSSAI: "123" } } }));
     expect(r1.status).toBe(422);
     expect((await r1.json()).refs).toEqual(["tax_id:FSSAI"]);
-    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [bad.tenant])).toBe(0);
+    expect(await nobody()).toBe(0);
     const r2 = await call("POST", "/v1/onboarding", t, onboardBody(bad, { outlet: { tz: "Australia/Sydney" } }));
     expect(r2.status).toBe(422);
     const r3 = await call("POST", "/v1/onboarding", t, onboardBody(bad, { country: "ZZ" }));
     expect(r3.status).toBe(422);
     expect((await r3.json()).error.code).toBe("out_of_pack_scope");
-    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [bad.tenant])).toBe(0);
+    expect(await nobody()).toBe(0);
     expect((await call("POST", "/v1/onboarding", null, onboardBody(bad))).status).toBe(401);
     // accepts: no tax ids at all (ON3 "optional") and a valid pack zone
     const ok = await call("POST", "/v1/onboarding", t, onboardBody(bad, { outlet: { tz: "Asia/Kolkata" } }));
     expect(ok.status).toBe(201);
-    expect(await count(`SELECT count(*) n FROM core.outlet WHERE tenant_id = $1 AND tax_ids = '{}'::jsonb`, [bad.tenant])).toBe(1);
+    const minted = (await ok.json()).entity_id as string;
+    expect(await nobody()).toBe(1);
+    expect(await count(`SELECT count(*) n FROM core.outlet WHERE tenant_id = $1 AND tax_ids = '{}'::jsonb`, [minted])).toBe(1);
   });
 
   it("GET /v1/me/tenants lists the tenants this sign-in belongs to (and none for a stranger)", async () => {
@@ -265,7 +296,7 @@ describe("the T-031 operator route over the seam (wire shape: no outlet)", () =>
       { tenant_id: T, name: "Provisioned Biz", country_code: "AU", is_demo: false, owner: { member_id: owner, name: "Provisioned Owner", email } }));
     expect(r.status).toBe(201);
     expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1 AND country_code = 'AU' AND base_currency = 'AUD' AND onboarded_at IS NULL`, [T])).toBe(1);
-    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [T])).toBe(22);
+    expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [T])).toBe(23);
     expect(await count(`SELECT count(*) n FROM core.outlet WHERE tenant_id = $1`, [T])).toBe(0);
     // the owner signs in for the first time → bind, then set up the outlet and finish
     const t = tok(sub, email);
@@ -368,7 +399,7 @@ describe("storefront keys", () => {
     const keyId = uuidv7();
     const r = await call("POST", "/v1/storefront-keys", a.token, { key_id: keyId, channel_id: channel, allowed_origins: ["https://shop.example.test"] }, a.tenant);
     expect(r.status).toBe(201);
-    const { key } = await r.json();
+    const { key } = SCHEMAS["tenancy.storefront-key.created"].parse(await r.json());
     expect(key).toMatch(/^sfk_[A-Za-z0-9_-]{43}$/);
     // stored: exactly sha256(key) hex; the raw value is nowhere in the tenant's rows
     const hash = createHash("sha256").update(key).digest("hex");
@@ -378,13 +409,16 @@ describe("storefront keys", () => {
     expect(await count(`SELECT count(*) n FROM core.outbox WHERE tenant_id = $1 AND (outbox::text LIKE '%' || $2 || '%')`, [a.tenant, key])).toBe(0);
     expect(await count(`SELECT count(*) n FROM core.storefront_key WHERE storefront_key::text LIKE '%' || $1 || '%'`, [key])).toBe(0);
     // the list never carries key material
-    expect(JSON.stringify(await (await call("GET", "/v1/storefront-keys", a.token, undefined, a.tenant)).json())).not.toContain(key);
+    const listed = await (await call("GET", "/v1/storefront-keys", a.token, undefined, a.tenant)).json();
+    expect(JSON.stringify(listed)).not.toContain(key);
+    expect(JSON.stringify(SCHEMAS["tenancy.storefront-key.list"].parse(listed))).toContain(keyId);
     // it resolves: requireCustomer on the key → 200
     const via = (k: string) => probe.request("/probe", { headers: { "X-Munim-Storefront-Key": k } });
     expect((await via(key)).status).toBe(200);
     // revoke → 404 at once; revoking twice is a stable success
     const rv = await call("POST", `/v1/storefront-keys/${keyId}:revoke`, a.token, undefined, a.tenant);
     expect(rv.status).toBe(200);
+    SCHEMAS["tenancy.storefront-key.revoked"].parse(await rv.json());
     expect((await via(key)).status).toBe(404);
     expect((await call("POST", `/v1/storefront-keys/${keyId}:revoke`, a.token, undefined, a.tenant)).status).toBe(200);
     // another tenant's owner cannot revoke or see it
@@ -437,6 +471,12 @@ describe("outlet authority (MB001)", () => {
     // twin: hours on A change all 7 days
     expect((await upd(mgr, a.outlet, { hours: { opens: "10:00", closes: "20:00" } })).status).toBe(200);
     expect(await count(`SELECT count(*) n FROM core.outlet_calendar WHERE outlet_id = $1 AND opens_at = '10:00' AND closes_at = '20:00'`, [a.outlet])).toBe(7);
+    // R1-M2: each of the 7 calendar rows is audited on its own, as it was and as it is (hand: 09:00–22:00 → 10:00–20:00).
+    const cal = (await db.admin<{ before: { opens_at: string; closes_at: string; weekday: number }; after: { opens_at: string; closes_at: string; weekday: number } }>(
+      `SELECT l.before, l.after FROM core.audit_log l JOIN core.outlet_calendar k ON k.tenant_id = l.tenant_id AND k.id::text = l.entity_id
+        WHERE l.tenant_id = $1 AND l.entity = 'core.outlet_calendar' AND k.outlet_id = $2 ORDER BY (l.after->>'weekday')::int`, [a.tenant, a.outlet])).rows;
+    expect(cal.map((r) => [r.before.weekday, r.before.opens_at, r.before.closes_at, r.after.weekday, r.after.opens_at, r.after.closes_at]))
+      .toEqual([0, 1, 2, 3, 4, 5, 6].map((d) => [d, "09:00:00", "22:00:00", d, "10:00:00", "20:00:00"]));
     // staff: role not listed → 403
     expect((await upd(staff, a.outlet, { accepting_orders: "paused" })).status).toBe(403);
     // devices: manager registers on A, not on B; a KDS with an invoice series is a 422

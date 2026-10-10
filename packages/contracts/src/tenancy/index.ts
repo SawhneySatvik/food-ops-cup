@@ -72,10 +72,14 @@ const Hours = z.strictObject({ opens: LocalTime, closes: LocalTime }).refine((h)
 
 /** `POST /v1/onboarding` (signed-in person, no tenant yet): one call creates tenant + first outlet + owner
  *  membership + the pack-and-kind defaults and sets `onboarded_at` — country is fixed from here on (R30).
- *  Ids the retry must reuse are the client's (same envelope twice → one tenant). Currency, FY start and the
+ *  `tenant_id` is IGNORED (R1-m6): core mints the tenant id from sha256("munim.onboard", verified sub,
+ *  idempotency_key) as a UUIDv7 and returns it as `entity_id` in the 201 result; the same envelope twice returns
+ *  the same id, a new idempotency key from the same person makes a new tenant. `owner_member_id` and `outlet_id`
+ *  are still the client's. Currency, FY start and the
  *  default time zone come from the country pack, never from this payload. The owner's email comes from the
  *  verified IdP identity. */
 export const TenancyOnboardV1 = z.strictObject({
+  /** Ignored by core (R1-m6); kept so the envelope shape stays stable. The minted id is `entity_id` of the result. */
   tenant_id: Uuid7,
   owner_member_id: Uuid7,
   outlet_id: Uuid7,

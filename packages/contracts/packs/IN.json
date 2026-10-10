@@ -1,7 +1,7 @@
 {
   "code": "IN",
-  "version": 1,
-  "effective_from": "2026-10-01",
+  "version": 2,
+  "effective_from": "2026-10-10",
   "name": "India",
   "locale": "en-IN",
   "currency": {

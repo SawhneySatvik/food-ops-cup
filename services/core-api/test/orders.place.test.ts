@@ -152,7 +152,7 @@ describe("preview (R40 C1)", () => {
     expect(body.lines[0]!.price_ref).toMatch(/^⟨cite:row:core\.price:/);
     expect(body.lines[0]!.option_refs).toEqual([`⟨cite:row:core.option:${env.menu.chutney}⟩`]);
     expect(body.lines[0]!.coupon_refs).toEqual([`⟨cite:row:core.coupon:${env.menu.save10}⟩`]);
-    expect(body.tax_rule).toEqual({ pack_code: "IN", pack_version: 1 });
+    expect(body.tax_rule).toEqual({ pack_code: "IN", pack_version: 2 });
     expect(await counts()).toEqual(before);
 
     const place = { ...placePayload(env, [], {}), ...previewReq(), device_id: null, table_ref: null, external_ref: null, client_totals: null, preview_total_minor: 25516,

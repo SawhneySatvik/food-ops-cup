@@ -1,5 +1,5 @@
 // T-024 gate — R40 C7 expired-sale override where the country pack ALLOWS it. This file's database clone gets a
-// test-only IN pack version 2 identical to the seeded one except `expired_sale_override: true` (the real IN and AU
+// test-only IN pack version 3 identical to the seeded one except `expired_sale_override: true` (the real IN and AU
 // packs keep false; inventory.test.ts proves the refusal there). Then: staff cannot issue (403, 0 rows); a manager
 // issues one for one cart line and batch; the pick draws the expired batch for THAT line only; placement consumes
 // it once and the movement cites it; a second use is refused by the database (MB005). Synthetic data only.
@@ -43,8 +43,9 @@ const issue = (who: Who, override_id: string, cart_line_id: string, qty_milli = 
 beforeAll(async () => {
   db = await openDb();
   // Test-only pack version (this clone only): the seeded IN document with the override allowed.
-  const v2 = { ...PACKS.IN, version: 2, expired_sale_override: true };
-  await db.admin(`INSERT INTO platform.country_pack (code, version, effective_from, doc, status) VALUES ('IN', 2, '2026-01-01', $1, 'active')`, [JSON.stringify(v2)]);
+  // One above whatever version the repo's pack carries (the seeded one), so it is the version in force.
+  const v2 = { ...PACKS.IN, version: PACKS.IN!.version + 1, expired_sale_override: true };
+  await db.admin(`INSERT INTO platform.country_pack (code, version, effective_from, doc, status) VALUES ('IN', $2, '2026-01-01', $1, 'active')`, [JSON.stringify(v2), v2.version]);
   const w = await buildWorld(db);
   Object.assign(T, { tenant: w.tenant, owner: w.owner, staff: w.staff, outlets: w.outlets, channel: w.channel, currency: w.currency });
   await db.withContext("munim_core", own("tenancy.member.invite.v1"), async (c) => {

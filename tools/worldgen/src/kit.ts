@@ -29,14 +29,15 @@ export interface OnboardSpec {
 /** ON1–ON3 as the owner: one onboarding call, then the extra outlets, each with its POS device. */
 export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
   const { api } = c;
-  const tenant = api.id("tenant");
+  const tenant = api.id("tenant"); // sent for the envelope shape only
   const first = api.id("outlet:1");
-  await api.cmd("owner", "/v1/onboarding", "tenancy.onboard.v1", "onboard", {
+  // R1-m6: the payload's tenant_id is ignored; core mints the tenant and returns it as entity_id. Logged under an alias.
+  const minted = await api.cmd("owner", "/v1/onboarding", "tenancy.onboard.v1", "onboard", {
     tenant_id: tenant, owner_member_id: api.id("member:owner"), outlet_id: first, owner_name: spec.ownerName, business_name: spec.business,
     kind: spec.kind, country_code: spec.country,
     outlet: { name: spec.outlet.name, address: spec.outlet.address, ...(spec.outlet.tz ? { tz: spec.outlet.tz } : {}), tax_ids: spec.outlet.taxIds },
   }, { noTenant: true });
-  api.tenantId = tenant;
+  api.tenantId = api.alias(String(minted.body.entity_id), "tenant");
   const [defaultTz] = ((await api.get("owner", "/v1/outlets")).outlets as J[]).map((o) => o.tz as string);
   const outlets: OutletInfo[] = [{ id: first, name: spec.outlet.name, tz: defaultTz!, device: null }];
   for (const [i, o] of (spec.more ?? []).entries()) {

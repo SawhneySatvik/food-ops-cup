@@ -188,16 +188,16 @@ describe("other config targets", () => {
 
   it("country pack: a new version needs a future start and the next version number; the schema is enforced", async () => {
     const packs = await (await call("GET", "/platform/v1/country-packs", OP1)).json();
-    expect(packs.items.map((p: { code: string; version: number }) => `${p.code}${p.version}`).sort()).toEqual(["AU1", "IN1"]);
-    const cur = await (await call("GET", "/platform/v1/country-packs/IN/1", OP1)).json();
+    expect(packs.items.map((p: { code: string; version: number }) => `${p.code}${p.version}`).sort()).toEqual(["AU2", "IN2"]);
+    const cur = await (await call("GET", "/platform/v1/country-packs/IN/2", OP1)).json();
     expect(cur.doc.code).toBe("IN");
-    const doc = { ...cur.doc, version: 2, effective_from: "2027-04-01" };
+    const doc = { ...cur.doc, version: 3, effective_from: "2027-04-01" };
     expect((await propose("country_pack:IN", { effective_from: "2020-01-01", doc: { ...doc, effective_from: "2020-01-01" } })).status).toBe(422); // past
     expect((await propose("country_pack:IN", { effective_from: "2027-04-01", doc: { ...doc, currency: "x" } })).status).toBe(422); // schema
     const d = await (await propose("country_pack:IN", { effective_from: "2027-04-01", doc })).json();
     expect((await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {})).status).toBe(200);
-    expect((await db.admin("SELECT version FROM platform.country_pack WHERE code = 'IN' ORDER BY version")).rows.map((r) => r.version)).toEqual([1, 2]);
-    const skip = await (await propose("country_pack:IN", { effective_from: "2027-05-01", doc: { ...doc, version: 4, effective_from: "2027-05-01" } })).json();
+    expect((await db.admin("SELECT version FROM platform.country_pack WHERE code = 'IN' ORDER BY version")).rows.map((r) => r.version)).toEqual([2, 3]);
+    const skip = await (await propose("country_pack:IN", { effective_from: "2027-05-01", doc: { ...doc, version: 5, effective_from: "2027-05-01" } })).json();
     expect((await call("POST", `/platform/v1/config-drafts/${skip.id}:approve`, OP1, {})).status).toBe(409);
   });
 
