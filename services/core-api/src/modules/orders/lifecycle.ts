@@ -230,8 +230,15 @@ export async function applyReprice(c: Queryable, orderId: string, q: RepriceQuot
     return before.unit_price_minor === after.unit_price_minor && before.line_discount_minor === after.line_discount_minor && before.tax_minor === after.tax_minor
       ? [] : [{ id: w.id, l, before, after }];
   });
+  // R2-S3-7: each coupon's new share is written to its use row (core.coupon_use), under the same rule as the header.
+  const uses = (await c.query<{ id: string; coupon_id: string; discount_minor: string }>(
+    `SELECT id, coupon_id, discount_minor FROM core.coupon_use WHERE order_id = $1`, [orderId])).rows;
+  const split = q.cart.priced.coupons.flatMap((k) => {
+    const u = uses.find((x) => x.coupon_id === k.coupon_id);
+    return u && Number(u.discount_minor) !== k.discount_minor ? [{ id: u.id, before: Number(u.discount_minor), after: k.discount_minor }] : [];
+  });
   const t = q.cart.totals;
-  if (!moved.length && t.total_minor === q.header.total_minor && t.tax_minor === q.header.tax_minor && t.discount_minor === q.header.discount_minor) return [];
+  if (!moved.length && !split.length && t.total_minor === q.header.total_minor && t.tax_minor === q.header.tax_minor && t.discount_minor === q.header.discount_minor) return [];
   const snapshot = {
     ...q.snapshot,
     repriced: {
@@ -250,9 +257,11 @@ export async function applyReprice(c: Queryable, orderId: string, q: RepriceQuot
       await c.query(`UPDATE core.order_line SET unit_price_minor = $2, line_discount_minor = $3, tax_minor = $4 WHERE id = $1`,
         [m.id, m.after.unit_price_minor, m.after.line_discount_minor, m.after.tax_minor]);
     }
+    for (const k of split) await c.query(`UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`, [k.id, k.after]);
   });
   return [
     { entity: "core.order", entityId: orderId, action: "orders.reprice", before: q.header, after: { ...t, judged_at: q.at } },
     ...moved.map((m) => ({ entity: "core.order_line", entityId: m.id, action: "orders.reprice", before: m.before, after: m.after })),
+    ...split.map((k) => ({ entity: "core.coupon_use", entityId: k.id, action: "orders.reprice", before: { discount_minor: k.before }, after: { discount_minor: k.after } })),
   ];
 }

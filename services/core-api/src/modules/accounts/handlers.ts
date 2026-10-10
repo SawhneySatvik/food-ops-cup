@@ -4,7 +4,6 @@
 // Audit entries carry ids and flags only — never a name, phone, email or token: audit_log is append-only and
 // must stay clean after an erasure.
 import type { CommandEnvelope } from "@munim/contracts";
-import { asSystem } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AuditEntry, CommandHandler, HandlerOutput } from "../../commit/index.ts";
 
@@ -45,25 +44,16 @@ export function linkHandler(spec: LinkSpec): CommandHandler {
       }
 
       if (spec.claimHash) {
-        // Visible only because the claim context carries the token's hash (0014 customer_scope on core.order).
-        const hit = (await c.query<{ id: string; customer_id: string | null }>(
-          `SELECT id, customer_id FROM core."order" WHERE guest_access_hash = decode($1, 'hex')`, [spec.claimHash])).rows;
-        const o = hit.length === 1 ? hit[0]! : undefined;
-        // An order already claimed (or merged) is unreachable here: 0016 clears its hash whenever customer_id changes.
-        if (!o) throw new ApiError("not_found");
-        if (o.customer_id !== null) {
-          // Only a guest checkout's order is claimable: an order already on another signed-in profile stays
-          // there (a leaked tracker link must not move someone's history). Core-owned check, nothing returned.
-          const owner = await asSystem(c, async () => (await c.query<{ guest: boolean }>(
-            `SELECT (is_guest AND idp_sub IS NULL AND erased_at IS NULL) AS guest FROM core.customer WHERE id = $1`,
-            [o.customer_id])).rows[0]);
-          if (!owner?.guest) throw new ApiError("not_found");
+        // The database does the claim (0017 C1): it proves the token, refuses an order on a signed-in profile,
+        // moves the order and its coupon uses, and marks the emptied guest profile merged so erasure reaches it (R41).
+        const rows = (await c.query<{ entity: string; entity_id: string; from_customer_id: string | null }>(
+          `SELECT entity, entity_id, from_customer_id FROM core.customer_claim_guest_token()`)).rows;
+        if (rows.length === 0) throw new ApiError("not_found");
+        for (const m of rows) {
+          audit.push(m.entity === "core.customer"
+            ? { entity: m.entity, entityId: m.entity_id, before: { merged_into: null }, after: { merged_into: spec.customerId, claimed_by: "guest_token" } }
+            : { entity: m.entity, entityId: m.entity_id, before: { customer_id: m.from_customer_id }, after: { customer_id: spec.customerId, claimed_by: "guest_token" } });
         }
-        const upd = await c.query(
-          `UPDATE core."order" SET customer_id = $1 WHERE id = $2 AND guest_access_hash = decode($3, 'hex')`,
-          [spec.customerId, o.id, spec.claimHash]);
-        if (upd.rowCount !== 1) throw new ApiError("not_found");
-        audit.push({ entity: "core.order", entityId: o.id, before: { customer_id: o.customer_id }, after: { customer_id: spec.customerId, claimed_by: "guest_token" } });
       }
 
       if (spec.emailVerified && spec.email !== null) {
