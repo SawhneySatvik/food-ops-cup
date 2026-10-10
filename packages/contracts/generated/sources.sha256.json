@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "3ebef6f8291b2d5a7d4af727e7a4796668a20a3a6a0fe02f9815f0956373e568",
+    "sha256": "bb68c6c87522171f86d9a75f3b0928a7ece903c139cef34e4cb834ebf62a0af6",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "669cb95b3cf0ed0452b51113788374c99565ae6570a19572c58599a898ffbb14",
@@ -23,10 +23,10 @@
       "src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
       "src/kitchen/index.ts": "0460742d82450f81b04e80516fda544a9c0de38a3d14e8d926c9164b6e69589e",
       "src/orders/events.ts": "a3f258b8fe2dbb025a8403b76f533e8b047ecdf636db4a179acef54d66034c7c",
-      "src/orders/index.ts": "da620aae80ff0e6eef9e1d35f3c9082488b03c9269244dcf875b63f9923d9413",
-      "src/orders/routes.ts": "e84efe4c59e1fbad597fe0526bbd755336f2b6a8580f45935730cf3dedd110d8",
+      "src/orders/index.ts": "28ccbc475d19131742f3fa4dee49d95e8c1d323ccf111f57233d1f1c97657279",
+      "src/orders/routes.ts": "4e4fc1a6a3400652ebebb860be735a83e0ff676f74cf150eb1ce812a46816168",
       "src/packs/index.ts": "fefeb6495c4655f1e92da5e34991a7b7f4813fcf38d29c1d96bb79f07baf0e3d",
-      "src/people/index.ts": "cced801fc60782d5dc5759cd2b1f4f6c5a6fbee017ad9f421464f8150b6a324c",
+      "src/people/index.ts": "abbd29d234da9a66350d46d33c9896ced5dc4f868434ccdfd609a9e418eb1c77",
       "src/platform/index.ts": "dfb8eb040fd8863acfbd9477e34b0c1da03f3f186b7694e781e2a056a9b61ef0",
       "src/purchasing/index.ts": "a69fbf03acf1f40e74d96f1be7eafc31e3c39b645d96a34fd0273c82879882ce",
       "src/registry.ts": "c452c0a7eaccd8574b3cc14c973321352f63cf9f209974cfa22b5d72d6519794",
@@ -47,11 +47,11 @@
       "src/shared/snapshot.ts": "145bdb41ff0a3be6b2d6f3ffc11e43282f93ba526e04a0a6af7f4618f42d1d67",
       "src/shared/trace.ts": "840307850bf41af292d4e4f8b8f76bb2f68d3d45f74ec3d02b012d855347ae61",
       "src/storefront/index.ts": "6ac919e01057bc30d332685f0691ebbc2eea4115cbdf5b5fe3cc4725e450f809",
-      "src/tenancy/index.ts": "4976fb9d0ea469b815fd4e37cf76d4b48f2f6503d59bc25d4aa863c8e239d801"
+      "src/tenancy/index.ts": "aad6d0ee2783f87390462dcc6d55143ed0a5d701a960a1560ceb35283064fd71"
     }
   },
   "outputs": {
-    "sha256": "31169e9c1e997eb8d83583ac3e8f2ab71abc451235413dd0867814377ab836ab",
+    "sha256": "56f818a03f4711971dd4bbf4c0834be67583f3095edc33600da306ec6256eb29",
     "files": {
       "packages/contracts/generated/json-schema/answer-envelope.schema.json": "4a1485c36995d06d77b6cb165153b72963a44a6f02571dba118358a32b88466d",
       "packages/contracts/generated/json-schema/catalogue.availability.set.v1.schema.json": "57ffc2bb35cd2f831177981991b9c6de63c88d4342762d873e29a56003399faa",
@@ -149,6 +149,9 @@
       "packages/contracts/generated/json-schema/munim.orders.tender.recorded.v1.schema.json": "6d7f2ead5b89f7176c2981c98cdc10a0e1047f345a8743f435c19b88221c97b4",
       "packages/contracts/generated/json-schema/munim.orders.void.recorded.v1.schema.json": "fc93cbeec5e0822a550c265339304bd142243a4c36494897c09bfa025f9e7f78",
       "packages/contracts/generated/json-schema/munim.purchasing.po.committed.v1.schema.json": "999a8accb5aae8581198437081c25387bf2e8b53415b852615d6d0aaf3fb7a44",
+      "packages/contracts/generated/json-schema/orders.order.accept.v1.schema.json": "a899316319dbbf3b060a9eeb5ad31f28badd87c5e10b59ff49380c5fb2971a41",
+      "packages/contracts/generated/json-schema/orders.order.advance.v1.schema.json": "c40c9d18909f8cc0b2b0422f1b68ce688f4ed11716cd595026bd3b3bc5be7b6d",
+      "packages/contracts/generated/json-schema/orders.order.reject.v1.schema.json": "ec57bc100ff0ed22946de853947271e876401fc65b0499c334db6eac515175d5",
       "packages/contracts/generated/json-schema/orders.pickup_window.generate.v1.schema.json": "511d7bf7ebc015c33fffe836c687dcfb0a9bc4675b2cba9751e1ace4ed4f5d08",
       "packages/contracts/generated/json-schema/orders.place.guest-response.schema.json": "e821a507b990b694fa5467a33330a3c336e432bff7a9a3b94f42ce65acb757f6",
       "packages/contracts/generated/json-schema/orders.place.v1.schema.json": "b3f3d8cd94a84960165c34201f538890473276fe66f7bd8eaecd1387f2a7ecfc",
@@ -164,6 +167,7 @@
       "packages/contracts/generated/json-schema/people.attendance.record.v1.schema.json": "2a45a4698f7c89e93e3cd6253ff9aa0fdf66db6fd6aac51264db99f8929833c5",
       "packages/contracts/generated/json-schema/people.candidate.upsert.v1.schema.json": "4b991fce28ecd99460bb7a2093e1736485cb3028a33d4e4af24ee9e20894bd7e",
       "packages/contracts/generated/json-schema/people.payroll_draft.create.v1.schema.json": "6bb0f170fd69ecd071725889ece29eb7eb02c672599791c95e8df2ced4601267",
+      "packages/contracts/generated/json-schema/people.payroll_draft.status.v1.schema.json": "9263303a69661ff00c70fdfd818f7413a81216255a9535724ca645c608683d13",
       "packages/contracts/generated/json-schema/people.roster.create.v1.schema.json": "60d588d98191160a5a6f25f2fa0a198b6bd108877f890458165bc6656715be6d",
       "packages/contracts/generated/json-schema/people.roster.update.v1.schema.json": "d45f3fdd9c2b033ac7d336c46815e5fee32852b235bf9be8d571d060ce13a9e0",
       "packages/contracts/generated/json-schema/people.staff.upsert.v1.schema.json": "05b9b7caf2112eeffbeb8fcae5cb2fd11fc286666fd82c5472725b2c4a7dea74",
@@ -243,7 +247,9 @@
       "packages/contracts/generated/json-schema/tenancy.device.register.v1.schema.json": "bd692d359a10e7eac75d0b7329ef5a0c57ec273abf6a6ec764da0499f7050bad",
       "packages/contracts/generated/json-schema/tenancy.me.tenants.schema.json": "627b8ff3c101218cc24c796fe4710022e09acaf4d061cfabf8143bc1f90fb717",
       "packages/contracts/generated/json-schema/tenancy.member.bind.v1.schema.json": "e20579c112d2587247c991c15692e917ad6c3ccc9996925ada03051e3159187c",
+      "packages/contracts/generated/json-schema/tenancy.member.deactivate.v1.schema.json": "05582337edf1cafe1ed88a07b971967ba9e28366e13afe5fd1ff0e4fd503ff90",
       "packages/contracts/generated/json-schema/tenancy.member.invite.v1.schema.json": "66e323e0480b4873ba80bd9eede56bf94d199f5a5814ab2666600971dd039945",
+      "packages/contracts/generated/json-schema/tenancy.member.role.set.v1.schema.json": "2f0f45108b2a495c05b4562923d9084a7b88f3cae91c3d0801e7111dc6a68891",
       "packages/contracts/generated/json-schema/tenancy.onboard.v1.schema.json": "0647ae88d78fb7998442bae67843eff7df36d13f279900aa0bd6c4ca6c503461",
       "packages/contracts/generated/json-schema/tenancy.outlet.create.v1.schema.json": "a1e818c21b74e25e0d92275bedadecd6fad38682de0378d9c601226920e14e27",
       "packages/contracts/generated/json-schema/tenancy.outlet.update.v1.schema.json": "cfba1ad478f507fd50988388f9367c2d63a4c315eb8b80985bc2f399842db374",
@@ -325,13 +331,13 @@
       "packages/contracts/generated/json-schema/v1.tenant.schema.json": "1d04bb7506cdcb0eb5066be95c6dfcef91f53322fe6b4e78dbec08ab0331296e",
       "packages/contracts/generated/json-schema/v1.tender.schema.json": "e638960dcc8b99b0645fb6ae2136135c8544b851fd75aef79ebd810496ac198a",
       "packages/contracts/generated/json-schema/v1.traces.response.schema.json": "d00c5fa552239872f7dcdb0fe1811fb1f01b32bc02de619cf4459da903c901f9",
-      "packages/contracts/generated/openapi/internal.json": "852b0ca89663cb0196d4af4fed9a55b8b6d88bad771b2be43d2075ed03be4a4d",
-      "packages/contracts/generated/openapi/public.json": "61f112f754b4eceb073fd43c61d89bb2d3d8bab397a3ed3441a6e7f997aa66ff",
-      "packages/sdk/src/gen/client.ts": "ef7910769182e6c6e75dce89205bf00b8a9a294225e6c5bd9f2b2e8a2f5739cc",
-      "packages/sdk/src/gen/openapi.ts": "186e862f60b51cce980177ecc71cea3e6c3ffc0981307ff0db4ee39ebdf1b6a1",
+      "packages/contracts/generated/openapi/internal.json": "5c21f9763e194762b5b314a56d04f244c607a50a8069b2aaba58d4162b2bba23",
+      "packages/contracts/generated/openapi/public.json": "a54aaed1ff39492e50426c970e75997479860b2f650aadbfc9868d777a42b061",
+      "packages/sdk/src/gen/client.ts": "99cded99d5be4c3e5aa5ddd5b482af238c3f142434286a3a22202dbc8f3e2e9f",
+      "packages/sdk/src/gen/openapi.ts": "132b87f2a826761bf5d0a7f5458640b693d880cbc694e6524af6565da6da7861",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "8698f6148b498613f8acbee623a996273e46bc1156a36e2b52ca93a1f2d29b6b",
-      "services/intel/munim_intel/contracts_gen/names.py": "c6fb32b7b831d09660745383eec0a30ec489552944a83bc23c9bdfe8a7b1fd82"
+      "services/intel/munim_intel/contracts_gen/models.py": "dd4a32c4af1bba80e82f8ec24501e960bdfd5ca24e694f6c7189beb6d70592ef",
+      "services/intel/munim_intel/contracts_gen/names.py": "bba84a1f2562de1c15f30cb13c20c5e807497dfcf1f4f9e68fa96f332fd66ef2"
     }
   }
 }

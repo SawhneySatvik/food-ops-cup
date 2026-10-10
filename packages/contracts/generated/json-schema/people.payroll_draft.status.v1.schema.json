@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "people.payroll_draft.status.v1",
+  "title": "PeoplePayrollDraftStatusV1",
+  "x-munim-module": "people",
+  "type": "object",
+  "properties": {
+    "payroll_draft_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "paid_externally",
+        "void"
+      ]
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "payroll_draft_id",
+    "status",
+    "reason_code"
+  ],
+  "additionalProperties": false
+}

@@ -9769,6 +9769,396 @@
         }
       }
     },
+    "/v1/orders/{id}:accept": {
+      "post": {
+        "operationId": "acceptOrder",
+        "summary": "Accept a placed order",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "OrdersOrderAcceptV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "orders.order.accept.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/OrdersOrderAcceptV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders/{id}:reject": {
+      "post": {
+        "operationId": "rejectOrder",
+        "summary": "Reject a placed order with a reason code; consumed stock, redeemed points and the pickup slot are given back",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "OrdersOrderRejectV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "orders.order.reject.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/OrdersOrderRejectV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orders/{id}:advance": {
+      "post": {
+        "operationId": "advanceOrder",
+        "summary": "Move an order one step (preparing, ready, completed, or cancelled with a reason); completion derives loyalty earn and the sale's journal entry",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "OrdersOrderAdvanceV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "orders.order.advance.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/OrdersOrderAdvanceV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/orders/{id}:push-back": {
       "post": {
         "operationId": "pushBackOrder",
@@ -11164,6 +11554,136 @@
                   },
                   "payload": {
                     "$ref": "#/components/schemas/PeoplePayrollDraftCreateV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1PeopleCommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/people/payroll-drafts/{id}:status": {
+      "post": {
+        "operationId": "peoplePayrollDraftStatus",
+        "summary": "Mark an approved payroll paid outside Munim, or void it with a reason (reverses its journal entry; owner)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "PeoplePayrollDraftStatusV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "people.payroll_draft.status.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/PeoplePayrollDraftStatusV1"
                   }
                 },
                 "required": [
@@ -17108,6 +17628,266 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{id}:set-role": {
+      "post": {
+        "operationId": "setMemberRole",
+        "summary": "tenancy.member.role.set.v1 — change another member's role and outlet scope (owner)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "TenancyMemberRoleSetV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "tenancy.member.role.set.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/TenancyMemberRoleSetV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/members/{id}:deactivate": {
+      "post": {
+        "operationId": "deactivateMember",
+        "summary": "tenancy.member.deactivate.v1 — deactivate another member; their sign-in stops resolving, their records stay (owner)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "TenancyMemberDeactivateV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "tenancy.member.deactivate.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/TenancyMemberDeactivateV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -35909,6 +36689,91 @@
         ],
         "additionalProperties": false
       },
+      "OrdersOrderAcceptV1": {
+        "title": "OrdersOrderAcceptV1",
+        "x-munim-contract": "orders.order.accept.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "OrdersOrderRejectV1": {
+        "title": "OrdersOrderRejectV1",
+        "x-munim-contract": "orders.order.reject.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          }
+        },
+        "required": [
+          "order_id",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
+      "OrdersOrderAdvanceV1": {
+        "title": "OrdersOrderAdvanceV1",
+        "x-munim-contract": "orders.order.advance.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "from_status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "accepted",
+              "rejected",
+              "preparing",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "to_status": {
+            "type": "string",
+            "enum": [
+              "preparing",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "order_id",
+          "from_status",
+          "to_status",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
       "V1Order": {
         "title": "V1Order",
         "x-munim-contract": "v1.order",
@@ -37594,6 +38459,41 @@
           "period_month",
           "currency",
           "lines"
+        ],
+        "additionalProperties": false
+      },
+      "PeoplePayrollDraftStatusV1": {
+        "title": "PeoplePayrollDraftStatusV1",
+        "x-munim-contract": "people.payroll_draft.status.v1",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "payroll_draft_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid_externally",
+              "void"
+            ]
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "payroll_draft_id",
+          "status",
+          "reason_code"
         ],
         "additionalProperties": false
       },
@@ -43024,6 +43924,53 @@
       "TenancyMemberBindV1": {
         "title": "TenancyMemberBindV1",
         "x-munim-contract": "tenancy.member.bind.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "member_id"
+        ],
+        "additionalProperties": false
+      },
+      "TenancyMemberRoleSetV1": {
+        "title": "TenancyMemberRoleSetV1",
+        "x-munim-contract": "tenancy.member.role.set.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "manager",
+              "staff",
+              "advisor"
+            ]
+          },
+          "outlet_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        },
+        "required": [
+          "member_id",
+          "role",
+          "outlet_ids"
+        ],
+        "additionalProperties": false
+      },
+      "TenancyMemberDeactivateV1": {
+        "title": "TenancyMemberDeactivateV1",
+        "x-munim-contract": "tenancy.member.deactivate.v1",
         "x-munim-module": "tenancy",
         "type": "object",
         "properties": {

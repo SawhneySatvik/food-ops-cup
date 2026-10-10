@@ -1476,6 +1476,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orders/{id}:accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a placed order */
+        post: operations["acceptOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/{id}:reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a placed order with a reason code; consumed stock, redeemed points and the pickup slot are given back */
+        post: operations["rejectOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/{id}:advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move an order one step (preparing, ready, completed, or cancelled with a reason); completion derives loyalty earn and the sale's journal entry */
+        post: operations["advanceOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orders/{id}:push-back": {
         parameters: {
             query?: never;
@@ -1674,6 +1725,23 @@ export interface paths {
         put?: never;
         /** Record an approved payroll draft (IN only) */
         post: operations["peoplePayrollDraftCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/people/payroll-drafts/{id}:status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an approved payroll paid outside Munim, or void it with a reason (reverses its journal entry; owner) */
+        post: operations["peoplePayrollDraftStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2603,6 +2671,40 @@ export interface paths {
         get: operations["listMembers"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{id}:set-role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** tenancy.member.role.set.v1 — change another member's role and outlet scope (owner) */
+        post: operations["setMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{id}:deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** tenancy.member.deactivate.v1 — deactivate another member; their sign-in stops resolving, their records stay (owner) */
+        post: operations["deactivateMember"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5884,6 +5986,24 @@ export interface components {
             shift_id: components["schemas"]["Uuid7"];
             counted_cash_minor: number;
         };
+        /** OrdersOrderAcceptV1 */
+        OrdersOrderAcceptV1: {
+            order_id: components["schemas"]["Uuid7"];
+        };
+        /** OrdersOrderRejectV1 */
+        OrdersOrderRejectV1: {
+            order_id: components["schemas"]["Uuid7"];
+            reason_code: string;
+        };
+        /** OrdersOrderAdvanceV1 */
+        OrdersOrderAdvanceV1: {
+            order_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            from_status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
+            /** @enum {string} */
+            to_status: "preparing" | "ready" | "completed" | "cancelled";
+            reason_code: string | null;
+        };
         /** V1Order */
         V1Order: {
             order_id: components["schemas"]["Uuid7"];
@@ -6186,6 +6306,13 @@ export interface components {
                 tips_minor: number;
                 net_minor: number;
             }[];
+        };
+        /** PeoplePayrollDraftStatusV1 */
+        PeoplePayrollDraftStatusV1: {
+            payroll_draft_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            status: "paid_externally" | "void";
+            reason_code: string | null;
         };
         /** PeopleAdvanceRecordV1 */
         PeopleAdvanceRecordV1: {
@@ -7239,6 +7366,17 @@ export interface components {
         };
         /** TenancyMemberBindV1 */
         TenancyMemberBindV1: {
+            member_id: components["schemas"]["Uuid7"];
+        };
+        /** TenancyMemberRoleSetV1 */
+        TenancyMemberRoleSetV1: {
+            member_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            role: "owner" | "manager" | "staff" | "advisor";
+            outlet_ids: components["schemas"]["Uuid7"][];
+        };
+        /** TenancyMemberDeactivateV1 */
+        TenancyMemberDeactivateV1: {
             member_id: components["schemas"]["Uuid7"];
         };
         /** DemoSessionStartV1 */
@@ -13941,6 +14079,243 @@ export interface operations {
             };
         };
     };
+    acceptOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "orders.order.accept.v1";
+                    payload: components["schemas"]["OrdersOrderAcceptV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rejectOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "orders.order.reject.v1";
+                    payload: components["schemas"]["OrdersOrderRejectV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    advanceOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "orders.order.advance.v1";
+                    payload: components["schemas"]["OrdersOrderAdvanceV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     pushBackOrder: {
         parameters: {
             query?: never;
@@ -14813,6 +15188,85 @@ export interface operations {
                     /** @constant */
                     type: "people.payroll_draft.create.v1";
                     payload: components["schemas"]["PeoplePayrollDraftCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peoplePayrollDraftStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "people.payroll_draft.status.v1";
+                    payload: components["schemas"]["PeoplePayrollDraftStatusV1"];
                 };
             };
         };
@@ -19138,6 +19592,164 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "tenancy.member.role.set.v1";
+                    payload: components["schemas"]["TenancyMemberRoleSetV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deactivateMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "tenancy.member.deactivate.v1";
+                    payload: components["schemas"]["TenancyMemberDeactivateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

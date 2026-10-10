@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orders.order.advance.v1",
+  "title": "OrdersOrderAdvanceV1",
+  "x-munim-module": "orders",
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "from_status": {
+      "type": "string",
+      "enum": [
+        "placed",
+        "accepted",
+        "rejected",
+        "preparing",
+        "ready",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "to_status": {
+      "type": "string",
+      "enum": [
+        "preparing",
+        "ready",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "order_id",
+    "from_status",
+    "to_status",
+    "reason_code"
+  ],
+  "additionalProperties": false
+}

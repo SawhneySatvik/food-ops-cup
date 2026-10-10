@@ -19240,6 +19240,91 @@
         ],
         "additionalProperties": false
       },
+      "OrdersOrderAcceptV1": {
+        "title": "OrdersOrderAcceptV1",
+        "x-munim-contract": "orders.order.accept.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      },
+      "OrdersOrderRejectV1": {
+        "title": "OrdersOrderRejectV1",
+        "x-munim-contract": "orders.order.reject.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          }
+        },
+        "required": [
+          "order_id",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
+      "OrdersOrderAdvanceV1": {
+        "title": "OrdersOrderAdvanceV1",
+        "x-munim-contract": "orders.order.advance.v1",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "from_status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "accepted",
+              "rejected",
+              "preparing",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "to_status": {
+            "type": "string",
+            "enum": [
+              "preparing",
+              "ready",
+              "completed",
+              "cancelled"
+            ]
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "order_id",
+          "from_status",
+          "to_status",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
       "V1Order": {
         "title": "V1Order",
         "x-munim-contract": "v1.order",
@@ -20925,6 +21010,41 @@
           "period_month",
           "currency",
           "lines"
+        ],
+        "additionalProperties": false
+      },
+      "PeoplePayrollDraftStatusV1": {
+        "title": "PeoplePayrollDraftStatusV1",
+        "x-munim-contract": "people.payroll_draft.status.v1",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "payroll_draft_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid_externally",
+              "void"
+            ]
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "payroll_draft_id",
+          "status",
+          "reason_code"
         ],
         "additionalProperties": false
       },
@@ -26355,6 +26475,53 @@
       "TenancyMemberBindV1": {
         "title": "TenancyMemberBindV1",
         "x-munim-contract": "tenancy.member.bind.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "member_id"
+        ],
+        "additionalProperties": false
+      },
+      "TenancyMemberRoleSetV1": {
+        "title": "TenancyMemberRoleSetV1",
+        "x-munim-contract": "tenancy.member.role.set.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "manager",
+              "staff",
+              "advisor"
+            ]
+          },
+          "outlet_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        },
+        "required": [
+          "member_id",
+          "role",
+          "outlet_ids"
+        ],
+        "additionalProperties": false
+      },
+      "TenancyMemberDeactivateV1": {
+        "title": "TenancyMemberDeactivateV1",
+        "x-munim-contract": "tenancy.member.deactivate.v1",
         "x-munim-module": "tenancy",
         "type": "object",
         "properties": {

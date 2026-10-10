@@ -4558,6 +4558,10 @@ class RoundingMinor(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
+class ReasonCode1(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
 class InvoiceFy(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
@@ -5651,6 +5655,22 @@ class TenancyTenantUpdateV1(BaseModel):
 
 
 class TenancyMemberBindV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    member_id: Uuid7
+
+
+class TenancyMemberRoleSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    member_id: Uuid7
+    role: Literal['owner', 'manager', 'staff', 'advisor']
+    outlet_ids: list[Uuid7]
+
+
+class TenancyMemberDeactivateV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -9110,6 +9130,31 @@ class OrdersShiftCloseV1(BaseModel):
     counted_cash_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
+class OrdersOrderAcceptV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+
+
+class OrdersOrderRejectV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class OrdersOrderAdvanceV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    from_status: Literal['placed', 'accepted', 'rejected', 'preparing', 'ready', 'completed', 'cancelled']
+    to_status: Literal['preparing', 'ready', 'completed', 'cancelled']
+    reason_code: ReasonCode1 | None
+
+
 class Line41(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -9326,6 +9371,15 @@ class PeoplePayrollDraftCreateV1(BaseModel):
     period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     lines: Annotated[list[Line43], Field(min_length=1)]
+
+
+class PeoplePayrollDraftStatusV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Uuid7
+    status: Literal['paid_externally', 'void']
+    reason_code: ReasonCode1 | None
 
 
 class PeopleAdvanceRecordV1(BaseModel):

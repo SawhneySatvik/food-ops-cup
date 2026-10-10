@@ -139,6 +139,9 @@ export const OPERATIONS = [
   "POST /v1/orders",
   "GET /v1/orders/{id}",
   "GET /v1/orders/{id}/receipt",
+  "POST /v1/orders/{id}:accept",
+  "POST /v1/orders/{id}:reject",
+  "POST /v1/orders/{id}:advance",
   "POST /v1/orders/{id}:push-back",
   "POST /v1/orders/{id}/tenders",
   "POST /v1/orders/{id}/voids",
@@ -151,6 +154,7 @@ export const OPERATIONS = [
   "POST /v1/people/rosters:update",
   "POST /v1/people/attendance",
   "POST /v1/people/payroll-drafts",
+  "POST /v1/people/payroll-drafts/{id}:status",
   "POST /v1/people/advances",
   "POST /v1/people/tip-pools",
   "POST /v1/people/training",
@@ -217,5 +221,7 @@ export const OPERATIONS = [
   "GET /v1/channels",
   "GET /v1/devices",
   "GET /v1/members",
+  "POST /v1/members/{id}:set-role",
+  "POST /v1/members/{id}:deactivate",
   "POST /v1/storefront-keys/{id}:revoke"
 ] as const;
