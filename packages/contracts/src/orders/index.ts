@@ -4,7 +4,8 @@ import { z } from "zod";
 import { CountryCode, CouponCode, CurrencyCode, IsoDate, IsoDateTime, LocalTime, MinorAmount, Money, QtyMilli, Slug, Uuid7 } from "../shared/primitives.ts";
 import { ReasonCode } from "../shared/reason-codes.ts";
 import { CiteRef } from "../shared/refs.ts";
-import type { Route } from "../shared/routes.ts";
+import { CommandResult } from "../shared/command.ts";
+import { ROUTES as ORDER_ROUTES } from "./routes.ts";
 
 export const OrderKind = z.enum(["dine_in", "takeaway", "pickup", "delivery"]);
 
@@ -26,6 +27,9 @@ export const OrdersPlaceV1 = z.strictObject({
   lines: z
     .array(
       z.strictObject({
+        /** Client-generated order_line id (02-schema §0). An expired-sale override is bound to it before placement
+         *  (0014 #49: override.cart_line_id = this id; placement consumes the override once). */
+        line_id: Uuid7,
         item_id: Uuid7,
         variant_id: Uuid7.nullable(),
         option_ids: z.array(Uuid7),
@@ -173,6 +177,146 @@ export const TenderView = z
       ctx.addIssue({ code: "custom", path: ["change_minor"], message: "change_minor = tendered_minor − amount_minor" });
   });
 
+// ── Order lifecycle commands (T-022). Every one writes only its seeded command's target_tables (0007/0014).
+
+/** The kitchen pushes the promised time back (R4 §E 13). Re-judges deals at the new time through core's one
+ *  pricing function (rule 9); a changed total is applied under the `orders.reprice` derivation while the order
+ *  is `placed`/`accepted`. `from_promised_at` is the optimistic guard (stale → 409). The reason is a code from
+ *  the KDS list, never free text (it reaches the customer's tracker). */
+export const OrdersPromisePushBackV1 = z.strictObject({
+  order_id: Uuid7,
+  from_promised_at: IsoDateTime.nullable(),
+  to_promised_at: IsoDateTime,
+  reason_code: Slug,
+});
+
+/** A void with reason (before tender: a line or the whole order). Core computes `amount_minor` (the value
+ *  written off) from the order / order-line row; the payload carries no amount. */
+export const OrdersVoidRecordV1 = z.strictObject({
+  void_id: Uuid7,
+  order_id: Uuid7,
+  /** null = the whole order. */
+  order_line_id: Uuid7.nullable(),
+  reason_code: Slug,
+  note: z.string().min(1).max(500),
+});
+
+/** A refund recorded against an order (money handed back outside Munim — recorded, never processed). Within
+ *  what was paid for the order less earlier refunds; within the member's command authority. */
+export const OrdersRefundRecordV1 = z.strictObject({
+  refund_id: Uuid7,
+  order_id: Uuid7,
+  /** The tender refunded; null = not tied to one tender. Method defaults to that tender's. */
+  tender_id: Uuid7.nullable(),
+  method: TenderMethod,
+  amount_minor: MinorAmount.positive(),
+  currency: CurrencyCode,
+  reason_code: Slug,
+  note: z.string().min(1).max(500),
+});
+
+export const OrdersShiftOpenV1 = z.strictObject({
+  shift_id: Uuid7,
+  outlet_id: Uuid7,
+  /** The POS device whose drawer this is; null = the outlet's only drawer. */
+  device_id: Uuid7.nullable(),
+  float_minor: MinorAmount.nonnegative(),
+  currency: CurrencyCode,
+});
+
+/** Close with the counted cash. Core computes expected cash (float + cash tenders − cash refunds of the
+ *  drawer's orders in the shift window) and the variance; the payload carries only the count. */
+export const OrdersShiftCloseV1 = z.strictObject({
+  shift_id: Uuid7,
+  counted_cash_minor: MinorAmount.nonnegative(),
+});
+
+export const OrderStatus = z.enum(["placed", "accepted", "rejected", "preparing", "ready", "completed", "cancelled"]);
+
+/** core.order with its lines and tenders, as read back (row fields, R26). `paid_minor` and `remaining_minor`
+ *  are computed by core from this order row and its tender/refund rows in the same read (R40 C1). */
+export const OrderView = z.strictObject({
+  order_id: Uuid7,
+  outlet_id: Uuid7,
+  channel_id: Uuid7,
+  device_id: Uuid7.nullable(),
+  kind: OrderKind,
+  table_ref: z.string().nullable(),
+  status: OrderStatus,
+  business_date: IsoDate,
+  ticket_no: z.int().min(1),
+  invoice_fy: z.int().nullable(),
+  invoice_no: z.int().nullable(),
+  promised_at: IsoDateTime.nullable(),
+  pickup_window_id: Uuid7.nullable(),
+  subtotal_minor: MinorAmount,
+  discount_minor: MinorAmount,
+  tax_minor: MinorAmount,
+  total_minor: MinorAmount,
+  /** Loyalty points' value applied to this order (INFERENCE: points are a means of payment, not a discount). */
+  loyalty_minor: MinorAmount.nonnegative(),
+  paid_minor: MinorAmount.nonnegative(),
+  remaining_minor: MinorAmount.nonnegative(),
+  currency: CurrencyCode,
+  lines: z.array(z.strictObject({
+    line_id: Uuid7,
+    line_no: z.int().min(1),
+    item_id: Uuid7,
+    variant_id: Uuid7.nullable(),
+    option_ids: z.array(Uuid7),
+    qty_milli: QtyMilli.positive(),
+    unit_price_minor: MinorAmount,
+    line_discount_minor: MinorAmount,
+    tax_minor: MinorAmount,
+  })),
+  tenders: z.array(TenderView),
+  created_at: IsoDateTime,
+});
+
+/** The bill as the pack prints it (core-domain buildReceipt over the stored order): an IN/AU tax invoice, or
+ *  for an IN aggregator order under Sec 9(5) a record-only receipt (no invoice number, no tax lines). Every
+ *  number is re-derived from the order's rows and must equal the stored totals (core refuses to print otherwise). */
+const TaxAmount = z.strictObject({ code: z.string().min(1).max(20), rate_bp: z.int().min(0), amount_minor: MinorAmount });
+export const ReceiptView = z.strictObject({
+  order_id: Uuid7,
+  kind: z.enum(["tax_invoice", "record"]),
+  title: z.string(),
+  /** The aggregator's display name on a record receipt; null on a tax invoice. */
+  operator: z.string().nullable(),
+  seller: z.strictObject({ name: z.string(), address: z.string() }),
+  tax_ids: z.array(z.strictObject({ code: z.string(), label: z.string(), value: z.string() })),
+  /** Device series + gapless number for a tax invoice; the external ref or ticket number on a record. */
+  number: z.string().min(1),
+  date: z.string().min(1),
+  currency: CurrencyCode,
+  lines: z.array(z.strictObject({
+    line_no: z.int().min(1),
+    item_id: Uuid7,
+    name_key: Slug,
+    qty_milli: QtyMilli.positive(),
+    unit_price_minor: MinorAmount,
+    amount_minor: MinorAmount,
+    discount_minor: MinorAmount,
+    net_minor: MinorAmount,
+    tax_minor: MinorAmount,
+    total_minor: MinorAmount,
+    tax_class: Slug,
+    components: z.array(TaxAmount),
+  })),
+  net_minor: MinorAmount,
+  tax_minor: MinorAmount,
+  total_minor: MinorAmount,
+  components: z.array(TaxAmount),
+});
+
+/** What a storefront placement returns (T-032 route over the `placeOrder` seam): the stored command result and,
+ *  for a guest only and only on the first response, the one-time order access token (only its sha256 is
+ *  stored; a replay returns null). */
+export const OrdersPlaceGuestResponse = z.strictObject({
+  result: CommandResult,
+  guest_access_token: z.string().min(16).max(256).nullable(),
+});
+
 export const SCHEMAS = {
   "orders.place.v1": OrdersPlaceV1,
   "orders.pickup_window.generate.v1": OrdersPickupWindowGenerateV1,
@@ -180,17 +324,14 @@ export const SCHEMAS = {
   "orders.preview.response": OrdersPreviewResponse,
   "orders.tender.record.v1": OrdersTenderRecordV1,
   "v1.tender": TenderView,
+  "orders.promise.push_back.v1": OrdersPromisePushBackV1,
+  "orders.void.record.v1": OrdersVoidRecordV1,
+  "orders.refund.record.v1": OrdersRefundRecordV1,
+  "orders.shift.open.v1": OrdersShiftOpenV1,
+  "orders.shift.close.v1": OrdersShiftCloseV1,
+  "v1.order": OrderView,
+  "v1.order.receipt": ReceiptView,
+  "orders.place.guest-response": OrdersPlaceGuestResponse,
 };
-export const ROUTES: readonly Route[] = [
-  {
-    surface: "public",
-    method: "post",
-    path: "/v1/orders:preview",
-    operationId: "previewOrder",
-    summary: "Price a cart with core's pricing function; writes nothing; labelled Preview (R40 C1)",
-    auth: "member",
-    request: "orders.preview.request",
-    response: "orders.preview.response",
-    status: 200,
-  },
-];
+export const ROUTES = ORDER_ROUTES;
+export { ORDER_EVENT_SCHEMAS } from "./events.ts";

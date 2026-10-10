@@ -1,0 +1,357 @@
+// T-022 gates — order lifecycle and money: status moves (conditional, min_role, #80 pairing), completion
+// derivations (fixture), MB001 (a kitchen command cannot change money), push-back re-judging deals, tenders and
+// cash rounding, voids, refunds within authority, shift close variance, receipts (IN tax invoice, Sec 9(5) record).
+// Every expected value is hand-written. Seams: local fakes (orders.kit.ts).
+import { localTime } from "@munim/core-domain/tz";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { executeCommand, verifyAuditChain } from "../src/commit/index.ts";
+import { svcTx } from "../src/commit/testkit.ts";
+import { withContext } from "../src/lib/db.ts";
+import { orderStatusHandler } from "../src/modules/orders/lifecycle.ts";
+import { placeOrder } from "../src/modules/orders/place.ts";
+import { type Env, installFakes, placePayload, POINT_MINOR, postCalls, startEnv, uuidv7, type Who } from "./orders.kit.ts";
+
+vi.mock("@munim/contracts/events", async (orig) => {
+  const actual = await orig<typeof import("@munim/contracts/events")>();
+  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
+  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
+});
+
+let env: Env;
+let undo: () => void;
+beforeAll(async () => {
+  env = await startEnv("IN");
+  undo = installFakes();
+});
+afterAll(async () => {
+  undo?.();
+  await env?.stop();
+});
+
+const ROLE: Record<Who, "owner" | "manager" | "staff"> = { owner: "owner", staff: "staff", mgr1: "manager", mgr2: "manager" };
+const scope = (who: Who) => (who === "owner" ? ("*" as const) : who === "mgr2" ? [env.w.outlets[1]] : [env.w.outlets[0]]);
+const ctxOf = (who: Who) => ({ tenant_id: env.w.tenant, outlet_ids: scope(who), role: ROLE[who], member_id: env.ids[who] });
+
+/** Order status moves run under kitchen.ticket.advance.v1 — the one seeded command writing core.order +
+ *  core.order_event (#41); no orders.* status command is seeded yet. */
+async function advance(who: Who, order_id: string, from_status: string, to_status: string, reason_code: string | null = null) {
+  try {
+    await executeCommand({ tx: (fn) => withContext(env.pools.core, ctxOf(who), fn), tenantId: env.w.tenant, actor: { kind: "member", id: env.ids[who], role: ROLE[who] } },
+      { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "kitchen.ticket.advance.v1", payload: { order_id, from_status, to_status, reason_code } },
+      orderStatusHandler("kitchen.ticket.advance.v1"));
+    return "ok";
+  } catch (e: any) {
+    return e.code ?? e.message;
+  }
+}
+
+async function place(who: Who, lines: Parameters<typeof placePayload>[1], extra: Record<string, unknown> = {}) {
+  const p = placePayload(env, lines, extra);
+  const r = await env.cmd("/v1/orders", who, "orders.place.v1", p);
+  expect(r.status).toBe(201);
+  return p.order_id;
+}
+/** Orders the gates changed with raw SQL probes (MB001), excluded from the clause-1 audit scan by name. */
+const rawFixtureWrites: string[] = [];
+const n = async (sql: string, params: unknown[]) => Number((await env.one<{ n: string }>(sql, params)).n);
+
+describe("status moves (rule 10)", () => {
+  it("follow the transition table, conditional on the current status; each order_event is paired with an outbox event (#80)", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    expect(await advance("staff", id, "placed", "ready")).toBe("illegal_transition");
+    expect(await advance("staff", id, "accepted", "preparing")).toBe("illegal_transition");
+    expect(await advance("staff", id, "placed", "accepted")).toBe("ok");
+    expect(await advance("staff", id, "placed", "accepted")).toBe("illegal_transition");
+    expect(await advance("staff", id, "accepted", "preparing")).toBe("ok");
+    expect(await advance("staff", id, "preparing", "ready")).toBe("ok");
+    expect(await advance("staff", id, "ready", "completed")).toBe("ok");
+    const events = await env.rows<{ from_status: string | null; to_status: string }>(`SELECT from_status, to_status FROM core.order_event WHERE order_id = $1 ORDER BY at, id`, [id]);
+    expect(events.map((e) => `${e.from_status}>${e.to_status}`)).toEqual(["null>placed", "placed>accepted", "accepted>preparing", "preparing>ready", "ready>completed"]);
+    const outbox = await env.rows<{ type: string }>(`SELECT type FROM core.outbox WHERE aggregateid = $1 AND type LIKE 'munim.orders.order.%' ORDER BY seq`, [id]);
+    expect(outbox.map((o) => o.type)).toEqual(["munim.orders.order.placed.v1", ...Array(4).fill("munim.orders.order.status_changed.v1")]);
+    expect(await advance("staff", id, "completed", "cancelled")).toBe("illegal_transition");
+  });
+
+  it("reject and cancel need a reason; an outlet-2 manager cannot move an outlet-1 order (404)", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    expect(await advance("staff", id, "placed", "rejected")).toBe("invalid_payload");
+    expect(await advance("mgr2", id, "placed", "accepted")).toBe("not_found");
+    expect(await advance("staff", id, "placed", "rejected", "too_busy")).toBe("ok");
+    expect((await env.one<{ reason: string }>(`SELECT reason FROM core.order_event WHERE order_id = $1 AND to_status = 'rejected'`, [id])).reason).toBe("too_busy");
+  });
+});
+
+describe("MB001: a kitchen command cannot change money", () => {
+  it("under kitchen.ticket.advance.v1 a total / snapshot change is refused with MB001; a status-only change under it and a money change under orders.reprice are admitted", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    rawFixtureWrites.push(id); // raw SQL below is the gate's own probe, not the orders path: no audit entry
+    const ctx = { ...ctxOf("staff"), command_type: "kitchen.ticket.advance.v1" };
+    const err = async (sql: string) => {
+      try {
+        await env.db.withContext("munim_core", ctx, (c) => c.query(sql, [id]));
+        return "ok";
+      } catch (e: any) {
+        return e.code;
+      }
+    };
+    expect(await err(`UPDATE core."order" SET total_minor = 1, subtotal_minor = 1, tax_minor = 0 WHERE id = $1`)).toBe("MB001");
+    expect(await err(`UPDATE core."order" SET pricing_snapshot = '{}' WHERE id = $1`)).toBe("MB001");
+    expect(await err(`UPDATE core."order" SET status = 'accepted' WHERE id = $1`)).toBe("ok");
+    const reprice = { ...ctx, posting_rule: "orders.reprice", source_ref: `core.order:${id}` };
+    await env.db.withContext("munim_core", reprice, (c) => c.query(`UPDATE core."order" SET subtotal_minor = 3000, tax_minor = 150, total_minor = 3150 WHERE id = $1`, [id]));
+    expect(Number((await env.one<{ t: string }>(`SELECT total_minor AS t FROM core."order" WHERE id = $1`, [id])).t)).toBe(3150);
+  });
+});
+
+describe("derivations (fixture): stock at placement (FEFO as sold), loyalty earn and the sale posting at completion", () => {
+  it("a customer order of 1 paneer tikka + 2 biscuits, 50 points redeemed: placement and completion write exactly the expected rows", async () => {
+    // Hand-written: paneer 32000 (+1600 tax), 2 biscuits 5000 (+900) → total 39500; 50 points × 100 = 5000 redeemed.
+    const principal = { kind: "customer" as const, tenant_id: env.w.tenant, channel_id: env.menu.pickupChannel, customer_id: env.w.customer, profile: true, sub: "cust-sub" };
+    const payload = placePayload(env, [{ item: env.menu.paneer }, { item: env.menu.biscuits, qty: 2000 }],
+      { channel_id: env.menu.pickupChannel, device_id: null, kind: "pickup", loyalty_redeem_points: 50 });
+    // The paneer price exists for the counter channel only; add the pickup price as the owner.
+    await env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "catalogue.price.set.v1" }, (c) =>
+      c.query(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from) VALUES ($1, $2, $3, $4, 'pickup', 32000, 'INR', 'restaurant_5', '2026-01-01')`,
+        [env.w.tenant, uuidv7(), env.menu.paneer, env.w.outlets[0]]));
+    const balance0 = Number((await env.one<{ b: string }>(`SELECT balance_after AS b FROM core.loyalty_entry WHERE customer_id = $1 ORDER BY seq DESC LIMIT 1`, [env.w.customer])).b);
+    const placed = await placeOrder({ deps: { pools: env.pools, log: () => {} }, principal },
+      { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "orders.place.v1", payload });
+    expect(placed.guest_access_token).toBeNull();
+    const id = payload.order_id;
+    const view = await (await env.call("GET", `/v1/orders/${id}`, "staff")).json();
+    expect([view.total_minor, view.loyalty_minor, view.remaining_minor]).toEqual([39500, 5000, 34500]);
+
+    const moves = () => env.rows<{ ingredient_id: string; batch_id: string | null; qty_milli: string; rule: string }>(
+      `SELECT ingredient_id, batch_id, qty_milli, origin ->> 'rule_id' AS rule FROM core.stock_movement WHERE ref_id = $1 ORDER BY qty_milli`, [id]);
+    const expectedMoves = [
+      { ingredient_id: env.w.ingredient, batch_id: null, qty_milli: "-150000", rule: "inventory.consume_order" },
+      { ingredient_id: env.menu.biscuitIngredient, batch_id: env.menu.biscuitBatch, qty_milli: "-2000", rule: "inventory.consume_sku" },
+    ];
+    expect(await moves()).toEqual(expectedMoves);
+    const rv = await env.rows<{ line_no: number; rv: string | null }>(`SELECT line_no, recipe_version_id AS rv FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [id]);
+    expect(rv.map((r) => r.rv !== null)).toEqual([true, false]);
+    expect(await n(`SELECT count(*) AS n FROM core.journal_entry WHERE source_id = $1`, [id])).toBe(0);
+    for (const [a, b] of [["placed", "accepted"], ["accepted", "preparing"], ["preparing", "ready"], ["ready", "completed"]]) expect(await advance("staff", id, a!, b!)).toBe("ok");
+
+    expect(await moves()).toEqual(expectedMoves);
+    const loyalty = await env.rows<{ kind: string; points: string; balance_after: string; rule: string | null }>(
+      `SELECT kind, points, balance_after, origin ->> 'rule_id' AS rule FROM core.loyalty_entry WHERE order_id = $1 ORDER BY seq`, [id]);
+    expect(loyalty).toEqual([
+      { kind: "redeem", points: "-50", balance_after: String(balance0 - 50), rule: null },
+      { kind: "earn", points: String(39500 / POINT_MINOR), balance_after: String(balance0 - 50 + 395), rule: "customers.loyalty_earn" },
+    ]);
+    const postings = await env.rows<{ amount_minor: string; rule: string }>(
+      `SELECT p.amount_minor, e.origin ->> 'rule_id' AS rule FROM core.journal_entry e JOIN core.posting p ON p.tenant_id = e.tenant_id AND p.journal_entry_id = e.id
+        WHERE e.source_id = $1 ORDER BY p.amount_minor`, [id]);
+    expect(postings).toEqual([{ amount_minor: "-39500", rule: "finance.post_order" }, { amount_minor: "39500", rule: "finance.post_order" }]);
+    expect(postCalls.filter((c) => c.source === `core.order:${id}`)).toEqual([{ rule: "finance.post_order", source: `core.order:${id}` }]);
+  });
+
+  it("cancel reverses the redeemed points and frees the pickup slot (placed → cancelled)", async () => {
+    const principal = { kind: "customer" as const, tenant_id: env.w.tenant, channel_id: env.menu.pickupChannel, customer_id: env.w.customer, profile: true, sub: "cust-sub" };
+    const payload = placePayload(env, [{ item: env.menu.dosa }], { channel_id: env.menu.pickupChannel, device_id: null, kind: "pickup", pickup_window_id: env.menu.window, loyalty_redeem_points: 10 });
+    const booked = async () => Number((await env.one<{ b: string }>(`SELECT booked AS b FROM core.pickup_window WHERE id = $1`, [env.menu.window])).b);
+    const b0 = await booked();
+    await placeOrder({ deps: { pools: env.pools, log: () => {} }, principal }, { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "orders.place.v1", payload });
+    expect(await booked()).toBe(b0 + 1);
+    expect(await advance("staff", payload.order_id, "placed", "cancelled", "customer_asked")).toBe("ok");
+    expect(await booked()).toBe(b0);
+    const e = await env.rows<{ kind: string; points: string }>(`SELECT kind, points FROM core.loyalty_entry WHERE order_id = $1 ORDER BY seq`, [payload.order_id]);
+    expect(e).toEqual([{ kind: "redeem", points: "-10" }, { kind: "reverse", points: "10" }]);
+  });
+});
+
+describe("push-back re-judges deals (rule 9)", () => {
+  it("a deal open at the first promise and closed at the new one: the order is re-priced under orders.reprice", async () => {
+    const at1 = new Date(Date.now() + 2 * 3600_000);
+    const at2 = new Date(at1.getTime() + 3 * 3600_000);
+    const tz = "Asia/Kolkata";
+    await env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "catalogue.deal.upsert.v1" }, (c) =>
+      c.query(`INSERT INTO core.deal (tenant_id, id, kind, name_key, rule, windows, valid_from) VALUES ($1, $2, 'percent_off', 'deal.thali_lunch', $3, $4, '2026-01-01')`,
+        [env.w.tenant, env.menu.lunchDeal, { kind: "percent_off", bp: 2000, item_ids: [env.menu.thali] },
+         JSON.stringify([{ days: [1, 2, 3, 4, 5, 6, 7], from: localTime(new Date(at1.getTime() - 1800_000), tz), to: localTime(new Date(at1.getTime() + 1800_000), tz) }])]));
+    const id = await place("staff", [{ item: env.menu.thali }], { channel_id: env.menu.pickupChannel, device_id: null, kind: "pickup", promised_at: at1.toISOString() });
+    // Hand-written: 20000 − 20% = 16000, tax 2 × 400 → 16800.
+    expect(Number((await env.one<{ t: string }>(`SELECT total_minor AS t FROM core."order" WHERE id = $1`, [id])).t)).toBe(16800);
+    const r = await env.cmd(`/v1/orders/${id}:push-back`, "staff", "orders.promise.push_back.v1",
+      { order_id: id, from_promised_at: at1.toISOString(), to_promised_at: at2.toISOString(), reason_code: "kitchen_busy" });
+    expect(r.status).toBe(200);
+    // Deal closed at at2: 20000 + 2 × 500 → 21000.
+    const o = await env.one<Record<string, string>>(`SELECT subtotal_minor, discount_minor, tax_minor, total_minor, promised_at FROM core."order" WHERE id = $1`, [id]);
+    expect([o.subtotal_minor, o.discount_minor, o.tax_minor, o.total_minor].map(Number)).toEqual([20000, 0, 1000, 21000]);
+    expect(new Date(o.promised_at!).toISOString()).toBe(at2.toISOString());
+    expect(await n(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1 AND kind = 'promised_at' AND reason = 'kitchen_busy'`, [id])).toBe(1);
+    expect(await n(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type = 'munim.orders.order.promise_changed.v1'`, [id])).toBe(1);
+    // A stale guard (the old promise) is refused.
+    const stale = await env.cmd(`/v1/orders/${id}:push-back`, "staff", "orders.promise.push_back.v1",
+      { order_id: id, from_promised_at: at1.toISOString(), to_promised_at: new Date(at2.getTime() + 600_000).toISOString(), reason_code: "kitchen_busy" });
+    expect(stale.status).toBe(409);
+  });
+});
+
+describe("tenders (R40 C1, ruling #59)", () => {
+  it("cash rounds the due to the pack step (IN 100) and records rounding and change; card / UPI cannot exceed the due", async () => {
+    const id = await place("staff", [{ item: env.menu.dosa, options: [env.menu.chutney] }]); // total 14176
+    const t1 = uuidv7();
+    const bad = await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: id, method: "card", tendered_minor: null, amount_minor: 14177, currency: "INR", ref: null });
+    expect(bad.status).toBe(422);
+    const ok = await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: t1, order_id: id, method: "cash", tendered_minor: 20000, amount_minor: null, currency: "INR", ref: null });
+    expect(ok.status).toBe(200);
+    const t = await env.one<Record<string, string>>(`SELECT amount_minor, tendered_minor, change_minor, rounding_minor FROM core.tender WHERE id = $1`, [t1]);
+    expect([t.amount_minor, t.tendered_minor, t.change_minor, t.rounding_minor].map(Number)).toEqual([14200, 20000, 5800, 24]);
+    const view = await (await env.call("GET", `/v1/orders/${id}`, "staff")).json();
+    expect([view.paid_minor, view.remaining_minor]).toEqual([14176, 0]);
+    const more = await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: id, method: "upi", tendered_minor: null, amount_minor: 1, currency: "INR", ref: "UPI-1" });
+    expect(more.status).toBe(409);
+    expect(await n(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type = 'munim.orders.tender.recorded.v1'`, [t1])).toBe(1);
+  });
+
+  it("a part cash payment is not rounded; UPI pays the exact rest", async () => {
+    const id = await place("staff", [{ item: env.menu.dosa }]); // total 12600
+    await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: id, method: "cash", tendered_minor: 5000, amount_minor: null, currency: "INR", ref: null });
+    expect((await (await env.call("GET", `/v1/orders/${id}`, "staff")).json()).remaining_minor).toBe(7600);
+    expect((await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: id, method: "upi", tendered_minor: null, amount_minor: 7600, currency: "INR", ref: "UPI-2" })).status).toBe(200);
+    expect((await (await env.call("GET", `/v1/orders/${id}`, "staff")).json()).remaining_minor).toBe(0);
+  });
+});
+
+describe("voids and refunds with reason, within authority", () => {
+  it("a void before tender writes the line's own total; after a tender it is refused", async () => {
+    const id = await place("staff", [{ item: env.menu.dosa }, { item: env.menu.coffee }]);
+    const line = (await env.one<{ id: string }>(`SELECT id FROM core.order_line WHERE order_id = $1 AND line_no = 2`, [id])).id;
+    const staffTry = await env.cmd(`/v1/orders/${id}/voids`, "staff", "orders.void.record.v1", { void_id: uuidv7(), order_id: id, order_line_id: line, reason_code: "wrong_item", note: "rang up coffee" });
+    expect(staffTry.status).toBe(403);
+    const v = uuidv7();
+    expect((await env.cmd(`/v1/orders/${id}/voids`, "mgr1", "orders.void.record.v1", { void_id: v, order_id: id, order_line_id: line, reason_code: "wrong_item", note: "rang up coffee" })).status).toBe(200);
+    expect(Number((await env.one<{ a: string }>(`SELECT amount_minor AS a FROM core.void WHERE id = $1`, [v])).a)).toBe(4200);
+    await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: id, method: "card", tendered_minor: null, amount_minor: 1000, currency: "INR", ref: null });
+    expect((await env.cmd(`/v1/orders/${id}/voids`, "mgr1", "orders.void.record.v1", { void_id: uuidv7(), order_id: id, order_line_id: null, reason_code: "customer_left", note: "walked out" })).status).toBe(409);
+  });
+
+  it("staff refund: denied by role as seeded; with staff allowed and a 5000 cap (clone only): below cap 200, above cap 403, manager above cap 200", async () => {
+    const id = await place("staff", [{ item: env.menu.thali }]); // total 21000
+    const tender = uuidv7();
+    await env.cmd(`/v1/orders/${id}/tenders`, "staff", "orders.tender.record.v1", { tender_id: tender, order_id: id, method: "card", tendered_minor: null, amount_minor: 21000, currency: "INR", ref: "APPR-1" });
+    const refund = (who: Who, amount: number) => env.cmd(`/v1/orders/${id}/refunds`, who, "orders.refund.record.v1",
+      { refund_id: uuidv7(), order_id: id, tender_id: tender, method: "card", amount_minor: amount, currency: "INR", reason_code: "quality", note: "cold" });
+    const seeded = await refund("staff", 1000);
+    expect([seeded.status, (await seeded.json()).error.reason_code]).toEqual([403, "authority_denied"]);
+    // Pending migrator request: staff in allowed_roles + the cap. Applied to this test clone only.
+    await env.db.admin(`UPDATE core.command_authority SET allowed_roles = allowed_roles || ARRAY['staff'], max_amount_minor = 5000 WHERE command_type = 'orders.refund.record.v1'`);
+    expect((await refund("staff", 4000)).status).toBe(200);
+    const above = await refund("staff", 6000);
+    expect([above.status, (await above.json()).error.reason_code]).toEqual([403, "authority_denied"]);
+    expect((await refund("mgr1", 6000)).status).toBe(200);
+    // More than was paid less earlier refunds (21000 − 10000 = 11000 left) is refused.
+    expect((await refund("mgr1", 11001)).status).toBe(422);
+    expect(await n(`SELECT count(*) AS n FROM core.refund WHERE order_id = $1`, [id])).toBe(2);
+    expect(postCalls.filter((c) => c.rule === "finance.post_refund" && c.source.startsWith("core.refund:")).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("shift open / close and cash variance", () => {
+  it("expected cash = float + cash tender amounts − cash refunds of the drawer's orders; variance = counted − expected (hand value −400)", async () => {
+    const device = uuidv7();
+    await env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "tenancy.device.register.v1" }, (c) =>
+      c.query(`INSERT INTO core.device (tenant_id, id, outlet_id, kind, invoice_series) VALUES ($1, $2, $3, 'pos', 'POS3')`, [env.w.tenant, device, env.w.outlets[0]]));
+    const shift = uuidv7();
+    expect((await env.cmd("/v1/shifts", "staff", "orders.shift.open.v1", { shift_id: shift, outlet_id: env.w.outlets[0], device_id: device, float_minor: 200000, currency: "INR" })).status).toBe(200);
+    expect((await env.cmd("/v1/shifts", "staff", "orders.shift.open.v1", { shift_id: uuidv7(), outlet_id: env.w.outlets[0], device_id: device, float_minor: 0, currency: "INR" })).status).toBe(409);
+    const a = await place("staff", [{ item: env.menu.coffee }], { device_id: device }); // 4200
+    const b = await place("staff", [{ item: env.menu.dosa, options: [env.menu.chutney] }], { device_id: device }); // 14176 → cash 14200
+    const c = await place("staff", [{ item: env.menu.dosa }], { device_id: device }); // 12600 card (not cash)
+    const pay = (order: string, method: string, tendered: number | null, amount: number | null) =>
+      env.cmd(`/v1/orders/${order}/tenders`, "staff", "orders.tender.record.v1", { tender_id: uuidv7(), order_id: order, method, tendered_minor: tendered, amount_minor: amount, currency: "INR", ref: null });
+    expect((await pay(a, "cash", 5000, null)).status).toBe(200);
+    expect((await pay(b, "cash", 20000, null)).status).toBe(200);
+    expect((await pay(c, "card", null, 12600)).status).toBe(200);
+    expect((await env.cmd(`/v1/orders/${a}/refunds`, "mgr1", "orders.refund.record.v1",
+      { refund_id: uuidv7(), order_id: a, tender_id: null, method: "cash", amount_minor: 1000, currency: "INR", reason_code: "quality", note: "spilt" })).status).toBe(200);
+    // 200000 + 4200 + 14200 − 1000 = 217400; counted 217000 → −400.
+    expect((await env.cmd(`/v1/shifts/${shift}:close`, "staff", "orders.shift.close.v1", { shift_id: shift, counted_cash_minor: 217000 })).status).toBe(403);
+    expect((await env.cmd(`/v1/shifts/${shift}:close`, "mgr1", "orders.shift.close.v1", { shift_id: shift, counted_cash_minor: 217000 })).status).toBe(200);
+    const s = await env.one<Record<string, string>>(`SELECT status, expected_cash_minor, counted_cash_minor, variance_minor FROM core.shift WHERE id = $1`, [shift]);
+    expect([s.status, Number(s.expected_cash_minor), Number(s.counted_cash_minor), Number(s.variance_minor)]).toEqual(["closed", 217400, 217000, -400]);
+    expect((await env.cmd(`/v1/shifts/${shift}:close`, "mgr1", "orders.shift.close.v1", { shift_id: shift, counted_cash_minor: 217000 })).status).toBe(409);
+  });
+});
+
+describe("receipts from core-domain buildReceipt", () => {
+  it("IN tax invoice: device series + number, GSTIN and FSSAI, totals equal the stored order", async () => {
+    const id = await place("staff", [{ item: env.menu.dosa, options: [env.menu.chutney] }, { item: env.menu.biscuits }]);
+    const o = await env.one<{ invoice_no: string }>(`SELECT invoice_no FROM core."order" WHERE id = $1`, [id]);
+    const r = await (await env.call("GET", `/v1/orders/${id}/receipt`, "staff")).json();
+    // 14176 + 2950
+    expect([r.kind, r.title, r.number, r.total_minor, r.tax_minor]).toEqual(["tax_invoice", "Tax Invoice", `POS1-${o.invoice_no}`, 17126, 1126]);
+    expect(r.tax_ids.map((t: any) => t.code)).toEqual(["GSTIN", "FSSAI"]);
+  });
+
+  it("missing FSSAI → 409 tax_id_missing (the sale stands); restored → 200", async () => {
+    const id = await place("staff", [{ item: env.menu.coffee }]);
+    const set = (ids: object) => env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "tenancy.outlet.update.v1" }, (c) =>
+      c.query(`UPDATE core.outlet SET tax_ids = $2 WHERE id = $1`, [env.w.outlets[0], ids]));
+    await set({ GSTIN: "29ABCDE1234F1Z5" });
+    const r = await env.call("GET", `/v1/orders/${id}/receipt`, "staff");
+    expect([r.status, (await r.json()).error.reason_code]).toEqual([409, "tax_id_missing"]);
+    await set({ GSTIN: "29ABCDE1234F1Z5", FSSAI: "12345678901234" });
+    expect((await env.call("GET", `/v1/orders/${id}/receipt`, "staff")).status).toBe(200);
+  });
+
+  it("IN aggregator order under Sec 9(5): no invoice number even on a device; a record-only receipt named by the external ref", async () => {
+    const swiggy = uuidv7();
+    await env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "tenancy.channel.create.v1" }, (c) =>
+      c.query(`INSERT INTO core.channel (tenant_id, id, name, kind) VALUES ($1, $2, 'Swiggy', 'aggregator:swiggy')`, [env.w.tenant, swiggy]));
+    await env.db.withContext("munim_core", { ...ctxOf("owner"), command_type: "catalogue.price.set.v1" }, (c) =>
+      c.query(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from) VALUES ($1, $2, $3, $4, 'aggregator:swiggy', 4000, 'INR', 'restaurant_5', '2026-01-01')`,
+        [env.w.tenant, uuidv7(), env.menu.coffee, env.w.outlets[0]]));
+    const id = await place("owner", [{ item: env.menu.coffee }], { channel_id: swiggy, external_ref: "SW-1001" });
+    const o = await env.one<{ invoice_no: string | null; ticket_no: number }>(`SELECT invoice_no, ticket_no FROM core."order" WHERE id = $1`, [id]);
+    expect(o.invoice_no).toBeNull();
+    const r = await (await env.call("GET", `/v1/orders/${id}/receipt`, "owner")).json();
+    expect([r.kind, r.operator, r.number, r.total_minor]).toEqual(["record", "Swiggy", "SW-1001", 4200]);
+  });
+});
+
+describe("One Guarantee clause 1 over everything this suite wrote (runs last)", () => {
+  it("every orders-path book row is a person's own command or a listed derivation; every status / promise change has its audit entry; the audit chain verifies", async () => {
+    // [planted write goes here in the red-proof]
+    const tables = ["core.\"order\"", "core.order_line", "core.order_event", "core.tender", "core.void", "core.refund", "core.shift", "core.coupon_use",
+      "core.loyalty_entry", "core.stock_movement", "core.journal_entry", "core.posting"];
+    const bad: string[] = [];
+    let checked = 0;
+    for (const t of tables) {
+      const rows = await env.rows<{ id: string; origin: any; tbl: string }>(`SELECT id, origin, '${t.replaceAll('"', "")}' AS tbl FROM ${t} WHERE tenant_id = $1`, [env.w.tenant]);
+      for (const r of rows) {
+        checked++;
+        const o = r.origin;
+        if (o.kind === "command") {
+          const known = await env.one<{ n: string }>(
+            `SELECT count(*) AS n FROM core.command_authority ca WHERE ca.command_type = $1 AND $2 = ANY (ca.target_tables)
+               AND (EXISTS (SELECT 1 FROM core.member m WHERE m.tenant_id = $3 AND m.id::text = $4) OR EXISTS (SELECT 1 FROM core.customer k WHERE k.tenant_id = $3 AND k.id::text = $4) OR $5 = 'operator')`,
+            [o.command_type, r.tbl, env.w.tenant, o.principal_id, o.role]);
+          if (Number(known.n) !== 1) bad.push(`${r.tbl}:${r.id} command ${o.command_type}`);
+        } else if (o.kind === "derivation") {
+          const known = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.derivation_rule WHERE rule_id = $1 AND target_table = $2`, [o.rule_id, r.tbl]);
+          if (Number(known.n) !== 1) bad.push(`${r.tbl}:${r.id} derivation ${o.rule_id}`);
+        } else if (o.kind !== "decision") bad.push(`${r.tbl}:${r.id} origin ${o.kind}`);
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+    expect(bad).toEqual([]);
+    // UPDATEs keep the creation origin (gotcha 34): each order whose status or promise moved has an audit entry
+    // carrying that status / promise, written by the command that moved it.
+    const moved = await env.rows<{ id: string; status: string; promised_at: string | null; audited: boolean }>(
+      `SELECT o.id, o.status, o.promised_at::text,
+              EXISTS (SELECT 1 FROM core.audit_log a WHERE a.tenant_id = o.tenant_id AND a.entity = 'core.order' AND a.entity_id = o.id::text
+                        AND (a.after ->> 'status' = o.status OR (a.after ? 'promised_at' AND (a.after ->> 'promised_at')::timestamptz = o.promised_at))
+                        AND (a.actor ->> 'id') IS NOT NULL) AS audited
+         FROM core."order" o WHERE o.tenant_id = $1 AND o.id <> ALL ($2::uuid[]) AND o.id <> ALL ($3::uuid[]) AND (o.status <> 'placed' OR EXISTS (
+           SELECT 1 FROM core.order_event e WHERE e.order_id = o.id AND e.kind = 'promised_at'))`, [env.w.tenant, env.w.orders, rawFixtureWrites]);
+    // by hand: completed (status test), rejected, completed (fixture), cancelled, pushed back
+    expect(moved.length).toBe(5);
+    expect(moved.filter((m) => !m.audited).map((m) => m.id)).toEqual([]);
+    const v = await verifyAuditChain(svcTx(env.db), env.w.tenant);
+    expect([v.ok, v.firstBadSeq]).toEqual([true, null]);
+    expect(v.rows).toBeGreaterThan(30);
+  });
+});

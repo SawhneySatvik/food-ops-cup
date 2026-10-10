@@ -1,0 +1,82 @@
+// T-022 × landed seams (evidence for T-034, not a hand-value gate): the same placement → completion path with NO
+// fakes — catalogue priceLines, inventory picks / consumption, customers loyalty, finance postFor and kitchen
+// tickets as their lanes wrote them. Asserts which derived rows exist and under which rule, plus the pairing (#80).
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { executeCommand } from "../src/commit/index.ts";
+import { withContext } from "../src/lib/db.ts";
+import { orderStatusHandler } from "../src/modules/orders/lifecycle.ts";
+import { placeOrder } from "../src/modules/orders/place.ts";
+import { PACKS } from "@munim/contracts/packs";
+import { seedChart } from "../src/modules/finance/index.ts";
+import { type Env, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
+
+vi.mock("@munim/contracts/events", async (orig) => {
+  const actual = await orig<typeof import("@munim/contracts/events")>();
+  const { ORDER_EVENT_SCHEMAS } = await import("@munim/contracts/orders");
+  return { ...actual, SCHEMAS: { ...actual.SCHEMAS, ...ORDER_EVENT_SCHEMAS } };
+});
+
+let env: Env;
+beforeAll(async () => {
+  env = await startEnv("IN");
+  // The world seeds only cash + sales; finance posts against the pack's full chart (seeded at provisioning).
+  await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "finance.account.upsert.v1" },
+    (c) => seedChart(c, PACKS.IN));
+  // customers' earn skips guest profiles (T-028 INFERENCE); make the world customer a signed-up one.
+  await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "customers.customer.upsert.v1" },
+    (c) => c.query(`UPDATE core.customer SET is_guest = false, idp_sub = 'cust-sub' WHERE id = $1`, [env.w.customer]));
+});
+afterAll(async () => env?.stop());
+
+describe("orders over the landed seams (no fakes)", () => {
+  it("customer pickup order with a redemption → completed: consumption, earn, the sale entry and kitchen tickets all derived", async () => {
+    await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "catalogue.price.set.v1" }, (c) =>
+      c.query(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from) VALUES ($1, $2, $3, $4, 'pickup', 32000, 'INR', 'restaurant_5', '2026-01-01')`,
+        [env.w.tenant, uuidv7(), env.menu.paneer, env.w.outlets[0]]));
+    const principal = { kind: "customer" as const, tenant_id: env.w.tenant, channel_id: env.menu.pickupChannel, customer_id: env.w.customer, profile: true, sub: "cust-sub" };
+    const payload = placePayload(env, [{ item: env.menu.paneer }, { item: env.menu.biscuits, qty: 2000 }],
+      { channel_id: env.menu.pickupChannel, device_id: null, kind: "pickup", loyalty_redeem_points: 20 });
+    await placeOrder({ deps: { pools: env.pools, log: () => {} }, principal }, { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "orders.place.v1", payload });
+    const id = payload.order_id;
+    const o = await env.one<{ total_minor: string; snap: any }>(`SELECT total_minor, pricing_snapshot AS snap FROM core."order" WHERE id = $1`, [id]);
+    expect(Number(o.total_minor)).toBe(39500);
+    expect(o.snap.loyalty.points).toBe(20);
+    for (const [a, b] of [["placed", "accepted"], ["accepted", "preparing"], ["preparing", "ready"], ["ready", "completed"]]) {
+      await executeCommand({ tx: (fn) => withContext(env.pools.core, { tenant_id: env.w.tenant, outlet_ids: [env.w.outlets[0]], role: "staff", member_id: env.w.staff }, fn),
+        tenantId: env.w.tenant, actor: { kind: "member", id: env.w.staff, role: "staff" } },
+        { command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type: "kitchen.ticket.advance.v1", payload: { order_id: id, from_status: a, to_status: b, reason_code: null } },
+        orderStatusHandler("kitchen.ticket.advance.v1"));
+    }
+    const rules = async (sql: string) => (await env.rows<{ r: string }>(sql, [id])).map((x) => x.r).sort();
+    expect(await rules(`SELECT DISTINCT origin ->> 'rule_id' AS r FROM core.stock_movement WHERE ref_id = $1`)).toEqual(["inventory.consume_order", "inventory.consume_sku"]);
+    expect(await rules(`SELECT kind || ':' || coalesce(origin ->> 'rule_id', origin ->> 'kind') AS r FROM core.loyalty_entry WHERE order_id = $1`))
+      .toEqual(["earn:customers.loyalty_earn", "redeem:command"]);
+    expect(await rules(`SELECT DISTINCT origin ->> 'rule_id' AS r FROM core.journal_entry WHERE source_id = $1`)).toEqual(["finance.post_order"]);
+    expect(Number((await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.kitchen_ticket WHERE order_id = $1`, [id])).n)).toBeGreaterThanOrEqual(1);
+    const ev = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1`, [id]);
+    const ob = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type LIKE 'munim.orders.order.%'`, [id]);
+    expect(Number(ob.n)).toBe(Number(ev.n));
+  });
+
+  it("C7 with the pack flag on (test clone only): expired-only stock is refused without an override; a manager's override bound to the cart line is consumed once at placement and cited by the movement", async () => {
+    await env.db.admin(`UPDATE platform.country_pack SET doc = jsonb_set(doc, '{expired_sale_override}', 'true') WHERE code = 'IN'`);
+    const batch = (await env.one<{ id: string }>(`SELECT id FROM core.batch WHERE batch_code = 'JUI-OLD'`)).id;
+    const without = placePayload(env, [{ item: env.menu.juice }]);
+    const r0 = await env.cmd("/v1/orders", "mgr1", "orders.place.v1", without);
+    expect([r0.status, (await r0.json()).error.reason_code]).toEqual([409, "expired_batch"]);
+    const p = placePayload(env, [{ item: env.menu.juice }]);
+    const override = uuidv7();
+    await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: [env.w.outlets[0]], role: "manager", member_id: env.ids.mgr1, command_type: "inventory.expired_sale.override.v1" }, (c) =>
+      c.query(`INSERT INTO core.expired_sale_override (tenant_id, id, outlet_id, cart_line_id, batch_id, qty_milli, reason_code, note, decided_by)
+               VALUES ($1, $2, $3, $4, $5, 1000, 'staff_meal', 'checked, sealed', $6)`, [env.w.tenant, override, env.w.outlets[0], p.lines[0]!.line_id, batch, env.ids.mgr1]));
+    const r1 = await env.cmd("/v1/orders", "mgr1", "orders.place.v1", p);
+    expect(r1.status).toBe(201);
+    const o = await env.one<{ used: boolean; line: string }>(`SELECT used_at IS NOT NULL AS used, order_line_id AS line FROM core.expired_sale_override WHERE id = $1`, [override]);
+    expect(o).toEqual({ used: true, line: p.lines[0]!.line_id });
+    const m = await env.rows<{ o: string; b: string }>(`SELECT expired_sale_override_id AS o, batch_id AS b FROM core.stock_movement WHERE ref_id = $1`, [p.order_id]);
+    expect(m).toEqual([{ o: override, b: batch }]);
+    // Single use: a second sale of the same cart line id is impossible (line ids are unique); another line → refused.
+    const r2 = await env.cmd("/v1/orders", "mgr1", "orders.place.v1", placePayload(env, [{ item: env.menu.juice }]));
+    expect(r2.status).toBe(409);
+  });
+});
