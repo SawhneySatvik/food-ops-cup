@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "imports.run.commit.v1",
+  "title": "ImportsRunCommitV1",
+  "x-munim-module": "imports",
+  "type": "object",
+  "properties": {
+    "import_run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "import_run_id"
+  ],
+  "additionalProperties": false
+}

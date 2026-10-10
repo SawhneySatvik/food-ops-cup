@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customers.erasure.request.v1",
+  "title": "CustomersErasureRequestV1",
+  "x-munim-module": "accounts",
+  "type": "object",
+  "properties": {
+    "confirm": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "confirm"
+  ],
+  "additionalProperties": false
+}

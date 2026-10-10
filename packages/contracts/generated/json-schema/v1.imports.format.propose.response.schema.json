@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.imports.format.propose.response",
+  "title": "V1ImportsFormatProposeResponse",
+  "x-munim-module": "imports",
+  "type": "object",
+  "properties": {
+    "draft_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "draft_id"
+  ],
+  "additionalProperties": false
+}

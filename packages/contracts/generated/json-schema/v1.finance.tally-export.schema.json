@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.finance.tally-export",
+  "title": "V1FinanceTallyExport",
+  "x-munim-module": "finance",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string",
+      "pattern": "^munim-tally-[0-9]{4}-[0-9]{2}-[0-9]{2}-to-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv$"
+    },
+    "content_type": {
+      "type": "string",
+      "const": "text/csv"
+    },
+    "content": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_name",
+    "content_type",
+    "content"
+  ],
+  "additionalProperties": false
+}

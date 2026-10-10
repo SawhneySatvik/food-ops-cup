@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "orders.shift.close.v1",
+  "title": "OrdersShiftCloseV1",
+  "x-munim-module": "orders",
+  "type": "object",
+  "properties": {
+    "shift_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "counted_cash_minor": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "shift_id",
+    "counted_cash_minor"
+  ],
+  "additionalProperties": false
+}

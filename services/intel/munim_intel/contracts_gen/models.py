@@ -8,7 +8,329 @@ from pydantic import BaseModel, ConfigDict, Field, RootModel, constr
 from typing_extensions import TypeAliasType
 
 
+class Phone(RootModel[str]):
+    root: Annotated[str, Field(pattern='^\\+[1-9][0-9]{6,14}$')]
+
+
+class CustomersAccountLinkV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+
+
+class CustomersProfileUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+
+
+class CustomersConsentSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    marketing: bool
+
+
+class CustomersDataExportV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format: Literal['json']
+
+
+class CustomersErasureRequestV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    confirm: Literal[True]
+
+
+class Email(RootModel[str]):
+    root: Annotated[
+        str, Field(max_length=254, pattern='^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+    ]
+
+
+class NextCursor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+
+
 class VariantId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+
+
+class Line(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    line_no: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    item_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    item_name_key: str
+    variant_id: VariantId | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    line_discount_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Balance(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    points: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    entry_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    seq: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class OrderId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+
+
+class Line1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    line_no: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    item_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    item_name_key: str
+    variant_id: VariantId | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    line_discount_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class ContactPhone(RootModel[str]):
+    root: Annotated[str, Field(pattern='^\\+[1-9][0-9]{6,14}$')]
+
+
+class Headcount(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class QuoteMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class AdvanceMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Currency(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class ValueBp(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValueBp1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=10000)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ValueMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValueMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class MinSpendMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class MinSpendMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class GlobalCap(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class GlobalCap1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class PerCustomerCap(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class PerCustomerCap1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class OutletId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ValidTo(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+
+
+class EditedPayload(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    code: Annotated[str, Field(pattern='^[A-Z0-9][A-Z0-9-]{2,31}$')]
+    kind: Literal['percent', 'amount']
+    value_bp: ValueBp | ValueBp1 | None
+    value_minor: ValueMinor | ValueMinor1 | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_spend_minor: MinSpendMinor | MinSpendMinor1
+    global_cap: GlobalCap | GlobalCap1 | None
+    per_customer_cap: PerCustomerCap | PerCustomerCap1 | None
+    requires_customer: bool
+    outlet_ids: Annotated[list[OutletId], Field(max_length=100)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    valid_to: ValidTo | None
+    active: bool
+
+
+class EditedPayload1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class VariantId2(RootModel[str]):
     root: Annotated[
         str,
         Field(
@@ -43,7 +365,7 @@ class AmountMinor1(BaseModel):
     ]
 
 
-class ValidTo(RootModel[str]):
+class ValidTo1(RootModel[str]):
     root: Annotated[
         str,
         Field(
@@ -52,7 +374,7 @@ class ValidTo(RootModel[str]):
     ]
 
 
-class EditedPayload(BaseModel):
+class EditedPayload2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -68,7 +390,7 @@ class EditedPayload(BaseModel):
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
-    variant_id: VariantId | None
+    variant_id: VariantId2 | None
     outlet_id: Annotated[
         str,
         Field(
@@ -85,7 +407,675 @@ class EditedPayload(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo1 | None
+
+
+class Version(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Version1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class YieldQtyMilli(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class YieldQtyMilli1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class QtyMilli(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class WastePctBp(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class WastePctBp1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=10000)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli | QtyMilli1
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    waste_pct_bp: WastePctBp | WastePctBp1
+
+
+class EditedPayload3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    recipe_version_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    variant_id: VariantId2 | None
+    version: Version | Version1
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo1 | None
+    yield_qty_milli: YieldQtyMilli | YieldQtyMilli1
+    lines: Annotated[list[Line2], Field(min_length=1)]
+
+
+class EstimatedCostMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class EstimatedCostMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class VendorNote(RootModel[str]):
+    root: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class EditedPayload4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    asset_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['preventive', 'inspection']
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    estimated_cost_minor: EstimatedCostMinor | EstimatedCostMinor1 | None
+    vendor_note: VendorNote | None
+
+
+class AudienceCount(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AudienceCount1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Value(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Value1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Placeholder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+    value: Value | Value1
+
+
+class CouponId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class WindowFrom(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+
+
+class WindowTo(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+
+
+class EditedPayload5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    channel: Literal['email', 'sms']
+    outlet_ids: Annotated[list[OutletId], Field(max_length=50)]
+    segment_snapshot_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    audience_count: AudienceCount | AudienceCount1
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    placeholders: Annotated[list[Placeholder], Field(max_length=20)]
+    coupon_id: CouponId | None
+    send_at: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    window_from: WindowFrom | None
+    window_to: WindowTo | None
+
+
+class SettlementLineId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class OrderId3(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ClaimedMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ClaimedMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    settlement_line_id: SettlementLineId | None
+    order_id: OrderId3 | None
+    claimed_minor: ClaimedMinor | ClaimedMinor1
+
+
+class TotalClaimedMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TotalClaimedMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class BreakId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class EditedPayload6(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    channel_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['unapproved_ad_fee', 'short_payout', 'missing_payout']
+    lines: list[Line3]
+    total_claimed_minor: TotalClaimedMinor | TotalClaimedMinor1
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    break_ids: list[BreakId]
+
+
+class ReversesId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class AmountMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AmountMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Posting(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    account_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    side: Literal['debit', 'credit']
+    amount_minor: AmountMinor2 | AmountMinor3
+
+
+class EditedPayload7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    journal_entry_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    entry_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    reverses_id: ReversesId | None
+    postings: Annotated[list[Posting], Field(min_length=2)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    memo_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class ChecklistItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    evidence_ref: Annotated[
+        str,
+        Field(
+            pattern='^(?:snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}))$'
+        ),
+    ]
+
+
+class NetMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class NetMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class EditedPayload8(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_close_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    checklist: Annotated[list[ChecklistItem], Field(min_length=1)]
+    net_minor: NetMinor | NetMinor1
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class TargetValue(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TargetValue1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class BasisSnapshotId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class EditedPayload9(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    metric: Literal['net_sales', 'orders']
+    target_value: TargetValue | TargetValue1
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis_snapshot_id: BasisSnapshotId | None
+
+
+class FindingId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class EditedPayload10(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    title_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    assignee_member_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    finding_id: FindingId | None
+
+
+class HeaderItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, min_length=1)]
+
+
+class MappingItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    source: Annotated[str, Field(max_length=100, min_length=1)]
+    target: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    unit: Annotated[str | None, Field(pattern='^[a-z][a-z0-9_]{0,15}$')] = None
+
+
+class EditedPayload11(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    header: Annotated[list[HeaderItem], Field(max_length=100, min_length=1)]
+    header_signature: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class EditedPayload12(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
 
 
 class MinQtyMilli(RootModel[str]):
@@ -132,7 +1122,7 @@ class ParQtyMilli1(BaseModel):
     ]
 
 
-class EditedPayload1(BaseModel):
+class EditedPayload13(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -152,13 +1142,443 @@ class EditedPayload1(BaseModel):
     par_qty_milli: ParQtyMilli | ParQtyMilli1
 
 
-class OutletId(RootModel[str]):
+class BatchId(RootModel[str]):
     root: Annotated[
         str,
         Field(
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
+
+
+class QtyMilli2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    batch_id: BatchId | None
+    qty_milli: QtyMilli2 | QtyMilli3
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class EditedPayload14(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    from_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    to_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    lines: Annotated[list[Line4], Field(min_length=1)]
+
+
+class QtyMilli4(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli4 | QtyMilli5
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class EditedPayload15(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    lines: Annotated[list[Line5], Field(max_length=200, min_length=1)]
+
+
+class PrepSec(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class PrepSec1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=86400)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class EditedPayload16(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    prep_sec: PrepSec | PrepSec1
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class BaseMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class BaseMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class OvertimeMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class OvertimeMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class AdvanceRecoveryMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AdvanceRecoveryMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class TipsMinor(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TipsMinor1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class NetMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class NetMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line6(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    base_minor: BaseMinor | BaseMinor1
+    overtime_minor: OvertimeMinor | OvertimeMinor1
+    advance_recovery_minor: AdvanceRecoveryMinor | AdvanceRecoveryMinor1
+    tips_minor: TipsMinor | TipsMinor1
+    net_minor: NetMinor2 | NetMinor3
+
+
+class EditedPayload17(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line6], Field(min_length=1)]
+
+
+class Shift(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_shift_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    staff_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    starts_at: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    ends_at: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+
+
+class EditedPayload18(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    week_start: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    shifts: Annotated[list[Shift], Field(min_length=1)]
+
+
+class ClaimedMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ClaimedMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invoice_line_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    claimed_minor: ClaimedMinor2 | ClaimedMinor3
+
+
+class EditedPayload19(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_invoice_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['overbilled', 'duplicate_invoice', 'other']
+    lines: Annotated[list[Line7], Field(min_length=1)]
 
 
 class ExpectedOn(RootModel[str]):
@@ -179,7 +1599,7 @@ class NegotiationRunId(RootModel[str]):
     ]
 
 
-class QtyMilli(RootModel[str]):
+class QtyMilli6(RootModel[str]):
     root: Annotated[
         str,
         Field(
@@ -188,7 +1608,7 @@ class QtyMilli(RootModel[str]):
     ]
 
 
-class QtyMilli1(BaseModel):
+class QtyMilli7(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -223,7 +1643,7 @@ class UnitPriceMinor1(BaseModel):
     ]
 
 
-class Line(BaseModel):
+class Line8(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -233,12 +1653,12 @@ class Line(BaseModel):
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
-    qty_milli: QtyMilli | QtyMilli1
+    qty_milli: QtyMilli6 | QtyMilli7
     unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
     unit_price_minor: UnitPriceMinor | UnitPriceMinor1
 
 
-class EditedPayload2(BaseModel):
+class EditedPayload20(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -258,14 +1678,19 @@ class EditedPayload2(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     expected_on: ExpectedOn | None
     negotiation_run_id: NegotiationRunId | None
-    lines: Annotated[list[Line], Field(min_length=1)]
+    lines: Annotated[list[Line8], Field(min_length=1)]
 
 
-class Reason(RootModel[str]):
-    root: Annotated[str, Field(max_length=500, min_length=1)]
+class GoodsReceivedId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
 
 
-class AmountMinor2(RootModel[str]):
+class QtyMilli8(RootModel[str]):
     root: Annotated[
         str,
         Field(
@@ -274,7 +1699,120 @@ class AmountMinor2(RootModel[str]):
     ]
 
 
-class AmountMinor3(BaseModel):
+class QtyMilli9(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line9(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: BatchId | None
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli8 | QtyMilli9
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class EditedPayload21(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    goods_received_id: GoodsReceivedId | None
+    reason_code: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+    lines: Annotated[list[Line9], Field(min_length=1)]
+
+
+class Reason(RootModel[str]):
+    root: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class ValueBp2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValueBp3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=10000)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ValueMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValueMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class MinSpendMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class MinSpendMinor3(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -287,7 +1825,139 @@ class AmountMinor3(BaseModel):
     ]
 
 
+class GlobalCap2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class GlobalCap3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class PerCustomerCap2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class PerCustomerCap3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ValidTo3(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+
+
 class Payload(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    code: Annotated[str, Field(pattern='^[A-Z0-9][A-Z0-9-]{2,31}$')]
+    kind: Literal['percent', 'amount']
+    value_bp: ValueBp2 | ValueBp3 | None
+    value_minor: ValueMinor2 | ValueMinor3 | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_spend_minor: MinSpendMinor2 | MinSpendMinor3
+    global_cap: GlobalCap2 | GlobalCap3 | None
+    per_customer_cap: PerCustomerCap2 | PerCustomerCap3 | None
+    requires_customer: bool
+    outlet_ids: Annotated[list[OutletId], Field(max_length=100)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    valid_to: ValidTo3 | None
+    active: bool
+
+
+class Payload1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class AmountMinor4(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AmountMinor5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class ValidTo4(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Payload2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -303,7 +1973,7 @@ class Payload(BaseModel):
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
-    variant_id: VariantId | None
+    variant_id: VariantId2 | None
     outlet_id: Annotated[
         str,
         Field(
@@ -311,7 +1981,7 @@ class Payload(BaseModel):
         ),
     ]
     channel_kind: Literal['counter', 'table_qr', 'pickup', 'own_site'] | ChannelKind
-    amount_minor: AmountMinor2 | AmountMinor3
+    amount_minor: AmountMinor4 | AmountMinor5
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     tax_class: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
     valid_from: Annotated[
@@ -320,7 +1990,564 @@ class Payload(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo4 | None
+
+
+class Version2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Version3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class YieldQtyMilli2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class YieldQtyMilli3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class QtyMilli10(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli11(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class WastePctBp2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class WastePctBp3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=10000)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line10(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli10 | QtyMilli11
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    waste_pct_bp: WastePctBp2 | WastePctBp3
+
+
+class Payload3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    recipe_version_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    variant_id: VariantId2 | None
+    version: Version2 | Version3
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo4 | None
+    yield_qty_milli: YieldQtyMilli2 | YieldQtyMilli3
+    lines: Annotated[list[Line10], Field(min_length=1)]
+
+
+class EstimatedCostMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class EstimatedCostMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    asset_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['preventive', 'inspection']
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    estimated_cost_minor: EstimatedCostMinor2 | EstimatedCostMinor3 | None
+    vendor_note: VendorNote | None
+
+
+class AudienceCount2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AudienceCount3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Value2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Value3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Placeholder1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+    value: Value2 | Value3
+
+
+class Payload5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    channel: Literal['email', 'sms']
+    outlet_ids: Annotated[list[OutletId], Field(max_length=50)]
+    segment_snapshot_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    audience_count: AudienceCount2 | AudienceCount3
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    placeholders: Annotated[list[Placeholder1], Field(max_length=20)]
+    coupon_id: CouponId | None
+    send_at: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    window_from: WindowFrom | None
+    window_to: WindowTo | None
+
+
+class ClaimedMinor4(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ClaimedMinor5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line11(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    settlement_line_id: SettlementLineId | None
+    order_id: OrderId3 | None
+    claimed_minor: ClaimedMinor4 | ClaimedMinor5
+
+
+class TotalClaimedMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TotalClaimedMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload6(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    channel_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['unapproved_ad_fee', 'short_payout', 'missing_payout']
+    lines: list[Line11]
+    total_claimed_minor: TotalClaimedMinor2 | TotalClaimedMinor3
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    break_ids: list[BreakId]
+
+
+class AmountMinor6(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AmountMinor7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Posting1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    account_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    side: Literal['debit', 'credit']
+    amount_minor: AmountMinor6 | AmountMinor7
+
+
+class Payload7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    journal_entry_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    entry_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    reverses_id: ReversesId | None
+    postings: Annotated[list[Posting1], Field(min_length=2)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    memo_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class NetMinor4(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class NetMinor5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload8(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_close_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    checklist: Annotated[list[ChecklistItem], Field(min_length=1)]
+    net_minor: NetMinor4 | NetMinor5
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class TargetValue2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TargetValue3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload9(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    metric: Literal['net_sales', 'orders']
+    target_value: TargetValue2 | TargetValue3
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis_snapshot_id: BasisSnapshotId | None
+
+
+class Payload10(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    title_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    assignee_member_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    finding_id: FindingId | None
+
+
+class Payload11(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    header: Annotated[list[HeaderItem], Field(max_length=100, min_length=1)]
+    header_signature: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class Payload12(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
 
 
 class MinQtyMilli2(RootModel[str]):
@@ -367,7 +2594,7 @@ class ParQtyMilli3(BaseModel):
     ]
 
 
-class Payload1(BaseModel):
+class Payload13(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -387,7 +2614,7 @@ class Payload1(BaseModel):
     par_qty_milli: ParQtyMilli2 | ParQtyMilli3
 
 
-class QtyMilli2(RootModel[str]):
+class QtyMilli12(RootModel[str]):
     root: Annotated[
         str,
         Field(
@@ -396,7 +2623,406 @@ class QtyMilli2(RootModel[str]):
     ]
 
 
-class QtyMilli3(BaseModel):
+class QtyMilli13(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line12(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    batch_id: BatchId | None
+    qty_milli: QtyMilli12 | QtyMilli13
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload14(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    from_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    to_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    lines: Annotated[list[Line12], Field(min_length=1)]
+
+
+class QtyMilli14(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli15(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line13(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli14 | QtyMilli15
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload15(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    lines: Annotated[list[Line13], Field(max_length=200, min_length=1)]
+
+
+class PrepSec2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class PrepSec3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=1, le=86400)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload16(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    prep_sec: PrepSec2 | PrepSec3
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class BaseMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class BaseMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class OvertimeMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class OvertimeMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class AdvanceRecoveryMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class AdvanceRecoveryMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class TipsMinor2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class TipsMinor3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class NetMinor6(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class NetMinor7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line14(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    base_minor: BaseMinor2 | BaseMinor3
+    overtime_minor: OvertimeMinor2 | OvertimeMinor3
+    advance_recovery_minor: AdvanceRecoveryMinor2 | AdvanceRecoveryMinor3
+    tips_minor: TipsMinor2 | TipsMinor3
+    net_minor: NetMinor6 | NetMinor7
+
+
+class Payload17(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line14], Field(min_length=1)]
+
+
+class Payload18(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    week_start: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    shifts: Annotated[list[Shift], Field(min_length=1)]
+
+
+class ClaimedMinor6(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ClaimedMinor7(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line15(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invoice_line_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    claimed_minor: ClaimedMinor6 | ClaimedMinor7
+
+
+class Payload19(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_invoice_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['overbilled', 'duplicate_invoice', 'other']
+    lines: Annotated[list[Line15], Field(min_length=1)]
+
+
+class QtyMilli16(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli17(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -431,7 +3057,7 @@ class UnitPriceMinor3(BaseModel):
     ]
 
 
-class Line1(BaseModel):
+class Line16(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -441,12 +3067,12 @@ class Line1(BaseModel):
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
-    qty_milli: QtyMilli2 | QtyMilli3
+    qty_milli: QtyMilli16 | QtyMilli17
     unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
     unit_price_minor: UnitPriceMinor2 | UnitPriceMinor3
 
 
-class Payload2(BaseModel):
+class Payload20(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -466,10 +3092,75 @@ class Payload2(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     expected_on: ExpectedOn | None
     negotiation_run_id: NegotiationRunId | None
-    lines: Annotated[list[Line1], Field(min_length=1)]
+    lines: Annotated[list[Line16], Field(min_length=1)]
 
 
-class Value(RootModel[int]):
+class QtyMilli18(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class QtyMilli19(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    typed_by: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Line17(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: BatchId | None
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: QtyMilli18 | QtyMilli19
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload21(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    goods_received_id: GoodsReceivedId | None
+    reason_code: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+    lines: Annotated[list[Line17], Field(min_length=1)]
+
+
+class Value4(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
@@ -527,7 +3218,7 @@ class Change(BaseModel):
             pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'
         ),
     ]
-    value: str | Value | bool | None
+    value: str | Value4 | bool | None
     now_ref: NowRef | None
     now: str | Now | bool | None
 
@@ -542,7 +3233,7 @@ class Change1(BaseModel):
             pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'
         ),
     ]
-    value: str | Value | bool | None
+    value: str | Value4 | bool | None
     now_ref: NowRef | None
     now: str | Now | bool | None
 
@@ -559,8 +3250,235 @@ class MrpMinor(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
-class Currency(RootModel[str]):
-    root: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+class Day(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=7)]
+
+
+class Window(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    days: Annotated[list[Day], Field(max_length=7, min_length=1)]
+    from_: Annotated[
+        str, Field(alias='from', pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ]
+    to: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
+class ValueBp4(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=10000)]
+
+
+class ValueMinor4(RootModel[int]):
+    root: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class GlobalCap4(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class PerCustomerCap4(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class VariantNameKey(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class MrpMinor2(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Window1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    days: Annotated[list[Day], Field(max_length=7, min_length=1)]
+    from_: Annotated[
+        str, Field(alias='from', pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ]
+    to: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
+class Window2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    days: Annotated[list[Day], Field(max_length=7, min_length=1)]
+    from_: Annotated[
+        str, Field(alias='from', pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ]
+    to: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
+class Issuer(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class Item1(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class Note(RootModel[str]):
+    root: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class MakeModel(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class SerialNo(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class SafeMinMilliC(RootModel[int]):
+    root: Annotated[int, Field(ge=-60000, le=300000)]
+
+
+class SafeMaxMilliC(RootModel[int]):
+    root: Annotated[int, Field(ge=-60000, le=300000)]
+
+
+class InstalledOn(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Cost(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    amount_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class EstimatedCostMinor4(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Vendor(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class Placeholder2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+    value: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class TableRef(RootModel[str]):
+    root: Annotated[str, Field(max_length=20, min_length=1)]
+
+
+class Note2(RootModel[str]):
+    root: Annotated[str, Field(max_length=500)]
+
+
+class Body(RootModel[str]):
+    root: Annotated[str, Field(max_length=4000)]
+
+
+class Headcount1(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class QuoteMinor1(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class AdvanceMinor1(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Consent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    email: bool | None = None
+    sms: bool | None = None
+
+
+class AdSpendCapMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Note6(RootModel[str]):
+    root: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class V1FinanceTallyExport(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    file_name: Annotated[
+        str,
+        Field(
+            pattern='^munim-tally-[0-9]{4}-[0-9]{2}-[0-9]{2}-to-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv$'
+        ),
+    ]
+    content_type: Literal['text/csv']
+    content: str
+
+
+class DueOn(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class ControlTotalMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class V1ImportsUploadRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    filename: Annotated[str, Field(max_length=255, min_length=1)]
+    media_type: Annotated[str, Field(pattern='^[a-z]+\\/[a-z0-9.+-]+$')]
+    content_base64: Annotated[str, Field(max_length=7000000, min_length=1)]
+
+
+class AmountMinor8(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class StagedItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    row_no: Annotated[int, Field(gt=0, le=9007199254740991)]
+    target_table: str
+    data: dict[str, Any]
+    amount_minor: AmountMinor8 | None
+    external_ref: str | None
+
+
+class QuarantinedItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    row_no: Annotated[int, Field(gt=0, le=9007199254740991)]
+    raw: str
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+
+
+class V1ImportsRunRowsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staged: list[StagedItem]
+    quarantined: list[QuarantinedItem]
 
 
 class OutletScope1(RootModel[list[Literal['*']]]):
@@ -594,7 +3512,114 @@ class InternalSnapshotsRequest(BaseModel):
     params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params | bool | list[str] | None]
 
 
-class Payload3(BaseModel):
+class ValueBp5(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValueMinor5(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class GlobalCap5(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class PerCustomerCap5(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class ValidTo13(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+
+
+class Payload22(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    code: Annotated[str, Field(pattern='^[A-Z0-9][A-Z0-9-]{2,31}$')]
+    kind: Literal['percent', 'amount']
+    value_bp: ValueBp5 | None
+    value_minor: ValueMinor5 | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_spend_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    global_cap: GlobalCap5 | None
+    per_customer_cap: PerCustomerCap5 | None
+    requires_customer: bool
+    outlet_ids: Annotated[list[OutletId], Field(max_length=100)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    valid_to: ValidTo13 | None
+    active: bool
+
+
+class Payload23(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class ValidTo14(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Payload24(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -610,7 +3635,7 @@ class Payload3(BaseModel):
             pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
     ]
-    variant_id: VariantId | None
+    variant_id: VariantId2 | None
     outlet_id: Annotated[
         str,
         Field(
@@ -632,10 +3657,367 @@ class Payload3(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo14 | None
 
 
-class Payload4(BaseModel):
+class Line22(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    waste_pct_bp: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload25(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    recipe_version_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    variant_id: VariantId2 | None
+    version: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo14 | None
+    yield_qty_milli: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    lines: Annotated[list[Line22], Field(min_length=1)]
+
+
+class EstimatedCostMinor5(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload26(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    asset_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['preventive', 'inspection']
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    estimated_cost_minor: EstimatedCostMinor5 | None
+    vendor_note: VendorNote | None
+
+
+class Placeholder4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+    value: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload27(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    channel: Literal['email', 'sms']
+    outlet_ids: Annotated[list[OutletId], Field(max_length=50)]
+    segment_snapshot_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    audience_count: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    placeholders: Annotated[list[Placeholder4], Field(max_length=20)]
+    coupon_id: CouponId | None
+    send_at: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$'
+        ),
+    ]
+    window_from: WindowFrom | None
+    window_to: WindowTo | None
+
+
+class Line23(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    settlement_line_id: SettlementLineId | None
+    order_id: OrderId3 | None
+    claimed_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload28(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    channel_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['unapproved_ad_fee', 'short_payout', 'missing_payout']
+    lines: list[Line23]
+    total_claimed_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    break_ids: list[BreakId]
+
+
+class Posting4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    account_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    side: Literal['debit', 'credit']
+    amount_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload29(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    journal_entry_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    entry_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    reverses_id: ReversesId | None
+    postings: Annotated[list[Posting4], Field(min_length=2)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    memo_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class Payload30(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_close_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    checklist: Annotated[list[ChecklistItem], Field(min_length=1)]
+    net_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class Payload31(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    metric: Literal['net_sales', 'orders']
+    target_value: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis_snapshot_id: BasisSnapshotId | None
+
+
+class Payload32(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: OutletId | None
+    title_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    assignee_member_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    finding_id: FindingId | None
+
+
+class Payload33(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    header: Annotated[list[HeaderItem], Field(max_length=100, min_length=1)]
+    header_signature: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class Payload34(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+
+
+class Payload35(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -665,7 +4047,253 @@ class Payload4(BaseModel):
     ]
 
 
-class Line3(BaseModel):
+class Line24(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    batch_id: BatchId | None
+    qty_milli: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload36(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    from_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    to_outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    lines: Annotated[list[Line24], Field(min_length=1)]
+
+
+class Line25(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload37(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    lines: Annotated[list[Line25], Field(max_length=200, min_length=1)]
+
+
+class Payload38(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    item_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    prep_sec: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Line26(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    base_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    overtime_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    advance_recovery_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    tips_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    net_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload39(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line26], Field(min_length=1)]
+
+
+class Payload40(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    week_start: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    shifts: Annotated[list[Shift], Field(min_length=1)]
+
+
+class Line27(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invoice_line_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    claimed_minor: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+
+
+class Payload41(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_invoice_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    basis: Literal['overbilled', 'duplicate_invoice', 'other']
+    lines: Annotated[list[Line27], Field(min_length=1)]
+
+
+class Line28(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -690,7 +4318,7 @@ class Line3(BaseModel):
     ]
 
 
-class Payload5(BaseModel):
+class Payload42(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -710,7 +4338,55 @@ class Payload5(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     expected_on: ExpectedOn | None
     negotiation_run_id: NegotiationRunId | None
-    lines: Annotated[list[Line3], Field(min_length=1)]
+    lines: Annotated[list[Line28], Field(min_length=1)]
+
+
+class Line29(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: BatchId | None
+    ingredient_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    qty_milli: Annotated[
+        str,
+        Field(
+            pattern='^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$'
+        ),
+    ]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class Payload43(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    supplier_id: Annotated[
+        str,
+        Field(
+            pattern='^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+    ]
+    goods_received_id: GoodsReceivedId | None
+    reason_code: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+    lines: Annotated[list[Line29], Field(min_length=1)]
 
 
 class BasedOnItem1(RootModel[str]):
@@ -722,7 +4398,7 @@ class BasedOnItem1(RootModel[str]):
     ]
 
 
-class Payload6(RootModel[str]):
+class Payload44(RootModel[str]):
     root: Annotated[str, Field(max_length=200)]
 
 
@@ -742,15 +4418,41 @@ class ShelfLifeDays(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
-class TableRef(RootModel[str]):
-    root: Annotated[str, Field(max_length=20, min_length=1)]
+class ExpiresOn(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class MrpMinor4(RootModel[int]):
+    root: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class Batch(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_code: Annotated[str, Field(max_length=64, min_length=1)]
+    expires_on: ExpiresOn | None
+    mrp_minor: MrpMinor4 | None
+
+
+class RefType(RootModel[str]):
+    root: Annotated[str, Field(pattern='^core\\.[a-z_]+$')]
+
+
+class Station(RootModel[str]):
+    root: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
 
 
 class ExternalRef(RootModel[str]):
     root: Annotated[str, Field(max_length=100, min_length=1)]
 
 
-class Note(RootModel[str]):
+class Note8(RootModel[str]):
     root: Annotated[str, Field(max_length=200)]
 
 
@@ -805,7 +4507,7 @@ class TenderedMinor(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
-class AmountMinor4(RootModel[int]):
+class AmountMinor9(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
@@ -821,7 +4523,45 @@ class RoundingMinor(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
-class Currency2(BaseModel):
+class InvoiceFy(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class InvoiceNo(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Seller(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str
+    address: str
+
+
+class TaxId(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: str
+    label: str
+    value: str
+
+
+class Component(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[str, Field(max_length=20, min_length=1)]
+    rate_bp: Annotated[int, Field(ge=0, le=9007199254740991)]
+    amount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class GuestAccessToken(RootModel[str]):
+    root: Annotated[str, Field(max_length=256, min_length=16)]
+
+
+class Currency6(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -854,7 +4594,7 @@ class Formats(BaseModel):
     magnitude_words: list[MagnitudeWord]
 
 
-class Component(BaseModel):
+class Component2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -873,7 +4613,7 @@ class Class(BaseModel):
     code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
     label: Annotated[str, Field(max_length=300, min_length=1)]
     rate_bp: Annotated[int, Field(ge=0, le=10000)]
-    components: list[Component]
+    components: list[Component2]
     input_tax_credit: bool
     supply: Literal['service', 'goods', 'any']
     applies_to: Annotated[str, Field(max_length=300, min_length=1)]
@@ -902,7 +4642,7 @@ class ReceiptField(RootModel[str]):
     root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
 
 
-class TaxId(BaseModel):
+class TaxId1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -1067,13 +4807,13 @@ class CountryPack(BaseModel):
     ]
     name: Annotated[str, Field(max_length=300, min_length=1)]
     locale: Annotated[str, Field(pattern='^[a-z]{2}-[A-Z]{2}$')]
-    currency: Currency2
+    currency: Currency6
     fy_start_month: Annotated[int, Field(ge=1, le=12)]
     timezones: Annotated[list[Timezone], Field(min_length=1)]
     default_timezone: Annotated[str, Field(pattern='^[A-Za-z]+\\/[A-Za-z_]+$')]
     formats: Formats
     tax: Tax
-    tax_ids: list[TaxId]
+    tax_ids: list[TaxId1]
     invoice: Invoice
     printed_price: PrintedPrice
     aggregators: list[Aggregator]
@@ -1094,6 +4834,43 @@ class CountryPack(BaseModel):
     ] = None
 
 
+class WageRateMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class MonthlySalaryMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class ContractMinPerMonth(RootModel[int]):
+    root: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class LeftOn(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Note9(RootModel[str]):
+    root: Annotated[str, Field(max_length=500)]
+
+
+class Email2(RootModel[str]):
+    root: Annotated[str, Field(max_length=254)]
+
+
+class Source(RootModel[str]):
+    root: Annotated[str, Field(max_length=100)]
+
+
+class Note10(RootModel[str]):
+    root: Annotated[str, Field(max_length=1000)]
+
+
 class PlatformModelRole(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1101,6 +4878,20 @@ class PlatformModelRole(BaseModel):
     role: Literal['router', 'reason', 'extract', 'narrate', 'vision', 'embed']
     provider: Literal['gemini', 'openai', 'openrouter', 'nvidia']
     model_id: Annotated[str, Field(pattern='^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$')]
+
+
+class PlatformConfigDraftApprove(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reason: Reason | None = None
+
+
+class PlatformConfigDraftReject(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reason: Annotated[str, Field(max_length=500, min_length=1)]
 
 
 class A2aCardUrl(RootModel[str]):
@@ -1117,6 +4908,22 @@ class Terms(BaseModel):
     )
     payment_days: Annotated[int, Field(ge=0, le=9007199254740991)]
     notes: Notes | None
+
+
+class Note11(RootModel[str]):
+    root: Annotated[str, Field(max_length=500)]
+
+
+class UnitCostMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Description(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class PaymentDays(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
 class Uuid7(RootModel[str]):
@@ -1289,7 +5096,7 @@ class TraceEvent1(BaseModel):
     actor: Annotated[str, Field(pattern='^[a-z][a-z0-9_.:-]{0,99}$')]
     at: IsoDatetime
     kind: Literal['route', 'skill_load', 'subagent_start', 'subagent_end', 'tool_call', 'tool_result', 'a2a_send', 'a2a_receive', 'finding', 'draft', 'abstain', 'error']
-    payload: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), Payload6 | list[PayloadItem]]
+    payload: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), Payload44 | list[PayloadItem]]
 
 
 class TraceReviewPayload(BaseModel):
@@ -1380,17 +5187,13 @@ class Error(BaseModel):
     error: Annotated[ErrorBody, Field(title='ErrorBody')]
 
 
-class Phone(RootModel[str]):
-    root: Annotated[str, Field(pattern='^\\+[1-9][0-9]{6,14}$')]
-
-
-class Email(RootModel[str]):
+class Email3(RootModel[str]):
     root: Annotated[
         str, Field(max_length=254, pattern='^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
     ]
 
 
-class Consent(BaseModel):
+class Consent2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -1404,8 +5207,247 @@ class StorefrontGuestCreateV1(BaseModel):
     )
     name: Annotated[str, Field(max_length=200, min_length=1)]
     phone: Phone | None
-    email: Email | None
-    consent: Consent
+    email: Email3 | None
+    consent: Consent2
+
+
+class Reason2(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class StorefrontOrderCancelV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    reason: Reason2 | None
+
+
+class StorefrontOrderRescheduleV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    pickup_window_id: Uuid7 | None
+    promised_at: IsoDatetime
+    preview_total_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+
+
+class StorefrontReschedulePreviewRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pickup_window_id: Uuid7 | None
+    promised_at: IsoDatetime
+
+
+class Outlet(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    name: str
+    kind: Literal['restaurant', 'cloud_kitchen', 'store']
+    tz: str
+    address: str
+
+
+class StorefrontOutletsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlets: list[Outlet]
+
+
+class PriceMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Variant2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    variant_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    available: bool
+    price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Option4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    price_delta_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class OptionGroup4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_group_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    min_select: Annotated[int, Field(ge=0, le=9007199254740991)]
+    max_select: Annotated[int, Field(ge=1, le=9007199254740991)]
+    required: bool
+    options: list[Option4]
+
+
+class Item2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    category: str
+    kind: Literal['dish', 'sku', 'combo']
+    available: bool
+    price_minor: PriceMinor | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    variants: list[Variant2]
+    option_groups: list[OptionGroup4]
+
+
+class Deal2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: str
+    windows: list[Any]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo14 | None
+
+
+class StorefrontAcceptingResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    state: Literal['open', 'busy', 'paused', 'closed']
+    busy_extra_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    default_prep_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    next_open: IsoDatetime | None
+    tz: str
+    as_of: IsoDatetime
+
+
+class Window3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pickup_window_id: Uuid7
+    starts_at: IsoDatetime
+    ends_at: IsoDatetime
+    capacity_orders: Annotated[int, Field(ge=1, le=9007199254740991)]
+    booked: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class StorefrontPickupWindowsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    windows: list[Window3]
+
+
+class Guest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    command_id: Uuid7
+    idempotency_key: Annotated[str, Field(pattern='^[A-Za-z0-9_.:-]{8,100}$')]
+    type: Literal['storefront.guest.create.v1']
+    payload: StorefrontGuestCreateV1
+
+
+class Contact(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+
+
+class StorefrontOrderPlaced(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    status: Literal['placed', 'accepted', 'rejected', 'preparing', 'ready', 'completed', 'cancelled']
+    ticket_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    promised_at: IsoDatetime | None
+    pay_at_counter: Literal[True]
+    guest_access_token: str | None
+
+
+class Line58(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    line_discount_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Event(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['status', 'promised_at']
+    from_status: str | None
+    to_status: str | None
+    from_promised_at: IsoDatetime | None
+    to_promised_at: IsoDatetime | None
+    reason: str | None
+    at: IsoDatetime
+
+
+class StorefrontOrderView(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    outlet_id: Uuid7
+    kind: Literal['dine_in', 'takeaway', 'pickup', 'delivery']
+    status: Literal['placed', 'accepted', 'rejected', 'preparing', 'ready', 'completed', 'cancelled']
+    ticket_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    promised_at: IsoDatetime | None
+    pickup_window_id: Uuid7 | None
+    subtotal_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    discount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    created_at: IsoDatetime
+    cancel_window_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    reschedule_window_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    pay_at_counter: Literal[True]
+    lines: list[Line58]
+    events: list[Event]
 
 
 class Owner(BaseModel):
@@ -1496,6 +5538,359 @@ class TenancyDeviceRegisterV1(BaseModel):
     invoice_series: InvoiceSeries | None
 
 
+class Hours(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    opens: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+    closes: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
+class Outlet1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    address: Annotated[str, Field(max_length=500, min_length=1)]
+    tz: Annotated[str | None, Field(pattern='^[A-Za-z]+\\/[A-Za-z_]+$')] = None
+    hours: Hours | None = None
+    tax_ids: dict[constr(pattern=r'^[A-Z][A-Z0-9_]*$'), TaxIdsAdditionalProperty]
+
+
+class TenancyOnboardV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    owner_member_id: Uuid7
+    outlet_id: Uuid7
+    owner_name: Annotated[str, Field(max_length=200, min_length=1)]
+    business_name: Annotated[str, Field(max_length=200, min_length=1)]
+    kind: Literal['restaurant', 'cloud_kitchen', 'shop']
+    country_code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    outlet: Outlet1
+
+
+class UpiVpa(RootModel[str]):
+    root: Annotated[
+        str, Field(pattern='^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9]{1,63}$')
+    ]
+
+
+class TenancyOutletUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    address: Annotated[str | None, Field(max_length=500, min_length=1)] = None
+    tax_ids: dict[constr(pattern=r'^[A-Z][A-Z0-9_]*$'), TaxIdsAdditionalProperty] | None = (
+        None
+    )
+    accepting_orders: Literal['open', 'busy', 'paused'] | None = None
+    busy_extra_min: Annotated[int | None, Field(ge=0, le=240)] = None
+    default_prep_min: Annotated[int | None, Field(ge=0, le=240)] = None
+    cancel_window_min: Annotated[int | None, Field(ge=0, le=1440)] = None
+    reschedule_window_min: Annotated[int | None, Field(ge=0, le=1440)] = None
+    pickup_slot_min: Annotated[int | None, Field(ge=5, le=120)] = None
+    pickup_lead_min: Annotated[int | None, Field(ge=0, le=1440)] = None
+    upi_vpa: UpiVpa | None = None
+    business_day_cutoff: Annotated[
+        str | None, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ] = None
+    hours: Hours | None = None
+
+
+class HomeTz(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[A-Za-z]+\\/[A-Za-z_]+$')]
+
+
+class TenancyTenantUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    home_tz: HomeTz | None = None
+    country_code: Annotated[str | None, Field(pattern='^[A-Z]{2}$')] = None
+    complete_onboarding: Literal[True] | None = None
+
+
+class TenancyMemberBindV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    member_id: Uuid7
+
+
+class IdpSub(RootModel[str]):
+    root: Annotated[str, Field(max_length=256, min_length=1)]
+
+
+class DemoSessionStartV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    member_id: Uuid7
+    outlet_id: Uuid7
+    kind: Literal['restaurant', 'cloud_kitchen', 'shop']
+    country_code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    idp_sub: IdpSub | None
+    judge_label: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class AllowedOrigin(RootModel[str]):
+    root: Annotated[str, Field(pattern='^https?:\\/\\/[^/\\s]+$')]
+
+
+class TenancyStorefrontKeyCreate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key_id: Uuid7
+    channel_id: Uuid7
+    allowed_origins: Annotated[list[AllowedOrigin], Field(max_length=20)]
+
+
+class TenancyStorefrontKeyCreated(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key_id: Uuid7
+    channel_id: Uuid7
+    key: Annotated[str, Field(max_length=256, min_length=16)]
+    created_at: IsoDatetime
+
+
+class Key(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key_id: Uuid7
+    channel_id: Uuid7
+    allowed_origins: list[str]
+    created_at: IsoDatetime
+    revoked_at: IsoDatetime | None
+
+
+class TenancyStorefrontKeyList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    keys: list[Key]
+
+
+class TenancyStorefrontKeyRevoked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key_id: Uuid7
+    revoked_at: IsoDatetime
+
+
+class Tenant(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    tenant_name: Annotated[str, Field(max_length=200, min_length=1)]
+    role: Literal['owner', 'manager', 'staff', 'advisor', 'judge']
+
+
+class TenancyMeTenants(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenants: list[Tenant]
+
+
+class V1AccountProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customer_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    name: str | None
+    phone: Phone | None
+    email: Email | None
+    email_verified_at: IsoDatetime | None
+    consent: Consent2 | None
+    is_guest: bool
+    created_at: IsoDatetime
+
+
+class Order(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    channel_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    kind: Literal['dine_in', 'takeaway', 'pickup', 'delivery']
+    status: Literal['placed', 'accepted', 'rejected', 'preparing', 'ready', 'completed', 'cancelled']
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    ticket_no: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    subtotal_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    discount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    created_at: IsoDatetime
+
+
+class V1AccountOrders(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    orders: list[Order]
+    next_cursor: NextCursor | None
+
+
+class V1AccountOrder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order: Order
+    lines: list[Line]
+
+
+class Entry(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entry_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    seq: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    kind: Literal['earn', 'redeem', 'reverse', 'expire', 'adjust']
+    points: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    balance_after: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    order_id: OrderId | None
+    note: str | None
+    created_at: IsoDatetime
+
+
+class V1AccountLoyalty(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    balance: Balance | None
+    entries: list[Entry]
+
+
+class Order2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order: Order
+    lines: list[Line1]
+
+
+class LoyaltyEntry(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entry_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    seq: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    kind: Literal['earn', 'redeem', 'reverse', 'expire', 'adjust']
+    points: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    balance_after: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    order_id: OrderId | None
+    note: str | None
+    created_at: IsoDatetime
+
+
+class Reservation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reservation_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    name: str
+    phone: Phone | None
+    party_size: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    starts_at: IsoDatetime
+    status: str
+    note: str | None
+    created_at: IsoDatetime
+
+
+class BulkOrder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bulk_order_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    outlet_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    contact_name: str
+    contact_phone: ContactPhone | None
+    deliver_at: IsoDatetime
+    headcount: Headcount | None
+    status: str
+    quote_minor: QuoteMinor | None
+    advance_minor: AdvanceMinor | None
+    currency: Currency | None
+    order_id: OrderId | None
+    note: str | None
+    created_at: IsoDatetime
+
+
+class Export(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format: Literal['munim.customer-export.v1']
+    generated_at: IsoDatetime
+    tenant_id: Annotated[
+        str,
+        Field(pattern='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'),
+    ]
+    profile: V1AccountProfile
+    orders: list[Order2]
+    loyalty_entries: list[LoyaltyEntry]
+    reservations: list[Reservation]
+    bulk_orders: list[BulkOrder]
+
+
+class V1AccountExport(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    command: CommandResult
+    export: Export
+
+
 class DraftsApproveV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1504,7 +5899,7 @@ class DraftsApproveV1(BaseModel):
     command_type: Annotated[
         str, Field(pattern='^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$')
     ]
-    edited_payload: EditedPayload | EditedPayload1 | EditedPayload2 | None
+    edited_payload: EditedPayload | EditedPayload1 | EditedPayload2 | EditedPayload3 | EditedPayload4 | EditedPayload5 | EditedPayload6 | EditedPayload7 | EditedPayload8 | EditedPayload9 | EditedPayload10 | EditedPayload11 | EditedPayload12 | EditedPayload13 | EditedPayload14 | EditedPayload15 | EditedPayload16 | EditedPayload17 | EditedPayload18 | EditedPayload19 | EditedPayload20 | EditedPayload21 | None
     reason: Reason | None
 
 
@@ -1522,7 +5917,7 @@ class ResolvedRef(BaseModel):
     )
     path: Annotated[str, Field(pattern='^(\\/[^/]+)+$')]
     ref: Ref
-    value: str | Value | bool | None
+    value: str | Value4 | bool | None
 
 
 class V1Draft(BaseModel):
@@ -1533,7 +5928,7 @@ class V1Draft(BaseModel):
     command_type: Annotated[
         str, Field(pattern='^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$')
     ]
-    payload: Payload | Payload1 | Payload2
+    payload: Payload | Payload1 | Payload2 | Payload3 | Payload4 | Payload5 | Payload6 | Payload7 | Payload8 | Payload9 | Payload10 | Payload11 | Payload12 | Payload13 | Payload14 | Payload15 | Payload16 | Payload17 | Payload18 | Payload19 | Payload20 | Payload21
     resolved_refs: list[ResolvedRef]
     outlet_ids: list[Uuid7]
     source: Annotated[str, Field(pattern='^(intel:[a-z_]+|import|member)$')]
@@ -1773,7 +6168,7 @@ class CatalogueItemUpsertV1(RootModel[CatalogueItemUpsertV11 | CatalogueItemUpse
     ]
 
 
-class Line2(BaseModel):
+class Line18(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -1797,9 +6192,9 @@ class CatalogueRecipeVersionCreateV1(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo4 | None
     yield_qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
-    lines: Annotated[list[Line2], Field(min_length=1)]
+    lines: Annotated[list[Line18], Field(min_length=1)]
 
 
 class CataloguePriceSetV1(BaseModel):
@@ -1820,7 +6215,97 @@ class CataloguePriceSetV1(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo4 | None
+
+
+class Rule(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['percent_off']
+    bp: Annotated[int, Field(ge=1, le=10000)]
+    item_ids: Annotated[list[Uuid7], Field(max_length=200)]
+
+
+class Rule1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['amount_off']
+    amount_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+    item_ids: Annotated[list[Uuid7], Field(max_length=200)]
+
+
+class Rule2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['buy_x_get_y']
+    buy_qty: Annotated[int, Field(ge=1, le=100)]
+    get_qty: Annotated[int, Field(ge=1, le=100)]
+    item_ids: Annotated[list[Uuid7], Field(max_length=200, min_length=1)]
+
+
+class CatalogueDealUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    rule: Rule | Rule1 | Rule2
+    windows: Annotated[list[Window], Field(max_length=20)]
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=100)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo4 | None
+    active: bool
+
+
+class CatalogueDealEndV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class CatalogueCouponSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_id: Uuid7
+    code: Annotated[str, Field(pattern='^[A-Z0-9][A-Z0-9-]{2,31}$')]
+    kind: Literal['percent', 'amount']
+    value_bp: ValueBp4 | None
+    value_minor: ValueMinor4 | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_spend_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    global_cap: GlobalCap4 | None
+    per_customer_cap: PerCustomerCap4 | None
+    requires_customer: bool
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=100)]
+    valid_from: IsoDatetime
+    valid_to: IsoDatetime | None
+    active: bool
+
+
+class CatalogueAvailabilitySetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    available: bool
 
 
 class ProposalCataloguePriceSetV1(BaseModel):
@@ -1841,7 +6326,636 @@ class ProposalCataloguePriceSetV1(BaseModel):
             pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
         ),
     ]
-    valid_to: ValidTo | None
+    valid_to: ValidTo4 | None
+
+
+class Line19(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    qty_milli: Ref
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    waste_pct_bp: Ref
+
+
+class ProposalCatalogueRecipeVersionCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    recipe_version_id: Uuid7
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    version: Ref
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo4 | None
+    yield_qty_milli: Ref
+    lines: Annotated[list[Line19], Field(min_length=1)]
+
+
+class ProposalCatalogueDealEndV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class ProposalCatalogueCouponSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_id: Uuid7
+    code: Annotated[str, Field(pattern='^[A-Z0-9][A-Z0-9-]{2,31}$')]
+    kind: Literal['percent', 'amount']
+    value_bp: Ref | None
+    value_minor: Ref | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_spend_minor: Ref
+    global_cap: Ref | None
+    per_customer_cap: Ref | None
+    requires_customer: bool
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=100)]
+    valid_from: IsoDatetime
+    valid_to: IsoDatetime | None
+    active: bool
+
+
+class Option2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    price_delta_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class OptionGroup2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_group_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    min_select: Annotated[int, Field(ge=0, le=9007199254740991)]
+    max_select: Annotated[int, Field(ge=1, le=9007199254740991)]
+    required: bool
+    options: list[Option2]
+
+
+class Deal(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: str
+    windows: list[Window1]
+
+
+class Entry1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    kind: Literal['dish', 'sku', 'combo']
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    variant_name_key: VariantNameKey | None
+    category: str
+    barcode: str | None
+    price_id: Uuid7
+    price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    tax_class: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    mrp_minor: MrpMinor2 | None
+    available: bool
+    option_groups: list[OptionGroup2]
+    deals: list[Deal]
+
+
+class V1CatalogueMenu(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    channel_kind: Literal['counter', 'table_qr', 'pickup', 'own_site'] | ChannelKind
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    entries: list[Entry1]
+
+
+class OptionGroup3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_group_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    min_select: Annotated[int, Field(ge=0, le=9007199254740991)]
+    max_select: Annotated[int, Field(ge=1, le=9007199254740991)]
+    required: bool
+    options: list[Option2]
+
+
+class Deal1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    deal_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: str
+    windows: list[Window2]
+
+
+class Entry2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    kind: Literal['dish', 'sku', 'combo']
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    variant_name_key: VariantNameKey | None
+    category: str
+    barcode: str | None
+    price_id: Uuid7
+    price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    tax_class: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    mrp_minor: MrpMinor2 | None
+    available: bool
+    option_groups: list[OptionGroup3]
+    deals: list[Deal1]
+
+
+class V1CatalogueBarcode(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    barcode: str
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    on_sale: bool
+    entry: Entry2 | None
+
+
+class ComplianceLicenceUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    licence_id: Uuid7
+    outlet_id: Uuid7 | None
+    kind: Annotated[str, Field(max_length=60, pattern='^[a-z][a-z0-9_]*$')]
+    number: Annotated[str, Field(max_length=200, min_length=1)]
+    issuer: Issuer | None
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo4 | None
+    document_id: Uuid7 | None
+    supersedes_licence_id: Uuid7 | None
+
+
+class ComplianceChecklistUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    checklist_id: Uuid7
+    outlet_id: Uuid7 | None
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    kind: Literal['opening', 'closing', 'hygiene', 'cleaning', 'other']
+    frequency: Literal['daily', 'weekly', 'monthly']
+    due_time: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+    items: Annotated[list[Item1], Field(max_length=100, min_length=1)]
+    active: bool
+
+
+class ComplianceChecklistCompleteV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    run_id: Uuid7
+    checklist_id: Uuid7
+    outlet_id: Uuid7
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    results: dict[constr(pattern=r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$'), bool]
+
+
+class ComplianceTempRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    log_id: Uuid7
+    outlet_id: Uuid7
+    asset_id: Uuid7
+    reading_milli_c: Annotated[int, Field(ge=-60000, le=300000)]
+    read_at: IsoDatetime
+    note: Note | None
+
+
+class ComplianceAssetUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    asset_id: Uuid7
+    outlet_id: Uuid7
+    kind: Literal['chiller', 'freezer', 'hot_holding', 'oven', 'fryer', 'dishwasher', 'air_conditioner', 'generator', 'water_purifier', 'other']
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    make_model: MakeModel | None
+    serial_no: SerialNo | None
+    safe_min_milli_c: SafeMinMilliC | None
+    safe_max_milli_c: SafeMaxMilliC | None
+    installed_on: InstalledOn | None
+    active: bool
+
+
+class ComplianceAmcRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    amc_id: Uuid7
+    asset_id: Uuid7
+    vendor: Annotated[str, Field(max_length=200, min_length=1)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    cost: Cost
+    document_id: Uuid7 | None
+
+
+class ComplianceMaintenanceScheduleV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Uuid7
+    outlet_id: Uuid7
+    asset_id: Uuid7
+    kind: Literal['preventive', 'inspection']
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    estimated_cost_minor: EstimatedCostMinor4 | None
+    vendor_note: VendorNote | None
+
+
+class ComplianceMaintenanceRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Uuid7
+    asset_id: Uuid7
+    kind: Literal['preventive', 'breakdown', 'inspection']
+    done_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    cost_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    vendor: Vendor | None
+    amc_id: Uuid7 | None
+    note: Note | None
+
+
+class ProposalComplianceMaintenanceScheduleV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    maintenance_id: Uuid7
+    outlet_id: Uuid7
+    asset_id: Uuid7
+    kind: Literal['preventive', 'inspection']
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    estimated_cost_minor: Ref | None
+    vendor_note: VendorNote | None
+
+
+class CustomersCustomerUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customer_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+    email: Email | None
+    withdraw_consent: Annotated[list[Literal['email', 'sms']], Field(max_length=2)]
+
+
+class CustomersLoyaltyAdjustV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customer_id: Uuid7
+    points: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class CustomersCampaignCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    channel: Literal['email', 'sms']
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=50)]
+    segment_snapshot_id: Uuid7
+    audience_count: Annotated[int, Field(ge=0, le=9007199254740991)]
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    placeholders: Annotated[list[Placeholder2], Field(max_length=20)]
+    coupon_id: Uuid7 | None
+    send_at: IsoDatetime
+    window_from: IsoDatetime | None
+    window_to: IsoDatetime | None
+
+
+class Placeholder3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+    value: Ref
+
+
+class ProposalCustomersCampaignCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    channel: Literal['email', 'sms']
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=50)]
+    segment_snapshot_id: Uuid7
+    audience_count: Ref
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    placeholders: Annotated[list[Placeholder3], Field(max_length=20)]
+    coupon_id: Uuid7 | None
+    send_at: IsoDatetime
+    window_from: IsoDatetime | None
+    window_to: IsoDatetime | None
+
+
+class CustomersCampaignCancelV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Uuid7
+
+
+class CustomersReservationUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reservation_id: Uuid7
+    outlet_id: Uuid7
+    customer_id: Uuid7 | None
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+    party_size: Annotated[int, Field(ge=1, le=500)]
+    starts_at: IsoDatetime
+    duration_min: Annotated[int, Field(ge=15, le=720)]
+    table_ref: TableRef | None
+    status: Literal['booked', 'seated', 'completed', 'cancelled', 'no_show']
+    note: Note2 | None
+
+
+class CustomersReviewRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    review_id: Uuid7
+    outlet_id: Uuid7
+    channel_id: Uuid7 | None
+    source: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    external_ref: Annotated[str, Field(max_length=200, min_length=1)]
+    rating: Annotated[int, Field(ge=1, le=5)]
+    body: Body | None
+    reviewed_at: IsoDatetime
+
+
+class CustomersBulkOrderUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bulk_order_id: Uuid7
+    outlet_id: Uuid7
+    customer_id: Uuid7 | None
+    contact_name: Annotated[str, Field(max_length=200, min_length=1)]
+    contact_phone: ContactPhone | None
+    deliver_at: IsoDatetime
+    headcount: Headcount1 | None
+    status: Literal['enquiry', 'quoted', 'confirmed', 'delivered', 'cancelled']
+    quote_minor: QuoteMinor1 | None
+    advance_minor: AdvanceMinor1 | None
+    currency: Currency | None
+    order_id: Uuid7 | None
+    note: Note2 | None
+
+
+class V1Customer(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customer_id: Uuid7
+    name: str | None
+    phone: str | None
+    email: str | None
+    consent: Consent
+    has_account: bool
+    erased: bool
+    created_at: IsoDatetime
+
+
+class CustomersCustomerList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customers: list[V1Customer]
+    next_cursor: str | None
+
+
+class V1LoyaltyEntry(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entry_id: Uuid7
+    customer_id: Uuid7
+    seq: Annotated[int, Field(ge=1, le=9007199254740991)]
+    kind: Literal['earn', 'redeem', 'reverse', 'expire', 'adjust']
+    points: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    balance_after: Annotated[int, Field(ge=0, le=9007199254740991)]
+    order_id: Uuid7 | None
+    reverses_id: Uuid7 | None
+    note: str | None
+    created_at: IsoDatetime
+
+
+class CustomersLoyaltyLedger(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    customer_id: Uuid7
+    balance: Annotated[int, Field(ge=0, le=9007199254740991)]
+    balance_entry_id: Uuid7 | None
+    entries: list[V1LoyaltyEntry]
+
+
+class V1CouponUse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_use_id: Uuid7
+    coupon_id: Uuid7
+    order_id: Uuid7
+    customer_id: Uuid7 | None
+    discount_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    applied_by: Uuid7
+    at: IsoDatetime
+
+
+class CustomersCouponUseList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    coupon_uses: list[V1CouponUse]
+
+
+class V1Campaign(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Uuid7
+    name: str
+    channel: Literal['email', 'sms']
+    outlet_ids: list[Uuid7]
+    segment_snapshot_id: Uuid7
+    audience_count: Annotated[int, Field(ge=0, le=9007199254740991)]
+    message_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    coupon_id: Uuid7 | None
+    send_at: IsoDatetime
+    status: Literal['queued', 'sent', 'cancelled']
+    never_auto_sent: Literal[True]
+    created_at: IsoDatetime
+
+
+class CustomersCampaignList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaigns: list[V1Campaign]
+
+
+class V1Reservation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reservation_id: Uuid7
+    outlet_id: Uuid7
+    customer_id: Uuid7 | None
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+    party_size: Annotated[int, Field(ge=1, le=500)]
+    starts_at: IsoDatetime
+    duration_min: Annotated[int, Field(ge=15, le=720)]
+    table_ref: TableRef | None
+    status: Literal['booked', 'seated', 'completed', 'cancelled', 'no_show']
+    note: Note2 | None
+    created_at: IsoDatetime
+
+
+class CustomersReservationList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reservations: list[V1Reservation]
+
+
+class V1Review(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    review_id: Uuid7
+    outlet_id: Uuid7
+    channel_id: Uuid7 | None
+    source: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    external_ref: Annotated[str, Field(max_length=200, min_length=1)]
+    rating: Annotated[int, Field(ge=1, le=5)]
+    body: Body | None
+    reviewed_at: IsoDatetime
+    created_at: IsoDatetime
+
+
+class CustomersReviewList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reviews: list[V1Review]
+
+
+class V1BulkOrder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bulk_order_id: Uuid7
+    outlet_id: Uuid7
+    customer_id: Uuid7 | None
+    contact_name: Annotated[str, Field(max_length=200, min_length=1)]
+    contact_phone: ContactPhone | None
+    deliver_at: IsoDatetime
+    headcount: Headcount1 | None
+    status: Literal['enquiry', 'quoted', 'confirmed', 'delivered', 'cancelled']
+    quote_minor: QuoteMinor1 | None
+    advance_minor: AdvanceMinor1 | None
+    currency: Currency | None
+    order_id: Uuid7 | None
+    note: Note2 | None
+    created_at: IsoDatetime
+
+
+class CustomersBulkOrderList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bulk_orders: list[V1BulkOrder]
 
 
 class Data(BaseModel):
@@ -1947,17 +7061,482 @@ class MunimPurchasingPoCommittedV1(BaseModel):
     data: Data2
 
 
+class Data3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ticket_id: Uuid7
+    order_id: Uuid7
+    outlet_id: Uuid7
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    status: Literal['queued', 'preparing', 'ready', 'done']
+
+
+class MunimKitchenTicketCreatedV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    specversion: Literal['1.0']
+    id: Uuid7
+    time: IsoDatetime
+    datacontenttype: Literal['application/json']
+    tenantid: Uuid7
+    munimrun: Annotated[
+        str, Field(pattern='^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$')
+    ]
+    source: Annotated[
+        str,
+        Field(
+            pattern='^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/kitchen$'
+        ),
+    ]
+    type: Literal['munim.kitchen.ticket.created.v1']
+    subject: Uuid7
+    data: Data3
+
+
+class Data4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ticket_id: Uuid7
+    order_id: Uuid7
+    outlet_id: Uuid7
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    status: Literal['queued', 'preparing', 'ready', 'done']
+    from_status: Literal['queued', 'preparing', 'ready', 'done']
+
+
+class MunimKitchenTicketAdvancedV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    specversion: Literal['1.0']
+    id: Uuid7
+    time: IsoDatetime
+    datacontenttype: Literal['application/json']
+    tenantid: Uuid7
+    munimrun: Annotated[
+        str, Field(pattern='^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$')
+    ]
+    source: Annotated[
+        str,
+        Field(
+            pattern='^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/kitchen$'
+        ),
+    ]
+    type: Literal['munim.kitchen.ticket.advanced.v1']
+    subject: Uuid7
+    data: Data4
+
+
 class MunimEvent(
     RootModel[
         MunimOrdersOrderPlacedV1
         | MunimInventoryMovementRecordedV1
         | MunimPurchasingPoCommittedV1
+        | MunimKitchenTicketCreatedV1
+        | MunimKitchenTicketAdvancedV1
     ]
 ):
     root: Annotated[
-        MunimOrdersOrderPlacedV1 | MunimInventoryMovementRecordedV1 | MunimPurchasingPoCommittedV1,
+        MunimOrdersOrderPlacedV1 | MunimInventoryMovementRecordedV1 | MunimPurchasingPoCommittedV1 | MunimKitchenTicketCreatedV1 | MunimKitchenTicketAdvancedV1,
         Field(title='MunimEvent'),
     ]
+
+
+class FinanceChannelTermsSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    channel_terms_id: Uuid7
+    channel_id: Uuid7
+    commission_bp: Annotated[int, Field(ge=0, le=10000)]
+    ads_opted_in: bool
+    ad_spend_cap_minor: AdSpendCapMinor | None
+    promo_share_bp: Annotated[int, Field(ge=0, le=10000)]
+    payout_cycle_days: Annotated[int, Field(ge=1, le=90)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo4 | None
+
+
+class FinanceExpenseRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    expense_id: Uuid7
+    outlet_id: Uuid7
+    category: Literal['rent', 'utilities', 'repairs', 'marketing', 'packaging', 'bank_charges', 'professional_fees', 'other']
+    incurred_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    amount_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    payee: Annotated[str, Field(max_length=200, min_length=1)]
+    note: Note6 | None
+    document_id: Uuid7 | None
+
+
+class Line20(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    settlement_line_id: Uuid7 | None
+    order_id: Uuid7 | None
+    claimed_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class FinanceDisputeDraftV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Uuid7
+    channel_id: Uuid7
+    basis: Literal['unapproved_ad_fee', 'short_payout', 'missing_payout']
+    lines: list[Line20]
+    total_claimed_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    break_ids: list[Uuid7]
+
+
+class ChecklistItem2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    evidence_ref: RefId
+
+
+class FinancePeriodCloseV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_close_id: Uuid7
+    outlet_id: Uuid7 | None
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    checklist: Annotated[list[ChecklistItem2], Field(min_length=1)]
+    net_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class Posting2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    account_id: Uuid7
+    side: Literal['debit', 'credit']
+    amount_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class FinanceJournalAdjustV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    journal_entry_id: Uuid7
+    entry_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    outlet_id: Uuid7 | None
+    reverses_id: Uuid7 | None
+    postings: Annotated[list[Posting2], Field(min_length=2)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    memo_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class Line21(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    settlement_line_id: Uuid7 | None
+    order_id: Uuid7 | None
+    claimed_minor: Ref
+
+
+class ProposalFinanceDisputeDraftV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Uuid7
+    channel_id: Uuid7
+    basis: Literal['unapproved_ad_fee', 'short_payout', 'missing_payout']
+    lines: list[Line21]
+    total_claimed_minor: Ref
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    break_ids: list[Uuid7]
+
+
+class Posting3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    account_id: Uuid7
+    side: Literal['debit', 'credit']
+    amount_minor: Ref
+
+
+class ProposalFinanceJournalAdjustV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    journal_entry_id: Uuid7
+    entry_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    outlet_id: Uuid7 | None
+    reverses_id: Uuid7 | None
+    postings: Annotated[list[Posting3], Field(min_length=2)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    memo_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class ProposalFinancePeriodCloseV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_close_id: Uuid7
+    outlet_id: Uuid7 | None
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    checklist: Annotated[list[ChecklistItem2], Field(min_length=1)]
+    net_minor: Ref
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class GoalsGoalCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Uuid7
+    outlet_id: Uuid7 | None
+    metric: Literal['net_sales', 'orders']
+    target_value: Annotated[int, Field(gt=0, le=9007199254740991)]
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis_snapshot_id: Uuid7 | None
+
+
+class GoalsGoalUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Uuid7
+    status: Literal['achieved', 'missed', 'cancelled']
+
+
+class GoalsTaskCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Uuid7
+    outlet_id: Uuid7 | None
+    title_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    assignee_member_id: Uuid7
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    finding_id: Uuid7 | None
+
+
+class GoalsTaskUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Uuid7
+    status: Literal['done', 'cancelled'] | None
+    assignee_member_id: Uuid7 | None
+    due_on: DueOn | None
+
+
+class ProposalGoalsGoalCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    goal_id: Uuid7
+    outlet_id: Uuid7 | None
+    metric: Literal['net_sales', 'orders']
+    target_value: Ref
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis_snapshot_id: Uuid7 | None
+
+
+class ProposalGoalsTaskCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    task_id: Uuid7
+    outlet_id: Uuid7 | None
+    title_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    assignee_member_id: Uuid7
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    finding_id: Uuid7 | None
+
+
+class ImportsFormatApproveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format_id: Uuid7
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    header: Annotated[list[HeaderItem], Field(max_length=100, min_length=1)]
+    header_signature: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class ImportsRunCommitV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Uuid7
+
+
+class ProposalImportsFormatApproveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    format_id: Uuid7
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    header: Annotated[list[HeaderItem], Field(max_length=100, min_length=1)]
+    header_signature: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class ProposalImportsRunCommitV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Uuid7
+
+
+class V1ImportsDocument(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    document_id: Uuid7
+    kind: str
+    media_type: str
+    filename: str | None
+    byte_size: Annotated[int, Field(gt=0, le=9007199254740991)]
+    sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    uploaded_by: Uuid7 | None
+    created_at: IsoDatetime
+
+
+class V1ImportsRun(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    import_run_id: Uuid7
+    document_id: Uuid7
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    parser: str | None
+    format_id: Uuid7 | None
+    status: Literal['parsing', 'previewed', 'committed', 'rejected', 'failed']
+    rows_ok: Annotated[int, Field(ge=0, le=9007199254740991)]
+    rows_quarantined: Annotated[int, Field(ge=0, le=9007199254740991)]
+    control_total_minor: ControlTotalMinor | None
+    currency: Currency | None
+    total_matches: bool | None
+    draft_id: Uuid7 | None
+    decision_id: Uuid7 | None
+    created_at: IsoDatetime
+    updated_at: IsoDatetime
+
+
+class V1ImportsUploadResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    duplicate: bool
+    document: V1ImportsDocument
+    run: V1ImportsRun | None
+    header: list[str] | None
+
+
+class V1ImportsRunCreateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    document_id: Uuid7
+
+
+class V1ImportsRunsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    runs: list[V1ImportsRun]
+
+
+class V1ImportsFormatProposeRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    document_id: Uuid7
+    kind: Literal['payout_statement', 'bank_statement', 'pos_export', 'tally_export', 'market_signal']
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    mapping: Annotated[list[MappingItem], Field(max_length=100, min_length=1)]
+
+
+class V1ImportsFormatProposeResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    draft_id: Uuid7
 
 
 class ResolvedRef1(BaseModel):
@@ -1965,7 +7544,7 @@ class ResolvedRef1(BaseModel):
         extra='forbid',
     )
     ref: Ref
-    value: str | Value | bool | None
+    value: str | Value4 | bool | None
 
 
 class V1Finding(BaseModel):
@@ -2088,7 +7667,7 @@ class InternalDraftsRequest(BaseModel):
     command_type: Annotated[
         str, Field(pattern='^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$')
     ]
-    payload: Payload3 | Payload4 | Payload5
+    payload: Payload22 | Payload23 | Payload24 | Payload25 | Payload26 | Payload27 | Payload28 | Payload29 | Payload30 | Payload31 | Payload32 | Payload33 | Payload34 | Payload35 | Payload36 | Payload37 | Payload38 | Payload39 | Payload40 | Payload41 | Payload42 | Payload43
     outlet_ids: list[Uuid7]
     finding_id: Uuid7 | None
     evidence: Annotated[list[RefId], Field(min_length=1)]
@@ -2131,7 +7710,7 @@ class Events(BaseModel):
     actor: Annotated[str, Field(pattern='^[a-z][a-z0-9_.:-]{0,99}$')]
     at: IsoDatetime
     kind: Literal['route', 'skill_load', 'subagent_start', 'subagent_end', 'tool_call', 'tool_result', 'a2a_send', 'a2a_receive', 'finding', 'draft', 'abstain', 'error']
-    payload: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), Payload6 | list[PayloadItem]]
+    payload: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), Payload44 | list[PayloadItem]]
 
 
 class Events1(BaseModel):
@@ -2175,13 +7754,14 @@ class InventoryReorderLevelSetV1(BaseModel):
     par_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
-class Line4(BaseModel):
+class Line30(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     movement_id: Uuid7
     ingredient_id: Uuid7
     batch_id: Uuid7 | None
+    batch: Batch | None
     qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
     unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
     unit_cost: Money
@@ -2194,7 +7774,90 @@ class InventoryStockReceiveV1(BaseModel):
     outlet_id: Uuid7
     source: Literal['opening']
     at: IsoDatetime
-    lines: Annotated[list[Line4], Field(min_length=1)]
+    lines: Annotated[list[Line30], Field(min_length=1)]
+
+
+class InventoryWasteRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    waste_id: Uuid7
+    outlet_id: Uuid7
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    reason: Literal['temperature', 'overprep', 'expired', 'damaged', 'other']
+    note: Note6 | None
+
+
+class Line31(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Uuid7
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    counted_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class InventoryCountSubmitV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    count_id: Uuid7
+    outlet_id: Uuid7
+    lines: Annotated[list[Line31], Field(min_length=1)]
+
+
+class InventoryBatchUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: Uuid7
+    expires_on: ExpiresOn | None
+    mrp_minor: MrpMinor4 | None
+
+
+class Line32(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class InventoryTransferCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Uuid7
+    from_outlet_id: Uuid7
+    to_outlet_id: Uuid7
+    lines: Annotated[list[Line32], Field(min_length=1)]
+
+
+class InventoryTransferReceiveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Uuid7
+
+
+class InventoryExpiredSaleOverrideV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    override_id: Uuid7
+    outlet_id: Uuid7
+    cart_line_id: Uuid7
+    batch_id: Uuid7
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    note: Annotated[str, Field(max_length=500, min_length=1)]
 
 
 class ProposalInventoryReorderLevelSetV1(BaseModel):
@@ -2207,6 +7870,72 @@ class ProposalInventoryReorderLevelSetV1(BaseModel):
     par_qty_milli: Ref
 
 
+class Line33(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Ref
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class ProposalInventoryTransferCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transfer_id: Uuid7
+    from_outlet_id: Uuid7
+    to_outlet_id: Uuid7
+    lines: Annotated[list[Line33], Field(min_length=1)]
+
+
+class Movement(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    movement_id: Uuid7
+    outlet_id: Uuid7
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    kind: Literal['receipt', 'sale_consumption', 'waste', 'transfer_out', 'transfer_in', 'count_adjust', 'supplier_return', 'sale_return']
+    ref_type: RefType | None
+    ref_id: Uuid7 | None
+    unit_cost: Money | None
+    expired_sale_override_id: Uuid7 | None
+    at: IsoDatetime
+
+
+class V1InventoryMovements(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    movements: list[Movement]
+    next_cursor: Uuid7 | None
+
+
+class Batch1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: Uuid7
+    outlet_id: Uuid7
+    ingredient_id: Uuid7
+    batch_code: Annotated[str, Field(min_length=1)]
+    expires_on: ExpiresOn | None
+    received_at: IsoDatetime
+    mrp: Money | None
+
+
+class V1InventoryBatches(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batches: list[Batch1]
+
+
 class KitchenTicketAdvanceV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -2216,16 +7945,184 @@ class KitchenTicketAdvanceV1(BaseModel):
     to_status: Literal['queued', 'preparing', 'ready', 'done']
 
 
-class Line5(BaseModel):
+class KitchenPrepTimeSetV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    outlet_id: Uuid7
+    item_id: Uuid7
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    prep_sec: Annotated[int, Field(ge=1, le=86400)]
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Line34(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class KitchenPrepListCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Uuid7
+    outlet_id: Uuid7
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    lines: Annotated[list[Line34], Field(max_length=200, min_length=1)]
+
+
+class ProposalKitchenPrepTimeSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    item_id: Uuid7
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    prep_sec: Ref
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class Line35(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    qty_milli: Ref
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class ProposalKitchenPrepListCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Uuid7
+    outlet_id: Uuid7
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    lines: Annotated[list[Line35], Field(max_length=200, min_length=1)]
+
+
+class Line36(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    item_id: Uuid7
+    name_key: Annotated[str, Field(max_length=200, min_length=1)]
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    options: list[Any]
+    note: str | None
+
+
+class Ticket(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ticket_id: Uuid7
+    order_id: Uuid7
+    ticket_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    station: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    status: Literal['queued', 'preparing', 'ready', 'done']
+    kind: Literal['dine_in', 'takeaway', 'pickup', 'delivery']
+    table_ref: str | None
+    channel_kind: str
+    started_at: IsoDatetime
+    accepted_at: IsoDatetime | None
+    ready_at: IsoDatetime | None
+    due_at: IsoDatetime | None
+    promised_at: IsoDatetime | None
+    lane: Literal['now', 'later']
+    surface_at: IsoDatetime | None
+    colour: Literal['normal', 'amber', 'red']
+    lines: list[Line36]
+
+
+class V1KdsBoard(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    as_of: IsoDatetime
+    stations: list[Station]
+    tickets: list[Ticket]
+
+
+class Line37(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7 | None
+    item_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class PrepList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    prep_list_id: Uuid7
+    status: Literal['open', 'done', 'cancelled']
+    draft_id: Uuid7 | None
+    lines: list[Line37]
+
+
+class V1KitchenPrepList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    state: Literal['approved', 'waiting', 'none', 'cannot_verify']
+    reason_code: ReasonCode | None
+    prep_list: PrepList | None
+
+
+class Line38(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Uuid7
     item_id: Uuid7
     variant_id: Uuid7 | None
     option_ids: list[Uuid7]
     qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
     barcode: Barcode | None
-    note: Note | None
+    note: Note8 | None
 
 
 class ClientTotals(BaseModel):
@@ -2250,7 +8147,7 @@ class OrdersPlaceV1(BaseModel):
     pickup_window_id: Uuid7 | None
     promised_at: IsoDatetime | None
     external_ref: ExternalRef | None
-    lines: Annotated[list[Line5], Field(min_length=1)]
+    lines: Annotated[list[Line38], Field(min_length=1)]
     coupon_codes: Annotated[list[CouponCode], Field(max_length=5)]
     loyalty_redeem_points: Annotated[int, Field(ge=0, le=9007199254740991)]
     preview_total_minor: PreviewTotalMinor | None
@@ -2274,7 +8171,7 @@ class OrdersPickupWindowGenerateV1(BaseModel):
     capacity_orders: Annotated[int, Field(ge=1, le=1000)]
 
 
-class Line6(BaseModel):
+class Line39(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -2297,10 +8194,10 @@ class OrdersPreviewRequest(BaseModel):
     promised_at: IsoDatetime | None
     coupon_codes: Annotated[list[CouponCode], Field(max_length=5)]
     loyalty_redeem_points: Annotated[int, Field(ge=0, le=9007199254740991)]
-    lines: Annotated[list[Line6], Field(min_length=1)]
+    lines: Annotated[list[Line39], Field(min_length=1)]
 
 
-class Line7(BaseModel):
+class Line40(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -2343,7 +8240,7 @@ class OrdersPreviewResponse(BaseModel):
     priced_at: IsoDatetime
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     tax_rule: TaxRule
-    lines: list[Line7]
+    lines: list[Line40]
     subtotal_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
     discount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
     tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
@@ -2359,7 +8256,7 @@ class OrdersTenderRecordV1(BaseModel):
     order_id: Uuid7
     method: Literal['cash', 'card', 'upi']
     tendered_minor: TenderedMinor | None
-    amount_minor: AmountMinor4 | None
+    amount_minor: AmountMinor9 | None
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     ref: Ref2 | None
 
@@ -2381,6 +8278,681 @@ class V1Tender(BaseModel):
     at: IsoDatetime
 
 
+class OrdersPromisePushBackV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    from_promised_at: IsoDatetime | None
+    to_promised_at: IsoDatetime
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class OrdersVoidRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    void_id: Uuid7
+    order_id: Uuid7
+    order_line_id: Uuid7 | None
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    note: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class OrdersRefundRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    refund_id: Uuid7
+    order_id: Uuid7
+    tender_id: Uuid7 | None
+    method: Literal['cash', 'card', 'upi']
+    amount_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    reason_code: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    note: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class OrdersShiftOpenV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    shift_id: Uuid7
+    outlet_id: Uuid7
+    device_id: Uuid7 | None
+    float_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class OrdersShiftCloseV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    shift_id: Uuid7
+    counted_cash_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Line41(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Uuid7
+    line_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    item_id: Uuid7
+    variant_id: Uuid7 | None
+    option_ids: list[Uuid7]
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    line_discount_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class V1Order(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    outlet_id: Uuid7
+    channel_id: Uuid7
+    device_id: Uuid7 | None
+    kind: Literal['dine_in', 'takeaway', 'pickup', 'delivery']
+    table_ref: str | None
+    status: Literal['placed', 'accepted', 'rejected', 'preparing', 'ready', 'completed', 'cancelled']
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    ticket_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    invoice_fy: InvoiceFy | None
+    invoice_no: InvoiceNo | None
+    promised_at: IsoDatetime | None
+    pickup_window_id: Uuid7 | None
+    subtotal_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    discount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    loyalty_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    paid_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    remaining_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: list[Line41]
+    tenders: list[V1Tender]
+    created_at: IsoDatetime
+
+
+class Line42(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    item_id: Uuid7
+    name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    amount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    discount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    net_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_class: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    components: list[Component]
+
+
+class V1OrderReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    kind: Literal['tax_invoice', 'record']
+    title: str
+    operator: str | None
+    seller: Seller
+    tax_ids: list[TaxId]
+    number: Annotated[str, Field(min_length=1)]
+    date: Annotated[str, Field(min_length=1)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: list[Line42]
+    net_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    components: list[Component]
+
+
+class OrdersPlaceGuestResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    result: CommandResult
+    guest_access_token: GuestAccessToken | None
+
+
+class PeopleStaffUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    member_id: Uuid7 | None
+    outlet_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    pay_basis: Literal['hourly', 'monthly']
+    wage_rate_minor: WageRateMinor | None
+    monthly_salary_minor: MonthlySalaryMinor | None
+    contract_min_per_month: ContractMinPerMonth | None
+    ot_multiplier_bp: Annotated[int, Field(ge=10000, le=40000)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    joined_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    left_on: LeftOn | None
+    active: bool
+
+
+class Shift3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_shift_id: Uuid7
+    staff_id: Uuid7
+    starts_at: IsoDatetime
+    ends_at: IsoDatetime
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+
+
+class PeopleRosterCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Uuid7
+    outlet_id: Uuid7
+    week_start: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    shifts: Annotated[list[Shift3], Field(min_length=1)]
+
+
+class AddShift(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_shift_id: Uuid7
+    staff_id: Uuid7
+    starts_at: IsoDatetime
+    ends_at: IsoDatetime
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+
+
+class EditShift(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_shift_id: Uuid7
+    starts_at: IsoDatetime
+    ends_at: IsoDatetime
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+
+
+class PeopleRosterUpdateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Uuid7
+    cancel_roster: bool
+    add_shifts: list[AddShift]
+    edit_shifts: list[EditShift]
+    cancel_shift_ids: list[Uuid7]
+
+
+class PeopleAttendanceRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attendance_id: Uuid7
+    outlet_id: Uuid7
+    staff_id: Uuid7
+    action: Literal['clock_in', 'clock_out']
+    at: IsoDatetime
+    roster_shift_id: Uuid7 | None
+    source: Literal['device', 'manual']
+
+
+class Line43(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    base_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    overtime_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    advance_recovery_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    tips_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    net_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class PeoplePayrollDraftCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Uuid7
+    outlet_id: Uuid7
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line43], Field(min_length=1)]
+
+
+class PeopleAdvanceRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    advance_id: Uuid7
+    staff_id: Uuid7
+    kind: Literal['given', 'recovered']
+    amount_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    on_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    note: Note9 | None
+
+
+class ManualShare(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    amount_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class PeopleTipPoolRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tip_pool_id: Uuid7
+    outlet_id: Uuid7
+    period_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    period_to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    basis: Literal['equal', 'hours', 'manual']
+    total_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    manual_shares: list[ManualShare]
+    staff_ids: list[Uuid7]
+
+
+class PeopleTrainingRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    training_id: Uuid7
+    staff_id: Uuid7
+    course_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    completed_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    valid_to: ValidTo14 | None
+    document_id: Uuid7 | None
+
+
+class PeopleCandidateUpsertV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    candidate_id: Uuid7
+    outlet_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    phone: Phone | None
+    email: Email2 | None
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    stage: Literal['applied', 'interviewed', 'offered', 'hired', 'rejected', 'withdrawn']
+    source: Source | None
+    note: Note10 | None
+
+
+class ProposalPeopleRosterCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    roster_id: Uuid7
+    outlet_id: Uuid7
+    week_start: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    shifts: Annotated[list[Shift3], Field(min_length=1)]
+
+
+class Line44(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    base_minor: Ref
+    overtime_minor: Ref
+    advance_recovery_minor: Ref
+    tips_minor: Ref
+    net_minor: Ref
+
+
+class ProposalPeoplePayrollDraftCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payroll_draft_id: Uuid7
+    outlet_id: Uuid7
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line44], Field(min_length=1)]
+
+
+class V1PeopleCommandResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    command_id: Uuid7
+    type: Annotated[
+        str, Field(pattern='^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$')
+    ]
+    entity_id: Uuid7
+    committed_at: IsoDatetime
+
+
+class Row(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    iso_week: Annotated[str, Field(pattern='^[0-9]{4}-W[0-9]{2}$')]
+    rostered_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    attended_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    extra_min: Annotated[int, Field(ge=0, le=9007199254740991)]
+    extra_cost_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class V1PeopleOvertimeResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    from_: Annotated[
+        str,
+        Field(
+            alias='from',
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$',
+        ),
+    ]
+    to: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    rows: list[Row]
+
+
+class Line45(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    base_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    overtime_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    advance_recovery_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    tips_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    net_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    outstanding_advance_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+
+
+class V1PeoplePayrollPreviewResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: list[Line45]
+
+
+class PlatformModelRoleRow(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    role: Literal['router', 'reason', 'extract', 'narrate', 'vision', 'embed']
+    provider: Literal['gemini', 'openai', 'openrouter', 'nvidia']
+    model_id: str
+    location: str | None
+    probed_at: IsoDatetime | None
+    updated_at: IsoDatetime
+
+
+class PlatformTenant(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    name: str
+    country_code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    base_currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    status: str
+    is_demo: bool
+    onboarded_at: IsoDatetime | None
+    created_at: IsoDatetime
+
+
+class PlatformCountryPackRow(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    effective_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    status: Literal['draft', 'active', 'retired']
+    created_at: IsoDatetime
+
+
+class PlatformCountryPackDetail(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    effective_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    status: Literal['draft', 'active', 'retired']
+    created_at: IsoDatetime
+    doc: dict[str, Any]
+
+
+class PlatformPlan(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: str
+    name: str
+    limits: dict[str, Any]
+    status: Literal['active', 'retired']
+    created_at: IsoDatetime
+
+
+class PlatformFeatureFlag(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str
+    value_type: Literal['boolean', 'integer', 'text']
+    value: bool | Value4 | str
+    description: str
+    updated_at: IsoDatetime
+
+
+class PlatformBudget(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    limit_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    spent_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class PlatformOperator(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    email: Annotated[
+        str, Field(max_length=254, pattern='^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+    ]
+    active: bool
+    created_at: IsoDatetime
+
+
+class PlatformConfigDraftPropose(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    draft_id: Uuid7 | None = None
+    target: Annotated[str, Field(pattern='^[a-z_]+(:[A-Za-z0-9_.-]+)?$')]
+    patch: dict[str, Any]
+
+
+class PlatformConfigDraft(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    target: str
+    patch: dict[str, Any]
+    before: dict[str, Any] | None
+    status: Literal['proposed', 'applied', 'rejected', 'stale']
+    proposed_by: str
+    decided_by: Uuid7 | None
+    decided_at: IsoDatetime | None
+    reason: str | None
+    created_at: IsoDatetime
+
+
+class PlatformSnapshotMint(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tenant_id: Uuid7
+    template_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params | bool | list[str] | None]
+
+
+class PlatformTenants(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformTenant]
+
+
+class PlatformCountryPacks(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformCountryPackRow]
+
+
+class PlatformPlans(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformPlan]
+
+
+class PlatformFeatureFlags(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformFeatureFlag]
+
+
+class PlatformBudgets(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformBudget]
+
+
+class PlatformModelRoles(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformModelRoleRow]
+
+
+class PlatformOperators(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformOperator]
+
+
+class PlatformConfigDrafts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[PlatformConfigDraft]
+
+
+class Price(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    price_id: Uuid7
+    ingredient_id: Uuid7
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_price_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    observed_at: IsoDatetime
+    source_ref: Annotated[str, Field(max_length=200, min_length=1)]
+
+
 class PurchasingSupplierUpsertV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -2390,9 +8962,10 @@ class PurchasingSupplierUpsertV1(BaseModel):
     kind: Literal['real', 'simulated']
     a2a_card_url: A2aCardUrl | None
     terms: Terms
+    prices: Annotated[list[Price], Field(max_length=200)]
 
 
-class Line8(BaseModel):
+class Line46(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -2412,10 +8985,127 @@ class PurchasingPoCreateV1(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     expected_on: ExpectedOn | None
     negotiation_run_id: Uuid7 | None
-    lines: Annotated[list[Line8], Field(min_length=1)]
+    lines: Annotated[list[Line46], Field(min_length=1)]
 
 
-class Line9(BaseModel):
+class Batch2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: Uuid7
+    batch_code: Annotated[str, Field(max_length=200, min_length=1)]
+    expires_on: ExpiresOn | None
+    mrp_minor: MrpMinor4 | None
+
+
+class Line47(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    grn_line_id: Uuid7
+    po_line_id: Uuid7 | None
+    ingredient_id: Uuid7
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_cost_minor: UnitCostMinor | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    batch: Batch2 | None
+
+
+class PurchasingGrnReceiveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    grn_id: Uuid7
+    outlet_id: Uuid7
+    supplier_id: Uuid7
+    po_id: Uuid7 | None
+    received_at: IsoDatetime | None
+    note: Note11 | None
+    lines: Annotated[list[Line47], Field(min_length=1)]
+
+
+class Line48(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Uuid7
+    po_line_id: Uuid7 | None
+    ingredient_id: Uuid7 | None
+    description: Description | None
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_price_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class PurchasingInvoiceRecordV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_invoice_id: Uuid7
+    supplier_id: Uuid7
+    invoice_no: Annotated[str, Field(max_length=200, min_length=1)]
+    invoice_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    po_id: Uuid7 | None
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    lines: Annotated[list[Line48], Field(min_length=1)]
+
+
+class PurchasingInvoiceApproveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_invoice_id: Uuid7
+
+
+class Line49(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invoice_line_id: Uuid7
+    claimed_minor: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class PurchasingInvoiceDisputeV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Uuid7
+    supplier_invoice_id: Uuid7
+    basis: Literal['overbilled', 'duplicate_invoice', 'other']
+    lines: Annotated[list[Line49], Field(min_length=1)]
+
+
+class Line50(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: Uuid7 | None
+    ingredient_id: Uuid7
+    qty_milli: Annotated[int, Field(gt=0, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class PurchasingSupplierReturnCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Uuid7
+    outlet_id: Uuid7
+    supplier_id: Uuid7
+    goods_received_id: Uuid7 | None
+    reason_code: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+    lines: Annotated[list[Line50], Field(min_length=1)]
+
+
+class Line51(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -2435,7 +9125,246 @@ class ProposalPurchasingPoCreateV1(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     expected_on: ExpectedOn | None
     negotiation_run_id: Uuid7 | None
-    lines: Annotated[list[Line9], Field(min_length=1)]
+    lines: Annotated[list[Line51], Field(min_length=1)]
+
+
+class Line52(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    invoice_line_id: Uuid7
+    claimed_minor: Ref
+
+
+class ProposalPurchasingInvoiceDisputeV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    dispute_id: Uuid7
+    supplier_invoice_id: Uuid7
+    basis: Literal['overbilled', 'duplicate_invoice', 'other']
+    lines: Annotated[list[Line52], Field(min_length=1)]
+
+
+class Line53(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    batch_id: Uuid7 | None
+    ingredient_id: Uuid7
+    qty_milli: Ref
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+
+
+class ProposalPurchasingSupplierReturnCreateV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Uuid7
+    outlet_id: Uuid7
+    supplier_id: Uuid7
+    goods_received_id: Uuid7 | None
+    reason_code: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
+    note: Annotated[str, Field(max_length=200, min_length=1)]
+    lines: Annotated[list[Line53], Field(min_length=1)]
+
+
+class V1Supplier(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    kind: Literal['real', 'simulated']
+    label: Literal['Simulated supplier'] | None
+    a2a_card_url: str | None
+    payment_days: PaymentDays | None
+    notes: str | None
+    active: bool
+    prices: list[Price]
+
+
+class V1Suppliers(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[V1Supplier]
+
+
+class Supplier(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    kind: Literal['real', 'simulated']
+    label: Literal['Simulated supplier'] | None
+
+
+class Line54(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    po_line_id: Uuid7
+    line_no: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    ingredient_id: Uuid7
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class V1PurchaseOrder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    po_id: Uuid7
+    supplier: Supplier
+    outlet_ids: list[Uuid7]
+    status: Literal['committed', 'received', 'cancelled']
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    expected_on: ExpectedOn | None
+    negotiation_run_id: Uuid7 | None
+    created_at: IsoDatetime
+    lines: list[Line54]
+
+
+class V1PurchaseOrders(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[V1PurchaseOrder]
+
+
+class Line55(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    grn_line_id: Uuid7
+    po_line_id: Uuid7 | None
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_cost_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class V1GoodsReceived(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    grn_id: Uuid7
+    outlet_id: Uuid7
+    supplier: Supplier
+    po_id: Uuid7 | None
+    received_at: IsoDatetime
+    received_by: Uuid7
+    note: str | None
+    lines: list[Line55]
+
+
+class V1GoodsReceivedList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[V1GoodsReceived]
+
+
+class Line56(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    line_id: Uuid7
+    line_no: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    po_line_id: Uuid7 | None
+    ingredient_id: Uuid7 | None
+    description: str | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    line_total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Payable(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    payable_id: Uuid7
+    due_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    amount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    status: Literal['open', 'paid', 'disputed', 'void']
+
+
+class V1SupplierInvoice(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_invoice_id: Uuid7
+    supplier: Supplier
+    invoice_no: str
+    invoice_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    po_id: Uuid7 | None
+    subtotal_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    tax_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    total_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    status: Literal['recorded', 'approved', 'disputed', 'void']
+    created_at: IsoDatetime
+    lines: list[Line56]
+    payable: Payable | None
+
+
+class V1SupplierInvoices(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[V1SupplierInvoice]
+
+
+class Line57(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ingredient_id: Uuid7
+    batch_id: Uuid7 | None
+    qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_cost_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class V1SupplierReturn(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_return_id: Uuid7
+    outlet_id: Uuid7
+    supplier: Supplier
+    goods_received_id: Uuid7 | None
+    reason_code: str
+    note: str
+    returned_by: Uuid7
+    returned_at: IsoDatetime
+    lines: list[Line57]
+
+
+class V1SupplierReturns(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[V1SupplierReturn]
 
 
 class TraceEvent2(BaseModel):
@@ -2454,6 +9383,49 @@ class TraceEvent2(BaseModel):
 
 class TraceEvent(RootModel[TraceEvent1 | TraceEvent2]):
     root: Annotated[TraceEvent1 | TraceEvent2, Field(title='TraceEvent')]
+
+
+class StorefrontReschedulePreviewResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order_id: Uuid7
+    promised_at: IsoDatetime
+    current_total_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
+    preview: OrdersPreviewResponse
+
+
+class StorefrontMenuResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    channel_kind: Literal['counter', 'table_qr', 'pickup', 'own_site'] | ChannelKind
+    accepting: StorefrontAcceptingResponse
+    items: list[Item2]
+    deals: list[Deal2]
+    pay_at_counter: Literal[True]
+
+
+class Order4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    command_id: Uuid7
+    idempotency_key: Annotated[str, Field(pattern='^[A-Za-z0-9_.:-]{8,100}$')]
+    type: Literal['orders.place.v1']
+    payload: OrdersPlaceV1
+
+
+class StorefrontOrderPlaceRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    order: Order4
+    guest: Guest | None
+    contact: Contact | None
 
 
 class V1TracesResponse(BaseModel):

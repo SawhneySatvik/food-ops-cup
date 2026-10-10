@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "platform.config-draft-reject",
+  "title": "PlatformConfigDraftReject",
+  "x-munim-module": "platform",
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "reason"
+  ],
+  "additionalProperties": false
+}

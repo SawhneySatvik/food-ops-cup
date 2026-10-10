@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.outlet.update.v1",
+  "title": "TenancyOutletUpdateV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "outlet_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "address": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "tax_ids": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      }
+    },
+    "accepting_orders": {
+      "type": "string",
+      "enum": [
+        "open",
+        "busy",
+        "paused"
+      ]
+    },
+    "busy_extra_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 240
+    },
+    "default_prep_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 240
+    },
+    "cancel_window_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1440
+    },
+    "reschedule_window_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1440
+    },
+    "pickup_slot_min": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120
+    },
+    "pickup_lead_min": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1440
+    },
+    "upi_vpa": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9]{1,63}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "business_day_cutoff": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "hours": {
+      "type": "object",
+      "properties": {
+        "opens": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "closes": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        }
+      },
+      "required": [
+        "opens",
+        "closes"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "outlet_id"
+  ],
+  "additionalProperties": false
+}

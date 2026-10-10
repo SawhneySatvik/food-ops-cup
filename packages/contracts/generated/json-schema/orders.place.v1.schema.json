@@ -101,6 +101,10 @@
       "items": {
         "type": "object",
         "properties": {
+          "line_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
           "item_id": {
             "type": "string",
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -152,6 +156,7 @@
           }
         },
         "required": [
+          "line_id",
           "item_id",
           "variant_id",
           "option_ids",

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customers.data.export.v1",
+  "title": "CustomersDataExportV1",
+  "x-munim-module": "accounts",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "json"
+    }
+  },
+  "required": [
+    "format"
+  ],
+  "additionalProperties": false
+}

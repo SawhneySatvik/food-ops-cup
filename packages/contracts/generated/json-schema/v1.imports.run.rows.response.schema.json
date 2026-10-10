@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.imports.run.rows.response",
+  "title": "V1ImportsRunRowsResponse",
+  "x-munim-module": "imports",
+  "type": "object",
+  "properties": {
+    "staged": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "row_no": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "target_table": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "external_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "row_no",
+          "target_table",
+          "data",
+          "amount_minor",
+          "external_ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "quarantined": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "row_no": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "raw": {
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "required": [
+          "row_no",
+          "raw",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "staged",
+    "quarantined"
+  ],
+  "additionalProperties": false
+}

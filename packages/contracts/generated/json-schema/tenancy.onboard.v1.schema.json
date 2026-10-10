@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tenancy.onboard.v1",
+  "title": "TenancyOnboardV1",
+  "x-munim-module": "tenancy",
+  "type": "object",
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "owner_member_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "outlet_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "owner_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "business_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "restaurant",
+        "cloud_kitchen",
+        "shop"
+      ]
+    },
+    "country_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "outlet": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "tz": {
+          "type": "string",
+          "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+        },
+        "hours": {
+          "type": "object",
+          "properties": {
+            "opens": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "closes": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            }
+          },
+          "required": [
+            "opens",
+            "closes"
+          ],
+          "additionalProperties": false
+        },
+        "tax_ids": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      },
+      "required": [
+        "name",
+        "address",
+        "tax_ids"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "tenant_id",
+    "owner_member_id",
+    "outlet_id",
+    "owner_name",
+    "business_name",
+    "kind",
+    "country_code",
+    "outlet"
+  ],
+  "additionalProperties": false
+}

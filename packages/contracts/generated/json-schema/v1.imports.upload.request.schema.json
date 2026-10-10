@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.imports.upload.request",
+  "title": "V1ImportsUploadRequest",
+  "x-munim-module": "imports",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "payout_statement",
+        "bank_statement",
+        "pos_export",
+        "tally_export",
+        "market_signal"
+      ]
+    },
+    "filename": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "media_type": {
+      "type": "string",
+      "pattern": "^[a-z]+\\/[a-z0-9.+-]+$"
+    },
+    "content_base64": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 7000000
+    }
+  },
+  "required": [
+    "kind",
+    "filename",
+    "media_type",
+    "content_base64"
+  ],
+  "additionalProperties": false
+}

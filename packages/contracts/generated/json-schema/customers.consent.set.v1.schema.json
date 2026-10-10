@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customers.consent.set.v1",
+  "title": "CustomersConsentSetV1",
+  "x-munim-module": "accounts",
+  "type": "object",
+  "properties": {
+    "marketing": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "marketing"
+  ],
+  "additionalProperties": false
+}
