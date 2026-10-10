@@ -1,0 +1,116 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "PLANTEDQUESTION what are suppliers saying about onions?"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/trace",
+  "output": [
+   null,
+   null,
+   null
+  ],
+  "system": "Answer the member's question with the tools you have.\n\nYou are an agent. Your internal name is \"munim\".",
+  "tools": [
+   {
+    "description": "A tool whose call fails.",
+    "name": "boom"
+   },
+   {
+    "description": "Propose a price change draft for a person to approve.",
+    "name": "propose_price",
+    "parameters_json_schema": {
+     "properties": {
+      "price_minor": {
+       "title": "Price Minor",
+       "type": "integer"
+      }
+     },
+     "required": [
+      "price_minor"
+     ],
+     "title": "propose_priceParams",
+     "type": "object"
+    }
+   },
+   {
+    "description": "Read one sales template and return its row count.",
+    "name": "read_sales",
+    "parameters_json_schema": {
+     "properties": {
+      "template": {
+       "title": "Template",
+       "type": "string"
+      }
+     },
+     "required": [
+      "template"
+     ],
+     "title": "read_salesParams",
+     "type": "object"
+    }
+   },
+   {
+    "description": "Ask the simulated suppliers for quotes.",
+    "name": "request_quotes",
+    "parameters_json_schema": {
+     "properties": {
+      "ingredient": {
+       "title": "Ingredient",
+       "type": "string"
+      }
+     },
+     "required": [
+      "ingredient"
+     ],
+     "title": "request_quotesParams",
+     "type": "object"
+    }
+   },
+   {
+    "description": "Search the outlet's documents and reviews.",
+    "name": "search",
+    "parameters_json_schema": {
+     "properties": {
+      "query": {
+       "title": "Query",
+       "type": "string"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "title": "searchParams",
+     "type": "object"
+    }
+   }
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "query": "PLANTEDARG onion supplier chatter"
+       },
+       "name": "search"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 20,
+    "prompt_token_count": 600
+   }
+  }
+ ]
+}
