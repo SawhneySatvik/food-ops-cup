@@ -1,9 +1,10 @@
 {
   "sources": {
-    "sha256": "aeff0664463eba6e20b3817ee9866151a808382879012bfe8b2e0130534db103",
+    "sha256": "ebd13940b3f677e3eddb4de3eca63d1191b8a82d2a323bb1df14239bb58ffae6",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "7ef211308a14666fb9e14238d265da0c390d5f3a9d346eb76b888959119f9c8c",
+      "scripts/ontology.ts": "661de2ffe10c228d12219775f8b5b3e565c7d3b2cd3bd58d854f655a22495699",
       "scripts/roundtrip.py": "14c26d1bb9909b16e30d4734865a99f4602faa74b2425c2baae3cfcb4339c9cd",
       "scripts/stamp.ts": "84ed395baf206e86a017463a5addca56cf6d84b821acd05ff5b0736a4b2bcf1d",
       "scripts/verify_models.py": "aff14e424e6c439be52b6042d271b30c9e347eac6a48fe3269b7e79c8fadcba1",
@@ -23,6 +24,10 @@
       "src/inventory/index.ts": "f143368409ece4afea8ee531d71e866191aea6291e933d54047866dbd6812241",
       "src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
       "src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
+      "src/ontology/actions.ts": "713846a46360863b5d29107e504fd6f465ab7f926ce298079901c9af22dc3a4b",
+      "src/ontology/lint.ts": "6bf298e6a9773960c53936e6aff4396e4a5d0af6f80cb278bffd7bb565d26005",
+      "src/ontology/stamp.ts": "9ceb542b08ee8c73f39d6f66e290193dfa081412d295b8a0ceddac8dec117c2e",
+      "src/ontology/transform.ts": "8124bc743d70aa8fbd0ee41f29b2ef8d0be4010ae323935588dde85237709cd5",
       "src/orders/events.ts": "a3f258b8fe2dbb025a8403b76f533e8b047ecdf636db4a179acef54d66034c7c",
       "src/orders/index.ts": "012cedf40e2e84c3f9bb631f1efa631e42c021f582c1d3ea9d9585c6a50b8701",
       "src/orders/routes.ts": "6cfc6229fc77ecb196e755895b515b6901bb84d2551ae5a0c08117cb8d1233f6",
