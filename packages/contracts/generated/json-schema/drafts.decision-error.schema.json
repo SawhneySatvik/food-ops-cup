@@ -76,7 +76,13 @@
                 "tax_id_missing",
                 "unknown_tax_class",
                 "unknown_channel",
-                "unit_mismatch"
+                "unit_mismatch",
+                "not_applicable",
+                "item_unavailable",
+                "reason_required",
+                "deal_changed",
+                "duplicate_invoice",
+                "guest_cannot_change"
               ]
             },
             {

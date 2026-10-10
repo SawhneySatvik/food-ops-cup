@@ -378,6 +378,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/compliance/licences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Licences (active by default), tenant-wide and in the caller's outlets */
+        get: operations["listLicences"];
+        put?: never;
+        /** compliance.licence.upsert.v1 — record or renew a licence */
+        post: operations["upsertLicence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/licences/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active licences expiring within N days of as_of (outlet-local date) */
+        get: operations["listExpiringLicences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assets in the caller's outlets */
+        get: operations["listAssets"];
+        put?: never;
+        /** compliance.asset.upsert.v1 — add or change an asset */
+        post: operations["upsertAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/checklists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checklists */
+        get: operations["listChecklists"];
+        put?: never;
+        /** compliance.checklist.upsert.v1 — add or change a checklist */
+        post: operations["upsertChecklist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/checklist-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Completed checklist runs, newest first */
+        get: operations["listChecklistRuns"];
+        put?: never;
+        /** compliance.checklist.complete.v1 — complete a checklist for a business date */
+        post: operations["completeChecklist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/temp-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Temperature readings with the asset's own range applied */
+        get: operations["listTempLogs"];
+        put?: never;
+        /** compliance.temp.record.v1 — record a temperature reading (evidence, not a certificate) */
+        post: operations["recordTemp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/amcs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Annual maintenance contracts */
+        get: operations["listAmcs"];
+        put?: never;
+        /** compliance.amc.record.v1 — record an AMC */
+        post: operations["recordAmc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Maintenance rows */
+        get: operations["listMaintenance"];
+        put?: never;
+        /** compliance.maintenance.schedule.v1 — schedule maintenance (intel may draft it) */
+        post: operations["scheduleMaintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/compliance/maintenance/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** compliance.maintenance.record.v1 — record maintenance done */
+        post: operations["recordMaintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customers": {
         parameters: {
             query?: never;
@@ -678,6 +838,76 @@ export interface paths {
         get: operations["exportTally"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Goals in the caller's outlets and the tenant-wide ones */
+        get: operations["listGoals"];
+        put?: never;
+        /** goals.goal.create.v1 — set a goal (intel may draft it) */
+        post: operations["createGoal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/goals/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** goals.goal.update.v1 — close a goal as achieved, missed or cancelled */
+        post: operations["updateGoal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tasks in the caller's outlets and the tenant-wide ones */
+        get: operations["listTasks"];
+        put?: never;
+        /** goals.task.create.v1 — assign a task (intel may draft it) */
+        post: operations["createTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** goals.task.update.v1 — close or reassign a task */
+        post: operations["updateTask"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1706,6 +1936,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/v1/config-drafts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One config draft (404 for an unknown id) */
+        get: operations["getConfigDraft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/v1/config-drafts/{id}:approve": {
         parameters: {
             query?: never;
@@ -2126,7 +2373,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Outlets in the caller's scope */
+        get: operations["listOutlets"];
         put?: never;
         /** tenancy.outlet.create.v1 — add an outlet (owner) */
         post: operations["createOutlet"];
@@ -2160,7 +2408,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Brands */
+        get: operations["listBrands"];
         put?: never;
         /** tenancy.brand.create.v1 — add a brand (owner) */
         post: operations["createBrand"];
@@ -2177,7 +2426,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Sales channels */
+        get: operations["listChannels"];
         put?: never;
         /** tenancy.channel.create.v1 — add a sales channel (owner) */
         post: operations["createChannel"];
@@ -2194,7 +2444,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** POS and KDS devices */
+        get: operations["listDevices"];
         put?: never;
         /** tenancy.device.register.v1 — register a POS or KDS device (owner; manager of that outlet) */
         post: operations["registerDevice"];
@@ -2267,6 +2518,91 @@ export interface paths {
         put?: never;
         /** Create a storefront key; the raw key is returned once (owner) */
         post: operations["createStorefrontKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** tenancy.onboard.v1 — a signed-in person with no tenant creates one: tenant, first outlet, owner membership, pack defaults. The owner's email is the verified IdP email; the same envelope twice makes one tenant */
+        post: operations["onboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where this sign-in is an active member */
+        get: operations["listMyTenants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members:bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** tenancy.member.bind.v1 — the invitee's first sign-in binds the IdP subject to the invited member, once. Tenant from the invite link (X-Munim-Tenant); the email must match the invite AND be verified by the IdP, else 404 */
+        post: operations["bindMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The business's settings row */
+        get: operations["getTenant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Members and their roles (owner only) */
+        get: operations["listMembers"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2481,6 +2817,70 @@ export interface components {
                     order_id: string | null;
                     note: string | null;
                     created_at: components["schemas"]["IsoDatetime"];
+                }[];
+                order_events: {
+                    order_event_id: string;
+                    order_id: string;
+                    /** @enum {string} */
+                    kind: "status" | "promised_at";
+                    from_status: string | null;
+                    to_status: string | null;
+                    from_promised_at: components["schemas"]["IsoDatetime"] | null;
+                    to_promised_at: components["schemas"]["IsoDatetime"] | null;
+                    reason: string | null;
+                    at: components["schemas"]["IsoDatetime"];
+                }[];
+                tenders: {
+                    tender_id: string;
+                    order_id: string;
+                    /** @enum {string} */
+                    method: "cash" | "card" | "upi";
+                    amount_minor: number;
+                    tendered_minor: number | null;
+                    change_minor: number | null;
+                    currency: string;
+                    ref: string | null;
+                    at: components["schemas"]["IsoDatetime"];
+                }[];
+                refunds: {
+                    refund_id: string;
+                    order_id: string;
+                    tender_id: string | null;
+                    /** @enum {string} */
+                    method: "cash" | "card" | "upi";
+                    amount_minor: number;
+                    currency: string;
+                    reason_code: string;
+                    note: string;
+                    at: components["schemas"]["IsoDatetime"];
+                }[];
+                coupon_uses: {
+                    coupon_use_id: string;
+                    coupon_id: string;
+                    order_id: string;
+                    discount_minor: number;
+                    currency: string;
+                    at: components["schemas"]["IsoDatetime"];
+                }[];
+                voids: {
+                    void_id: string;
+                    order_id: string;
+                    order_line_id: string | null;
+                    reason_code: string;
+                    note: string;
+                    amount_minor: number;
+                    currency: string;
+                    at: components["schemas"]["IsoDatetime"];
+                }[];
+                sale_returns: {
+                    sale_return_id: string;
+                    order_id: string;
+                    order_line_id: string;
+                    qty_milli: number;
+                    restock: boolean;
+                    reason_code: string;
+                    note: string;
+                    at: components["schemas"]["IsoDatetime"];
                 }[];
             };
         };
@@ -3704,6 +4104,131 @@ export interface components {
             estimated_cost_minor: components["schemas"]["Ref"] | null;
             vendor_note: string | null;
         };
+        /** V1ComplianceLicences */
+        V1ComplianceLicences: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                kind: string;
+                number: string;
+                issuer: string | null;
+                /** Format: date */
+                valid_from: string;
+                valid_to: string | null;
+                document_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                status: "active" | "superseded" | "lapsed";
+            }[];
+        };
+        /** V1ComplianceLicencesExpiring */
+        V1ComplianceLicencesExpiring: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                kind: string;
+                number: string;
+                /** Format: date */
+                valid_to: string;
+                document_id: components["schemas"]["Uuid7"] | null;
+                days_left: number;
+                expired: boolean;
+            }[];
+        };
+        /** V1ComplianceAssets */
+        V1ComplianceAssets: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "chiller" | "freezer" | "hot_holding" | "oven" | "fryer" | "dishwasher" | "air_conditioner" | "generator" | "water_purifier" | "other";
+                name: string;
+                make_model: string | null;
+                serial_no: string | null;
+                safe_min_milli_c: number | null;
+                safe_max_milli_c: number | null;
+                installed_on: string | null;
+                active: boolean;
+            }[];
+        };
+        /** V1ComplianceTempLogs */
+        V1ComplianceTempLogs: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                asset_id: components["schemas"]["Uuid7"];
+                reading_milli_c: number;
+                read_at: components["schemas"]["IsoDatetime"];
+                recorded_by: components["schemas"]["Uuid7"];
+                note: string | null;
+                /** Format: date */
+                local_date: string;
+                out_of_range: boolean | null;
+            }[];
+        };
+        /** V1ComplianceChecklists */
+        V1ComplianceChecklists: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                name_key: string;
+                /** @enum {string} */
+                kind: "opening" | "closing" | "hygiene" | "cleaning" | "other";
+                /** @enum {string} */
+                frequency: "daily" | "weekly" | "monthly";
+                due_time: string;
+                items: string[];
+                active: boolean;
+            }[];
+        };
+        /** V1ComplianceChecklistRuns */
+        V1ComplianceChecklistRuns: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                checklist_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** Format: date */
+                business_date: string;
+                results: {
+                    [key: string]: boolean;
+                };
+                completed_by: components["schemas"]["Uuid7"];
+                completed_at: components["schemas"]["IsoDatetime"];
+            }[];
+        };
+        /** V1ComplianceAmcs */
+        V1ComplianceAmcs: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                asset_id: components["schemas"]["Uuid7"];
+                vendor: string;
+                /** Format: date */
+                valid_from: string;
+                /** Format: date */
+                valid_to: string;
+                cost_minor: number;
+                currency: string;
+                document_id: components["schemas"]["Uuid7"] | null;
+            }[];
+        };
+        /** V1ComplianceMaintenance */
+        V1ComplianceMaintenance: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                asset_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "preventive" | "breakdown" | "inspection";
+                /** @enum {string} */
+                status: "scheduled" | "done" | "cancelled";
+                due_on: string | null;
+                done_on: string | null;
+                estimated_cost_minor: number | null;
+                cost_minor: number | null;
+                currency: string | null;
+                vendor: string | null;
+                amc_id: components["schemas"]["Uuid7"] | null;
+                note: string | null;
+            }[];
+        };
         /** CustomersCustomerUpsertV1 */
         CustomersCustomerUpsertV1: {
             customer_id: components["schemas"]["Uuid7"];
@@ -4055,8 +4580,157 @@ export interface components {
                 from_status: "queued" | "preparing" | "ready" | "done";
             };
         };
+        /** MunimOrdersOrderStatusChangedV1 */
+        MunimOrdersOrderStatusChangedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.order.status_changed.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                from_status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
+                /** @enum {string} */
+                to_status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
+            };
+        };
+        /** MunimOrdersOrderPromiseChangedV1 */
+        MunimOrdersOrderPromiseChangedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.order.promise_changed.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                reason_code: string;
+            };
+        };
+        /** MunimOrdersTenderRecordedV1 */
+        MunimOrdersTenderRecordedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.tender.recorded.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                tender_id: components["schemas"]["Uuid7"];
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                method: "cash" | "card" | "upi";
+            };
+        };
+        /** MunimOrdersVoidRecordedV1 */
+        MunimOrdersVoidRecordedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.void.recorded.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                void_id: components["schemas"]["Uuid7"];
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                reason_code: string;
+            };
+        };
+        /** MunimOrdersRefundRecordedV1 */
+        MunimOrdersRefundRecordedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.refund.recorded.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                refund_id: components["schemas"]["Uuid7"];
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                method: "cash" | "card" | "upi";
+                reason_code: string;
+            };
+        };
+        /** MunimOrdersShiftOpenedV1 */
+        MunimOrdersShiftOpenedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.shift.opened.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                shift_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                device_id: components["schemas"]["Uuid7"] | null;
+            };
+        };
+        /** MunimOrdersShiftClosedV1 */
+        MunimOrdersShiftClosedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.orders.shift.closed.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                shift_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                device_id: components["schemas"]["Uuid7"] | null;
+            };
+        };
         /** MunimEvent */
-        MunimEvent: components["schemas"]["MunimOrdersOrderPlacedV1"] | components["schemas"]["MunimInventoryMovementRecordedV1"] | components["schemas"]["MunimPurchasingPoCommittedV1"] | components["schemas"]["MunimKitchenTicketCreatedV1"] | components["schemas"]["MunimKitchenTicketAdvancedV1"];
+        MunimEvent: components["schemas"]["MunimOrdersOrderPlacedV1"] | components["schemas"]["MunimInventoryMovementRecordedV1"] | components["schemas"]["MunimPurchasingPoCommittedV1"] | components["schemas"]["MunimKitchenTicketCreatedV1"] | components["schemas"]["MunimKitchenTicketAdvancedV1"] | components["schemas"]["MunimOrdersOrderStatusChangedV1"] | components["schemas"]["MunimOrdersOrderPromiseChangedV1"] | components["schemas"]["MunimOrdersTenderRecordedV1"] | components["schemas"]["MunimOrdersVoidRecordedV1"] | components["schemas"]["MunimOrdersRefundRecordedV1"] | components["schemas"]["MunimOrdersShiftOpenedV1"] | components["schemas"]["MunimOrdersShiftClosedV1"];
         /** FinanceChannelTermsSetV1 */
         FinanceChannelTermsSetV1: {
             channel_terms_id: components["schemas"]["Uuid7"];
@@ -4239,6 +4913,40 @@ export interface components {
             /** Format: date */
             due_on: string;
             finding_id: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1Goals */
+        V1Goals: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                metric: "net_sales" | "orders";
+                target_value: number;
+                currency: string | null;
+                /** Format: date */
+                period_from: string;
+                /** Format: date */
+                due_on: string;
+                /** @enum {string} */
+                status: "active" | "achieved" | "missed" | "cancelled";
+                basis_snapshot_id: components["schemas"]["Uuid7"] | null;
+            }[];
+        };
+        /** V1Tasks */
+        V1Tasks: {
+            items: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                title_key: string;
+                assignee_member_id: components["schemas"]["Uuid7"];
+                /** Format: date */
+                due_on: string;
+                finding_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                status: "open" | "done" | "cancelled";
+                done_at: components["schemas"]["IsoDatetime"] | null;
+                done_by: components["schemas"]["Uuid7"] | null;
+            }[];
         };
         /** ImportsFormatApproveV1 */
         ImportsFormatApproveV1: {
@@ -6094,7 +6802,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -6579,6 +7287,85 @@ export interface components {
                 tenant_name: string;
                 /** @enum {string} */
                 role: "owner" | "manager" | "staff" | "advisor" | "judge";
+            }[];
+        };
+        /** V1Tenant */
+        V1Tenant: {
+            tenant_id: components["schemas"]["Uuid7"];
+            name: string;
+            country_code: string;
+            base_currency: string;
+            fy_start_month: number;
+            /** @enum {string} */
+            status: "active" | "retired";
+            is_demo: boolean;
+            onboarded_at: components["schemas"]["IsoDatetime"] | null;
+            home_tz: string | null;
+        };
+        /** V1Outlets */
+        V1Outlets: {
+            outlets: {
+                id: components["schemas"]["Uuid7"];
+                name: string;
+                /** @enum {string} */
+                kind: "restaurant" | "cloud_kitchen" | "store";
+                tz: string;
+                address: string;
+                tax_ids: {
+                    [key: string]: string;
+                };
+                /** @enum {string} */
+                accepting_orders: "open" | "busy" | "paused";
+                busy_extra_min: number;
+                default_prep_min: number;
+                cancel_window_min: number;
+                reschedule_window_min: number;
+                pickup_slot_min: number;
+                pickup_lead_min: number;
+                upi_vpa: string | null;
+                business_day_cutoff: string;
+            }[];
+        };
+        /** V1Brands */
+        V1Brands: {
+            brands: {
+                id: components["schemas"]["Uuid7"];
+                name: string;
+                outlet_ids: components["schemas"]["Uuid7"][];
+                active: boolean;
+            }[];
+        };
+        /** V1Channels */
+        V1Channels: {
+            channels: {
+                id: components["schemas"]["Uuid7"];
+                name: string;
+                kind: ("counter" | "table_qr" | "pickup" | "own_site") | string;
+                active: boolean;
+            }[];
+        };
+        /** V1Devices */
+        V1Devices: {
+            devices: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "pos" | "kds";
+                invoice_series: string | null;
+                last_seen_at: components["schemas"]["IsoDatetime"] | null;
+            }[];
+        };
+        /** V1Members */
+        V1Members: {
+            members: {
+                id: components["schemas"]["Uuid7"];
+                name: string;
+                email: string;
+                active: boolean;
+                signed_in: boolean;
+                /** @enum {string} */
+                role: "owner" | "manager" | "staff" | "advisor" | "judge";
+                outlet_ids: components["schemas"]["Uuid7"][];
             }[];
         };
     };
@@ -8142,6 +8929,1098 @@ export interface operations {
             };
         };
     };
+    listLicences: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                status?: "active" | "superseded" | "lapsed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceLicences"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    upsertLicence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.licence.upsert.v1";
+                    payload: components["schemas"]["ComplianceLicenceUpsertV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listExpiringLicences: {
+        parameters: {
+            query?: {
+                within_days?: number;
+                as_of?: string;
+                outlet?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceLicencesExpiring"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAssets: {
+        parameters: {
+            query?: {
+                outlet?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceAssets"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    upsertAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.asset.upsert.v1";
+                    payload: components["schemas"]["ComplianceAssetUpsertV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listChecklists: {
+        parameters: {
+            query?: {
+                outlet?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceChecklists"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    upsertChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.checklist.upsert.v1";
+                    payload: components["schemas"]["ComplianceChecklistUpsertV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listChecklistRuns: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                checklist?: string;
+                from?: string;
+                to?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceChecklistRuns"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    completeChecklist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.checklist.complete.v1";
+                    payload: components["schemas"]["ComplianceChecklistCompleteV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listTempLogs: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                asset?: string;
+                from?: string;
+                to?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceTempLogs"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordTemp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.temp.record.v1";
+                    payload: components["schemas"]["ComplianceTempRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAmcs: {
+        parameters: {
+            query?: {
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceAmcs"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordAmc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.amc.record.v1";
+                    payload: components["schemas"]["ComplianceAmcRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listMaintenance: {
+        parameters: {
+            query?: {
+                asset?: string;
+                status?: "scheduled" | "done" | "cancelled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ComplianceMaintenance"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    scheduleMaintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.maintenance.schedule.v1";
+                    payload: components["schemas"]["ComplianceMaintenanceScheduleV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordMaintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "compliance.maintenance.record.v1";
+                    payload: components["schemas"]["ComplianceMaintenanceRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listCustomers: {
         parameters: {
             query?: {
@@ -9362,6 +11241,434 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listGoals: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                status?: "active" | "achieved" | "missed" | "cancelled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Goals"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "goals.goal.create.v1";
+                    payload: components["schemas"]["GoalsGoalCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "goals.goal.update.v1";
+                    payload: components["schemas"]["GoalsGoalUpdateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listTasks: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                assignee?: string;
+                status?: "open" | "done" | "cancelled";
+                due_before?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Tasks"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "goals.task.create.v1";
+                    payload: components["schemas"]["GoalsTaskCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "goals.task.update.v1";
+                    payload: components["schemas"]["GoalsTaskUpdateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13573,6 +15880,64 @@ export interface operations {
             };
         };
     };
+    getConfigDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformConfigDraft"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     approveConfigDraft: {
         parameters: {
             query?: never;
@@ -15502,6 +17867,62 @@ export interface operations {
             };
         };
     };
+    listOutlets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Outlets"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createOutlet: {
         parameters: {
             query?: never;
@@ -15658,6 +18079,62 @@ export interface operations {
             };
         };
     };
+    listBrands: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Brands"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createBrand: {
         parameters: {
             query?: never;
@@ -15735,6 +18212,62 @@ export interface operations {
             };
         };
     };
+    listChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Channels"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createChannel: {
         parameters: {
             query?: never;
@@ -15794,6 +18327,62 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDevices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Devices"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16227,6 +18816,328 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    onboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "tenancy.onboard.v1";
+                    payload: components["schemas"]["TenancyOnboardV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listMyTenants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenancyMeTenants"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    bindMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "tenancy.member.bind.v1";
+                    payload: components["schemas"]["TenancyMemberBindV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Tenant"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Members"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
