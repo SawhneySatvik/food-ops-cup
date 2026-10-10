@@ -3352,6 +3352,124 @@ class InternalTracesBatchResponse(BaseModel):
     last_seq: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
+class InternalBatchResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    inserted: Annotated[int, Field(ge=0, le=9007199254740991)]
+    existing: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class CoreRef(RootModel[str]):
+    root: Annotated[str, Field(pattern='^core\\.[a-z_]+:[0-9a-f-]{36}$')]
+
+
+class Object(RootModel[str]):
+    root: Annotated[str, Field(max_length=500, min_length=1)]
+
+
+class SourceRef(RootModel[str]):
+    root: Annotated[str, Field(pattern='^core\\.[a-z_]+:[0-9a-f-]{36}$')]
+
+
+class ValidFrom(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class EmbeddingMicroItem(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class WapeBp(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class BaselineWapeBp(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class BiasBp(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class SlotStart(RootModel[str]):
+    root: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
+class InternalForecastsBatchResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    run_inserted: bool
+    inserted: Annotated[int, Field(ge=0, le=9007199254740991)]
+    existing: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Terms(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class Terms1(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
+
+
+class Pack(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class SeverityLadder(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    critical_minor_gte: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    high_minor_gte: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    medium_minor_gte: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+ThresholdsAdditionalProperty = TypeAliasType(
+    "ThresholdsAdditionalProperty", Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+)
+
+
+class Detectors(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thresholds: dict[str, ThresholdsAdditionalProperty]
+
+
+class OwnerCapMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class Budget(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    owner_cap_minor: OwnerCapMinor | None
+    operator_limit_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    effective_cap_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    spent_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    hard_left_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    level: Literal['ok', 'hard']
+
+
 class ShelfLifeDays(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
@@ -3690,7 +3808,7 @@ class FieldNote(RootModel[str]):
     root: Annotated[str, Field(min_length=1)]
 
 
-class SeverityLadder(BaseModel):
+class SeverityLadder1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -3700,12 +3818,7 @@ class SeverityLadder(BaseModel):
     field_notes: Annotated[list[FieldNote], Field(alias='_notes', min_length=1)]
 
 
-ThresholdsAdditionalProperty = TypeAliasType(
-    "ThresholdsAdditionalProperty", Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
-)
-
-
-class Detectors(BaseModel):
+class Detectors1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -3753,8 +3866,8 @@ class CountryPack(BaseModel):
     expired_sale_override: bool
     status_channels: Annotated[list[Literal['in_app', 'email', 'sms']], Field(min_length=1)]
     cash_rounding_minor: Annotated[int, Field(ge=1, le=9007199254740991)]
-    severity_ladder: SeverityLadder
-    detectors: dict[constr(pattern=r'^[a-z][a-z_]*\.[a-z][a-z0-9_]*$'), Detectors]
+    severity_ladder: SeverityLadder1
+    detectors: dict[constr(pattern=r'^[a-z][a-z_]*\.[a-z][a-z0-9_]*$'), Detectors1]
     chart_of_accounts: Annotated[list[ChartOfAccount], Field(min_length=1)]
     field_unverified: Annotated[list[FieldUnverifiedItem] | None, Field(alias='_unverified', min_length=1)] = None
 
@@ -3827,7 +3940,7 @@ class Notes(RootModel[str]):
     root: Annotated[str, Field(max_length=500)]
 
 
-class Terms(BaseModel):
+class Terms2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -4219,7 +4332,7 @@ class StorefrontReschedulePreviewRequest(BaseModel):
     promised_at: IsoDatetime
 
 
-class Outlet(BaseModel):
+class Outlet1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -4234,7 +4347,7 @@ class StorefrontOutletsResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    outlets: list[Outlet]
+    outlets: list[Outlet1]
 
 
 class PriceMinor(RootModel[int]):
@@ -4523,7 +4636,7 @@ class Hours(BaseModel):
     closes: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
 
 
-class Outlet1(BaseModel):
+class Outlet2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -4545,7 +4658,7 @@ class TenancyOnboardV1(BaseModel):
     business_name: Annotated[str, Field(max_length=200, min_length=1)]
     kind: Literal['restaurant', 'cloud_kitchen', 'shop']
     country_code: Annotated[str, Field(pattern='^[A-Z]{2}$')]
-    outlet: Outlet1
+    outlet: Outlet2
 
 
 class UpiVpa(RootModel[str]):
@@ -4706,7 +4819,7 @@ class V1Tenant(BaseModel):
     home_tz: HomeTz | None
 
 
-class Outlet2(BaseModel):
+class Outlet3(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -4731,7 +4844,7 @@ class V1Outlets(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    outlets: list[Outlet2]
+    outlets: list[Outlet3]
 
 
 class Brand(BaseModel):
@@ -4804,6 +4917,190 @@ class V1Members(BaseModel):
         extra='forbid',
     )
     members: list[Member]
+
+
+class V1AskRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    question: Annotated[str, Field(max_length=2000, min_length=1)]
+    thread_id: Uuid7 | None = None
+
+
+class Turn(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    turn_id: Uuid7
+    turn_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    addressed_to: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
+    tainted: bool
+
+
+class ResolvedRef2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ref: Ref
+    value: str | Value4 | bool | None
+
+
+class Signature(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Literal['answer.signature.via_manager', 'answer.signature.manager']
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | Literal['manager']
+    name_key: Annotated[str, Field(min_length=1)]
+
+
+class Answer(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    envelope: AnswerEnvelope
+    resolved_refs: list[ResolvedRef2]
+    signature: Signature
+
+
+class V1AskResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thread_id: Uuid7
+    turn: Turn
+    answer: Answer
+
+
+class OutletScope6(RootModel[list[Uuid7]]):
+    root: Annotated[list[Uuid7], Field(min_length=1)]
+
+
+class OutletScope7(RootModel[list[Literal['*']]]):
+    root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
+
+
+class SummaryItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    turn_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    answer_id: Uuid7
+    segment: Annotated[int, Field(ge=0, le=9007199254740991)]
+    refs: Annotated[list[RefId], Field(min_length=1)]
+
+
+class ResolvedRef3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ref: Ref
+    value: str | Value4 | bool | None
+
+
+class Answer1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    envelope: AnswerEnvelope
+    resolved_refs: list[ResolvedRef3]
+    signature: Signature
+
+
+class Turn1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    turn_id: Uuid7
+    turn_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    member_id: Uuid7
+    addressed_to: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
+    tainted: bool
+    question: str | None
+    answer: Answer1 | None
+    created_at: IsoDatetime
+
+
+class V1Thread(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thread_id: Uuid7
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
+    created_by: Uuid7
+    outlet_scope: OutletScope6 | OutletScope7
+    created_at: IsoDatetime
+    updated_at: IsoDatetime
+    summary: Annotated[list[SummaryItem], Field(max_length=8)]
+    turns: list[Turn1]
+
+
+class OutletScope8(RootModel[list[Uuid7]]):
+    root: Annotated[list[Uuid7], Field(min_length=1)]
+
+
+class OutletScope9(RootModel[list[Literal['*']]]):
+    root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
+
+
+class Item15(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thread_id: Uuid7
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
+    created_by: Uuid7
+    outlet_scope: OutletScope8 | OutletScope9
+    created_at: IsoDatetime
+    updated_at: IsoDatetime
+
+
+class V1ThreadsResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    items: list[Item15]
+    next_cursor: str | None
+
+
+class SummaryRef(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    turn_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    answer_id: Uuid7
+    segment: Annotated[int, Field(ge=0, le=9007199254740991)]
+    refs: Annotated[list[RefId], Field(min_length=1)]
+
+
+class ThreadsBlock(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    thread_id: Uuid7
+    summary_refs: Annotated[list[SummaryRef], Field(max_length=8)]
+    last_turn_ids: Annotated[list[Uuid7], Field(max_length=3)]
+    tainted: bool
+
+
+class ThreadsIntelAskRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    question: Annotated[str, Field(max_length=2000, min_length=1)]
+    addressed_to: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
+    thread: ThreadsBlock | None
+
+
+class ThreadsIntelAskResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    tainted: bool
 
 
 class V1AccountProfile(BaseModel):
@@ -7239,7 +7536,7 @@ class InternalDraftsRequest(BaseModel):
         extra='forbid',
     )
     draft_id: Uuid7
-    pack: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    pack: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
     command_type: Annotated[str, Field(pattern='^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$')]
     payload: Payload22 | Payload23 | Payload24 | Payload25 | Payload26 | Payload27 | Payload28 | Payload29 | Payload30 | Payload31 | Payload32 | Payload33 | Payload34 | Payload35 | Payload36 | Payload37 | Payload38 | Payload39 | Payload40 | Payload41 | Payload42 | Payload43
     outlet_ids: list[Uuid7]
@@ -7305,6 +7602,287 @@ class InternalTracesBatchRequest(BaseModel):
         extra='forbid',
     )
     events: Annotated[list[Events | Events1], Field(max_length=500, min_length=1)]
+
+
+class Entity(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    kind: Literal['business', 'outlet', 'brand', 'channel', 'item', 'ingredient', 'supplier', 'person', 'customer', 'day', 'other']
+    core_ref: CoreRef | None
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class InternalEntitiesBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entities: Annotated[list[Entity], Field(max_length=500, min_length=1)]
+
+
+class Alias1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    entity_id: Uuid7
+    alias: Annotated[str, Field(max_length=200, min_length=1)]
+    source: Literal['core', 'claim', 'import', 'member']
+
+
+class InternalAliasesBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    aliases: Annotated[list[Alias1], Field(max_length=500, min_length=1)]
+
+
+class Chunk(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    document_id: Uuid7 | None
+    message_id: Uuid7 | None
+    seq: Annotated[int, Field(ge=0, le=9007199254740991)]
+    char_start: Annotated[int, Field(ge=0, le=9007199254740991)]
+    text: Annotated[str, Field(max_length=8000, min_length=1)]
+
+
+class InternalChunksBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    chunks: Annotated[list[Chunk], Field(max_length=500, min_length=1)]
+
+
+class Claim(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    chunk_id: Uuid7 | None
+    message_id: Uuid7 | None
+    span_start: Annotated[int, Field(ge=0, le=9007199254740991)]
+    span_end: Annotated[int, Field(ge=1, le=9007199254740991)]
+    quote: Annotated[str, Field(max_length=2000, min_length=1)]
+    subject_entity_id: Uuid7 | None
+    predicate: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    object: Object | None
+    object_entity_id: Uuid7 | None
+
+
+class InternalClaimsBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    claims: Annotated[list[Claim], Field(max_length=500, min_length=1)]
+
+
+class Edge(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    kind: Literal['uses', 'quoted', 'sold', 'wasted', 'supplies', 'works_at', 'mentions', 'supported_by', 'proposes', 'about', 'contradicts']
+    src_entity_id: Uuid7
+    dst_entity_id: Uuid7
+    claim_id: Uuid7 | None
+    source_ref: SourceRef | None
+    valid_from: ValidFrom | None
+    valid_to: ValidTo15 | None
+
+
+class InternalEdgesBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    edges: Annotated[list[Edge], Field(max_length=500, min_length=1)]
+
+
+class Embedding(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    chunk_id: Uuid7
+    embedding_micro: Annotated[list[EmbeddingMicroItem], Field(max_length=768, min_length=768)]
+
+
+class InternalEmbeddingsBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    embeddings: Annotated[list[Embedding], Field(max_length=100, min_length=1)]
+
+
+class BodyItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    text: Annotated[str, Field(max_length=2000, min_length=1)]
+    refs: list[RefId]
+
+
+class Page(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    entity_id: Uuid7 | None
+    kind: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    slug: Annotated[str, Field(pattern='^[a-z0-9][a-z0-9-]{0,119}$')]
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    version_id: Uuid7
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    body: Annotated[list[BodyItem], Field(max_length=200)]
+
+
+class InternalWikiBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pages: Annotated[list[Page], Field(max_length=50, min_length=1)]
+
+
+class Page1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    status: Literal['stored', 'existing', 'abstained']
+    reason_code: ReasonCode | None
+
+
+class InternalWikiBatchResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pages: list[Page1]
+
+
+class ForecastRun(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    method: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    trained_through: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    horizon_days: Annotated[int, Field(ge=1, le=60)]
+    holdout_days: Annotated[int, Field(ge=0, le=9007199254740991)]
+    wape_bp: WapeBp | None
+    baseline_wape_bp: BaselineWapeBp | None
+    bias_bp: BiasBp | None
+
+
+class Point(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    outlet_id: Uuid7
+    item_id: Uuid7 | None
+    business_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    slot_start: SlotStart | None
+    method: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    lo_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    hi_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    inputs_snapshot_id: Uuid7
+
+
+class InternalForecastsBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    forecast_run: ForecastRun
+    points: Annotated[list[Point], Field(max_length=500)]
+
+
+class Quote(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    supplier_id: Uuid7
+    ingredient_id: Uuid7
+    round: Annotated[int, Field(ge=1, le=3)]
+    qty_milli: Annotated[int, Field(ge=1, le=9007199254740991)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    unit_price_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    min_order_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    payment_days: Annotated[int, Field(ge=0, le=365)]
+    terms: dict[constr(pattern=r'^[a-z][a-z0-9_]{0,39}$'), bool | Terms | Terms1]
+    trace_event_id: Uuid7 | None
+
+
+class InternalQuotesBatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    quotes: Annotated[list[Quote], Field(max_length=100, min_length=1)]
+
+
+class Entry3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    role: Literal['router', 'reason', 'extract', 'narrate', 'vision', 'embed']
+    provider: Literal['gemini', 'openai', 'openrouter', 'nvidia']
+    model_id: Annotated[str, Field(max_length=200, min_length=1)]
+    input_tokens: Annotated[int, Field(ge=0, le=9007199254740991)]
+    output_tokens: Annotated[int, Field(ge=0, le=9007199254740991)]
+    amount_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
+class InternalSpendRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entries: Annotated[list[Entry3], Field(max_length=100, min_length=1)]
+
+
+class Outlet(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Uuid7
+    name: Annotated[str, Field(min_length=1)]
+    kind: Literal['restaurant', 'cloud_kitchen', 'store']
+    tz: Annotated[str, Field(pattern='^[A-Za-z]+\\/[A-Za-z_]+$')]
+    business_date: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class InternalRunFrameResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pack: Pack
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    severity_ladder: SeverityLadder
+    detectors: dict[str, Detectors]
+    outlets: list[Outlet]
+    budget: Budget | None
+    narration: Literal['model', 'template']
 
 
 class InventoryIngredientUpsertV1(BaseModel):
@@ -8639,7 +9217,7 @@ class PurchasingSupplierUpsertV1(BaseModel):
     name: Annotated[str, Field(max_length=200, min_length=1)]
     kind: Literal['real', 'simulated']
     a2a_card_url: A2aCardUrl | None
-    terms: Terms
+    terms: Terms2
     prices: Annotated[list[Price], Field(max_length=200)]
 
 

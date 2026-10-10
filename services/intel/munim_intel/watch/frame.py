@@ -5,19 +5,29 @@
   outlets                 id, kind and business date of every outlet in the run's scope (core's one tz module)
   narration               "model" or "template" — the typed kill switch; the budget's soft cap means "template"
 
-It comes from core's `GET /internal/intel/v1/run-frame` (T-040b, not landed): until then there is no source, and a
-watcher run does nothing rather than guess a country (FrameSource returns None; the app logs `frame_unavailable`).
+It comes from core's `GET /internal/intel/v1/run-frame` (T-040b; `core_frame_source`, the app's default). When core
+cannot give one (unreachable, refused, an unexpected body) the source returns None and a watcher run does nothing
+rather than guess a country (the app logs `frame_unavailable`). The response also carries the month's budget, which
+this Frame does not keep yet (T-042 / T-082a extend it); a watcher needs only the narration mode core derived from the
+budget and the kill switch. An ask's thread excerpt is not in the run-frame: it rides in core's `/ask` body.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
+import httpx
+
+from munim_intel.config import Config, ConfigError
 from munim_intel.detect import Ladder, OutletFrame, Thresholds
 from munim_intel.runtime.context import RunContext
+from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER
+
+log = logging.getLogger("munim_intel.watch.frame")
 
 Narration = Literal["template", "model"]
 
@@ -50,8 +60,44 @@ def frame_from_pack(pack: Mapping[str, Any], outlets: list[dict[str, str]], narr
     )
 
 
+def frame_from_run_frame(body: Mapping[str, Any]) -> Frame:
+    """A Frame from core's run-frame response (packages/contracts/src/internal `internal.run-frame.response`)."""
+    ladder = body["severity_ladder"]
+    narration = body["narration"]
+    if narration not in ("model", "template"):
+        raise ValueError("narration")
+    return Frame(
+        pack_code=body["pack"]["code"],
+        currency=body["currency"],
+        ladder=Ladder(int(ladder["critical_minor_gte"]), int(ladder["high_minor_gte"]), int(ladder["medium_minor_gte"])),
+        detectors={k: {n: int(x) for n, x in v["thresholds"].items()} for k, v in body["detectors"].items()},
+        outlets=tuple(OutletFrame(o["id"], o["kind"], date.fromisoformat(o["business_date"])) for o in body["outlets"]),
+        narration=narration,
+    )
+
+
 FrameSource = Callable[[RunContext], Awaitable[Frame | None]]
 
 
 async def no_frame(_: RunContext) -> Frame | None:
     return None
+
+
+def core_frame_source(cfg: Config, transport: httpx.AsyncBaseTransport | None = None) -> FrameSource:
+    """The run's Frame from core-api, under the run's own token (core takes tenant and scope from it alone). A GET
+    writes nothing; it is not retried — a run without a frame does nothing and the next sweep covers it."""
+
+    async def source(ctx: RunContext) -> Frame | None:
+        try:
+            headers = {"authorization": f"Bearer {ctx.token}", SERVICE_SECRET_HEADER: cfg.service_secret()}
+            async with httpx.AsyncClient(base_url=cfg.core_url, timeout=10.0, transport=transport, headers=headers) as http:
+                res = await http.get(f"{PREFIX}/run-frame")
+            if not res.is_success:
+                log.info("intel: run %s run-frame refused (%s)", ctx.run_id, res.status_code)
+                return None
+            return frame_from_run_frame(res.json())
+        except (httpx.HTTPError, ConfigError, KeyError, TypeError, ValueError) as e:
+            log.warning("intel: run %s run-frame unavailable: %s", ctx.run_id, type(e).__name__)
+            return None
+
+    return source

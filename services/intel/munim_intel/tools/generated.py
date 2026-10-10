@@ -399,4 +399,6 @@ def build_every_tool(ctx: RunContext, client: InternalClient, handles: HandleTab
     ont = ontology if ontology is not None else load_ontology()
     fns, acts = _exposed(ont)
     tools: list[BaseTool] = [ReadTemplateTool(f, client, handles) for f in fns.values()]
-    return tools + [ProposeTool(a, "manager", ctx, client, handles) for a in acts.values()]
+    # Each action posts as the first specialist whose registry entry may propose it (core refuses any other pack, T-040b).
+    owner = {d: sp["id"] for sp in reversed(ont["specialists"]) if sp["kind"] == "specialist" for d in sp["draftables"]}
+    return tools + [ProposeTool(a, owner[t], ctx, client, handles) for t, a in acts.items()]

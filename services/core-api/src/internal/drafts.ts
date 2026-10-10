@@ -5,6 +5,14 @@
 //   0. The pack is a registered specialist that may propose this command type (F8, T-087a registry), else 422.
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
 //      every ref and every based_on cell resolves for this run → else `abstained` + reason, nothing stored.
+//   2b. The number grammar over the payload's PROSE leaves (T-040b, T-080's finding): a model-typed string a person
+//      reads on the draft — a supplier-return note, a maintenance vendor note, a campaign name — carries no free
+//      digit, number word or quotation, exactly as answer prose (04 §4 check 2) → else `abstained` + `number_grammar`.
+//      A prose leaf is a string the proposal schema leaves free: no pattern, format, enum or const (`proseLeafPaths`).
+//      Every other string leaf is EXCEPTED, each fixed by its pattern: ids, refs, dates and times, currency and unit
+//      codes, i18n keys, slugs, and short codes such as a coupon code (`^[A-Z0-9][A-Z0-9-]{2,31}$`, which may hold
+//      digits: a code is an identifier, not a number shown as a fact). imports.* draftables are excepted as a whole:
+//      no specialist may propose them (step 0), so intel never reaches this check with one.
 //   3. Fingerprint (below). An OPEN draft with it → that draft's id, 0 new rows. A draft a person REJECTED with it
 //      within 30 days → `abstained` + `recently_rejected` (the verdict only, never the reason text).
 //   4. Insert, with `expected` copied from each based_on cell (approval re-checks them; changed → stale).
@@ -21,7 +29,7 @@
 import { draftable, type ParsedRef, parseRef } from "@munim/contracts";
 import { DraftsRequest } from "@munim/contracts/internal";
 import { SPECIALIST_REGISTRY } from "@munim/contracts/intel";
-import { validateDraft } from "@munim/core-domain/envelope";
+import { checkGrammar, validateDraft } from "@munim/core-domain/envelope";
 import { canonicalJson, sha256Hex } from "../commit/index.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { Queryable } from "../runtoken/index.ts";
@@ -87,6 +95,41 @@ const requestOf = (d: StoredDraft) => ({
   outlet_ids: d.outlet_ids, finding_id: d.finding_id, evidence: d.evidence, based_on: basedOnRefs(d.based_on),
 });
 
+type JsonSchema = { type?: string | string[]; pattern?: string; format?: string; enum?: unknown[]; const?: unknown;
+  properties?: Record<string, JsonSchema>; items?: JsonSchema; additionalProperties?: boolean | JsonSchema; anyOf?: JsonSchema[]; oneOf?: JsonSchema[]; allOf?: JsonSchema[] };
+const isFree = (s: JsonSchema) => s.pattern === undefined && s.format === undefined && s.enum === undefined && s.const === undefined;
+
+/** Paths of the free string leaves of a command type's proposal schema: `note`, `lines[].note`, `labels.*`. */
+function freeStrings(s: JsonSchema, path: string, out: Set<string>): Set<string> {
+  for (const b of [...(s.anyOf ?? []), ...(s.oneOf ?? []), ...(s.allOf ?? [])]) freeStrings(b, path, out);
+  const types = Array.isArray(s.type) ? s.type : s.type ? [s.type] : [];
+  if (types.includes("string") && isFree(s)) out.add(path);
+  const at = (k: string) => (path ? `${path}.${k}` : k);
+  for (const [k, v] of Object.entries(s.properties ?? {})) freeStrings(v, at(k), out);
+  if (s.items) freeStrings(s.items, `${path}[]`, out);
+  if (s.additionalProperties && typeof s.additionalProperties === "object") freeStrings(s.additionalProperties, at("*"), out);
+  return out;
+}
+const PROSE = new Map<string, Set<string>>();
+export function proseLeafPaths(commandType: string): Set<string> {
+  if (!PROSE.has(commandType)) {
+    const d = draftable(commandType);
+    PROSE.set(commandType, d ? freeStrings(d.proposal.toJSONSchema({ unrepresentable: "any", io: "input" }) as JsonSchema, "", new Set()) : new Set());
+  }
+  return PROSE.get(commandType)!;
+}
+/** The strings of a value at a path's keys (`note`, `lines[]`, `*`). */
+function stringsAt(v: unknown, keys: readonly string[]): string[] {
+  if (keys.length === 0) return typeof v === "string" ? [v] : [];
+  const [k, ...rest] = keys as [string, ...string[]];
+  if (!v || typeof v !== "object") return [];
+  if (k === "*") return Object.values(v).flatMap((x) => stringsAt(x, rest));
+  const x = (v as Record<string, unknown>)[k.endsWith("[]") ? k.slice(0, -2) : k];
+  if (!k.endsWith("[]")) return stringsAt(x, rest);
+  return Array.isArray(x) ? x.flatMap((e) => stringsAt(e, rest)) : [];
+}
+const proseIn = (commandType: string, payload: unknown) => [...proseLeafPaths(commandType)].flatMap((p) => stringsAt(payload, p.split(".")));
+
 const DRAFT_COLS = `id, source, command_type, command_payload, outlet_ids, finding_id, evidence, based_on`;
 
 /** Returns the response body text: stored drafts answer with exactly these bytes on every replay. */
@@ -114,6 +157,7 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   const resolver = dbResolver(c, run.scope);
   const verdict = await validateDraft({ payload: req.payload, based_on: req.based_on }, resolver);
   if (!verdict.ok) return answer({ draft_id: req.draft_id, status: "abstained", reason_code: verdict.reason_code });
+  if (proseIn(req.command_type, req.payload).some((t) => !checkGrammar(t).ok)) return answer({ draft_id: req.draft_id, status: "abstained", reason_code: "number_grammar" });
   for (const e of req.evidence) {
     if ((await resolver.resolve(evidenceRef(e))).status !== "ok") return answer({ draft_id: req.draft_id, status: "abstained", reason_code: "unresolved_ref" });
   }

@@ -20,6 +20,9 @@ export interface InternalConfig {
   watchWindowMs?: number;
   /** Unix ms; injectable so expiry is tested without sleeping. */
   now?: () => number;
+  /** Wall clock of the run-frame (business dates, the budget month) and of spend stamps. Separate from `now` so a
+   *  test can pin the calendar without moving token expiry. */
+  clock?: () => Date;
 }
 
 const configs = new WeakMap<Deps, InternalConfig>();

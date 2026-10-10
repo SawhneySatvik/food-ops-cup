@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi.testclient import TestClient
 
 from conftest import SECRET
@@ -34,8 +35,13 @@ def test_health(cfg: Config) -> None:
     assert (r.status_code, r.json()) == (200, {"status": "ok", "service": "intel", "model_mode": "recorded"})
 
 
+def core_refusing() -> httpx.MockTransport:
+    """core-api answering every call 503: the run-frame is refused, so each run fails closed (no network in tests)."""
+    return httpx.MockTransport(lambda _: httpx.Response(503))
+
+
 def test_events_are_acknowledged_only_with_the_secret_and_each_events_own_tenant(cfg: Config, minted: dict[str, Any]) -> None:
-    client = TestClient(create_app(cfg))
+    client = TestClient(create_app(cfg, core_transport=core_refusing()))
     a, valid, b_token = minted["tenant_a"], minted["tokens"]["valid"], minted["tokens"]["tenant_b"]
     headers = {"x-munim-service-secret": SECRET, "content-type": "application/cloudevents-batch+json"}
     ok = client.post("/events", json=[ce(a, valid, 1), ce(a, valid, 2)], headers=headers)
@@ -50,9 +56,9 @@ def test_events_are_acknowledged_only_with_the_secret_and_each_events_own_tenant
 
 
 def test_fanout_calls_need_a_valid_run_token(cfg: Config, minted: dict[str, Any]) -> None:
-    client = TestClient(create_app(cfg))
+    # Core refuses the run-frame (T-040b's default source): a sweep fails closed — no country guessed, nothing detected.
+    client = TestClient(create_app(cfg, core_transport=core_refusing()))
     run_id = minted["claims"]["valid"]["run_id"]
-    # Without a run-frame source (T-040b) a sweep fails closed: no country is guessed, nothing is detected.
     for path, body in (("/watch:sweep", {"run_id": run_id, "status": "frame_unavailable"}), ("/brief", {"run_id": run_id})):
         ok = client.post(path, headers={"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['valid']}"})
         assert (ok.status_code, ok.json()) == (202, body)

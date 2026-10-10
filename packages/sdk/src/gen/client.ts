@@ -235,5 +235,8 @@ export const OPERATIONS = [
   "GET /v1/members",
   "POST /v1/members/{id}:set-role",
   "POST /v1/members/{id}:deactivate",
-  "POST /v1/storefront-keys/{id}:revoke"
+  "POST /v1/storefront-keys/{id}:revoke",
+  "POST /v1/ask",
+  "GET /v1/threads",
+  "GET /v1/threads/{id}"
 ] as const;

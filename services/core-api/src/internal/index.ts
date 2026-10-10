@@ -7,6 +7,13 @@
 //   POST drafts         → 201 {status: proposed | abstained} (idempotent, open-duplicate merge, recently_rejected)
 //   POST answers        → 201                               POST traces:batch → 201 {inserted, last_seq}
 //   GET  model-roles    → 200 platform.model_role (R36; the board files it under T-040b)
+// T-040b (batches.ts, frame.ts):
+//   POST entities:batch · aliases:batch · chunks:batch · claims:batch · edges:batch · quotes:batch · spend
+//                       → 201 {inserted, existing} (idempotent by id; same id + other body → 409)
+//   POST embeddings:batch → 201, or 503 where 0013 (pgvector) is not applied
+//   POST wiki:batch      → 201 {pages[{status: stored | existing | abstained}]}
+//   POST forecasts:batch → 201 {run_inserted, inserted, existing}
+//   GET  run-frame      → 200 pack, thresholds, outlets, budget, narration
 import { MintSnapshotRequest } from "@munim/contracts";
 import { Hono, type Context } from "hono";
 import { ApiError } from "../lib/errors.ts";
@@ -15,7 +22,11 @@ import { mintSnapshot } from "../modules/evidence/mint.ts";
 import { modelRoles } from "../platform/read.ts";
 import type { OutletScope, Queryable } from "../runtoken/index.ts";
 import { authenticate, type InternalConfig, type Run, runTx } from "./auth.ts";
+import {
+  refusing, writeAliases, writeChunks, writeClaims, writeEdges, writeEmbeddings, writeEntities, writeForecasts, writeQuotes, writeSpend, writeWiki,
+} from "./batches.ts";
 import { writeDraft } from "./drafts.ts";
+import { runFrame } from "./frame.ts";
 import { claimEvent, claimWatch, writeAnswer, writeFinding, writeTraces } from "./writes.ts";
 
 export { configureInternal, type InternalConfig, SERVICE_SECRET_HEADER } from "./auth.ts";
@@ -59,4 +70,19 @@ export const router = new Hono<AppEnv>()
   .get(`${P}/model-roles`, async (c) => {
     const { run } = await authenticate(c);
     return c.json(await runTx(c.var.deps, run, modelRoles), 200);
+  })
+  .post(`${P}/:seg{entities:batch}`, post(201, refusing(writeEntities)))
+  .post(`${P}/:seg{aliases:batch}`, post(201, refusing(writeAliases)))
+  .post(`${P}/:seg{chunks:batch}`, post(201, refusing(writeChunks)))
+  .post(`${P}/:seg{claims:batch}`, post(201, refusing(writeClaims)))
+  .post(`${P}/:seg{edges:batch}`, post(201, refusing(writeEdges)))
+  .post(`${P}/:seg{embeddings:batch}`, post(201, refusing(writeEmbeddings)))
+  .post(`${P}/:seg{wiki:batch}`, post(201, refusing(writeWiki)))
+  .post(`${P}/:seg{forecasts:batch}`, post(201, refusing(writeForecasts)))
+  .post(`${P}/:seg{quotes:batch}`, post(201, refusing(writeQuotes)))
+  .post(`${P}/spend`, post(201, refusing(writeSpend)))
+  .get(`${P}/run-frame`, async (c) => {
+    const { run, cfg } = await authenticate(c);
+    const at = (cfg.clock ?? (() => new Date()))();
+    return c.json(await runTx(c.var.deps, run, (q) => runFrame(q, run, at)), 200);
   });

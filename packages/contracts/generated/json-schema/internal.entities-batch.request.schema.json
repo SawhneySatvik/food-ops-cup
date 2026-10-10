@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal.entities-batch.request",
+  "title": "InternalEntitiesBatchRequest",
+  "x-munim-module": "internal",
+  "type": "object",
+  "properties": {
+    "entities": {
+      "minItems": 1,
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "business",
+              "outlet",
+              "brand",
+              "channel",
+              "item",
+              "ingredient",
+              "supplier",
+              "person",
+              "customer",
+              "day",
+              "other"
+            ]
+          },
+          "core_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^core\\.[a-z_]+:[0-9a-f-]{36}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "core_ref",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "entities"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "threads.intel-ask.response",
+  "title": "ThreadsIntelAskResponse",
+  "x-munim-module": "threads",
+  "type": "object",
+  "properties": {
+    "answer_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "tainted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "answer_id",
+    "tainted"
+  ],
+  "additionalProperties": false
+}

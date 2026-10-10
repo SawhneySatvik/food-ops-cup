@@ -11,7 +11,16 @@
     },
     "pack": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "enum": [
+        "catalogue",
+        "kitchen",
+        "inventory_purchasing",
+        "finance",
+        "people",
+        "customers",
+        "compliance",
+        "market"
+      ]
     },
     "command_type": {
       "type": "string",

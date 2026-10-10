@@ -11,3 +11,17 @@ internal.answers.request
 internal.answers.response
 internal.traces-batch.request
 internal.traces-batch.response
+internal.batch.response
+internal.entities-batch.request
+internal.aliases-batch.request
+internal.chunks-batch.request
+internal.claims-batch.request
+internal.edges-batch.request
+internal.embeddings-batch.request
+internal.wiki-batch.request
+internal.wiki-batch.response
+internal.forecasts-batch.request
+internal.forecasts-batch.response
+internal.quotes-batch.request
+internal.spend.request
+internal.run-frame.response

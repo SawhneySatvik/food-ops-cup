@@ -37,7 +37,7 @@ from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, CoreError
 from munim_intel.runtime.runner import RunFailed
 from munim_intel.smoke import smoke_run
 from munim_intel.watch import sweep
-from munim_intel.watch.frame import Frame, FrameSource, no_frame
+from munim_intel.watch.frame import Frame, FrameSource, core_frame_source
 from munim_intel.watch.pipeline import Report
 
 log = logging.getLogger("munim_intel.app")
@@ -57,10 +57,12 @@ def create_app(
     *,
     now: Callable[[], float] = time.time,
     core_transport: httpx.AsyncBaseTransport | None = None,
-    frame_source: FrameSource = no_frame,
+    frame_source: FrameSource | None = None,
 ) -> FastAPI:
     app = FastAPI(title="munim-intel", docs_url=None, redoc_url=None, openapi_url=None)
     keys: dict[str, Ed25519PublicKey] = {}
+    # T-040b: core's run-frame by default; a test may pass its own source.
+    frame_of = frame_source or core_frame_source(cfg, core_transport)
 
     # Read lazily: core-api creates the key and the secret on its first start, which may follow intel's.
     def public_key() -> Ed25519PublicKey:
@@ -132,7 +134,7 @@ def create_app(
 
     async def watch(ctx: RunContext, work: Callable[[InternalClient, Frame, BaseLlm | None], Awaitable[Report | None]]) -> dict[str, Any]:
         """One watcher run: its Frame (or nothing, fail closed), the narrate model when the Frame allows it, the work."""
-        frame = await frame_source(ctx)
+        frame = await frame_of(ctx)
         if frame is None:
             log.info("intel: run %s frame_unavailable", ctx.run_id)
             return {"status": "frame_unavailable"}

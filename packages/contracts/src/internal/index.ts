@@ -1,10 +1,11 @@
-// /internal/intel/v1 W1 request/response bodies (03-architecture §1.7, §1.9; R25). Caller: intel only,
+// /internal/intel/v1 request/response bodies (03-architecture §1.7, §1.9; R25). Caller: intel only,
 // with a run token AND a service credential. Tenant and outlet scope come only from the run token — no
-// body here carries a tenant_id (04-agent-framework §11 "tenant binding").
+// body here carries a tenant_id or a run_id (04-agent-framework §11 "tenant binding").
 import { z } from "zod";
-import { AnswerEnvelope, FindingEnvelope } from "../shared/envelope.ts";
+import { SPECIALIST_REGISTRY } from "../intel/specialists.ts";
+import { AnswerEnvelope, FindingEnvelope, Segment } from "../shared/envelope.ts";
 import { checkDraftPayload, draftPayload } from "../shared/draftables.ts";
-import { BasisPoints, CommandType, IsoDateTime, Slug, Uuid7 } from "../shared/primitives.ts";
+import { BasisPoints, CommandType, CurrencyCode, IanaZone, IsoDate, IsoDateTime, LocalTime, Slug, Unit, Uuid7 } from "../shared/primitives.ts";
 import { ReasonCode } from "../shared/reason-codes.ts";
 import { RefId, SnapCellRef } from "../shared/refs.ts";
 import type { Route } from "../shared/routes.ts";
@@ -40,11 +41,16 @@ export const FindingsResponse = z.strictObject({
   reason_code: ReasonCode.nullable(),
 });
 
+/** The eight specialist ids of ledger R45 F8 (the registry's `specialist` entries; not the manager, not forecast). */
+export const SpecialistId = z.enum(
+  SPECIALIST_REGISTRY.specialists.filter((s) => s.kind === "specialist").map((s) => s.id) as [string, ...string[]],
+);
+
 export const DraftsRequest = z
   .strictObject({
     draft_id: Uuid7,
     /** The proposing specialist (F8): core stores `source = intel:<pack>`; a cited finding must be of this pack. */
-    pack: z.string().regex(/^[a-z][a-z0-9_]*$/),
+    pack: SpecialistId,
     /** A registered draftable command type (shared/draftables.ts); anything else is refused. */
     command_type: CommandType,
     /** The registered proposal schema: numeric leaves are refs only (R26), no person-edit form. */
@@ -72,6 +78,194 @@ export const AnswersResponse = z.strictObject({ answer_id: Uuid7, abstained: z.b
 export const TracesBatchRequest = z.strictObject({ events: z.array(TraceEventInput).min(1).max(500) });
 export const TracesBatchResponse = z.strictObject({ inserted: z.int().min(0), last_seq: z.int().min(0) });
 
+// ---------------------------------------------------------------------------------------------------------------
+// T-040b (ADR-014 §14 C2): the batch writes. Every batch is idempotent by row id — a retry inserts 0 and answers
+// `existing`; the same id with another body is 409. Ids are intel's (deterministic per input); `run_id` is the token's.
+// A batch is one transaction: one refused row (a quote that is not its source, an id this run cannot see) refuses all.
+// ---------------------------------------------------------------------------------------------------------------
+const rows = <T extends z.ZodType>(item: T, max = 500) => z.array(item).min(1).max(max);
+/** `inserted` rows are new; `existing` were already stored with the same body (a retry). */
+export const BatchResponse = z.strictObject({ inserted: z.int().min(0), existing: z.int().min(0) });
+const CoreRowRef = z.string().regex(/^core\.[a-z_]+:[0-9a-f-]{36}$/);
+const Predicate = z.string().regex(/^[a-z][a-z0-9_]*$/);
+
+export const EntitiesBatchRequest = z.strictObject({
+  entities: rows(z.strictObject({
+    id: Uuid7,
+    kind: z.enum(["business", "outlet", "brand", "channel", "item", "ingredient", "supplier", "person", "customer", "day", "other"]),
+    /** The core row this entity stands for (`core.<table>:<uuid>`), or null for an entity known only from claims. */
+    core_ref: CoreRowRef.nullable(),
+    name: z.string().min(1).max(200),
+  })),
+});
+export const AliasesBatchRequest = z.strictObject({
+  /** `normalized` is core's (NFKC, trimmed, single spaces, lower case) — intel does not send it. */
+  aliases: rows(z.strictObject({ id: Uuid7, entity_id: Uuid7, alias: z.string().min(1).max(200), source: z.enum(["core", "claim", "import", "member"]) })),
+});
+export const ChunksBatchRequest = z.strictObject({
+  chunks: rows(z.strictObject({
+    id: Uuid7,
+    /** Exactly one of document_id / message_id. */
+    document_id: Uuid7.nullable(),
+    message_id: Uuid7.nullable(),
+    seq: z.int().min(0),
+    char_start: z.int().min(0),
+    text: z.string().min(1).max(8000),
+  }).refine((c) => (c.document_id === null) !== (c.message_id === null), { message: "exactly one of document_id, message_id" })),
+});
+export const ClaimsBatchRequest = z.strictObject({
+  claims: rows(z.strictObject({
+    id: Uuid7,
+    /** Exactly one of chunk_id / message_id; `quote` must be that source's text at [span_start, span_end) (MB012). */
+    chunk_id: Uuid7.nullable(),
+    message_id: Uuid7.nullable(),
+    span_start: z.int().min(0),
+    span_end: z.int().min(1),
+    quote: z.string().min(1).max(2000),
+    subject_entity_id: Uuid7.nullable(),
+    predicate: Predicate,
+    object: z.string().min(1).max(500).nullable(),
+    object_entity_id: Uuid7.nullable(),
+  }).refine((c) => (c.chunk_id === null) !== (c.message_id === null) && c.span_end > c.span_start, { message: "one source, span_end > span_start" })),
+});
+export const EdgesBatchRequest = z.strictObject({
+  edges: rows(z.strictObject({
+    id: Uuid7,
+    kind: z.enum(["uses", "quoted", "sold", "wasted", "supplies", "works_at", "mentions", "supported_by", "proposes", "about", "contradicts"]),
+    src_entity_id: Uuid7,
+    dst_entity_id: Uuid7,
+    /** Provenance (02-schema §6): a claim, a core row, or both. */
+    claim_id: Uuid7.nullable(),
+    source_ref: CoreRowRef.nullable(),
+    valid_from: IsoDate.nullable(),
+    valid_to: IsoDate.nullable(),
+  }).refine((e) => e.claim_id !== null || e.source_ref !== null, { message: "claim_id or source_ref" })),
+});
+/** 768 dimensions (gotcha 26), each component in millionths (`embedding_micro`, an integer: no contract carries a
+ *  float). Sets a chunk's embedding once; a chunk that already has one is `existing`. Refused `unavailable` (503)
+ *  where the database has no pgvector column (0013 not applied). */
+export const EMBEDDING_DIMENSIONS = 768;
+export const EmbeddingsBatchRequest = z.strictObject({
+  embeddings: rows(z.strictObject({ chunk_id: Uuid7, embedding_micro: z.array(z.int()).length(EMBEDDING_DIMENSIONS) }), 100),
+});
+/** One new version per page; `body` is cited segments, validated by core as an answer is (grammar, refs resolve). A
+ *  page whose body fails is `abstained` with its reason and nothing of it is stored. `version` = the page's next. */
+export const WikiBatchRequest = z.strictObject({
+  pages: rows(z.strictObject({
+    page_id: Uuid7,
+    entity_id: Uuid7.nullable(),
+    kind: z.string().regex(/^[a-z][a-z0-9_]*$/),
+    slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,119}$/),
+    title: z.string().min(1).max(200),
+    version_id: Uuid7,
+    version: z.int().min(1),
+    body: z.array(Segment).max(200),
+  }), 50),
+});
+export const WikiBatchResponse = z.strictObject({
+  pages: z.array(z.strictObject({ page_id: Uuid7, version: z.int().min(1), status: z.enum(["stored", "existing", "abstained"]), reason_code: ReasonCode.nullable() })),
+});
+/** T-052's output: the run row once (repeat it with each further chunk of points), then ≤ 500 points per call. Points
+ *  are outlet-scoped (a run sees only its outlets) and each names the snapshot its inputs came from (in the run's scope). */
+export const ForecastsBatchRequest = z.strictObject({
+  forecast_run: z.strictObject({
+    id: Uuid7,
+    method: Predicate,
+    trained_through: IsoDate,
+    horizon_days: z.int().min(1).max(60),
+    holdout_days: z.int().min(0),
+    wape_bp: z.int().min(0).nullable(),
+    baseline_wape_bp: z.int().min(0).nullable(),
+    bias_bp: z.int().nullable(),
+  }),
+  points: z.array(z.strictObject({
+    id: Uuid7,
+    outlet_id: Uuid7,
+    /** null = the outlet's 'other' series. */
+    item_id: Uuid7.nullable(),
+    business_on: IsoDate,
+    /** null = the whole day. */
+    slot_start: LocalTime.nullable(),
+    method: Predicate,
+    qty_milli: z.int().min(0),
+    /** lo ≤ qty ≤ hi (the engine's band; with no backtest intel sends lo = hi = qty). */
+    lo_qty_milli: z.int().min(0),
+    hi_qty_milli: z.int().min(0),
+    inputs_snapshot_id: Uuid7,
+  })).max(500),
+});
+export const ForecastsBatchResponse = z.strictObject({ run_inserted: z.boolean(), inserted: z.int().min(0), existing: z.int().min(0) });
+/** Quotes from SIMULATED suppliers only (R22/R23: the DB refuses any other supplier kind). Typed fields from the
+ *  no-tools extractor — supplier prose never reaches this table; `terms` holds flags, counts and codes only. */
+export const QuotesBatchRequest = z.strictObject({
+  quotes: rows(z.strictObject({
+    id: Uuid7,
+    supplier_id: Uuid7,
+    ingredient_id: Uuid7,
+    round: z.int().min(1).max(3),
+    qty_milli: z.int().min(1),
+    unit: Unit,
+    unit_price_minor: z.int().min(0),
+    currency: CurrencyCode,
+    min_order_qty_milli: z.int().min(0),
+    payment_days: z.int().min(0).max(365),
+    terms: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), z.union([z.boolean(), z.int(), z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)])),
+    trace_event_id: Uuid7.nullable(),
+  }), 100),
+});
+/** Model spend per call (04 §10). Stamped by core at receipt (never backdated out of a month); always recorded,
+ *  even past the cap (run tokens are never refused for budget). The currency must be the month's budget currency
+ *  (else the tenant's base currency) — spend in another currency would escape the cap. */
+export const SpendRequest = z.strictObject({
+  entries: rows(z.strictObject({
+    id: Uuid7,
+    role: z.enum(["router", "reason", "extract", "narrate", "vision", "embed"]),
+    provider: z.enum(["gemini", "openai", "openrouter", "nvidia"]),
+    model_id: z.string().min(1).max(200),
+    input_tokens: z.int().min(0),
+    output_tokens: z.int().min(0),
+    amount_minor: z.int().min(0),
+    currency: CurrencyCode,
+  }), 100),
+});
+
+// GET run-frame (04 §1 RunFrame; ADR-014 §6.1 block 5, §14 C1): what a run needs that its token does not carry. An
+// ask's thread excerpt is not here: it rides only in core's `/ask` body (`threads.block`), bound to the run core mints.
+export const RunFrameOutlet = z.strictObject({
+  id: Uuid7,
+  name: z.string().min(1),
+  kind: z.enum(["restaurant", "cloud_kitchen", "store"]),
+  tz: IanaZone,
+  /** The outlet's business date at the frame's instant (core's one tz module, the outlet's cutoff). */
+  business_date: IsoDate,
+});
+/** The month's AI budget (UTC month, F11 O-2; T-090's effectiveCap). effective cap = the lower of the owner's cap (when set, in the budget's currency)
+ *  and the operator's limit; hard_left = effective cap − spent (≤ 0 = `hard`: rules only). No soft threshold is decided yet
+ *  (open item), so `level` is ok | hard. Run tokens are never refused for budget. */
+export const RunFrameBudget = z.strictObject({
+  month: IsoDate,
+  currency: CurrencyCode,
+  owner_cap_minor: z.int().min(0).nullable(),
+  operator_limit_minor: z.int().min(0),
+  effective_cap_minor: z.int().min(0),
+  spent_minor: z.int().min(0),
+  hard_left_minor: z.int(),
+  level: z.enum(["ok", "hard"]),
+});
+export const RunFrameResponse = z.strictObject({
+  pack: z.strictObject({ code: z.string().regex(/^[A-Z]{2}$/), version: z.int().min(1) }),
+  currency: CurrencyCode,
+  /** The pack's monthly-impact ladder L and `detectors.<id>.thresholds` (rule 7: pack data, never code). */
+  severity_ladder: z.strictObject({ critical_minor_gte: z.int(), high_minor_gte: z.int(), medium_minor_gte: z.int() }),
+  detectors: z.record(z.string(), z.strictObject({ thresholds: z.record(z.string(), z.int()) })),
+  /** Outlets in the run's scope, by id. */
+  outlets: z.array(RunFrameOutlet),
+  /** null: the operator set no budget for this month → rules only. */
+  budget: RunFrameBudget.nullable(),
+  /** `model` only with AI on (`intel.enabled`), a budget, and level `ok`; else `template` (rule 11). */
+  narration: z.enum(["model", "template"]),
+});
+
 export const SCHEMAS = {
   "internal.events-claim.request": EventsClaimRequest,
   "internal.events-claim.response": EventsClaimResponse,
@@ -86,6 +280,20 @@ export const SCHEMAS = {
   "internal.answers.response": AnswersResponse,
   "internal.traces-batch.request": TracesBatchRequest,
   "internal.traces-batch.response": TracesBatchResponse,
+  "internal.batch.response": BatchResponse,
+  "internal.entities-batch.request": EntitiesBatchRequest,
+  "internal.aliases-batch.request": AliasesBatchRequest,
+  "internal.chunks-batch.request": ChunksBatchRequest,
+  "internal.claims-batch.request": ClaimsBatchRequest,
+  "internal.edges-batch.request": EdgesBatchRequest,
+  "internal.embeddings-batch.request": EmbeddingsBatchRequest,
+  "internal.wiki-batch.request": WikiBatchRequest,
+  "internal.wiki-batch.response": WikiBatchResponse,
+  "internal.forecasts-batch.request": ForecastsBatchRequest,
+  "internal.forecasts-batch.response": ForecastsBatchResponse,
+  "internal.quotes-batch.request": QuotesBatchRequest,
+  "internal.spend.request": SpendRequest,
+  "internal.run-frame.response": RunFrameResponse,
 };
 
 const P = "/internal/intel/v1";
@@ -112,4 +320,18 @@ export const ROUTES: readonly Route[] = [
   // ADR-014 §14 C2 (filed under T-040b on the board; served by T-040 for T-041's live role lookup).
   { surface: "internal", method: "get", path: `${P}/model-roles`, operationId: "getModelRoles", summary: "Provider + model per role (R36), read-only",
     auth: "intel", response: "platform.model-roles", status: 200 },
+  // T-040b: the batch writes and the run-frame (ADR-014 §14 C1, C2).
+  intel("entities:batch", "writeEntities", "Knowledge entities (idempotent by id)", "internal.entities-batch.request", "internal.batch.response", 201, true),
+  intel("aliases:batch", "writeAliases", "Entity aliases (idempotent by id)", "internal.aliases-batch.request", "internal.batch.response", 201, true),
+  intel("chunks:batch", "writeChunks", "Text chunks of documents and messages (idempotent by id)", "internal.chunks-batch.request", "internal.batch.response", 201, true),
+  intel("claims:batch", "writeClaims", "Extracted claims; each quote must be its source span (MB012 refuses the batch)", "internal.claims-batch.request", "internal.batch.response", 201, true),
+  intel("edges:batch", "writeEdges", "Graph edges with provenance (idempotent by id)", "internal.edges-batch.request", "internal.batch.response", 201, true),
+  intel("embeddings:batch", "writeEmbeddings", "Chunk embeddings, 768-d, set once", "internal.embeddings-batch.request", "internal.batch.response", 201, true),
+  intel("wiki:batch", "writeWiki", "Wiki page versions of validated cited segments", "internal.wiki-batch.request", "internal.wiki-batch.response", 201, true),
+  intel("forecasts:batch", "writeForecasts", "A forecast run and its points (T-052 output)", "internal.forecasts-batch.request", "internal.forecasts-batch.response", 201, true),
+  intel("quotes:batch", "writeQuotes", "Simulated-supplier quotes as typed fields", "internal.quotes-batch.request", "internal.batch.response", 201, true),
+  intel("spend", "writeSpend", "Model spend per call; always recorded, stamped by core", "internal.spend.request", "internal.batch.response", 201, true),
+  { surface: "internal", method: "get", path: `${P}/run-frame`, operationId: "getRunFrame",
+    summary: "The run's pack, thresholds, outlets with business dates, AI budget and narration mode",
+    auth: "intel", response: "internal.run-frame.response", status: 200 },
 ];

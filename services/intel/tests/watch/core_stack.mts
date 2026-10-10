@@ -55,7 +55,8 @@ async function main() {
     keys: { privateKeyPem: keys.privateKey.export({ type: "pkcs8", format: "pem" }).toString(), publicKeyPem },
     intelUrl: stub.url, serviceSecret: SECRET,
   });
-  configureInternal(api.deps, { serviceSecret: SECRET, keys: api.keys, watchWindowMs: 0 });
+  // T-040b: the run-frame's clock is pinned to noon IST on AS_OF, so core's business dates equal the profile's "today".
+  configureInternal(api.deps, { serviceSecret: SECRET, keys: api.keys, watchWindowMs: 0, clock: () => new Date(`${AS_OF}T06:30:00Z`) });
   const served = await serveApi(api.app, 0);
   const svcPool = createPool(url("munim_svc"), 2);
   const timer = setInterval(() => void parsePendingImports({ pool: svcPool, blobs, log: () => {} }).catch(() => {}), 150);

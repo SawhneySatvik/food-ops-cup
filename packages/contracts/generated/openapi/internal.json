@@ -678,6 +678,1020 @@
           }
         }
       }
+    },
+    "/internal/intel/v1/entities:batch": {
+      "post": {
+        "operationId": "writeEntities",
+        "summary": "Knowledge entities (idempotent by id)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalEntitiesBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/aliases:batch": {
+      "post": {
+        "operationId": "writeAliases",
+        "summary": "Entity aliases (idempotent by id)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalAliasesBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/chunks:batch": {
+      "post": {
+        "operationId": "writeChunks",
+        "summary": "Text chunks of documents and messages (idempotent by id)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalChunksBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/claims:batch": {
+      "post": {
+        "operationId": "writeClaims",
+        "summary": "Extracted claims; each quote must be its source span (MB012 refuses the batch)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalClaimsBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/edges:batch": {
+      "post": {
+        "operationId": "writeEdges",
+        "summary": "Graph edges with provenance (idempotent by id)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalEdgesBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/embeddings:batch": {
+      "post": {
+        "operationId": "writeEmbeddings",
+        "summary": "Chunk embeddings, 768-d, set once",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalEmbeddingsBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/wiki:batch": {
+      "post": {
+        "operationId": "writeWiki",
+        "summary": "Wiki page versions of validated cited segments",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalWikiBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalWikiBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/forecasts:batch": {
+      "post": {
+        "operationId": "writeForecasts",
+        "summary": "A forecast run and its points (T-052 output)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalForecastsBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalForecastsBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/quotes:batch": {
+      "post": {
+        "operationId": "writeQuotes",
+        "summary": "Simulated-supplier quotes as typed fields",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalQuotesBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/spend": {
+      "post": {
+        "operationId": "writeSpend",
+        "summary": "Model spend per call; always recorded, stamped by core",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalSpendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/intel/v1/run-frame": {
+      "get": {
+        "operationId": "getRunFrame",
+        "summary": "The run's pack, thresholds, outlets with business dates, AI budget and narration mode",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalRunFrameResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15598,7 +16612,16 @@
           },
           "pack": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
+            "enum": [
+              "catalogue",
+              "kitchen",
+              "inventory_purchasing",
+              "finance",
+              "people",
+              "customers",
+              "compliance",
+              "market"
+            ]
           },
           "command_type": {
             "type": "string",
@@ -17383,6 +18406,1201 @@
         "required": [
           "inserted",
           "last_seq"
+        ],
+        "additionalProperties": false
+      },
+      "InternalBatchResponse": {
+        "title": "InternalBatchResponse",
+        "x-munim-contract": "internal.batch.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "inserted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "existing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "inserted",
+          "existing"
+        ],
+        "additionalProperties": false
+      },
+      "InternalEntitiesBatchRequest": {
+        "title": "InternalEntitiesBatchRequest",
+        "x-munim-contract": "internal.entities-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "entities": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "business",
+                    "outlet",
+                    "brand",
+                    "channel",
+                    "item",
+                    "ingredient",
+                    "supplier",
+                    "person",
+                    "customer",
+                    "day",
+                    "other"
+                  ]
+                },
+                "core_ref": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^core\\.[a-z_]+:[0-9a-f-]{36}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "core_ref",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entities"
+        ],
+        "additionalProperties": false
+      },
+      "InternalAliasesBatchRequest": {
+        "title": "InternalAliasesBatchRequest",
+        "x-munim-contract": "internal.aliases-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "aliases": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "entity_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "alias": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "core",
+                    "claim",
+                    "import",
+                    "member"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "entity_id",
+                "alias",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "aliases"
+        ],
+        "additionalProperties": false
+      },
+      "InternalChunksBatchRequest": {
+        "title": "InternalChunksBatchRequest",
+        "x-munim-contract": "internal.chunks-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "chunks": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "document_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "message_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "char_start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "id",
+                "document_id",
+                "message_id",
+                "seq",
+                "char_start",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "chunks"
+        ],
+        "additionalProperties": false
+      },
+      "InternalClaimsBatchRequest": {
+        "title": "InternalClaimsBatchRequest",
+        "x-munim-contract": "internal.claims-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "claims": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "chunk_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "message_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "span_start": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "span_end": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "subject_entity_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "predicate": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "object": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "object_entity_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "chunk_id",
+                "message_id",
+                "span_start",
+                "span_end",
+                "quote",
+                "subject_entity_id",
+                "predicate",
+                "object",
+                "object_entity_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "additionalProperties": false
+      },
+      "InternalEdgesBatchRequest": {
+        "title": "InternalEdgesBatchRequest",
+        "x-munim-contract": "internal.edges-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "edges": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "uses",
+                    "quoted",
+                    "sold",
+                    "wasted",
+                    "supplies",
+                    "works_at",
+                    "mentions",
+                    "supported_by",
+                    "proposes",
+                    "about",
+                    "contradicts"
+                  ]
+                },
+                "src_entity_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "dst_entity_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "claim_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "source_ref": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^core\\.[a-z_]+:[0-9a-f-]{36}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "valid_from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "valid_to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "src_entity_id",
+                "dst_entity_id",
+                "claim_id",
+                "source_ref",
+                "valid_from",
+                "valid_to"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "edges"
+        ],
+        "additionalProperties": false
+      },
+      "InternalEmbeddingsBatchRequest": {
+        "title": "InternalEmbeddingsBatchRequest",
+        "x-munim-contract": "internal.embeddings-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "embeddings": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chunk_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "embedding_micro": {
+                  "minItems": 768,
+                  "maxItems": 768,
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "required": [
+                "chunk_id",
+                "embedding_micro"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "embeddings"
+        ],
+        "additionalProperties": false
+      },
+      "InternalWikiBatchRequest": {
+        "title": "InternalWikiBatchRequest",
+        "x-munim-contract": "internal.wiki-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "entity_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "slug": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,119}$"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "version_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "body": {
+                  "maxItems": 200,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "refs": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/RefId"
+                        }
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "refs"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "page_id",
+                "entity_id",
+                "kind",
+                "slug",
+                "title",
+                "version_id",
+                "version",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "additionalProperties": false
+      },
+      "InternalWikiBatchResponse": {
+        "title": "InternalWikiBatchResponse",
+        "x-munim-contract": "internal.wiki-batch.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "stored",
+                    "existing",
+                    "abstained"
+                  ]
+                },
+                "reason_code": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ReasonCode"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "page_id",
+                "version",
+                "status",
+                "reason_code"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "additionalProperties": false
+      },
+      "InternalForecastsBatchRequest": {
+        "title": "InternalForecastsBatchRequest",
+        "x-munim-contract": "internal.forecasts-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "forecast_run": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "method": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "trained_through": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              },
+              "horizon_days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              },
+              "holdout_days": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "wape_bp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "baseline_wape_bp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bias_bp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "method",
+              "trained_through",
+              "horizon_days",
+              "holdout_days",
+              "wape_bp",
+              "baseline_wape_bp",
+              "bias_bp"
+            ],
+            "additionalProperties": false
+          },
+          "points": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "item_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "business_on": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "slot_start": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "method": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "lo_qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "hi_qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "inputs_snapshot_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              "required": [
+                "id",
+                "outlet_id",
+                "item_id",
+                "business_on",
+                "slot_start",
+                "method",
+                "qty_milli",
+                "lo_qty_milli",
+                "hi_qty_milli",
+                "inputs_snapshot_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "forecast_run",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "InternalForecastsBatchResponse": {
+        "title": "InternalForecastsBatchResponse",
+        "x-munim-contract": "internal.forecasts-batch.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "run_inserted": {
+            "type": "boolean"
+          },
+          "inserted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "existing": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "run_inserted",
+          "inserted",
+          "existing"
+        ],
+        "additionalProperties": false
+      },
+      "InternalQuotesBatchRequest": {
+        "title": "InternalQuotesBatchRequest",
+        "x-munim-contract": "internal.quotes-batch.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "quotes": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "supplier_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "round": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "unit_price_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "min_order_qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "payment_days": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 365
+                },
+                "terms": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                      }
+                    ]
+                  }
+                },
+                "trace_event_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "supplier_id",
+                "ingredient_id",
+                "round",
+                "qty_milli",
+                "unit",
+                "unit_price_minor",
+                "currency",
+                "min_order_qty_milli",
+                "payment_days",
+                "terms",
+                "trace_event_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "quotes"
+        ],
+        "additionalProperties": false
+      },
+      "InternalSpendRequest": {
+        "title": "InternalSpendRequest",
+        "x-munim-contract": "internal.spend.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "entries": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "router",
+                    "reason",
+                    "extract",
+                    "narrate",
+                    "vision",
+                    "embed"
+                  ]
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "gemini",
+                    "openai",
+                    "openrouter",
+                    "nvidia"
+                  ]
+                },
+                "model_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "input_tokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "output_tokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "amount_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "id",
+                "role",
+                "provider",
+                "model_id",
+                "input_tokens",
+                "output_tokens",
+                "amount_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "InternalRunFrameResponse": {
+        "title": "InternalRunFrameResponse",
+        "x-munim-contract": "internal.run-frame.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "code",
+              "version"
+            ],
+            "additionalProperties": false
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "severity_ladder": {
+            "type": "object",
+            "properties": {
+              "critical_minor_gte": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "high_minor_gte": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "medium_minor_gte": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "critical_minor_gte",
+              "high_minor_gte",
+              "medium_minor_gte"
+            ],
+            "additionalProperties": false
+          },
+          "detectors": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "thresholds": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "required": [
+                "thresholds"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "outlets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "restaurant",
+                    "cloud_kitchen",
+                    "store"
+                  ]
+                },
+                "tz": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+                },
+                "business_date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "tz",
+                "business_date"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "month": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "owner_cap_minor": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "operator_limit_minor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "effective_cap_minor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "spent_minor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "hard_left_minor": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "hard"
+                    ]
+                  }
+                },
+                "required": [
+                  "month",
+                  "currency",
+                  "owner_cap_minor",
+                  "operator_limit_minor",
+                  "effective_cap_minor",
+                  "spent_minor",
+                  "hard_left_minor",
+                  "level"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "narration": {
+            "type": "string",
+            "enum": [
+              "model",
+              "template"
+            ]
+          }
+        },
+        "required": [
+          "pack",
+          "currency",
+          "severity_ladder",
+          "detectors",
+          "outlets",
+          "budget",
+          "narration"
         ],
         "additionalProperties": false
       },
@@ -28335,6 +30553,676 @@
         },
         "required": [
           "members"
+        ],
+        "additionalProperties": false
+      },
+      "V1AskRequest": {
+        "title": "V1AskRequest",
+        "x-munim-contract": "v1.ask.request",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "thread_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "additionalProperties": false
+      },
+      "V1AskResponse": {
+        "title": "V1AskResponse",
+        "x-munim-contract": "v1.ask.response",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "turn": {
+            "type": "object",
+            "properties": {
+              "turn_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "turn_no": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "addressed_to": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "catalogue",
+                      "kitchen",
+                      "inventory_purchasing",
+                      "finance",
+                      "people",
+                      "customers",
+                      "compliance",
+                      "market"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tainted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "turn_id",
+              "turn_no",
+              "addressed_to",
+              "tainted"
+            ],
+            "additionalProperties": false
+          },
+          "answer": {
+            "type": "object",
+            "properties": {
+              "answer_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "envelope": {
+                "$ref": "#/components/schemas/AnswerEnvelope"
+              },
+              "resolved_refs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "signature": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "enum": [
+                      "answer.signature.via_manager",
+                      "answer.signature.manager"
+                    ]
+                  },
+                  "specialist": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "catalogue",
+                          "kitchen",
+                          "inventory_purchasing",
+                          "finance",
+                          "people",
+                          "customers",
+                          "compliance",
+                          "market"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "const": "manager"
+                      }
+                    ]
+                  },
+                  "name_key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "key",
+                  "specialist",
+                  "name_key"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "answer_id",
+              "envelope",
+              "resolved_refs",
+              "signature"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "thread_id",
+          "turn",
+          "answer"
+        ],
+        "additionalProperties": false
+      },
+      "V1Thread": {
+        "title": "V1Thread",
+        "x-munim-contract": "v1.thread",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "specialist": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "catalogue",
+                  "kitchen",
+                  "inventory_purchasing",
+                  "finance",
+                  "people",
+                  "customers",
+                  "compliance",
+                  "market"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_scope": {
+            "anyOf": [
+              {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              {
+                "minItems": 1,
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "const": "*"
+                }
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "summary": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turn_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "answer_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "segment": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "refs": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RefId"
+                  }
+                }
+              },
+              "required": [
+                "turn_no",
+                "answer_id",
+                "segment",
+                "refs"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turn_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "turn_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "member_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "addressed_to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "catalogue",
+                        "kitchen",
+                        "inventory_purchasing",
+                        "finance",
+                        "people",
+                        "customers",
+                        "compliance",
+                        "market"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tainted": {
+                  "type": "boolean"
+                },
+                "question": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "answer": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "answer_id": {
+                          "$ref": "#/components/schemas/Uuid7"
+                        },
+                        "envelope": {
+                          "$ref": "#/components/schemas/AnswerEnvelope"
+                        },
+                        "resolved_refs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "ref": {
+                                "$ref": "#/components/schemas/Ref"
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "ref",
+                              "value"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "signature": {
+                          "type": "object",
+                          "properties": {
+                            "key": {
+                              "type": "string",
+                              "enum": [
+                                "answer.signature.via_manager",
+                                "answer.signature.manager"
+                              ]
+                            },
+                            "specialist": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "catalogue",
+                                    "kitchen",
+                                    "inventory_purchasing",
+                                    "finance",
+                                    "people",
+                                    "customers",
+                                    "compliance",
+                                    "market"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "manager"
+                                }
+                              ]
+                            },
+                            "name_key": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "specialist",
+                            "name_key"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "answer_id",
+                        "envelope",
+                        "resolved_refs",
+                        "signature"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "turn_id",
+                "turn_no",
+                "member_id",
+                "addressed_to",
+                "tainted",
+                "question",
+                "answer",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "thread_id",
+          "specialist",
+          "created_by",
+          "outlet_scope",
+          "created_at",
+          "updated_at",
+          "summary",
+          "turns"
+        ],
+        "additionalProperties": false
+      },
+      "V1ThreadsResponse": {
+        "title": "V1ThreadsResponse",
+        "x-munim-contract": "v1.threads.response",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "thread_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "specialist": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "catalogue",
+                        "kitchen",
+                        "inventory_purchasing",
+                        "finance",
+                        "people",
+                        "customers",
+                        "compliance",
+                        "market"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_scope": {
+                  "anyOf": [
+                    {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      }
+                    },
+                    {
+                      "minItems": 1,
+                      "maxItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "const": "*"
+                      }
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "updated_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "thread_id",
+                "specialist",
+                "created_by",
+                "outlet_scope",
+                "created_at",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadsBlock": {
+        "title": "ThreadsBlock",
+        "x-munim-contract": "threads.block",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "summary_refs": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turn_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "answer_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "segment": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "refs": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RefId"
+                  }
+                }
+              },
+              "required": [
+                "turn_no",
+                "answer_id",
+                "segment",
+                "refs"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "last_turn_ids": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          },
+          "tainted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "thread_id",
+          "summary_refs",
+          "last_turn_ids",
+          "tainted"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadsIntelAskRequest": {
+        "title": "ThreadsIntelAskRequest",
+        "x-munim-contract": "threads.intel-ask.request",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "answer_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "addressed_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "catalogue",
+                  "kitchen",
+                  "inventory_purchasing",
+                  "finance",
+                  "people",
+                  "customers",
+                  "compliance",
+                  "market"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreadsBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "answer_id",
+          "question",
+          "addressed_to",
+          "thread"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadsIntelAskResponse": {
+        "title": "ThreadsIntelAskResponse",
+        "x-munim-contract": "threads.intel-ask.response",
+        "x-munim-module": "threads",
+        "type": "object",
+        "properties": {
+          "answer_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "tainted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer_id",
+          "tainted"
         ],
         "additionalProperties": false
       }

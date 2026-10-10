@@ -126,11 +126,45 @@ describe("numeric fields intel may still send (reviewed list — a new one turns
   //   findings.request confidence_bp — model self-assessment, shown as a band;
   //   snapshots.request params — template parameters (limits, flags), validated by the template;
   //   traces-batch seq — ordering counter.
+  // T-040b batches (each lands in an allow-listed intel numeric source or is not a figure at all):
+  //   chunks seq/char_start, claims span_start/span_end, wiki version — positions and ordinals, never figures;
+  //   embeddings — vector components in millionths, never shown;
+  //   forecasts — T-052's deterministic figures: point qty/lo/hi are on INTEL_NUMERIC_ALLOW (db/tests/manifest.ts) and
+  //     shown only as forecast template cells, each point tied to its inputs snapshot; the run's wape/bias/horizon/
+  //     holdout are NOT on it, so no template may show them without a new review;
+  //   quotes — figures the no-tools EXTRACTOR MODEL typed from a SIMULATED supplier's reply (R22): price, qty,
+  //     min order, payment days and round are on the allow-list and shown to people as quote cells; terms integers
+  //     are not on it;
+  //   spend — amount_minor (on the allow-list, shown as budget template cells) is SELF-REPORTED by intel, so core
+  //     cannot hold the cap against under-reporting; token counts are not on the allow-list.
   const EXPECTED = [
     "internal.findings.request: $.properties.confidence_bp (type integer)",
     "internal.snapshots.request: $.properties.params.additionalProperties.anyOf[1] (type integer)",
     "internal.traces-batch.request: $.properties.events.items.oneOf[0].properties.seq (type integer)",
     "internal.traces-batch.request: $.properties.events.items.oneOf[1].properties.seq (type integer)",
+    "internal.chunks-batch.request: $.properties.chunks.items.properties.char_start (type integer)",
+    "internal.chunks-batch.request: $.properties.chunks.items.properties.seq (type integer)",
+    "internal.claims-batch.request: $.properties.claims.items.properties.span_end (type integer)",
+    "internal.claims-batch.request: $.properties.claims.items.properties.span_start (type integer)",
+    "internal.embeddings-batch.request: $.properties.embeddings.items.properties.embedding_micro.items (type integer)",
+    "internal.forecasts-batch.request: $.properties.forecast_run.properties.baseline_wape_bp.anyOf[0] (type integer)",
+    "internal.forecasts-batch.request: $.properties.forecast_run.properties.bias_bp.anyOf[0] (type integer)",
+    "internal.forecasts-batch.request: $.properties.forecast_run.properties.holdout_days (type integer)",
+    "internal.forecasts-batch.request: $.properties.forecast_run.properties.horizon_days (type integer)",
+    "internal.forecasts-batch.request: $.properties.forecast_run.properties.wape_bp.anyOf[0] (type integer)",
+    "internal.forecasts-batch.request: $.properties.points.items.properties.hi_qty_milli (type integer)",
+    "internal.forecasts-batch.request: $.properties.points.items.properties.lo_qty_milli (type integer)",
+    "internal.forecasts-batch.request: $.properties.points.items.properties.qty_milli (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.min_order_qty_milli (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.payment_days (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.qty_milli (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.round (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.terms.additionalProperties.anyOf[1] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.unit_price_minor (type integer)",
+    "internal.spend.request: $.properties.entries.items.properties.amount_minor (type integer)",
+    "internal.spend.request: $.properties.entries.items.properties.input_tokens (type integer)",
+    "internal.spend.request: $.properties.entries.items.properties.output_tokens (type integer)",
+    "internal.wiki-batch.request: $.properties.pages.items.properties.version (type integer)",
   ];
   it("every intel-sent body's numeric leaves are exactly the reviewed list", () => {
     const got = manifestNames()

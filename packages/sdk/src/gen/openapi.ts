@@ -2849,6 +2849,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the Manager, or a specialist by a leading @Name; appends a turn to a thread (new or given) */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Threads in the caller's outlet scope; ?specialist= those addressed to that desk */
+        get: operations["listThreads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/threads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A thread with its turns, answers and rolling cited summary */
+        get: operations["getThread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5451,7 +5502,8 @@ export interface components {
         /** InternalDraftsRequest */
         InternalDraftsRequest: {
             draft_id: components["schemas"]["Uuid7"];
-            pack: string;
+            /** @enum {string} */
+            pack: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
             command_type: string;
             payload: {
                 coupon_id: string;
@@ -5746,6 +5798,214 @@ export interface components {
         InternalTracesBatchResponse: {
             inserted: number;
             last_seq: number;
+        };
+        /** InternalBatchResponse */
+        InternalBatchResponse: {
+            inserted: number;
+            existing: number;
+        };
+        /** InternalEntitiesBatchRequest */
+        InternalEntitiesBatchRequest: {
+            entities: {
+                id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "business" | "outlet" | "brand" | "channel" | "item" | "ingredient" | "supplier" | "person" | "customer" | "day" | "other";
+                core_ref: string | null;
+                name: string;
+            }[];
+        };
+        /** InternalAliasesBatchRequest */
+        InternalAliasesBatchRequest: {
+            aliases: {
+                id: components["schemas"]["Uuid7"];
+                entity_id: components["schemas"]["Uuid7"];
+                alias: string;
+                /** @enum {string} */
+                source: "core" | "claim" | "import" | "member";
+            }[];
+        };
+        /** InternalChunksBatchRequest */
+        InternalChunksBatchRequest: {
+            chunks: {
+                id: components["schemas"]["Uuid7"];
+                document_id: components["schemas"]["Uuid7"] | null;
+                message_id: components["schemas"]["Uuid7"] | null;
+                seq: number;
+                char_start: number;
+                text: string;
+            }[];
+        };
+        /** InternalClaimsBatchRequest */
+        InternalClaimsBatchRequest: {
+            claims: {
+                id: components["schemas"]["Uuid7"];
+                chunk_id: components["schemas"]["Uuid7"] | null;
+                message_id: components["schemas"]["Uuid7"] | null;
+                span_start: number;
+                span_end: number;
+                quote: string;
+                subject_entity_id: components["schemas"]["Uuid7"] | null;
+                predicate: string;
+                object: string | null;
+                object_entity_id: components["schemas"]["Uuid7"] | null;
+            }[];
+        };
+        /** InternalEdgesBatchRequest */
+        InternalEdgesBatchRequest: {
+            edges: {
+                id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "uses" | "quoted" | "sold" | "wasted" | "supplies" | "works_at" | "mentions" | "supported_by" | "proposes" | "about" | "contradicts";
+                src_entity_id: components["schemas"]["Uuid7"];
+                dst_entity_id: components["schemas"]["Uuid7"];
+                claim_id: components["schemas"]["Uuid7"] | null;
+                source_ref: string | null;
+                valid_from: string | null;
+                valid_to: string | null;
+            }[];
+        };
+        /** InternalEmbeddingsBatchRequest */
+        InternalEmbeddingsBatchRequest: {
+            embeddings: {
+                chunk_id: components["schemas"]["Uuid7"];
+                embedding_micro: number[];
+            }[];
+        };
+        /** InternalWikiBatchRequest */
+        InternalWikiBatchRequest: {
+            pages: {
+                page_id: components["schemas"]["Uuid7"];
+                entity_id: components["schemas"]["Uuid7"] | null;
+                kind: string;
+                slug: string;
+                title: string;
+                version_id: components["schemas"]["Uuid7"];
+                version: number;
+                body: {
+                    text: string;
+                    refs: components["schemas"]["RefId"][];
+                }[];
+            }[];
+        };
+        /** InternalWikiBatchResponse */
+        InternalWikiBatchResponse: {
+            pages: {
+                page_id: components["schemas"]["Uuid7"];
+                version: number;
+                /** @enum {string} */
+                status: "stored" | "existing" | "abstained";
+                reason_code: components["schemas"]["ReasonCode"] | null;
+            }[];
+        };
+        /** InternalForecastsBatchRequest */
+        InternalForecastsBatchRequest: {
+            forecast_run: {
+                id: components["schemas"]["Uuid7"];
+                method: string;
+                /** Format: date */
+                trained_through: string;
+                horizon_days: number;
+                holdout_days: number;
+                wape_bp: number | null;
+                baseline_wape_bp: number | null;
+                bias_bp: number | null;
+            };
+            points: {
+                id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                item_id: components["schemas"]["Uuid7"] | null;
+                /** Format: date */
+                business_on: string;
+                slot_start: string | null;
+                method: string;
+                qty_milli: number;
+                lo_qty_milli: number;
+                hi_qty_milli: number;
+                inputs_snapshot_id: components["schemas"]["Uuid7"];
+            }[];
+        };
+        /** InternalForecastsBatchResponse */
+        InternalForecastsBatchResponse: {
+            run_inserted: boolean;
+            inserted: number;
+            existing: number;
+        };
+        /** InternalQuotesBatchRequest */
+        InternalQuotesBatchRequest: {
+            quotes: {
+                id: components["schemas"]["Uuid7"];
+                supplier_id: components["schemas"]["Uuid7"];
+                ingredient_id: components["schemas"]["Uuid7"];
+                round: number;
+                qty_milli: number;
+                unit: string;
+                unit_price_minor: number;
+                currency: string;
+                min_order_qty_milli: number;
+                payment_days: number;
+                terms: {
+                    [key: string]: boolean | number | string;
+                };
+                trace_event_id: components["schemas"]["Uuid7"] | null;
+            }[];
+        };
+        /** InternalSpendRequest */
+        InternalSpendRequest: {
+            entries: {
+                id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                role: "router" | "reason" | "extract" | "narrate" | "vision" | "embed";
+                /** @enum {string} */
+                provider: "gemini" | "openai" | "openrouter" | "nvidia";
+                model_id: string;
+                input_tokens: number;
+                output_tokens: number;
+                amount_minor: number;
+                currency: string;
+            }[];
+        };
+        /** InternalRunFrameResponse */
+        InternalRunFrameResponse: {
+            pack: {
+                code: string;
+                version: number;
+            };
+            currency: string;
+            severity_ladder: {
+                critical_minor_gte: number;
+                high_minor_gte: number;
+                medium_minor_gte: number;
+            };
+            detectors: {
+                [key: string]: {
+                    thresholds: {
+                        [key: string]: number;
+                    };
+                };
+            };
+            outlets: {
+                id: components["schemas"]["Uuid7"];
+                name: string;
+                /** @enum {string} */
+                kind: "restaurant" | "cloud_kitchen" | "store";
+                tz: string;
+                /** Format: date */
+                business_date: string;
+            }[];
+            budget: {
+                /** Format: date */
+                month: string;
+                currency: string;
+                owner_cap_minor: number | null;
+                operator_limit_minor: number;
+                effective_cap_minor: number;
+                spent_minor: number;
+                hard_left_minor: number;
+                /** @enum {string} */
+                level: "ok" | "hard";
+            } | null;
+            /** @enum {string} */
+            narration: "model" | "template";
         };
         /** InventoryIngredientUpsertV1 */
         InventoryIngredientUpsertV1: {
@@ -7783,6 +8043,109 @@ export interface components {
                 role: "owner" | "manager" | "staff" | "advisor" | "judge";
                 outlet_ids: components["schemas"]["Uuid7"][];
             }[];
+        };
+        /** V1AskRequest */
+        V1AskRequest: {
+            question: string;
+            thread_id?: components["schemas"]["Uuid7"];
+        };
+        /** V1AskResponse */
+        V1AskResponse: {
+            thread_id: components["schemas"]["Uuid7"];
+            turn: {
+                turn_id: components["schemas"]["Uuid7"];
+                turn_no: number;
+                addressed_to: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
+                tainted: boolean;
+            };
+            answer: {
+                answer_id: components["schemas"]["Uuid7"];
+                envelope: components["schemas"]["AnswerEnvelope"];
+                resolved_refs: {
+                    ref: components["schemas"]["Ref"];
+                    value: string | number | boolean | null;
+                }[];
+                signature: {
+                    /** @enum {string} */
+                    key: "answer.signature.via_manager" | "answer.signature.manager";
+                    specialist: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | "manager";
+                    name_key: string;
+                };
+            };
+        };
+        /** V1Thread */
+        V1Thread: {
+            thread_id: components["schemas"]["Uuid7"];
+            specialist: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
+            created_by: components["schemas"]["Uuid7"];
+            outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
+            created_at: components["schemas"]["IsoDatetime"];
+            updated_at: components["schemas"]["IsoDatetime"];
+            summary: {
+                turn_no: number;
+                answer_id: components["schemas"]["Uuid7"];
+                segment: number;
+                refs: components["schemas"]["RefId"][];
+            }[];
+            turns: {
+                turn_id: components["schemas"]["Uuid7"];
+                turn_no: number;
+                member_id: components["schemas"]["Uuid7"];
+                addressed_to: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
+                tainted: boolean;
+                question: string | null;
+                answer: {
+                    answer_id: components["schemas"]["Uuid7"];
+                    envelope: components["schemas"]["AnswerEnvelope"];
+                    resolved_refs: {
+                        ref: components["schemas"]["Ref"];
+                        value: string | number | boolean | null;
+                    }[];
+                    signature: {
+                        /** @enum {string} */
+                        key: "answer.signature.via_manager" | "answer.signature.manager";
+                        specialist: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | "manager";
+                        name_key: string;
+                    };
+                } | null;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+        };
+        /** V1ThreadsResponse */
+        V1ThreadsResponse: {
+            items: {
+                thread_id: components["schemas"]["Uuid7"];
+                specialist: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
+                created_by: components["schemas"]["Uuid7"];
+                outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
+                created_at: components["schemas"]["IsoDatetime"];
+                updated_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: string | null;
+        };
+        /** ThreadsBlock */
+        ThreadsBlock: {
+            thread_id: components["schemas"]["Uuid7"];
+            summary_refs: {
+                turn_no: number;
+                answer_id: components["schemas"]["Uuid7"];
+                segment: number;
+                refs: components["schemas"]["RefId"][];
+            }[];
+            last_turn_ids: components["schemas"]["Uuid7"][];
+            tainted: boolean;
+        };
+        /** ThreadsIntelAskRequest */
+        ThreadsIntelAskRequest: {
+            answer_id: components["schemas"]["Uuid7"];
+            question: string;
+            addressed_to: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
+            thread: components["schemas"]["ThreadsBlock"] | null;
+        };
+        /** ThreadsIntelAskResponse */
+        ThreadsIntelAskResponse: {
+            answer_id: components["schemas"]["Uuid7"];
+            tainted: boolean;
         };
     };
     responses: never;
@@ -22315,6 +22678,220 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenancyStorefrontKeyRevoked"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["V1AskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1AskResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listThreads: {
+        parameters: {
+            query?: {
+                specialist?: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market" | "manager";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ThreadsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Thread"];
                 };
             };
             /** @description Bad request */
