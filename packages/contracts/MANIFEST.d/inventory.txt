@@ -1,4 +1,13 @@
 inventory.ingredient.upsert.v1
 inventory.reorder_level.set.v1
 inventory.stock.receive.v1
+inventory.waste.record.v1
+inventory.count.submit.v1
+inventory.batch.update.v1
+inventory.transfer.create.v1
+inventory.transfer.receive.v1
+inventory.expired_sale.override.v1
 proposal.inventory.reorder_level.set.v1
+proposal.inventory.transfer.create.v1
+v1.inventory.movements
+v1.inventory.batches
