@@ -85,6 +85,8 @@
             "coupon_cap_reached",
             "coupon_min_spend",
             "change_window_closed",
+            "coupon_expired",
+            "coupon_out_of_scope",
             "price_above_mrp",
             "expired_batch",
             "period_closed",
@@ -100,7 +102,10 @@
             "reason_required",
             "deal_changed",
             "duplicate_invoice",
-            "guest_cannot_change"
+            "guest_cannot_change",
+            "refund_first",
+            "order_tendered",
+            "cash_below_rounding"
           ]
         }
       },

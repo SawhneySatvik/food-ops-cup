@@ -9,6 +9,7 @@ export type MunimClient = Client<paths>;
 export const TENANT_HEADER = "X-Munim-Tenant";
 export const STOREFRONT_KEY_HEADER = "X-Munim-Storefront-Key";
 export const REPLAYED_HEADER = "X-Munim-Replayed";
+export const GUEST_TOKEN_HEADER = "X-Munim-Guest-Token";
 
 type Lazy = string | (() => string | Promise<string>);
 const value = async (v: Lazy) => (typeof v === "function" ? v() : v);
@@ -21,6 +22,8 @@ export type MunimClientOptions = {
   tenantId?: Lazy;
   /** Storefront calls: the public storefront key (sent as X-Munim-Storefront-Key). */
   storefrontKey?: Lazy;
+  /** Guest order tracking: the order's guest access token (sent as X-Munim-Guest-Token, with storefrontKey). */
+  guestToken?: Lazy;
   fetch?: typeof fetch;
 };
 
@@ -32,6 +35,7 @@ export function createMunimClient(opts: MunimClientOptions): MunimClient {
       if (opts.token) request.headers.set("Authorization", `Bearer ${await opts.token()}`);
       if (opts.tenantId !== undefined) request.headers.set(TENANT_HEADER, await value(opts.tenantId));
       if (opts.storefrontKey !== undefined) request.headers.set(STOREFRONT_KEY_HEADER, await value(opts.storefrontKey));
+      if (opts.guestToken !== undefined) request.headers.set(GUEST_TOKEN_HEADER, await value(opts.guestToken));
       return request;
     },
   });
@@ -99,6 +103,7 @@ export const OPERATIONS = [
   "POST /v1/finance/disputes",
   "POST /v1/finance/period-closes",
   "GET /v1/finance/exports/tally",
+  "GET /v1/finance/channel-terms",
   "GET /v1/goals",
   "POST /v1/goals",
   "POST /v1/goals/update",
@@ -114,7 +119,6 @@ export const OPERATIONS = [
   "GET /v1/findings",
   "GET /v1/inbox",
   "POST /v1/snapshots",
-  "POST /platform/v1/snapshots",
   "GET /v1/snapshots/{id}",
   "GET /v1/runs/{id}",
   "GET /v1/runs",
@@ -130,6 +134,7 @@ export const OPERATIONS = [
   "POST /v1/inventory/expired-sale-overrides",
   "GET /v1/inventory/movements",
   "GET /v1/inventory/batches",
+  "GET /v1/inventory/reorder-levels",
   "GET /v1/kitchen/board",
   "POST /v1/kitchen/tickets/{id}:advance",
   "POST /v1/kitchen/prep-times",
@@ -149,6 +154,7 @@ export const OPERATIONS = [
   "POST /v1/pickup-windows",
   "POST /v1/shifts",
   "POST /v1/shifts/{id}:close",
+  "GET /v1/shifts/{id}",
   "POST /v1/people/staff:upsert",
   "POST /v1/people/rosters",
   "POST /v1/people/rosters:update",
@@ -161,6 +167,7 @@ export const OPERATIONS = [
   "POST /v1/people/candidates:upsert",
   "GET /v1/people/overtime",
   "GET /v1/people/payroll-preview",
+  "GET /v1/people/staff",
   "GET /platform/v1/tenants",
   "GET /platform/v1/country-packs",
   "GET /platform/v1/country-packs/{code}/{version}",

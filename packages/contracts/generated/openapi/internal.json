@@ -38,6 +38,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthenticated",
             "content": {
@@ -122,6 +132,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthenticated",
             "content": {
@@ -192,6 +212,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -270,6 +300,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthenticated",
             "content": {
@@ -340,6 +380,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InternalDraftsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -418,6 +468,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthenticated",
             "content": {
@@ -488,6 +548,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InternalTracesBatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -13450,6 +13520,24 @@
         ],
         "additionalProperties": false
       },
+      "V1FinanceChannelTerms": {
+        "title": "V1FinanceChannelTerms",
+        "x-munim-contract": "v1.finance.channel-terms",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "channel_terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceChannelTermsSetV1"
+            }
+          }
+        },
+        "required": [
+          "channel_terms"
+        ],
+        "additionalProperties": false
+      },
       "GoalsGoalCreateV1": {
         "title": "GoalsGoalCreateV1",
         "x-munim-contract": "goals.goal.create.v1",
@@ -14461,7 +14549,24 @@
                   "propertyNames": {
                     "type": "string"
                   },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
                 },
                 "amount_minor": {
                   "anyOf": [
@@ -17603,6 +17708,16 @@
                     }
                   ]
                 },
+                "unit_cost_per_1000": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Money"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "expired_sale_override_id": {
                   "anyOf": [
                     {
@@ -17628,6 +17743,7 @@
                 "ref_type",
                 "ref_id",
                 "unit_cost",
+                "unit_cost_per_1000",
                 "expired_sale_override_id",
                 "at"
               ],
@@ -17716,6 +17832,57 @@
         },
         "required": [
           "batches"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryReorderLevels": {
+        "title": "V1InventoryReorderLevels",
+        "x-munim-contract": "v1.inventory.reorder-levels",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "reorder_levels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reorder_level_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "min_qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "par_qty_milli": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "updated_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "reorder_level_id",
+                "outlet_id",
+                "ingredient_id",
+                "min_qty_milli",
+                "par_qty_milli",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "reorder_levels"
         ],
         "additionalProperties": false
       },
@@ -18098,7 +18265,24 @@
                       },
                       "options": {
                         "type": "array",
-                        "items": {}
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "option_id": {
+                              "$ref": "#/components/schemas/Uuid7"
+                            },
+                            "name_key": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "option_id",
+                            "name_key"
+                          ],
+                          "additionalProperties": false
+                        }
                       },
                       "note": {
                         "type": [
@@ -19814,6 +19998,124 @@
           "tax_minor",
           "total_minor",
           "components"
+        ],
+        "additionalProperties": false
+      },
+      "V1Shift": {
+        "title": "V1Shift",
+        "x-munim-contract": "v1.shift",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "shift_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "opened_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "opened_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "float_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "closed_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IsoDatetime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counted_cash_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_cash_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variance_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "shift_id",
+          "outlet_id",
+          "device_id",
+          "status",
+          "opened_by",
+          "opened_at",
+          "float_minor",
+          "currency",
+          "closed_by",
+          "closed_at",
+          "counted_cash_minor",
+          "expected_cash_minor",
+          "variance_minor"
         ],
         "additionalProperties": false
       },
@@ -21627,6 +21929,144 @@
           "period_month",
           "currency",
           "lines"
+        ],
+        "additionalProperties": false
+      },
+      "V1PeopleStaffList": {
+        "title": "V1PeopleStaffList",
+        "x-munim-contract": "v1.people.staff.list",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "staff": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "staff_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "member_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "role_key": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "pay_basis": {
+                  "type": "string",
+                  "enum": [
+                    "hourly",
+                    "monthly"
+                  ]
+                },
+                "wage_rate_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "monthly_salary_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contract_min_per_month": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ot_multiplier_bp": {
+                  "type": "integer",
+                  "minimum": 10000,
+                  "maximum": 40000
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "joined_on": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "left_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "staff_id",
+                "member_id",
+                "outlet_id",
+                "name",
+                "role_key",
+                "pay_basis",
+                "wage_rate_minor",
+                "monthly_salary_minor",
+                "contract_min_per_month",
+                "ot_multiplier_bp",
+                "currency",
+                "joined_on",
+                "left_on",
+                "active"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "outlet_id",
+          "staff"
         ],
         "additionalProperties": false
       },
@@ -24068,6 +24508,11 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "unit_cost_per_1000_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "currency": {
                   "type": "string",
                   "pattern": "^[A-Z]{3}$"
@@ -24079,6 +24524,7 @@
                 "qty_milli",
                 "unit",
                 "unit_cost_minor",
+                "unit_cost_per_1000_minor",
                 "currency"
               ],
               "additionalProperties": false
@@ -24210,6 +24656,8 @@
           "coupon_cap_reached",
           "coupon_min_spend",
           "change_window_closed",
+          "coupon_expired",
+          "coupon_out_of_scope",
           "price_above_mrp",
           "expired_batch",
           "period_closed",
@@ -24225,7 +24673,10 @@
           "reason_required",
           "deal_changed",
           "duplicate_invoice",
-          "guest_cannot_change"
+          "guest_cannot_change",
+          "refund_first",
+          "order_tendered",
+          "cash_below_rounding"
         ]
       },
       "AnswerEnvelope": {
@@ -24858,6 +25309,12 @@
                     "boolean",
                     "uuid"
                   ]
+                },
+                "numeric_source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -24935,7 +25392,38 @@
             "properties": {
               "code": {
                 "type": "string",
-                "pattern": "^[a-z_]+$"
+                "enum": [
+                  "bad_request",
+                  "unauthenticated",
+                  "forbidden",
+                  "not_found",
+                  "conflict",
+                  "book_write_refused",
+                  "country_locked",
+                  "currency_mismatch",
+                  "illegal_transition",
+                  "override_refused",
+                  "decision_refused",
+                  "customer_erased",
+                  "command_table_mismatch",
+                  "period_closed",
+                  "books_unbalanced",
+                  "loyalty_refused",
+                  "claim_quote_mismatch",
+                  "out_of_pack_scope",
+                  "sequence_gap",
+                  "idempotency_conflict",
+                  "command_type_mismatch",
+                  "invalid_payload",
+                  "unregistered_command_type",
+                  "cannot_verify",
+                  "already_decided",
+                  "stale_draft",
+                  "chart_incomplete",
+                  "execution_failed",
+                  "unavailable",
+                  "internal"
+                ]
               },
               "message": {
                 "type": "string",
@@ -25039,8 +25527,12 @@
             "anyOf": [
               {
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 200
+                "enum": [
+                  "changed_mind",
+                  "ordered_by_mistake",
+                  "wait_too_long",
+                  "other"
+                ]
               },
               {
                 "type": "null"
@@ -25389,7 +25881,35 @@
                 },
                 "windows": {
                   "type": "array",
-                  "items": {}
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "days": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 7
+                        }
+                      },
+                      "from": {
+                        "type": "string",
+                        "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                      },
+                      "to": {
+                        "type": "string",
+                        "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                      }
+                    },
+                    "required": [
+                      "days",
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "valid_from": {
                   "type": "string",
@@ -27217,6 +27737,12 @@
         "type": "http",
         "scheme": "bearer",
         "description": "IdP ID token of a customer (optional on storefront routes)"
+      },
+      "guestToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Munim-Guest-Token",
+        "description": "Guest access token of one order (returned once when the guest places it); with storefrontKey, on routes that mark guest access"
       }
     }
   }

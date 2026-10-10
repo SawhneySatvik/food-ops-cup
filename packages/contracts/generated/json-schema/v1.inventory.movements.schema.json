@@ -103,6 +103,32 @@
               }
             ]
           },
+          "unit_cost_per_1000": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "amount_minor": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  }
+                },
+                "required": [
+                  "amount_minor",
+                  "currency"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expired_sale_override_id": {
             "anyOf": [
               {
@@ -131,6 +157,7 @@
           "ref_type",
           "ref_id",
           "unit_cost",
+          "unit_cost_per_1000",
           "expired_sale_override_id",
           "at"
         ],

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.finance.channel-terms",
+  "title": "V1FinanceChannelTerms",
+  "x-munim-module": "finance",
+  "type": "object",
+  "properties": {
+    "channel_terms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "channel_terms_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "commission_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "ads_opted_in": {
+            "type": "boolean"
+          },
+          "ad_spend_cap_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "promo_share_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "payout_cycle_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "channel_terms_id",
+          "channel_id",
+          "commission_bp",
+          "ads_opted_in",
+          "ad_spend_cap_minor",
+          "promo_share_bp",
+          "payout_cycle_days",
+          "currency",
+          "valid_from",
+          "valid_to"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "channel_terms"
+  ],
+  "additionalProperties": false
+}

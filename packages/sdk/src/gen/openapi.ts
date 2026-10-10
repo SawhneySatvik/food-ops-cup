@@ -766,7 +766,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Recorded channel terms (commission, ad consent and cap, validity), newest window first (owner, advisor, judge) */
+        get: operations["listChannelTerms"];
         put?: never;
         /** finance.channel_terms.set.v1 — record agreed commission, ad and promo terms for a channel (owner) */
         post: operations["setChannelTerms"];
@@ -1051,23 +1052,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/platform/v1/snapshots": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Mint an operator snapshot of an operator-level template (R40 C4) */
-        post: operations["mintOperatorSnapshot"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/snapshots/{id}": {
         parameters: {
             query?: never;
@@ -1211,7 +1195,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Min / par levels at an outlet */
+        get: operations["listReorderLevels"];
         put?: never;
         /** inventory.reorder_level.set.v1 — min / par for one ingredient at one outlet (draftable) */
         post: operations["setReorderLevel"];
@@ -1519,7 +1504,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move an order one step (preparing, ready, completed, or cancelled with a reason); completion derives loyalty earn and the sale's journal entry */
+        /** Move an order one step (preparing, ready, completed, or cancelled with a reason — refused while payments stand unrefunded); completion derives loyalty earn and the sale's journal entry */
         post: operations["advanceOrder"];
         delete?: never;
         options?: never;
@@ -1536,7 +1521,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move the promised time later with a reason code; deals are re-judged at the new time */
+        /** Move the promised time later with a reason code; deals are re-judged at the new time; refused once a payment is recorded */
         post: operations["pushBackOrder"];
         delete?: never;
         options?: never;
@@ -1570,7 +1555,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Void a line or the whole order with a reason */
+        /** Void a line, or the whole order (which cancels it; voids never exceed the total), with a reason; before any payment */
         post: operations["recordVoid"];
         delete?: never;
         options?: never;
@@ -1640,6 +1625,23 @@ export interface paths {
         put?: never;
         /** Close a shift with the counted cash; core computes expected cash and variance */
         post: operations["closeShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shifts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One drawer shift: opening float and, once closed, counted cash, expected cash and variance (row fields) */
+        get: operations["getShift"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1850,6 +1852,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff of an outlet with their pay terms (not for staff-role members) */
+        get: operations["peopleStaffList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/v1/tenants": {
         parameters: {
             query?: never;
@@ -2049,6 +2068,23 @@ export interface paths {
         put?: never;
         /** Reject a config draft with a reason */
         post: operations["rejectConfigDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/v1/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint an operator snapshot of an operator-level template (R40 C4) */
+        post: operations["mintOperatorSnapshot"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4957,6 +4993,10 @@ export interface components {
             content_type: "text/csv";
             content: string;
         };
+        /** V1FinanceChannelTerms */
+        V1FinanceChannelTerms: {
+            channel_terms: components["schemas"]["FinanceChannelTermsSetV1"][];
+        };
         /** GoalsGoalCreateV1 */
         GoalsGoalCreateV1: {
             goal_id: components["schemas"]["Uuid7"];
@@ -5146,7 +5186,7 @@ export interface components {
                 row_no: number;
                 target_table: string;
                 data: {
-                    [key: string]: unknown;
+                    [key: string]: string | number | boolean | null;
                 };
                 amount_minor: number | null;
                 external_ref: string | null;
@@ -5700,6 +5740,7 @@ export interface components {
                 ref_type: string | null;
                 ref_id: components["schemas"]["Uuid7"] | null;
                 unit_cost: components["schemas"]["Money"] | null;
+                unit_cost_per_1000: components["schemas"]["Money"] | null;
                 expired_sale_override_id: components["schemas"]["Uuid7"] | null;
                 at: components["schemas"]["IsoDatetime"];
             }[];
@@ -5715,6 +5756,17 @@ export interface components {
                 expires_on: string | null;
                 received_at: components["schemas"]["IsoDatetime"];
                 mrp: components["schemas"]["Money"] | null;
+            }[];
+        };
+        /** V1InventoryReorderLevels */
+        V1InventoryReorderLevels: {
+            reorder_levels: {
+                reorder_level_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                ingredient_id: components["schemas"]["Uuid7"];
+                min_qty_milli: number;
+                par_qty_milli: number;
+                updated_at: components["schemas"]["IsoDatetime"];
             }[];
         };
         /** KitchenTicketAdvanceV1 */
@@ -5800,7 +5852,10 @@ export interface components {
                     item_id: components["schemas"]["Uuid7"];
                     name_key: string;
                     qty_milli: number;
-                    options: unknown[];
+                    options: {
+                        option_id: components["schemas"]["Uuid7"];
+                        name_key: string;
+                    }[];
                     note: string | null;
                 }[];
             }[];
@@ -6089,6 +6144,23 @@ export interface components {
                 rate_bp: number;
                 amount_minor: number;
             }[];
+        };
+        /** V1Shift */
+        V1Shift: {
+            shift_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            device_id: components["schemas"]["Uuid7"] | null;
+            /** @enum {string} */
+            status: "open" | "closed";
+            opened_by: components["schemas"]["Uuid7"];
+            opened_at: components["schemas"]["IsoDatetime"];
+            float_minor: number;
+            currency: string;
+            closed_by: components["schemas"]["Uuid7"] | null;
+            closed_at: components["schemas"]["IsoDatetime"] | null;
+            counted_cash_minor: number | null;
+            expected_cash_minor: number | null;
+            variance_minor: number | null;
         };
         /** OrdersPlaceGuestResponse */
         OrdersPlaceGuestResponse: {
@@ -6432,6 +6504,28 @@ export interface components {
                 tips_minor: number;
                 net_minor: number;
                 outstanding_advance_minor: number;
+            }[];
+        };
+        /** V1PeopleStaffList */
+        V1PeopleStaffList: {
+            outlet_id: components["schemas"]["Uuid7"];
+            staff: {
+                staff_id: components["schemas"]["Uuid7"];
+                member_id: components["schemas"]["Uuid7"] | null;
+                outlet_id: components["schemas"]["Uuid7"];
+                name: string;
+                role_key: string;
+                /** @enum {string} */
+                pay_basis: "hourly" | "monthly";
+                wage_rate_minor: number | null;
+                monthly_salary_minor: number | null;
+                contract_min_per_month: number | null;
+                ot_multiplier_bp: number;
+                currency: string;
+                /** Format: date */
+                joined_on: string;
+                left_on: string | null;
+                active: boolean;
             }[];
         };
         /** PlatformModelRole */
@@ -6902,6 +6996,7 @@ export interface components {
                 qty_milli: number;
                 unit: string;
                 unit_cost_minor: number;
+                unit_cost_per_1000_minor: number;
                 currency: string;
             }[];
         };
@@ -6929,7 +7024,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -7051,6 +7146,7 @@ export interface components {
                 name: string;
                 /** @enum {string} */
                 type: "integer" | "numeric" | "text" | "date" | "timestamptz" | "boolean" | "uuid";
+                numeric_source?: string | null;
             }[];
             rows: {
                 [key: string]: string | number | boolean | null;
@@ -7063,7 +7159,8 @@ export interface components {
         Error: {
             /** ErrorBody */
             error: {
-                code: string;
+                /** @enum {string} */
+                code: "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "book_write_refused" | "country_locked" | "currency_mismatch" | "illegal_transition" | "override_refused" | "decision_refused" | "customer_erased" | "command_table_mismatch" | "period_closed" | "books_unbalanced" | "loyalty_refused" | "claim_quote_mismatch" | "out_of_pack_scope" | "sequence_gap" | "idempotency_conflict" | "command_type_mismatch" | "invalid_payload" | "unregistered_command_type" | "cannot_verify" | "already_decided" | "stale_draft" | "chart_incomplete" | "execution_failed" | "unavailable" | "internal";
                 message: string;
                 reason_code: components["schemas"]["ReasonCode"] | null;
             };
@@ -7081,7 +7178,7 @@ export interface components {
         /** StorefrontOrderCancelV1 */
         StorefrontOrderCancelV1: {
             order_id: components["schemas"]["Uuid7"];
-            reason: string | null;
+            reason: ("changed_mind" | "ordered_by_mistake" | "wait_too_long" | "other") | null;
         };
         /** StorefrontOrderRescheduleV1 */
         StorefrontOrderRescheduleV1: {
@@ -7150,7 +7247,11 @@ export interface components {
                 deal_id: components["schemas"]["Uuid7"];
                 name_key: string;
                 kind: string;
-                windows: unknown[];
+                windows: {
+                    days: number[];
+                    from: string;
+                    to: string;
+                }[];
                 /** Format: date */
                 valid_from: string;
                 valid_to: string | null;
@@ -7533,6 +7634,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1AccountProfile"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -7599,6 +7709,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -7678,6 +7797,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -7755,6 +7883,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -7823,6 +7960,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1AccountOrders"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -7881,6 +8027,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1AccountOrder"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -7935,6 +8090,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1AccountLoyalty"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8003,6 +8167,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1AccountExport"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8082,6 +8255,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8152,6 +8334,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1DraftsResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8208,6 +8399,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1DraftDetail"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8278,6 +8478,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8359,6 +8568,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8434,6 +8652,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8513,6 +8740,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8590,6 +8826,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8665,6 +8910,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8746,6 +9000,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8821,6 +9084,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -8900,6 +9172,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -8968,6 +9249,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1CatalogueMenu"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9029,6 +9319,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1CatalogueBarcode"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9086,6 +9385,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ComplianceLicences"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9154,6 +9462,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9225,6 +9542,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ComplianceLicencesExpiring"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9281,6 +9607,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ComplianceAssets"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9351,6 +9686,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9416,6 +9760,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ComplianceChecklists"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9484,6 +9837,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9557,6 +9919,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ComplianceChecklistRuns"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9623,6 +9994,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9696,6 +10076,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ComplianceTempLogs"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9764,6 +10153,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9829,6 +10227,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ComplianceAmcs"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -9899,6 +10306,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -9967,6 +10383,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ComplianceMaintenance"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10033,6 +10458,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10112,6 +10546,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10179,6 +10622,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomersCustomerList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10249,6 +10701,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10316,6 +10777,15 @@ export interface operations {
                     "application/json": components["schemas"]["CustomersLoyaltyLedger"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10372,6 +10842,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomersCouponUseList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10442,6 +10921,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10505,6 +10993,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomersCampaignList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10573,6 +11070,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10644,6 +11150,15 @@ export interface operations {
                     "application/json": components["schemas"]["CustomersReservationList"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10710,6 +11225,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10780,6 +11304,15 @@ export interface operations {
                     "application/json": components["schemas"]["CustomersReviewList"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10848,6 +11381,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -10913,6 +11455,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomersBulkOrderList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -10983,6 +11534,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11030,6 +11590,73 @@ export interface operations {
             };
         };
     };
+    listChannelTerms: {
+        parameters: {
+            query?: {
+                channel_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceChannelTerms"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setChannelTerms: {
         parameters: {
             query?: never;
@@ -11058,6 +11685,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11137,6 +11773,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11212,6 +11857,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11291,6 +11945,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11359,6 +12022,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1FinanceTallyExport"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11416,6 +12088,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Goals"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11484,6 +12165,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11563,6 +12253,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11633,6 +12332,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1Tasks"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11699,6 +12407,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11778,6 +12495,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11847,6 +12573,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ImportsUploadResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -11901,6 +12636,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ImportsRunsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -11963,6 +12707,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ImportsRun"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12021,6 +12774,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ImportsRun"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12077,6 +12839,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1ImportsRunRowsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12139,6 +12910,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1ImportsFormatProposeResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12199,6 +12979,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1FindingsResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12256,6 +13045,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1InboxResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12318,64 +13116,13 @@ export interface operations {
                     "application/json": components["schemas"]["Snapshot"];
                 };
             };
-            /** @description Unauthenticated */
-            401: {
+            /** @description Bad request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    mintOperatorSnapshot: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlatformSnapshotMint"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Snapshot"];
                 };
             };
             /** @description Unauthenticated */
@@ -12436,6 +13183,15 @@ export interface operations {
                     "application/json": components["schemas"]["Snapshot"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12494,6 +13250,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1RunResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12550,6 +13315,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1RunResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12611,6 +13385,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1TracesResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12679,6 +13462,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12758,6 +13550,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12833,6 +13634,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -12912,6 +13722,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -12959,6 +13778,74 @@ export interface operations {
             };
         };
     };
+    listReorderLevels: {
+        parameters: {
+            query: {
+                outlet: string;
+                ingredient?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InventoryReorderLevels"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setReorderLevel: {
         parameters: {
             query?: never;
@@ -12987,6 +13874,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -13066,6 +13962,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13141,6 +14046,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -13222,6 +14136,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13299,6 +14222,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13369,6 +14301,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1InventoryMovements"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13428,6 +14369,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1InventoryBatches"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13485,6 +14435,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1KdsBoard"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -13555,6 +14514,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -13634,6 +14602,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13711,6 +14688,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13779,6 +14765,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1KitchenPrepList"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13837,6 +14832,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrdersPreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -13907,6 +14911,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -13974,6 +14987,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1Order"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14030,6 +15052,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1OrderReceipt"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14111,6 +15142,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14188,6 +15228,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14269,6 +15318,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14346,6 +15404,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14427,6 +15494,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14504,6 +15580,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14585,6 +15670,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14662,6 +15756,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14737,6 +15840,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14818,6 +15930,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -14865,6 +15986,73 @@ export interface operations {
             };
         };
     };
+    getShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Shift"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     peopleStaffUpsert: {
         parameters: {
             query?: never;
@@ -14893,6 +16081,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -14972,6 +16169,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15047,6 +16253,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -15126,6 +16341,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15201,6 +16425,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -15282,6 +16515,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15357,6 +16599,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -15436,6 +16687,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15511,6 +16771,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -15590,6 +16859,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleCommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15659,6 +16937,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeopleOvertimeResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15718,6 +17005,82 @@ export interface operations {
                     "application/json": components["schemas"]["V1PeoplePayrollPreviewResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peopleStaffList: {
+        parameters: {
+            query: {
+                outlet: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleStaffList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15774,6 +17137,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformTenants"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15828,6 +17200,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformCountryPacks"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -15889,6 +17270,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformCountryPackDetail"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -15943,6 +17333,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformPlans"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16001,6 +17400,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformFeatureFlags"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16055,6 +17463,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformBudgets"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16113,6 +17530,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformModelRoles"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16167,6 +17593,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformOperators"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16227,6 +17662,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformConfigDrafts"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16285,6 +17729,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformConfigDraft"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16354,6 +17807,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformConfigDraft"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16414,6 +17876,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformConfigDraft"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16487,6 +17958,15 @@ export interface operations {
                     "application/json": components["schemas"]["PlatformConfigDraft"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16534,6 +18014,75 @@ export interface operations {
             };
         };
     };
+    mintOperatorSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformSnapshotMint"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snapshot"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listSuppliers: {
         parameters: {
             query?: never;
@@ -16550,6 +18099,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Suppliers"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16620,6 +18178,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16687,6 +18254,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1Supplier"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16741,6 +18317,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PurchaseOrders"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -16811,6 +18396,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16878,6 +18472,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1PurchaseOrder"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -16932,6 +18535,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1GoodsReceivedList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17002,6 +18614,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17069,6 +18690,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1GoodsReceived"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17123,6 +18753,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1SupplierInvoices"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17193,6 +18832,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17258,6 +18906,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1SupplierInvoice"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17328,6 +18985,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17409,6 +19075,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17472,6 +19147,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1SupplierReturns"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17542,6 +19226,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17607,6 +19300,15 @@ export interface operations {
                     "application/json": components["schemas"]["StorefrontOutletsResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17663,6 +19365,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorefrontMenuResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17723,6 +19434,15 @@ export interface operations {
                     "application/json": components["schemas"]["StorefrontAcceptingResponse"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17779,6 +19499,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorefrontPickupWindowsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17839,6 +19568,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrdersPreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -17910,6 +19648,15 @@ export interface operations {
                     "application/json": components["schemas"]["StorefrontOrderPlaced"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -17975,6 +19722,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorefrontOrderView"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18047,6 +19803,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18116,6 +19881,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorefrontReschedulePreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18197,6 +19971,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18274,6 +20057,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18337,6 +20129,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Outlets"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18405,6 +20206,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18486,6 +20296,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18549,6 +20368,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Brands"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18619,6 +20447,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18682,6 +20519,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Channels"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18752,6 +20598,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -18815,6 +20670,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Devices"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18883,6 +20747,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -18962,6 +20835,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19037,6 +20919,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -19116,6 +21007,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19181,6 +21081,15 @@ export interface operations {
                     "application/json": components["schemas"]["TenancyStorefrontKeyList"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19239,6 +21148,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenancyStorefrontKeyCreated"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -19318,6 +21236,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19381,6 +21308,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenancyMeTenants"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -19451,6 +21387,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19516,6 +21461,15 @@ export interface operations {
                     "application/json": components["schemas"]["V1Tenant"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19570,6 +21524,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1Members"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -19640,6 +21603,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */
@@ -19721,6 +21693,15 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResult"];
                 };
             };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unauthenticated */
             401: {
                 headers: {
@@ -19786,6 +21767,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenancyStorefrontKeyRevoked"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unauthenticated */

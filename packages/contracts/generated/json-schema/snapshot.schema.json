@@ -118,6 +118,12 @@
               "boolean",
               "uuid"
             ]
+          },
+          "numeric_source": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

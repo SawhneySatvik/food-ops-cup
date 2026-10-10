@@ -3484,6 +3484,10 @@ class V1ImportsUploadRequest(BaseModel):
     content_base64: Annotated[str, Field(max_length=7000000, min_length=1)]
 
 
+class Data12(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
 class AmountMinor8(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
@@ -3494,7 +3498,7 @@ class StagedItem(BaseModel):
     )
     row_no: Annotated[int, Field(gt=0, le=9007199254740991)]
     target_table: str
-    data: dict[str, Any]
+    data: dict[str, str | Data12 | bool | None]
     amount_minor: AmountMinor8 | None
     external_ref: str | None
 
@@ -4596,6 +4600,18 @@ class Component(BaseModel):
     amount_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
+class CountedCashMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class ExpectedCashMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class VarianceMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
 class GuestAccessToken(RootModel[str]):
     root: Annotated[str, Field(max_length=256, min_length=16)]
 
@@ -5014,10 +5030,10 @@ class RefId(RootModel[str]):
 
 
 class ReasonCode(
-    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change']]
+    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding']]
 ):
     root: Annotated[
-        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change'],
+        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding'],
         Field(title='ReasonCode'),
     ]
 
@@ -5186,6 +5202,7 @@ class Column(BaseModel):
     )
     name: Annotated[str, Field(pattern='^[a-z_][a-z0-9_]*$')]
     type: Literal['integer', 'numeric', 'text', 'date', 'timestamptz', 'boolean', 'uuid']
+    numeric_source: str | None = None
 
 
 class Rows(RootModel[int]):
@@ -5214,7 +5231,7 @@ class ErrorBody(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    code: Annotated[str, Field(pattern='^[a-z_]+$')]
+    code: Literal['bad_request', 'unauthenticated', 'forbidden', 'not_found', 'conflict', 'book_write_refused', 'country_locked', 'currency_mismatch', 'illegal_transition', 'override_refused', 'decision_refused', 'customer_erased', 'command_table_mismatch', 'period_closed', 'books_unbalanced', 'loyalty_refused', 'claim_quote_mismatch', 'out_of_pack_scope', 'sequence_gap', 'idempotency_conflict', 'command_type_mismatch', 'invalid_payload', 'unregistered_command_type', 'cannot_verify', 'already_decided', 'stale_draft', 'chart_incomplete', 'execution_failed', 'unavailable', 'internal']
     message: Annotated[str, Field(max_length=500, min_length=1)]
     reason_code: ReasonCode | None
 
@@ -5250,16 +5267,12 @@ class StorefrontGuestCreateV1(BaseModel):
     consent: Consent2
 
 
-class Reason2(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, min_length=1)]
-
-
 class StorefrontOrderCancelV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     order_id: Uuid7
-    reason: Reason2 | None
+    reason: Literal['changed_mind', 'ordered_by_mistake', 'wait_too_long', 'other'] | None
 
 
 class StorefrontOrderRescheduleV1(BaseModel):
@@ -5314,7 +5327,7 @@ class Variant2(BaseModel):
     price_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
-class Option4(BaseModel):
+class Option5(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5332,7 +5345,7 @@ class OptionGroup4(BaseModel):
     min_select: Annotated[int, Field(ge=0, le=9007199254740991)]
     max_select: Annotated[int, Field(ge=1, le=9007199254740991)]
     required: bool
-    options: list[Option4]
+    options: list[Option5]
 
 
 class Item13(BaseModel):
@@ -5350,6 +5363,17 @@ class Item13(BaseModel):
     option_groups: list[OptionGroup4]
 
 
+class Window3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    days: Annotated[list[Day], Field(max_length=7, min_length=1)]
+    from_: Annotated[
+        str, Field(alias='from', pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ]
+    to: Annotated[str, Field(pattern='^([01][0-9]|2[0-3]):[0-5][0-9]$')]
+
+
 class Deal2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -5357,7 +5381,7 @@ class Deal2(BaseModel):
     deal_id: Uuid7
     name_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
     kind: str
-    windows: list[Any]
+    windows: list[Window3]
     valid_from: Annotated[
         str,
         Field(
@@ -5380,7 +5404,7 @@ class StorefrontAcceptingResponse(BaseModel):
     as_of: IsoDatetime
 
 
-class Window3(BaseModel):
+class Window4(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5396,7 +5420,7 @@ class StorefrontPickupWindowsResponse(BaseModel):
         extra='forbid',
     )
     outlet_id: Uuid7
-    windows: list[Window3]
+    windows: list[Window4]
 
 
 class Guest(BaseModel):
@@ -8066,6 +8090,13 @@ class ProposalFinancePeriodCloseV1(BaseModel):
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
 
 
+class V1FinanceChannelTerms(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    channel_terms: list[FinanceChannelTermsSetV1]
+
+
 class GoalsGoalCreateV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -8702,6 +8733,7 @@ class Movement(BaseModel):
     ref_type: RefType | None
     ref_id: Uuid7 | None
     unit_cost: Money | None
+    unit_cost_per_1000: Money | None
     expired_sale_override_id: Uuid7 | None
     at: IsoDatetime
 
@@ -8732,6 +8764,25 @@ class V1InventoryBatches(BaseModel):
         extra='forbid',
     )
     batches: list[Batch1]
+
+
+class ReorderLevel(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reorder_level_id: Uuid7
+    outlet_id: Uuid7
+    ingredient_id: Uuid7
+    min_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    par_qty_milli: Annotated[int, Field(ge=0, le=9007199254740991)]
+    updated_at: IsoDatetime
+
+
+class V1InventoryReorderLevels(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reorder_levels: list[ReorderLevel]
 
 
 class KitchenTicketAdvanceV1(BaseModel):
@@ -8823,6 +8874,14 @@ class ProposalKitchenPrepListCreateV1(BaseModel):
     lines: Annotated[list[Line35], Field(max_length=200, min_length=1)]
 
 
+class Option4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    option_id: Uuid7
+    name_key: Annotated[str, Field(max_length=200, min_length=1)]
+
+
 class Line36(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -8831,7 +8890,7 @@ class Line36(BaseModel):
     item_id: Uuid7
     name_key: Annotated[str, Field(max_length=200, min_length=1)]
     qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
-    options: list[Any]
+    options: list[Option4]
     note: str | None
 
 
@@ -9245,6 +9304,25 @@ class V1OrderReceipt(BaseModel):
     components: list[Component]
 
 
+class V1Shift(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    shift_id: Uuid7
+    outlet_id: Uuid7
+    device_id: Uuid7 | None
+    status: Literal['open', 'closed']
+    opened_by: Uuid7
+    opened_at: IsoDatetime
+    float_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    closed_by: Uuid7 | None
+    closed_at: IsoDatetime | None
+    counted_cash_minor: CountedCashMinor | None
+    expected_cash_minor: ExpectedCashMinor | None
+    variance_minor: VarianceMinor | None
+
+
 class OrdersPlaceGuestResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -9571,6 +9649,39 @@ class V1PeoplePayrollPreviewResponse(BaseModel):
     period_month: Annotated[str, Field(pattern='^[0-9]{4}-(0[1-9]|1[0-2])-01$')]
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
     lines: list[Line45]
+
+
+class StaffItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    staff_id: Uuid7
+    member_id: Uuid7 | None
+    outlet_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    role_key: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*$')]
+    pay_basis: Literal['hourly', 'monthly']
+    wage_rate_minor: WageRateMinor | None
+    monthly_salary_minor: MonthlySalaryMinor | None
+    contract_min_per_month: ContractMinPerMonth | None
+    ot_multiplier_bp: Annotated[int, Field(ge=10000, le=40000)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    joined_on: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    left_on: LeftOn | None
+    active: bool
+
+
+class V1PeopleStaffList(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7
+    staff: list[StaffItem]
 
 
 class PlatformModelRoleRow(BaseModel):
@@ -10174,6 +10285,9 @@ class Line57(BaseModel):
     qty_milli: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
     unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
     unit_cost_minor: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+    unit_cost_per_1000_minor: Annotated[
+        int, Field(ge=-9007199254740991, le=9007199254740991)
+    ]
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
 
 

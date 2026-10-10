@@ -23,7 +23,24 @@
             "propertyNames": {
               "type": "string"
             },
-            "additionalProperties": {}
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
           },
           "amount_minor": {
             "anyOf": [

@@ -183,7 +183,25 @@
                 },
                 "options": {
                   "type": "array",
-                  "items": {}
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "option_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "name_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "option_id",
+                      "name_key"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "note": {
                   "type": [

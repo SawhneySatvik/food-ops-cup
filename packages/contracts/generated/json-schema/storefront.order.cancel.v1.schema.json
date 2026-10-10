@@ -13,8 +13,12 @@
       "anyOf": [
         {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 200
+          "enum": [
+            "changed_mind",
+            "ordered_by_mistake",
+            "wait_too_long",
+            "other"
+          ]
         },
         {
           "type": "null"

@@ -10,7 +10,38 @@
       "properties": {
         "code": {
           "type": "string",
-          "pattern": "^[a-z_]+$"
+          "enum": [
+            "bad_request",
+            "unauthenticated",
+            "forbidden",
+            "not_found",
+            "conflict",
+            "book_write_refused",
+            "country_locked",
+            "currency_mismatch",
+            "illegal_transition",
+            "override_refused",
+            "decision_refused",
+            "customer_erased",
+            "command_table_mismatch",
+            "period_closed",
+            "books_unbalanced",
+            "loyalty_refused",
+            "claim_quote_mismatch",
+            "out_of_pack_scope",
+            "sequence_gap",
+            "idempotency_conflict",
+            "command_type_mismatch",
+            "invalid_payload",
+            "unregistered_command_type",
+            "cannot_verify",
+            "already_decided",
+            "stale_draft",
+            "chart_incomplete",
+            "execution_failed",
+            "unavailable",
+            "internal"
+          ]
         },
         "message": {
           "type": "string",
@@ -59,6 +90,8 @@
                 "coupon_cap_reached",
                 "coupon_min_spend",
                 "change_window_closed",
+                "coupon_expired",
+                "coupon_out_of_scope",
                 "price_above_mrp",
                 "expired_batch",
                 "period_closed",
@@ -74,7 +107,10 @@
                 "reason_required",
                 "deal_changed",
                 "duplicate_invoice",
-                "guest_cannot_change"
+                "guest_cannot_change",
+                "refund_first",
+                "order_tendered",
+                "cash_below_rounding"
               ]
             },
             {
