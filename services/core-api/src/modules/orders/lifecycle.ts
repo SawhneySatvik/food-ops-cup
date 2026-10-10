@@ -5,7 +5,7 @@
 // owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` reverses redeemed points,
 // gives the consumed stock back (W2-R6, inventory's seam) and frees the pickup slot. `orderStatusHandler(type)` binds the
 // move to the seeded command that carries it: the POS's orders.order.accept.v1 / .reject.v1 / .advance.v1 (each limited
-// to its own steps here — the database binds all three to the same tables), the kitchen's kitchen.ticket.advance.v1 and
+// to its own steps by posStatusHandler — the database binds all three to the same tables), the kitchen's kitchen.ticket.advance.v1 and
 // the shopper's storefront.order.cancel.v1 (0015 A4, #41).
 import type { CommandHandler, EventDraft, HandlerOutput } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
@@ -73,14 +73,6 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
   };
 }
 
-/** The steps each POS status command may make; the kitchen's and the shopper's commands keep their own callers'
- *  checks. A command not listed here may make any legal step. */
-const STEPS: Record<string, (from: OrderStatus, to: OrderStatus) => boolean> = {
-  "orders.order.accept.v1": (from, to) => from === "placed" && to === "accepted",
-  "orders.order.reject.v1": (from, to) => from === "placed" && to === "rejected",
-  "orders.order.advance.v1": (_from, to) => to !== "accepted" && to !== "rejected" && to !== "placed",
-};
-
 /** A handler that moves an order one status step under `type` (payload: order_id, from_status, to_status,
  *  reason_code). The actor is read from the transaction's identity, never from the payload. */
 export function orderStatusHandler(type: string): CommandHandler {
@@ -91,13 +83,15 @@ export function orderStatusHandler(type: string): CommandHandler {
       const ok = (s: unknown): s is OrderStatus => typeof s === "string" && (ORDER_STATUSES as readonly string[]).includes(s);
       if (typeof p.order_id !== "string" || !ok(p.from_status) || !ok(p.to_status)) throw new ApiError("invalid_payload");
       if (p.reason_code != null && !/^[a-z][a-z0-9_]*$/.test(p.reason_code)) throw new ApiError("invalid_payload");
-      if (STEPS[type] && !STEPS[type](p.from_status, p.to_status)) throw new ApiError("invalid_payload");
       return advanceOrder(c, { order_id: p.order_id, from_status: p.from_status, to_status: p.to_status, reason_code: p.reason_code ?? null }, await mover(c));
     },
   };
 }
 
-/** The POS commands' payloads (accept / reject carry no statuses) as the one status-move shape. */
+/** The POS commands' payloads as the one status-move shape. Each command is limited to its own steps by its
+ *  contract: accept / reject carry no statuses (always placed → accepted / rejected) and advance's to_status
+ *  excludes accepted, rejected and placed — the database binds all three to the same tables, so this is where the
+ *  difference lives. */
 export function posStatusHandler(type: "orders.order.accept.v1" | "orders.order.reject.v1" | "orders.order.advance.v1"): CommandHandler {
   const inner = orderStatusHandler(type);
   return {
