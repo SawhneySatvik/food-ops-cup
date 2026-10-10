@@ -43,7 +43,7 @@ async function authorize(c: Queryable, type: string, target_outlet: string | nul
 
 const parse = <T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, cmd: CommandEnvelope): T => {
   const r = schema.safeParse(cmd.payload);
-  if (!r.success) throw new ApiError("bad_request");
+  if (!r.success) throw new ApiError("invalid_payload");
   return r.data;
 };
 

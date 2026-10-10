@@ -1,5 +1,6 @@
 // Public reads under the shopper's own context (customer_scope: catalogue / outlet / calendar / pickup windows are
 // public to a storefront key; nothing else is). Every value returned is a row's own field (R26).
+import { DealWindow } from "@munim/contracts/catalogue";
 import type { Accepting, CalendarRow } from "./state.ts";
 import { effectiveState, openByCalendar } from "./state.ts";
 import { ApiError } from "../../lib/errors.ts";
@@ -93,7 +94,8 @@ export async function menu(c: Queryable, outlet: OutletRow, kind: StorefrontKind
     channel_kind: kind,
     accepting: await accepting(c, outlet, at),
     items,
-    deals: deals.rows,
+    // Only deals whose windows have the contract shape (catalogue prices no other deal).
+    deals: deals.rows.filter((d) => DealWindow.array().safeParse(d.windows).success),
     pay_at_counter: true as const,
   };
 }

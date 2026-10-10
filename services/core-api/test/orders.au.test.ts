@@ -1,19 +1,14 @@
 // T-022 gates on an AU tenant (the project's gate table: IN and AU golden receipts and tax totals; ruling #59 AU 5¢
 // cash rounding). AU pack: gst_10 one component of 10%, prices INCLUSIVE, tax = round(gross × 1000 / 11000).
-// Expected values are hand-written. Seams: local fakes (orders.kit.ts).
+// Expected values are hand-written. Seams: the REAL owners' functions (R3-M3).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type Env, installFakes, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
+import { type Env, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
 
 let env: Env;
-let undo: () => void;
 beforeAll(async () => {
   env = await startEnv("AU");
-  undo = installFakes();
 });
-afterAll(async () => {
-  undo?.();
-  await env?.stop();
-});
+afterAll(async () => env?.stop());
 
 const place = async (lines: Parameters<typeof placePayload>[1]) => {
   const p = placePayload(env, lines);

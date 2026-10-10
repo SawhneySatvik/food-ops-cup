@@ -2,8 +2,9 @@
 //   read:       a signed-in customer (own orders) or a guest-token holder (that one order) — anything else is 404.
 //   cancel / reschedule: signed-in customers only. A guest is refused `guest_cannot_change` ("Call the outlet to
 //   change this order", W2-R2); a guest context writes nothing (0014 guest_scope).
-//   The status move is orders.advanceOrder's (W2-R9): the paired outbox event (#80), the loyalty reversal and the
-//   pickup slot release happen there, in this transaction.
+//   The status move is orders.advanceOrder's (W2-R9): the paired outbox event (#80), the loyalty and stock reversals
+//   and the pickup slot release happen there, in this transaction. The re-price is orders' quoteReprice /
+//   applyReprice: the order as placed, judged at the new time.
 //   Windows (INFERENCE: G-SF-1 has no definition, screen O3 reads "window − elapsed"): minutes after
 //   core.order.created_at, per core.outlet.cancel_window_min / reschedule_window_min; only a `placed` order is
 //   changeable online (the transition table lets a customer cancel only from placed).
@@ -16,16 +17,17 @@ import { asSystem, withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Deps } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
-import { advanceOrder, repriceLines } from "../orders/index.ts";
-import { now, seam } from "./config.ts";
+import { advanceOrder, applyReprice, previewBody, quoteReprice, refuseIfTendered } from "../orders/index.ts";
+import { now } from "./config.ts";
 import { type CustomerPrincipal, refused } from "./checkout.ts";
 import { outletRow, ownRefusals } from "./read.ts";
 
 type Shopper = CustomerPrincipal | Extract<Principal, { kind: "guest" }>;
 
-function parse<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, body: unknown): T {
+/** A request body that does not fit is 400; a command payload that does not fit is 422 invalid_payload (R3-M6). */
+function parse<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, body: unknown, code: "bad_request" | "invalid_payload" = "bad_request"): T {
   const r = schema.safeParse(body);
-  if (!r.success) throw new ApiError("bad_request");
+  if (!r.success) throw new ApiError(code);
   return r.data;
 }
 const iso = (d: Date) => d.toISOString();
@@ -47,7 +49,7 @@ export async function getOrder(deps: Deps, who: Shopper, order_id: string) {
     const lines = await c.query<{ line_no: number; item_id: string; variant_id: string | null; qty_milli: string; unit_price_minor: string; line_discount_minor: string; tax_minor: string }>(
       `SELECT line_no, item_id, variant_id, qty_milli, unit_price_minor, line_discount_minor, tax_minor FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [order_id]);
     const events = await c.query<{ kind: string; from_status: string | null; to_status: string | null; from_promised_at: Date | null; to_promised_at: Date | null; reason: string | null; at: Date }>(
-      `SELECT kind, from_status, to_status, from_promised_at, to_promised_at, reason, at FROM core.order_event WHERE order_id = $1 ORDER BY at, id`, [order_id]);
+      `SELECT kind, from_status, to_status, from_promised_at, to_promised_at, reason, at FROM core.order_event WHERE order_id = $1 ORDER BY seq`, [order_id]);
     // The outlet is public to a customer but not to a guest context; its two window columns are not secret.
     const w = await asSystem(c, async () =>
       (await c.query<{ cancel_window_min: number; reschedule_window_min: number }>(`SELECT cancel_window_min, reschedule_window_min FROM core.outlet WHERE id = $1`, [o.outlet_id])).rows[0]!);
@@ -97,12 +99,11 @@ export function cancelHandler(who: CustomerPrincipal, order_id: string): Command
   return {
     type: "storefront.order.cancel.v1",
     async run(c, cmd) {
-      const p = parse(StorefrontOrderCancelV1, cmd.payload);
-      if (p.order_id !== order_id) throw new ApiError("bad_request");
+      const p = parse(StorefrontOrderCancelV1, cmd.payload, "invalid_payload");
+      if (p.order_id !== order_id) throw new ApiError("invalid_payload");
       const o = await lockOrder(c, order_id, true);
       changeable(o, o.cancel_window_min);
-      // The shopper's own words are kept as the event's reason; with none, a fixed code. Coupon-use and stock
-      // reversals wait on their schema/rules (W2-R6, B5 — reported).
+      // The reason is one of the contract's fixed codes, else a fixed code: free text is never stored (R1-m1).
       return advanceOrder(c, { order_id, from_status: "placed", to_status: "cancelled", reason_code: p.reason ?? "customer_cancelled" },
         { kind: "customer", id: who.customer_id, role: "customer" });
     },
@@ -110,42 +111,18 @@ export function cancelHandler(who: CustomerPrincipal, order_id: string): Command
 }
 
 // ── Reschedule: re-price at the new promised time
-async function repricingInputs(deps: Deps, who: CustomerPrincipal, order_id: string) {
-  return withContext(deps.pools.core, contextOf(who), async (c) => {
-    const o = await lockOrder(c, order_id, false);
-    const lines = await c.query<{ item_id: string; variant_id: string | null; options: unknown; qty_milli: string }>(
-      `SELECT item_id, variant_id, options, qty_milli FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [order_id]);
-    // The customer may read only coupons the request presents, so the order's own codes are read as core.
-    const codes = await asSystem(c, async () =>
-      (await c.query<{ code: string }>(
-        `SELECT cp.code FROM core.coupon_use cu JOIN core.coupon cp ON cp.tenant_id = cu.tenant_id AND cp.id = cu.coupon_id WHERE cu.order_id = $1 ORDER BY cp.code`, [order_id])).rows.map((r) => r.code));
-    return { o, lines: lines.rows, codes };
-  });
-}
-
-/** order_line.options as orders writes it: the chosen option ids (orders/place.ts). */
-const optionIds = (options: unknown): string[] => (Array.isArray(options) ? options.filter((x): x is string => typeof x === "string") : []);
-
-async function priceAt(
-  who: CustomerPrincipal, c: Queryable, o: Locked, lines: Array<{ item_id: string; variant_id: string | null; options: unknown; qty_milli: string }>,
-  codes: string[], to: { pickup_window_id: string | null; promised_at: string },
-) {
-  const { channel_id: channel, kind } = (await c.query<{ channel_id: string; kind: string }>(`SELECT channel_id, kind FROM core."order" WHERE id = $1`, [o.id])).rows[0]!;
-  return seam("previewOrder")(c, who, {
-    outlet_id: o.outlet_id, channel_id: channel, brand_id: null, kind: kind as "pickup", pickup_window_id: to.pickup_window_id, promised_at: to.promised_at,
-    coupon_codes: codes, loyalty_redeem_points: 0,
-    lines: lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id, option_ids: optionIds(l.options), qty_milli: Number(l.qty_milli), barcode: null })),
-  });
-}
+const lineKeys = async (c: Queryable, order_id: string) =>
+  (await c.query<{ item_id: string; variant_id: string | null }>(`SELECT item_id, variant_id FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [order_id])).rows;
 
 /** Write-nothing: the order re-priced at the new time, with the same refusals placement would raise. */
 export async function reschedulePreview(deps: Deps, who: CustomerPrincipal, order_id: string, body: unknown) {
   const req = parse(StorefrontReschedulePreviewRequest, body);
-  const { o, lines, codes } = await repricingInputs(deps, who, order_id);
-  return withContext(deps.pools.core, contextOf(who, { coupon_codes: codes }), async (c) => {
-    const priced = await priceAt(who, c, o, lines, codes, req);
+  return withContext(deps.pools.core, contextOf(who), async (c) => {
+    const o = await lockOrder(c, order_id, false);
+    await refuseIfTendered(c, order_id, o.outlet_id);
+    const priced = previewBody((await quoteReprice(c, order_id, req.promised_at)).cart, req.promised_at);
     const outlet = await outletRow(c, o.outlet_id);
-    const own = await ownRefusals(c, { outlet, pickup_window_id: req.pickup_window_id, promised_at: req.promised_at, lines: lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id })) });
+    const own = await ownRefusals(c, { outlet, pickup_window_id: req.pickup_window_id, promised_at: req.promised_at, lines: await lineKeys(c, order_id) });
     // The order's own current window is already counted in `booked`; staying in it is not a capacity problem.
     const refusals = own.filter((r) => !(r.reason_code === "window_full" && req.pickup_window_id === o.pickup_window_id));
     return {
@@ -155,27 +132,26 @@ export async function reschedulePreview(deps: Deps, who: CustomerPrincipal, orde
   });
 }
 
-export function rescheduleHandler(who: CustomerPrincipal, order_id: string, codes: string[]): CommandHandler {
+export function rescheduleHandler(who: CustomerPrincipal, order_id: string): CommandHandler {
   return {
     type: "storefront.order.reschedule.v1",
     async run(c, cmd) {
-      const p = parse(StorefrontOrderRescheduleV1, cmd.payload);
-      if (p.order_id !== order_id) throw new ApiError("bad_request");
+      const p = parse(StorefrontOrderRescheduleV1, cmd.payload, "invalid_payload");
+      if (p.order_id !== order_id) throw new ApiError("invalid_payload");
       const o = await lockOrder(c, order_id, true);
       changeable(o, o.reschedule_window_min);
+      await refuseIfTendered(c, order_id, o.outlet_id);
       const outlet = await outletRow(c, o.outlet_id);
-      const lines = (await c.query<{ item_id: string; variant_id: string | null; options: unknown; qty_milli: string }>(
-        `SELECT item_id, variant_id, options, qty_milli FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [order_id])).rows;
-      const own = await ownRefusals(c, { outlet, pickup_window_id: p.pickup_window_id, promised_at: p.promised_at, lines });
+      const own = await ownRefusals(c, { outlet, pickup_window_id: p.pickup_window_id, promised_at: p.promised_at, lines: await lineKeys(c, order_id) });
       const blocking = own.find((r) => !(r.reason_code === "window_full" && p.pickup_window_id === o.pickup_window_id));
       if (blocking) throw refused(blocking.reason_code);
 
-      const priced = await priceAt(who, c, o, lines, codes, p);
-      const bad = priced.refusals[0];
+      const quote = await quoteReprice(c, order_id, p.promised_at);
+      const bad = quote.cart.refusals[0];
       if (bad) throw refused(bad.reason_code);
       // The person confirms the re-priced total they saw; a deal that stopped (or started) applying at the new
       // time changes it, and nothing is written until they see the new figure (R4 §E 5).
-      if (priced.total_minor !== p.preview_total_minor) throw refused("deal_rejudged");
+      if (quote.cart.totals.total_minor !== p.preview_total_minor) throw refused("deal_rejudged");
 
       if (p.pickup_window_id !== o.pickup_window_id) {
         if (p.pickup_window_id) {
@@ -189,21 +165,15 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string, code
         `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_promised_at, to_promised_at, actor, reason)
          VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'promised_at', $4, $5, $6, 'customer_rescheduled')`,
         [uuidv7(), o.outlet_id, order_id, o.promised_at, p.promised_at, actorOf(who)]);
-      // The money columns (header and lines) move only under the seeded pricing rule `orders.reprice`, for this order alone.
-      await c.query(`SELECT set_config('app.posting_rule', 'orders.reprice', true), set_config('app.source_ref', $1, true)`, [`core.order:${order_id}`]);
-      await c.query(
-        `UPDATE core."order" SET subtotal_minor = $2, discount_minor = $3, tax_minor = $4, total_minor = $5, pricing_snapshot = $6 WHERE id = $1`,
-        [order_id, priced.subtotal_minor, priced.discount_minor, priced.tax_minor, priced.total_minor,
-         { priced_at: priced.priced_at, tax_rule: priced.tax_rule, lines: priced.lines, repriced_for: p.promised_at }]);
-      await repriceLines(c, order_id, priced.lines);
-      await c.query(`SELECT set_config('app.posting_rule', '', true), set_config('app.source_ref', '', true)`);
+      // The money (header, moved lines, the merged snapshot) moves only under orders.reprice, each row audited.
+      const repriced = await applyReprice(c, order_id, quote);
       return {
         entityId: order_id,
         audit: [{
           entity: "core.order", entityId: order_id,
-          before: { promised_at: o.promised_at ? iso(o.promised_at) : null, total_minor: o.total_minor },
-          after: { promised_at: p.promised_at, total_minor: priced.total_minor },
-        }],
+          before: { promised_at: o.promised_at ? iso(o.promised_at) : null, pickup_window_id: o.pickup_window_id },
+          after: { promised_at: p.promised_at, pickup_window_id: p.pickup_window_id },
+        }, ...repriced],
         // #80: the promised_at order_event is paired with its outbox event (shopper feed and KDS wake on it).
         events: [{ type: "munim.orders.order.promise_changed.v1", subject: order_id, aggregateType: "order",
           data: { order_id, outlet_id: o.outlet_id, reason_code: "customer_rescheduled" } }],
@@ -212,15 +182,10 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string, code
   };
 }
 
-/** Runs a shopper command on its own transaction (coupons presented for the re-pricing) and publishes after commit. */
-export async function runShopperCommand(deps: Deps, who: CustomerPrincipal, command: CommandEnvelope, handler: CommandHandler, codes: string[] = []): Promise<ExecuteResult> {
-  const out = await withContext(deps.pools.core, contextOf(who, codes.length ? { coupon_codes: codes } : {}), (c) =>
+/** Runs a shopper command on its own transaction and publishes after commit. */
+export async function runShopperCommand(deps: Deps, who: CustomerPrincipal, command: CommandEnvelope, handler: CommandHandler): Promise<ExecuteResult> {
+  const out = await withContext(deps.pools.core, contextOf(who), (c) =>
     executeCommand({ tx: (fn) => fn(c), tenantId: who.tenant_id, actor: { kind: "customer", id: who.customer_id, role: "customer" } }, command, handler));
   if (deps.publish) await publishCommitted(deps.publish, who.tenant_id, out.outbox);
   return out;
-}
-
-export async function rescheduleInputs(deps: Deps, who: CustomerPrincipal, order_id: string) {
-  const { codes } = await repricingInputs(deps, who, order_id);
-  return codes;
 }

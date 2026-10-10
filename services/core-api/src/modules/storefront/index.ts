@@ -17,7 +17,7 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import { type CustomerPrincipal, placeFlow, previewFlow } from "./checkout.ts";
 import { accepting, channelKind, menu, outletRow, outlets, pickupWindows } from "./read.ts";
-import { cancelHandler, getOrder, rescheduleHandler, reschedulePreview, rescheduleInputs, runShopperCommand } from "./orders.ts";
+import { cancelHandler, getOrder, rescheduleHandler, reschedulePreview, runShopperCommand } from "./orders.ts";
 
 export { configureStorefront, resetStorefront } from "./config.ts";
 export type { SaleEntry, Seams } from "./config.ts";
@@ -62,7 +62,7 @@ const read = <T>(c: Context<AppEnv>, fn: (q: import("../../runtoken/index.ts").Q
 
 const command = async (c: Context<AppEnv>) => {
   const env = CommandEnvelope.safeParse(await json(c));
-  if (!env.success) throw new ApiError("bad_request");
+  if (!env.success) throw new ApiError("invalid_payload");
   return env.data;
 };
 const action = (c: Context<AppEnv>, suffix: string) => c.req.param("action")!.slice(0, -suffix.length);
@@ -95,7 +95,6 @@ export const router = new Hono<AppEnv>()
     c.json(await reschedulePreview(c.var.deps, customer(c), action(c, ":reschedule-preview"), await json(c)), 200))
   .post(`/v1/storefront/orders/:action{${ID}:reschedule}`, signedIn, async (c) => {
     const id = action(c, ":reschedule");
-    const codes = await rescheduleInputs(c.var.deps, customer(c), id);
-    const out = await runShopperCommand(c.var.deps, customer(c), await command(c), rescheduleHandler(customer(c), id, codes), codes);
+    const out = await runShopperCommand(c.var.deps, customer(c), await command(c), rescheduleHandler(customer(c), id));
     return c.body(out.body, 200, { "Content-Type": "application/json", ...replayHeaders(out) });
   });

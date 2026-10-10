@@ -7,6 +7,7 @@ import { commandEnvelopeOf } from "../shared/command.ts";
 import { CurrencyCode, Email, IsoDate, IsoDateTime, MinorAmount, NonEmpty, QtyMilli, Slug, Uuid7 } from "../shared/primitives.ts";
 import type { ReasonCode } from "../shared/reason-codes.ts";
 import type { Route } from "../shared/routes.ts";
+import { DealWindow } from "../catalogue/index.ts";
 import { ChannelKind } from "../tenancy/index.ts";
 import { OrderKind, OrdersPlaceV1, OrdersPreviewRequest, OrdersPreviewResponse } from "../orders/index.ts";
 
@@ -19,9 +20,13 @@ export const StorefrontGuestCreateV1 = z.strictObject({
   consent: z.strictObject({ marketing: z.boolean(), at: IsoDateTime }),
 });
 
+/** Why a shopper cancels: a fixed list (the tracker shows one choice per code). Free text is never taken — it
+ *  would be stored for good in the order's event (R1-m1). null = "customer_cancelled". */
+export const StorefrontCancelReason = z.enum(["changed_mind", "ordered_by_mistake", "wait_too_long", "other"]);
+
 /** The customer's own cancel (status placed → cancelled, inside the outlet's cancel window). The order is the
  *  one the path names; the customer comes from the verified token, never from here. */
-export const StorefrontOrderCancelV1 = z.strictObject({ order_id: Uuid7, reason: z.string().min(1).max(200).nullable() });
+export const StorefrontOrderCancelV1 = z.strictObject({ order_id: Uuid7, reason: StorefrontCancelReason.nullable() });
 
 /** The customer's own change of pickup time / window (inside the reschedule window). Core re-prices at the new
  *  time; `preview_total_minor` is the total of the reschedule preview the person saw — a different re-priced
@@ -92,8 +97,8 @@ export const StorefrontDeal = z.strictObject({
   deal_id: Uuid7,
   name_key: Slug,
   kind: z.string(),
-  /** core.deal.windows as stored (outlet-local weekday / time ranges). */
-  windows: z.array(z.unknown()),
+  /** core.deal.windows: outlet-local ISO weekdays (1 = Monday) and a time range (an overnight range wraps). */
+  windows: z.array(DealWindow),
   valid_from: IsoDate,
   valid_to: IsoDate.nullable(),
 });
@@ -203,6 +208,8 @@ export const STOREFRONT_REFUSAL_COPY = {
   item_sold_out: "order.refuse.sold_out",
   deal_rejudged: "order.refuse.deal_rejudged",
   coupon_invalid: "order.refuse.coupon_invalid",
+  coupon_expired: "order.refuse.coupon_expired",
+  coupon_out_of_scope: "order.refuse.coupon_out_of_scope",
   coupon_cap_reached: "order.refuse.coupon_cap",
   coupon_min_spend: "order.refuse.coupon_min_spend",
   change_window_closed: "order.refuse.change_window_closed",
@@ -232,7 +239,7 @@ export const ROUTES: readonly Route[] = [
   { surface: "public", method: "get", path: "/v1/storefront/outlets/{outlet_id}/pickup-windows", operationId: "storefrontPickupWindows", summary: "Pickup windows with spare capacity", auth: "storefront", response: "storefront.pickup_windows.response", status: 200, pathParams: outlet },
   { surface: "public", method: "post", path: "/v1/storefront/orders:preview", operationId: "storefrontPreviewOrder", summary: "Price a cart (Preview; writes nothing); channel comes from the key", auth: "storefront", request: "orders.preview.request", response: "orders.preview.response", status: 200, conflict: true },
   { surface: "public", method: "post", path: "/v1/storefront/orders", operationId: "storefrontPlaceOrder", summary: "Guest or signed-in checkout in one transaction; pay at the counter", auth: "storefront", request: "storefront.order.place.request", response: "storefront.order.placed", status: 201, conflict: true },
-  { surface: "public", method: "get", path: "/v1/storefront/orders/{id}", operationId: "storefrontGetOrder", summary: "The shopper's own order (customer token or guest access token); anything else is 404", auth: "storefront", response: "storefront.order.view", status: 200, pathParams: [{ name: "id", uuid: true }] },
+  { surface: "public", method: "get", path: "/v1/storefront/orders/{id}", operationId: "storefrontGetOrder", summary: "The shopper's own order (customer token or guest access token); anything else is 404", auth: "storefront", guest: true, response: "storefront.order.view", status: 200, pathParams: [{ name: "id", uuid: true }] },
   { surface: "public", method: "post", path: "/v1/storefront/orders/{id}:cancel", operationId: "storefrontCancelOrder", summary: "storefront.order.cancel.v1 — inside the outlet's cancel window", auth: "storefront", command: "storefront.order.cancel.v1", response: "command-result", status: 200, pathParams: [{ name: "id", uuid: true }], conflict: true },
   { surface: "public", method: "post", path: "/v1/storefront/orders/{id}:reschedule-preview", operationId: "storefrontReschedulePreview", summary: "Re-price the order at a new pickup time; writes nothing", auth: "storefront", request: "storefront.reschedule.preview.request", response: "storefront.reschedule.preview.response", status: 200, pathParams: [{ name: "id", uuid: true }], conflict: true },
   { surface: "public", method: "post", path: "/v1/storefront/orders/{id}:reschedule", operationId: "storefrontRescheduleOrder", summary: "storefront.order.reschedule.v1 — inside the outlet's reschedule window; deals re-priced", auth: "storefront", command: "storefront.order.reschedule.v1", response: "command-result", status: 200, pathParams: [{ name: "id", uuid: true }], conflict: true },

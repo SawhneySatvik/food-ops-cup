@@ -48,7 +48,7 @@ const count = async (sql: string, params: unknown[] = []) => Number((await one<{
 const env = (type: string, payload: unknown, key = `k-${uuidv7()}`) => ({ command_id: uuidv7(), idempotency_key: key, type, payload });
 
 /** Stand-in for T-022's orders.place.v1: inserts the order and lines, then calls THE SEAM in the same transaction. */
-async function place(o: { outlet: string; items: string[]; promised_at?: string | null; status?: string; customer?: string; total?: number }): Promise<{ order: string; tickets: Array<{ ticket_id: string; station: string }>; applicable: boolean }> {
+async function place(o: { outlet: string; items: string[]; promised_at?: string | null; status?: string; customer?: string; total?: number; options?: string[] }): Promise<{ order: string; tickets: Array<{ ticket_id: string; station: string }>; applicable: boolean }> {
   const order = uuidv7();
   let result!: Awaited<ReturnType<typeof createTicketsFor>>;
   const handler: CommandHandler = {
@@ -59,8 +59,8 @@ async function place(o: { outlet: string; items: string[]; promised_at?: string 
          VALUES ($1, $2, $3, $4, 'dine_in', $5, $8, 0, $8, $6, '{}', $7, $9)`,
         [T.tenant, order, o.outlet, T.channel, o.status ?? "placed", T.currency, o.promised_at ?? null, o.total ?? 1000, o.customer ?? null]);
       for (const [i, item] of o.items.entries()) {
-        await c.query(`INSERT INTO core.order_line (tenant_id, id, outlet_id, order_id, line_no, item_id, qty_milli, unit_price_minor) VALUES ($1, $2, $3, $4, $5, $6, 1000, 1000)`,
-          [T.tenant, uuidv7(), o.outlet, order, i + 1, item]);
+        await c.query(`INSERT INTO core.order_line (tenant_id, id, outlet_id, order_id, line_no, item_id, qty_milli, unit_price_minor, options) VALUES ($1, $2, $3, $4, $5, $6, 1000, 1000, $7)`,
+          [T.tenant, uuidv7(), o.outlet, order, i + 1, item, JSON.stringify(i === 0 ? o.options ?? [] : [])]);
       }
       result = await createTicketsFor(c, order);
       return { entityId: order, audit: [{ entity: "core.order", entityId: order }, ...result.audit], events: result.events };
@@ -222,10 +222,9 @@ describe("kitchen.ticket.advance.v1", () => {
     expect(await orderStatus(p.order)).toBe("ready");
     expect((await advance("staff", b, "ready", "done")).status).toBe(200);
     expect(await orderStatus(p.order)).toBe("completed");
-    // Hops of one advance share the transaction's `at` and uuidv7 ids are not monotonic within a millisecond: order
-    // by the chain position (the hand-written expectation) after `at`.
-    const ev = (await db.admin(`SELECT from_status, to_status FROM core.order_event WHERE order_id = $1
-                                 ORDER BY at, array_position(ARRAY['placed', 'accepted', 'preparing', 'ready'], from_status::text)`, [p.order])).rows;
+    // Hops of one advance share the transaction's `at` and uuidv7 ids are not monotonic within a millisecond: the
+    // order's own sequence (0016 seq, R3-M1) is the order they were written in.
+    const ev = (await db.admin(`SELECT from_status, to_status FROM core.order_event WHERE order_id = $1 AND from_status IS NOT NULL ORDER BY seq`, [p.order])).rows;
     expect(ev).toEqual([
       { from_status: "placed", to_status: "accepted" }, { from_status: "accepted", to_status: "preparing" },
       { from_status: "preparing", to_status: "ready" }, { from_status: "ready", to_status: "completed" },
@@ -333,15 +332,21 @@ describe("KDS board", () => {
   it("colours match D-2 on hand-written timestamps; red first; ready tickets are not coloured; scheduled orders go to 'later'", async () => {
     // Earlier tests left tickets due at the real clock; this board is judged at a fixed instant, so start clean.
     await db.admin(`DELETE FROM core.kitchen_ticket WHERE outlet_id = $1`, [T.outlets[1]]);
-    const mk = async (due: string, items = [T.itemTandoor]) => {
-      const p = await place({ outlet: T.outlets[1], items });
+    // An option on the dish: the board names it for the station (contract: option id + name key).
+    const [group, hot] = [uuidv7(), uuidv7()];
+    await db.withContext("munim_core", own("catalogue.item.upsert.v1"), async (c) => {
+      await c.query(`INSERT INTO core.option_group (tenant_id, id, item_id, name_key, max_select) VALUES ($1, $2, $3, 'menu.kds_spice', 1)`, [T.tenant, group, T.itemTandoor]);
+      await c.query(`INSERT INTO core.option (tenant_id, id, option_group_id, name_key, price_delta_minor, currency) VALUES ($1, $2, $3, 'menu.kds_spice.hot', 0, $4)`, [T.tenant, hot, group, T.currency]);
+    });
+    const mk = async (due: string, items = [T.itemTandoor], options: string[] = []) => {
+      const p = await place({ outlet: T.outlets[1], items, options });
       await db.admin(`UPDATE core.kitchen_ticket SET due_at = $2 WHERE order_id = $1`, [p.order, due]);
       return p;
     };
     const normal = await mk("2026-10-10T12:03:01Z"); // 3:01 ahead of "now" (12:00:00): now < due − 3 min → normal
     const amber = await mk("2026-10-10T12:02:59Z"); // 2:59 ahead → amber
     const edge = await mk("2026-10-10T12:03:00Z"); // exactly 3:00 ahead → amber (due − 3 min ≤ now)
-    const red = await mk("2026-10-10T12:00:00Z"); // due == now → red
+    const red = await mk("2026-10-10T12:00:00Z", [T.itemTandoor], [hot]); // due == now → red
     const late = await mk("2026-10-10T11:30:00Z"); // 30 min late → red
     const far = await mk("2026-10-10T13:00:00Z");
     const ready = await mk("2026-10-10T11:00:00Z");
@@ -362,7 +367,7 @@ describe("KDS board", () => {
     expect(board.tickets.find((t) => t.ticket_id === red.tickets[0]!.ticket_id)!.lane).toBe("now");
     // Lines carry the dish's name_key and quantity; a station filter narrows the board.
     expect(board.tickets.find((t) => t.ticket_id === red.tickets[0]!.ticket_id)!.lines).toEqual([
-      { line_no: 1, item_id: T.itemTandoor, name_key: "menu.paneer_tikka", qty_milli: 1000, options: [], note: null }]);
+      { line_no: 1, item_id: T.itemTandoor, name_key: "menu.paneer_tikka", qty_milli: 1000, options: [{ option_id: hot, name_key: "menu.kds_spice.hot" }], note: null }]);
     const kitchenOnly = await db.withContext("munim_core", own("kitchen.ticket.advance.v1"), (c) => buildBoard(c, T.outlets[1], now, "kitchen"));
     expect(kitchenOnly.tickets.every((t) => t.station === "kitchen")).toBe(true);
     expect(kitchenOnly.tickets.length).toBe(0);

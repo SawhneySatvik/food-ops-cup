@@ -13,11 +13,13 @@
 //                  coupons: percent per line (half-up); amount split across lines in proportion (largest
 //                  remainder). Min spend is judged on the cart after deals, before tax.
 //   tax          ← core-domain `orderTax` with the tenant's active country pack (highest version)
-// Refusals are returned, never thrown: item_sold_out, price_above_mrp, coupon_invalid, coupon_cap_reached,
+// Refusals are returned, never thrown: item_sold_out, price_above_mrp, coupon_invalid (unknown, repeated or
+// inactive), coupon_expired (outside its dates), coupon_out_of_scope (another outlet, or customer-only without a
+// customer), coupon_cap_reached,
 // coupon_min_spend, unknown_channel, unknown_tax_class. A line refused for its MRP is not priced (it cannot be
 // sold at all); a sold-out line is priced and refused. Malformed requests (unknown item, an option that is
 // not the item's, a group's min/max broken) throw ApiError; an inactive item or variant, or one with no price
-// in force, is `conflict` (it went off sale since the menu was read).
+// in force, is `conflict` / `item_unavailable` (it went off sale since the menu was read).
 import { citeRef, type ReasonCode } from "@munim/contracts";
 import { DealRule, DealWindow } from "@munim/contracts/catalogue";
 import { CountryPack } from "@munim/contracts/packs";
@@ -36,8 +38,11 @@ export type PriceRequest = {
   at: Date | string;
   lines: ReadonlyArray<{ item_id: string; variant_id: string | null; option_ids: readonly string[]; qty_milli: number }>;
   coupon_codes?: readonly string[];
-  /** From the verified principal only (per-customer caps, requires_customer); null/absent = anonymous. */
+  /** From the verified principal, or the order's own row on a re-price (per-customer caps, requires_customer);
+   *  null/absent = anonymous. */
   customer_id?: string | null;
+  /** Re-pricing this order: its own coupon uses are not counted against the caps (R2-S2-1). */
+  exclude_order_id?: string;
 };
 
 export type PricedLine = {
@@ -134,19 +139,19 @@ async function lineFacts(tx: Queryable, req: PriceRequest, line: PriceRequest["l
   if (line.variant_id !== null) {
     const v = (await tx.query<{ active: boolean }>(`SELECT active FROM core.variant WHERE id = $1 AND item_id = $2`, [line.variant_id, line.item_id])).rows[0];
     if (!v) throw new ApiError("not_found");
-    if (!v.active) throw new ApiError("conflict");
+    if (!v.active) throw new ApiError("conflict", "item_unavailable");
   }
-  if (!item.active) throw new ApiError("conflict");
+  if (!item.active) throw new ApiError("conflict", "item_unavailable");
   // The menu's rule (sellableAs, as itemsForSale lists): an item that has active variants is sold only as one of them.
   const sellable = (await tx.query<{ ok: boolean }>(`SELECT ${sellableAs("i", "$2::uuid")} AS ok FROM core.item i WHERE i.id = $1`, [line.item_id, line.variant_id])).rows[0];
-  if (!sellable?.ok) throw new ApiError("conflict");
+  if (!sellable?.ok) throw new ApiError("conflict", "item_unavailable");
   const price = (await tx.query<{ id: string; amount_minor: string; tax_class: string }>(
     `SELECT id, amount_minor, tax_class FROM core.price
       WHERE item_id = $1 AND outlet_id = $2 AND channel_kind = $3 AND (variant_id = $4 OR variant_id IS NULL)
         AND valid_from <= $5::date AND (valid_to IS NULL OR $5::date < valid_to)
       ORDER BY variant_id NULLS LAST LIMIT 1`,
     [line.item_id, req.outlet_id, req.channel_kind, line.variant_id, business_date])).rows[0];
-  if (!price) throw new ApiError("conflict");
+  if (!price) throw new ApiError("conflict", "item_unavailable");
 
   const opts = (await tx.query<OptionRow>(
     `SELECT o.id, o.option_group_id AS group_id, o.price_delta_minor, o.active, g.min_select, g.max_select, g.required
@@ -181,19 +186,19 @@ type CouponRow = {
 };
 
 /** Uses so far, counted over every order of the tenant, except uses on orders that were cancelled or rejected (the
- *  use row stays — append-only — but no longer counts towards a cap). A cap is tenant-wide, so the count is core's
+ *  use row stays — append-only — but no longer counts towards a cap) and, on a re-price, the order's own. A cap is tenant-wide, so the count is core's
  *  own read for every caller: role cleared and every outlet in view for this one statement (a shopper can read
  *  neither others' uses nor their orders; a member scoped to some outlets cannot see another outlet's cancellation),
  *  then restored. Only the two counts leave it. orders' placement (recordCoupons) counts the same way. */
-export async function couponUses(tx: Queryable, coupon_id: string, customer_id: string | null) {
+export async function couponUses(tx: Queryable, coupon_id: string, customer_id: string | null, exclude_order_id: string | null = null) {
   const prev = (await tx.query<{ o: string | null }>(`SELECT current_setting('app.outlet_ids', true) AS o`)).rows[0]!.o;
   const c = await asSystem(tx, async () => {
     await tx.query(`SELECT set_config('app.outlet_ids', '{*}', true)`);
     const out = (await tx.query<{ all: string; mine: string }>(
       `SELECT count(*) AS all, count(*) FILTER (WHERE u.customer_id = $2) AS mine FROM core.coupon_use u
-        WHERE u.coupon_id = $1
+        WHERE u.coupon_id = $1 AND u.order_id IS DISTINCT FROM $3::uuid
           AND NOT EXISTS (SELECT 1 FROM core."order" o WHERE o.tenant_id = u.tenant_id AND o.id = u.order_id AND o.status IN ('cancelled', 'rejected'))`,
-      [coupon_id, customer_id])).rows[0]!;
+      [coupon_id, customer_id, exclude_order_id])).rows[0]!;
     await tx.query(`SELECT set_config('app.outlet_ids', $1, true)`, [prev ?? ""]);
     return out;
   });
@@ -250,13 +255,20 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
     for (const code of codes) {
       const c = rows.find((r) => r.code === code);
       const refuse = (reason_code: ReasonCode) => refusals.push({ line_no: null, reason_code, code });
-      if (!c || seen.has(code) || !c.active || at < c.valid_from || (c.valid_to !== null && at >= c.valid_to)
-        || (c.outlet_ids.length > 0 && !c.outlet_ids.includes(req.outlet_id)) || (c.requires_customer && customer === null)) {
+      if (!c || seen.has(code) || !c.active) {
         refuse("coupon_invalid");
         continue;
       }
+      if (at < c.valid_from || (c.valid_to !== null && at >= c.valid_to)) {
+        refuse("coupon_expired");
+        continue;
+      }
+      if ((c.outlet_ids.length > 0 && !c.outlet_ids.includes(req.outlet_id)) || (c.requires_customer && customer === null)) {
+        refuse("coupon_out_of_scope");
+        continue;
+      }
       seen.add(code);
-      const uses = await couponUses(tx, c.id, customer);
+      const uses = await couponUses(tx, c.id, customer, req.exclude_order_id ?? null);
       if ((c.global_cap !== null && uses.all >= c.global_cap) || (c.per_customer_cap !== null && uses.mine >= c.per_customer_cap)) {
         refuse("coupon_cap_reached");
         continue;

@@ -7,6 +7,7 @@ import { contextOf } from "../src/auth/resolve.ts";
 import { withContext } from "../src/lib/db.ts";
 import { orderStatusHandler } from "../src/modules/orders/lifecycle.ts";
 import { placeOrder } from "../src/modules/orders/place.ts";
+import { pickSaleBatches } from "../src/modules/inventory/index.ts";
 import { PACKS } from "@munim/contracts/packs";
 import { seedChart } from "../src/modules/finance/index.ts";
 import { type Env, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
@@ -17,9 +18,6 @@ beforeAll(async () => {
   // The world seeds only cash + sales; finance posts against the pack's full chart (seeded at provisioning).
   await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "finance.account.upsert.v1" },
     (c) => seedChart(c, PACKS.IN));
-  // customers' earn skips guest profiles (T-028 INFERENCE); make the world customer a signed-up one.
-  await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "customers.customer.upsert.v1" },
-    (c) => c.query(`UPDATE core.customer SET is_guest = false, idp_sub = 'cust-sub' WHERE id = $1`, [env.w.customer]));
 });
 afterAll(async () => env?.stop());
 
@@ -46,7 +44,7 @@ describe("orders over the landed seams (no fakes)", () => {
     expect(await rules(`SELECT DISTINCT origin ->> 'rule_id' AS r FROM core.stock_movement WHERE ref_id = $1`)).toEqual(["inventory.consume_order", "inventory.consume_sku"]);
     expect(await rules(`SELECT kind || ':' || coalesce(origin ->> 'rule_id', origin ->> 'kind') AS r FROM core.loyalty_entry WHERE order_id = $1`))
       .toEqual(["earn:customers.loyalty_earn", "redeem:command"]);
-    expect(await rules(`SELECT DISTINCT origin ->> 'rule_id' AS r FROM core.journal_entry WHERE source_id = $1`)).toEqual(["finance.post_order"]);
+    expect(await rules(`SELECT DISTINCT origin ->> 'rule_id' AS r FROM core.journal_entry WHERE source_id = $1`)).toEqual(["finance.post_loyalty_redemption", "finance.post_order"]);
     expect(Number((await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.kitchen_ticket WHERE order_id = $1`, [id])).n)).toBeGreaterThanOrEqual(1);
     const ev = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.order_event WHERE order_id = $1`, [id]);
     const ob = await env.one<{ n: string }>(`SELECT count(*) AS n FROM core.outbox WHERE aggregateid = $1 AND type LIKE 'munim.orders.order.%'`, [id]);
@@ -82,14 +80,23 @@ describe("orders over the landed seams (no fakes)", () => {
     await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: [env.w.outlets[0]], role: "manager", member_id: env.ids.mgr1, command_type: "inventory.expired_sale.override.v1" }, (c) =>
       c.query(`INSERT INTO core.expired_sale_override (tenant_id, id, outlet_id, cart_line_id, batch_id, qty_milli, reason_code, note, decided_by)
                VALUES ($1, $2, $3, $4, $5, 1000, 'staff_meal', 'checked, sealed', $6)`, [env.w.tenant, override, env.w.outlets[0], p.lines[0]!.line_id, batch, env.ids.mgr1]));
+    // Re-presenting a cart line to inventory's FEFO pick (the seam placement uses): before the sale the override
+    // covers it (control); after it, the consumed override no longer does (R3-m4).
+    const present = () => env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: [env.w.outlets[0]], role: "manager", member_id: env.ids.mgr1 }, (c) =>
+      pickSaleBatches(c, env.w.outlets[0]!, [{ line_no: 1, line_id: p.lines[0]!.line_id, item_id: env.menu.juice, qty_milli: 1000 }]));
+    const covered = await present();
+    expect([covered.picks.map((k) => [k.expired, k.override_id]), covered.refusals]).toEqual([[[true, override]], []]);
     const r1 = await env.cmd("/v1/orders", "mgr1", "orders.place.v1", p);
     expect(r1.status).toBe(201);
     const o = await env.one<{ used: boolean; line: string }>(`SELECT used_at IS NOT NULL AS used, order_line_id AS line FROM core.expired_sale_override WHERE id = $1`, [override]);
     expect(o).toEqual({ used: true, line: p.lines[0]!.line_id });
+    // R1-M2: the override's use is audited in the placement's own command.
+    expect(await env.rows(`SELECT action, after FROM core.audit_log WHERE entity = 'core.expired_sale_override' AND entity_id = $1`, [override]))
+      .toEqual([{ action: "orders.place.v1", after: { used: true, order_id: p.order_id } }]);
     const m = await env.rows<{ o: string; b: string }>(`SELECT expired_sale_override_id AS o, batch_id AS b FROM core.stock_movement WHERE ref_id = $1`, [p.order_id]);
     expect(m).toEqual([{ o: override, b: batch }]);
-    // Single use: a second sale of the same cart line id is impossible (line ids are unique); another line → refused.
-    const r2 = await env.cmd("/v1/orders", "mgr1", "orders.place.v1", placePayload(env, [{ item: env.menu.juice }]));
-    expect(r2.status).toBe(409);
+    // Single use: the consumed override, re-presented on its own cart line, covers nothing any more.
+    const again = await present();
+    expect([again.picks, again.refusals.map((r) => r.reason_code)]).toEqual([[], ["expired_batch"]]);
   });
 });

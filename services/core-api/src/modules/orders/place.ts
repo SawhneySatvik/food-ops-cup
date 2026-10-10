@@ -8,7 +8,6 @@ import type { CommandEnvelope, ReasonCode } from "@munim/contracts";
 import { OrdersPlaceV1, OrdersPreviewRequest } from "@munim/contracts/orders";
 import { evaluateAuthority } from "@munim/core-domain/authority";
 import { orderTax } from "@munim/core-domain/packs";
-import { businessDate } from "@munim/core-domain/tz";
 import type { Principal } from "../../auth/resolve.ts";
 import { contextOf } from "../../auth/resolve.ts";
 import { type AuditEntry, type CommandHandler, type EventDraft, executeCommand, type ExecuteResult, uuidv7 } from "../../commit/index.ts";
@@ -64,7 +63,8 @@ async function authorityRow(c: Queryable, type: string, role: string) {
 
 /** Role + outlet scope + amount cap from core.command_authority before anything runs (the guard is the backstop;
  *  it does not read caps). The cap is the caller's role's entry in `role_caps` (W2-R3: e.g. refunds — staff
- *  50000, manager 500000, owner and judge absent = uncapped), else the row's own `max_amount_minor`. */
+ *  50000, manager 500000, owner and judge absent = uncapped), else the row's own `max_amount_minor`. This checks
+ *  one request's amount; a refund's cap over the role's refunds on the order in total is refundHandler's (R1-M3). */
 export async function authorise(c: Queryable, p: Extract<Principal, { kind: "member" }>, type: string, outletId: string, amount: number | null = null): Promise<void> {
   const row = await authorityRow(c, type, p.role);
   const v = row && evaluateAuthority(
@@ -117,7 +117,7 @@ export async function previewIn(c: Queryable, principal: Principal, req: ReturnT
   return previewBody(cart, at);
 }
 
-function previewBody(cart: PricedCart, at: string) {
+export function previewBody(cart: PricedCart, at: string) {
   const lines = cart.tax
     ? cart.priced.lines.map((l, i) => {
         const t = cart.tax!.lines[i]!;
@@ -209,25 +209,27 @@ export function placeHandler(p: Shopper, guestHash: string | null): CommandHandl
           line_id: o.lines[i]!.line_id, line_no: l.line_no, price_ref: l.price_ref, option_refs: l.option_refs, deal_refs: l.deal_refs,
           coupon_refs: l.coupon_refs, tax_class: l.tax_class, unit_price_minor: l.unit_price_minor, options_minor: l.options_minor,
         })),
+        // In the order applied: a re-price applies them in this same order (R2-S2-3).
         coupons: cart.priced.coupons.map((k) => ({ coupon_id: k.coupon_id, discount_minor: k.discount_minor })),
         picks: picked.picks,
         loyalty: null as null | { entry_id: string; points: number; value_minor: number },
       };
-      await c.query(
+      const placed = await c.query<{ business_date: string }>(
         `INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, brand_id, device_id, pickup_window_id, kind, table_ref, promised_at,
                                    status, customer_id, subtotal_minor, discount_minor, tax_minor, total_minor, currency, pricing_snapshot,
                                    external_ref, client_totals, guest_access_hash, created_by)
          VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, 'placed', $10, $11, $12, $13, $14, $15, $16,
-                 $17, $18, decode($19, 'hex'), $20)`,
+                 $17, $18, decode($19, 'hex'), $20) RETURNING business_date::text`,
         [o.order_id, o.outlet_id, o.channel_id, o.brand_id, o.device_id, o.pickup_window_id, o.kind, o.table_ref, promised, customerId,
          cart.totals.subtotal_minor, cart.totals.discount_minor, cart.totals.tax_minor, cart.totals.total_minor, pack.currency.code,
          JSON.stringify(snapshot), o.external_ref, o.client_totals === null ? null : JSON.stringify(o.client_totals), guestHash,
          member?.member_id ?? null]);
-      const bd = businessDate(new Date(), outlet.tz, outlet.cutoff);
+      // The order's own business date (set by the database from its outlet clock), not this process's clock (R2-S3-3).
+      const bd = placed.rows[0]!.business_date;
       for (const [i, l] of o.lines.entries()) {
         const pl = cart.priced.lines[i]!;
-        // The recipe in force on the order's business date (variant's own, else the item's); order_line has no
-        // UPDATE grant, so it is written here, at insert. Consumption explodes the same version.
+        // The recipe in force on the order's business date (variant's own, else the item's), stamped on the line at
+        // insert (its recipe column has no UPDATE grant).
         const rv = await c.query<{ id: string }>(
           `SELECT rv.id FROM core.recipe_version rv JOIN core.item i ON i.tenant_id = rv.tenant_id AND i.id = rv.item_id AND i.kind = 'dish'
             WHERE rv.item_id = $1 AND (rv.variant_id IS NOT DISTINCT FROM $2 OR rv.variant_id IS NULL)
@@ -246,20 +248,20 @@ export function placeHandler(p: Shopper, guestHash: string | null): CommandHandl
          VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'status', 'placed', $4)`,
         [uuidv7(), o.outlet_id, o.order_id, JSON.stringify(actor)]);
 
-      await seams.consumeExpiredOverrides(c, o.order_id);
+      const overrides = await seams.consumeExpiredOverrides(c, o.order_id);
       await recordCoupons(c, o.outlet_id, o.order_id, customerId, member?.member_id ?? customerId!, pack.currency.code, cart);
       if (o.loyalty_redeem_points > 0) await redeem(c, o.outlet_id, o.order_id, o.loyalty_redeem_points, cart.totals.total_minor, snapshot);
 
       const audit: AuditEntry[] = [{
         entity: "core.order", entityId: o.order_id,
         after: { status: "placed", outlet_id: o.outlet_id, total_minor: cart.totals.total_minor, lines: o.lines.length },
-      }];
+      }, ...overrides.map((id) => ({ entity: "core.expired_sale_override", entityId: id, before: { used: false }, after: { used: true, order_id: o.order_id } }))];
       const events: EventDraft[] = [{
         type: "munim.orders.order.placed.v1", subject: o.order_id, aggregateType: "order",
         data: { order_id: o.order_id, outlet_id: o.outlet_id, channel_id: o.channel_id, status: "placed", placed_at: new Date().toISOString() },
       }];
       // Stock is consumed at placement (inventory's FEFO pick as sold, overrides already consumed); the rules'
-      // source state admits a `placed` order. A later cancel / reject has no seeded reversal rule (reported).
+      // source state admits a `placed` order. A cancel / reject gives it back (W2-R6, lifecycle.ts).
       const consumed = await asCore(c, o.outlet_id, () => seams.deriveOrderConsumption(c, o.order_id));
       events.push(...(consumed?.events ?? []));
       const tickets = await asCore(c, o.outlet_id, () => seams.createTicketsFor(c, o.order_id));

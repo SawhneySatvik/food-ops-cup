@@ -7,27 +7,41 @@ import { slots } from "@munim/core-domain/tz";
 import { type CommandHandler, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
-import { mover } from "./lifecycle.ts";
+import { advanceOrder, mover } from "./lifecycle.ts";
+import { asCore } from "./place.ts";
 import { loadPack } from "./pricing.ts";
 import { seams } from "./seams.ts";
 
 type OrderMoney = { outlet_id: string; device_id: string | null; status: string; total_minor: number; loyalty_minor: number; paid_minor: number; refunded_minor: number; currency: string };
 
 /** The order's money in one read: total, the loyalty value applied, Σ tenders toward the bill
- *  (amount − cash rounding), Σ refunds. `lock` takes the order row lock first (tenders, refunds). */
+ *  (amount − cash rounding), Σ refunds. `lock` takes the order row lock first (tenders, refunds).
+ *  Loyalty (clause 2): the value stands only while the snapshot's redeem names this order's `core.loyalty_entry`
+ *  redeem row with the same points, unreversed; a reversed redeem (cancel) counts 0. Any other disagreement
+ *  between the entries and the snapshot fails closed rather than show a number that does not trace. */
 export async function orderMoney(c: Queryable, orderId: string, lock: boolean): Promise<OrderMoney> {
   if (lock) await c.query(`SELECT 1 FROM core."order" WHERE id = $1 FOR UPDATE`, [orderId]);
   const r = await c.query<{ [k: string]: string }>(
     `SELECT o.outlet_id, o.device_id, o.status, o.total_minor, o.currency,
-            coalesce((o.pricing_snapshot -> 'loyalty' ->> 'value_minor')::bigint, 0) AS loyalty_minor,
+            (o.pricing_snapshot -> 'loyalty' ->> 'entry_id') AS loyalty_entry,
+            coalesce((o.pricing_snapshot -> 'loyalty' ->> 'points')::bigint, 0) AS loyalty_points,
+            coalesce((o.pricing_snapshot -> 'loyalty' ->> 'value_minor')::bigint, 0) AS loyalty_value,
+            (SELECT coalesce(-sum(e.points), 0) FROM core.loyalty_entry e WHERE e.order_id = o.id AND e.kind = 'redeem'
+                AND NOT EXISTS (SELECT 1 FROM core.loyalty_entry x WHERE x.tenant_id = e.tenant_id AND x.reverses_id = e.id)) AS redeemed_points,
+            (SELECT count(*) FROM core.loyalty_entry e WHERE e.order_id = o.id AND e.kind = 'redeem'
+                AND e.id::text = o.pricing_snapshot -> 'loyalty' ->> 'entry_id') AS entry_matches,
             (SELECT coalesce(sum(t.amount_minor - t.rounding_minor), 0) FROM core.tender t WHERE t.order_id = o.id) AS paid_minor,
             (SELECT coalesce(sum(f.amount_minor), 0) FROM core.refund f WHERE f.order_id = o.id) AS refunded_minor
        FROM core."order" o WHERE o.id = $1`, [orderId]);
   const o = r.rows[0];
   if (!o) throw new ApiError("not_found");
+  const redeemed = Number(o.redeemed_points);
+  const named = o.loyalty_entry !== null && Number(o.entry_matches) === 1;
+  if (redeemed !== 0 && !(named && redeemed === Number(o.loyalty_points))) throw new ApiError("internal");
+  if (o.loyalty_entry !== null && !named) throw new ApiError("internal");
   return {
     outlet_id: o.outlet_id!, device_id: o.device_id ?? null, status: o.status!, currency: o.currency!,
-    total_minor: Number(o.total_minor), loyalty_minor: Number(o.loyalty_minor), paid_minor: Number(o.paid_minor), refunded_minor: Number(o.refunded_minor),
+    total_minor: Number(o.total_minor), loyalty_minor: redeemed === 0 ? 0 : Number(o.loyalty_value), paid_minor: Number(o.paid_minor), refunded_minor: Number(o.refunded_minor),
   };
 }
 
@@ -51,6 +65,9 @@ export const tenderHandler: CommandHandler = {
     if (p.method === "cash") {
       const pack = (await loadPack(c)).doc;
       const r = cashTender(pack, "cash", due);
+      // What is left is below the pack's smallest cash step (e.g. 49 paise after a card part-payment): it can only
+      // be taken by card / UPI. Reason code "cash_below_rounding" requested from f-4; until then none (R2-S3-1).
+      if (r.amount_minor === 0) throw new ApiError("conflict");
       if (p.tendered_minor! >= r.amount_minor) {
         amount = r.amount_minor;
         rounding = r.rounding_minor;
@@ -77,15 +94,22 @@ export const tenderHandler: CommandHandler = {
   },
 };
 
-/** orders.void.record.v1 — before any tender; the value written off is the line's (or the order's) own total. */
+/** orders.void.record.v1 — before any tender, on an order not yet ended. The value written off is the line's own
+ *  total, or for the whole order what its earlier line voids left of the total (Σ voids ≤ total, R2-S2-5). A
+ *  whole-order void ends the order: it moves to `cancelled` through advanceOrder (0015 A8 — reversals, freed
+ *  slot, paired event) where the transition table allows it, else it is refused. */
 export const voidHandler: CommandHandler = {
   type: "orders.void.record.v1",
   async run(c, cmd) {
     const p = cmd.payload as { void_id: string; order_id: string; order_line_id: string | null; reason_code: string; note: string };
     const m = await orderMoney(c, p.order_id, true);
     if (m.paid_minor > 0) throw new ApiError("conflict");
+    if (m.status === "cancelled" || m.status === "rejected") throw new ApiError("illegal_transition");
     let amount = m.total_minor;
-    if (p.order_line_id) {
+    if (!p.order_line_id) {
+      const lines = await c.query<{ s: string }>(`SELECT coalesce(sum(amount_minor), 0) AS s FROM core.void WHERE order_id = $1 AND order_line_id IS NOT NULL`, [p.order_id]);
+      amount = Math.max(m.total_minor - Number(lines.rows[0]!.s), 0);
+    } else {
       const pack = (await loadPack(c)).doc;
       const l = await c.query<{ amount: string; line_discount_minor: string; tax_minor: string }>(
         `SELECT round(qty_milli * unit_price_minor / 1000.0) AS amount, line_discount_minor, tax_minor FROM core.order_line WHERE id = $1 AND order_id = $2`,
@@ -102,33 +126,50 @@ export const voidHandler: CommandHandler = {
       `INSERT INTO core.void (tenant_id, id, outlet_id, order_id, order_line_id, reason_code, note, amount_minor, currency, actor)
        VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [p.void_id, m.outlet_id, p.order_id, p.order_line_id, p.reason_code, p.note, amount, m.currency, by.id]);
+    const ended = p.order_line_id ? null
+      : await advanceOrder(c, { order_id: p.order_id, from_status: m.status as "placed", to_status: "cancelled", reason_code: p.reason_code }, by);
     return {
       entityId: p.void_id,
-      audit: [{ entity: "core.void", entityId: p.void_id, after: { order_id: p.order_id, order_line_id: p.order_line_id, reason_code: p.reason_code, amount_minor: amount } }],
+      audit: [{ entity: "core.void", entityId: p.void_id, after: { order_id: p.order_id, order_line_id: p.order_line_id, reason_code: p.reason_code, amount_minor: amount } },
+        ...(ended?.audit ?? [])],
       events: [{ type: "munim.orders.void.recorded.v1", subject: p.void_id, aggregateType: "void",
-        data: { void_id: p.void_id, order_id: p.order_id, outlet_id: m.outlet_id, reason_code: p.reason_code } }],
+        data: { void_id: p.void_id, order_id: p.order_id, outlet_id: m.outlet_id, reason_code: p.reason_code } }, ...(ended?.events ?? [])],
     };
   },
 };
 
-/** orders.refund.record.v1 — at most what was paid less earlier refunds; a named tender must be the order's. */
+/** orders.refund.record.v1 — at most what was paid less earlier refunds (an aggregator order, which has no
+ *  tenders here — the aggregator collected — at most its total less earlier refunds; finance posts it as a channel
+ *  deduction, R2-S2-10); a named tender must be the order's. The
+ *  role's cap (W2-R3, command_authority.role_caps) binds what that role has refunded on this order in total, this
+ *  refund included (R1-M3): checked here, under the order lock, so split or concurrent refunds cannot pass it. */
 export const refundHandler: CommandHandler = {
   type: "orders.refund.record.v1",
   async run(c, cmd) {
     const p = cmd.payload as { refund_id: string; order_id: string; tender_id: string | null; method: string; amount_minor: number; currency: string; reason_code: string; note: string };
     const m = await orderMoney(c, p.order_id, true);
     if (p.currency !== m.currency) throw new ApiError("currency_mismatch");
-    if (p.amount_minor > m.paid_minor - m.refunded_minor) throw new ApiError("invalid_payload");
+    const ch = await c.query<{ kind: string }>(
+      `SELECT ch.kind FROM core."order" o JOIN core.channel ch ON ch.tenant_id = o.tenant_id AND ch.id = o.channel_id WHERE o.id = $1`, [p.order_id]);
+    const collected = ch.rows[0]!.kind.startsWith("aggregator:") ? m.total_minor : m.paid_minor;
+    if (p.amount_minor > collected - m.refunded_minor) throw new ApiError("invalid_payload");
     if (p.tender_id) {
       const t = await c.query(`SELECT 1 FROM core.tender WHERE id = $1 AND order_id = $2`, [p.tender_id, p.order_id]);
       if (!t.rowCount) throw new ApiError("invalid_payload");
     }
     const by = await mover(c);
+    const cap = await c.query<{ cap: string | null; so_far: string }>(
+      `SELECT (SELECT coalesce(role_caps ->> $2, max_amount_minor::text) FROM core.command_authority WHERE command_type = 'orders.refund.record.v1') AS cap,
+              (SELECT coalesce(sum(amount_minor), 0) FROM core.refund WHERE order_id = $1 AND origin ->> 'role' = $2) AS so_far`, [p.order_id, by.role]);
+    const k = cap.rows[0]!;
+    if (k.cap !== null && Number(k.so_far) + p.amount_minor > Number(k.cap)) throw new ApiError("forbidden", "authority_denied");
     await c.query(
       `INSERT INTO core.refund (tenant_id, id, outlet_id, order_id, tender_id, method, amount_minor, currency, reason_code, note, actor)
        VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [p.refund_id, m.outlet_id, p.order_id, p.tender_id, p.method, p.amount_minor, p.currency, p.reason_code, p.note, by.id]);
     await seams.postFor(c, "finance.post_refund", `core.refund:${p.refund_id}`);
+    // A completed order's refund takes back its earned points (W2-R10, customers' seam; the rule cites this refund).
+    if (m.status === "completed") await asCore(c, m.outlet_id, () => seams.loyaltyReverseFor(c, p.order_id));
     return {
       entityId: p.refund_id,
       audit: [{ entity: "core.refund", entityId: p.refund_id, after: { order_id: p.order_id, method: p.method, amount_minor: p.amount_minor, reason_code: p.reason_code } }],

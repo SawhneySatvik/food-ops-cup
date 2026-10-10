@@ -18,6 +18,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, storefrontResolver } from "../src/app.ts";
 import { configureStorefront, resetStorefront } from "../src/modules/storefront/index.ts";
+import { OrdersPreviewResponse } from "@munim/contracts/orders";
+import {
+  StorefrontAccepting, StorefrontMenuResponse, StorefrontOrderPlaced, StorefrontOrderView, StorefrontOutletsResponse, StorefrontPickupWindowsResponse,
+  StorefrontReschedulePreviewResponse,
+} from "@munim/contracts/storefront";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 
@@ -165,6 +170,9 @@ describe("keys and public reads", () => {
   it("a bad key, and a key on a counter channel, are 404 — never 403", async () => {
     expect((await call("GET", "/v1/storefront/outlets", undefined, {}, "sfk_not_a_real_key_0000000000000000")).status).toBe(404);
     expect((await call("GET", `/v1/storefront/outlets/${OUT}/menu`, undefined, {}, W.storefrontKey)).status).toBe(404); // bound to the counter channel
+    // The good key's outlet list parses with its contract schema (a real response, R3-M5).
+    const list = await call("GET", "/v1/storefront/outlets");
+    expect(StorefrontOutletsResponse.parse(await list.json()).outlets.map((o) => o.outlet_id)).toContain(OUT);
   });
 
   it("menu: priced for the key's channel kind, availability per outlet, the deal, the accepting state, pay at the counter", async () => {
@@ -173,6 +181,7 @@ describe("keys and public reads", () => {
     const res = await call("GET", `/v1/storefront/outlets/${OUT}/menu`);
     expect(res.status).toBe(200);
     const m = (await res.json()) as any;
+    StorefrontMenuResponse.parse(m);
     expect(m.channel_kind).toBe("pickup");
     expect(m.pay_at_counter).toBe(true);
     // The world's paneer tikka is sold by variant (catalogue itemsForSale): no item price, the variant carries the row's 32000.
@@ -186,7 +195,7 @@ describe("keys and public reads", () => {
   it("accepting state: busy shows +N, paused has no resume time, after hours is closed with the next opening (calendar)", async () => {
     const setOutlet = (state: string, extra: number) => db.withContext("munim_core", cmdCtx("tenancy.outlet.create.v1"), (c) =>
       c.query(`UPDATE core.outlet SET accepting_orders = $2, busy_extra_min = $3 WHERE id = $1`, [OUT, state, extra]));
-    const st = async () => ((await (await call("GET", `/v1/storefront/outlets/${OUT}/state`)).json()) as any);
+    const st = async () => StorefrontAccepting.parse(await (await call("GET", `/v1/storefront/outlets/${OUT}/state`)).json());
     await setOutlet("busy", 10);
     expect(await st()).toMatchObject({ state: "busy", busy_extra_min: 10 });
     await setOutlet("paused", 0);
@@ -199,8 +208,8 @@ describe("keys and public reads", () => {
   });
 
   it("pickup windows: the full window is hidden, windows with spare capacity are listed with their row fields", async () => {
-    const r = (await (await call("GET", `/v1/storefront/outlets/${OUT}/pickup-windows`)).json()) as any;
-    const ids = r.windows.map((w: any) => w.pickup_window_id);
+    const r = StorefrontPickupWindowsResponse.parse(await (await call("GET", `/v1/storefront/outlets/${OUT}/pickup-windows`)).json());
+    const ids = r.windows.map((w) => w.pickup_window_id);
     expect(ids).toContain(win.w1300);
     expect(ids).not.toContain(win.full);
     expect(r.windows.find((w: any) => w.pickup_window_id === win.w1300)).toMatchObject({ capacity_orders: 100 });
@@ -288,8 +297,8 @@ describe("refusals: each code, paired with an accept", () => {
     await db.admin(`DELETE FROM core.item_availability WHERE item_id = $1`, [ITEM2]);
   });
 
-  it("coupons presented reach the pricing: expired/unknown → coupon_invalid, spent cap → coupon_cap_reached, below minimum → coupon_min_spend; WELCOME10 accepted (27216)", async () => {
-    expect(reason((await place({ coupon_codes: ["EXPIRED1"] })).body)).toBe("coupon_invalid");
+  it("coupons presented reach the pricing: expired → coupon_expired, unknown → coupon_invalid, spent cap → coupon_cap_reached, below minimum → coupon_min_spend; WELCOME10 accepted (27216)", async () => {
+    expect(reason((await place({ coupon_codes: ["EXPIRED1"] })).body)).toBe("coupon_expired");
     expect(reason((await place({ coupon_codes: ["NOSUCH1"] })).body)).toBe("coupon_invalid");
     expect(reason((await place({ coupon_codes: ["CAPPED1"] })).body)).toBe("coupon_cap_reached");
     expect(reason((await place({ coupon_codes: ["TENSPEND"] })).body)).toBe("coupon_min_spend");
@@ -303,7 +312,7 @@ describe("refusals: each code, paired with an accept", () => {
     const before = Number((await db.admin(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n);
     const req = { outlet_id: OUT, channel_id: W.channel, brand_id: null, kind: "pickup", pickup_window_id: win.full, promised_at: P_1300, coupon_codes: [], loyalty_redeem_points: 0,
       lines: [{ item_id: W.item, variant_id: VARIANT, option_ids: [], qty_milli: 1000, barcode: null }] };
-    const r = (await (await call("POST", "/v1/storefront/orders:preview", req)).json()) as any;
+    const r = OrdersPreviewResponse.parse(await (await call("POST", "/v1/storefront/orders:preview", req)).json());
     expect(r).toMatchObject({ label: "preview", total_minor: 30240, tax_minor: 1440, discount_minor: 3200 });
     expect(r.refusals).toEqual([{ line_no: null, reason_code: "window_full" }]);
     expect(Number((await db.admin(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n)).toBe(before);
@@ -316,7 +325,8 @@ describe("guest isolation and the tracker read", () => {
     const b = await place();
     const own = await call("GET", `/v1/storefront/orders/${a.id}`, undefined, { [GUEST_TOKEN_HEADER]: a.body.guest_access_token });
     expect(own.status).toBe(200);
-    const view = (await own.json()) as any;
+    StorefrontOrderPlaced.parse(a.body);
+    const view = StorefrontOrderView.parse(await own.json());
     expect(view).toMatchObject({ order_id: a.id, status: "placed", total_minor: 30240, pay_at_counter: true, cancel_window_min: 5, reschedule_window_min: 30 });
     expect(view.lines).toHaveLength(1);
     expect(view.events[0]).toMatchObject({ kind: "status", to_status: "placed" });
@@ -325,6 +335,20 @@ describe("guest isolation and the tracker read", () => {
     expect((await call("GET", `/v1/storefront/orders/${a.id}`)).status).toBe(404);
     expect((await call("GET", `/v1/storefront/orders/${a.id}`, undefined, { [GUEST_TOKEN_HEADER]: "x".repeat(43) })).status).toBe(404);
     expect((await call("GET", `/v1/storefront/orders/${a.id}`, undefined, { [GUEST_TOKEN_HEADER]: a.body.guest_access_token }, other.storefrontKey)).status).toBe(404);
+  });
+
+  it("R3-M1: the tracker lists an order's events in their sequence, also when two land in one transaction with ids out of order", async () => {
+    const a = await place();
+    // Two hops in ONE transaction (as the kitchen's multi-hop advance writes them): same `at`; the first-written
+    // event gets the larger id, so (at, id) would list them backwards.
+    await db.withContext("munim_core", cmdCtx("kitchen.ticket.advance.v1"), async (c) => {
+      const ev = `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor) VALUES ($1, $2, $3, $4, 'status', $5, $6, $7)`;
+      const actor = JSON.stringify({ kind: "member", id: W.owner });
+      await c.query(ev, [W.tenant, "01a1ffff-ffff-7fff-bfff-ffffffffffff", OUT, a.id, "placed", "accepted", actor]);
+      await c.query(ev, [W.tenant, "01a10000-0000-7000-8000-000000000000", OUT, a.id, "accepted", "preparing", actor]);
+    });
+    const view = StorefrontOrderView.parse(await (await call("GET", `/v1/storefront/orders/${a.id}`, undefined, { [GUEST_TOKEN_HEADER]: a.body.guest_access_token })).json());
+    expect(view.events.map((e) => e.to_status)).toEqual(["placed", "accepted", "preparing"]);
   });
 
   it("W2-R2: a guest cannot cancel or reschedule — 403 guest_cannot_change (\"Call the outlet to change this order\"), the order is untouched", async () => {
@@ -392,7 +416,7 @@ describe("signed-in checkout, cancel, reschedule", () => {
     const res = await call("POST", "/v1/storefront/orders", b.body, bearer(SUB));
     expect([res.status, ((await res.json()) as any).total_minor]).toEqual([201, 31186]);
     clockNow = await afterCreated(b.order_id, 2);
-    const pv = (await (await call("POST", `/v1/storefront/orders/${b.order_id}:reschedule-preview`, { pickup_window_id: win.w1600, promised_at: P_1600 }, bearer(SUB))).json()) as any;
+    const pv = StorefrontReschedulePreviewResponse.parse(await (await call("POST", `/v1/storefront/orders/${b.order_id}:reschedule-preview`, { pickup_window_id: win.w1600, promised_at: P_1600 }, bearer(SUB))).json());
     expect([pv.current_total_minor, pv.preview.total_minor]).toEqual([31186, 34650]);
   });
 
@@ -418,6 +442,11 @@ describe("signed-in checkout, cancel, reschedule", () => {
     // The line follows the header (0015 A8): unit 32000, no discount, tax 1600.
     const line = (await db.admin(`SELECT unit_price_minor::int AS u, line_discount_minor::int AS d, tax_minor::int AS t FROM core.order_line WHERE order_id = $1`, [id])).rows;
     expect(line).toEqual([{ u: 32000, d: 0, t: 1600 }]);
+    // R2-S1-1: the snapshot is merged (placement's keys stay) and the re-price is recorded beside them; R2-S1-2:
+    // the line's change is audited with before / after.
+    expect(Object.keys(row.pricing_snapshot).sort()).toEqual(["coupons", "judged_at", "lines", "loyalty", "pack", "picks", "repriced"]);
+    expect((await db.admin(`SELECT a.before, a.after FROM core.audit_log a JOIN core.order_line l ON l.id::text = a.entity_id WHERE l.order_id = $1 AND a.entity = 'core.order_line'`, [id])).rows)
+      .toEqual([{ before: { unit_price_minor: 32000, line_discount_minor: 3200, tax_minor: 1440 }, after: { unit_price_minor: 32000, line_discount_minor: 0, tax_minor: 1600 } }]);
     expect(new Date(row.promised_at).toISOString()).toBe(P_1600);
     expect(row.pickup_window_id).toBe(win.w1600);
     const ev = (await db.admin(`SELECT to_promised_at, reason FROM core.order_event WHERE order_id = $1 AND kind = 'promised_at'`, [id])).rows;

@@ -1,6 +1,6 @@
 // Cross-module seams: finance.postFor and finance.reverseSource (T-026 owns them; brief "Cross-module seams"). Resolved lazily from
-// `../finance/index.ts` when that module has landed; until then a local stand-in records the call and posts
-// NOTHING. T-034 (W2 integration) wires the real one. Signature fixed by the brief:
+// `../finance/index.ts`. A missing module or export FAILS CLOSED with `unavailable` (R3-M2): a payroll is never
+// approved without its entry. Gates may inject postFor with `setPostFor`. Signature fixed by the brief:
 //   postFor(tx, rule_id, source_ref)   source_ref = 'core.<table>:<uuid>' (db/README "Context keys")
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -10,11 +10,9 @@ import type { Queryable } from "../../runtoken/index.ts";
 
 export type PostFor = (tx: Queryable, rule_id: string, source_ref: string) => Promise<unknown>;
 
-/** Calls the stand-in served while finance has not landed (for the gate; empty once the real one is wired). */
+/** Kept for w2-seams.test.ts (not this lane's file): nothing is ever recorded here now that there is no
+ *  stand-in. Remove with that assertion. */
 export const standInCalls: Array<{ rule_id: string; source_ref: string }> = [];
-const standIn: PostFor = async (_tx, rule_id, source_ref) => {
-  standInCalls.push({ rule_id, source_ref });
-};
 
 let override: PostFor | undefined;
 /** Test hook: replaces the seam for the process; returns the undo. */
@@ -37,7 +35,8 @@ async function resolve(): Promise<PostFor> {
       if (typeof mod.postFor === "function") real = mod.postFor;
     }
   }
-  return real ?? standIn;
+  if (!real) throw new ApiError("unavailable");
+  return real;
 }
 
 export async function postFor(tx: Queryable, rule_id: string, source_ref: string): Promise<void> {

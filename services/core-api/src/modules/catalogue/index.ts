@@ -59,7 +59,7 @@ async function run(c: Context<AppEnv>, handler: CommandHandler, check?: (payload
     throw new ApiError("bad_request");
   }
   const env = CommandEnvelope.safeParse(body);
-  if (!env.success || (check && !check(env.data.payload))) throw new ApiError("bad_request");
+  if (!env.success || (check && !check(env.data.payload))) throw new ApiError("invalid_payload");
   const { deps } = c.var;
   try {
     const out = await executeCommand({

@@ -48,7 +48,7 @@ export async function orderView(c: Queryable, orderId: string) {
 type Snap = {
   lines: Array<{ line_no: number; tax_class: string }>;
   picks?: Array<{ line_no: number; mrp_minor: number | null }>;
-  repriced?: { lines: Array<{ line_no: number; line_discount_minor: number }> };
+  repriced?: { lines: Array<{ line_no: number; tax_class?: string }> };
 };
 
 /** The receipt. Refusal `tax_id_missing` (a required seller tax id is absent / malformed) → 409, so the POS
@@ -66,13 +66,16 @@ export async function receiptView(c: Queryable, orderId: string) {
     `SELECT l.line_no, l.item_id, l.qty_milli, l.unit_price_minor, l.line_discount_minor, i.name_key
        FROM core.order_line l JOIN core.item i ON i.tenant_id = l.tenant_id AND i.id = l.item_id WHERE l.order_id = $1 ORDER BY l.line_no`, [orderId])).rows;
   const sale: SaleLine[] = lines.map((l) => {
+    // The latest judgement's tax class (a re-price may land on a price row of another class); the line row
+    // carries the money as re-priced (0015 A8).
+    // (Re-prices written before f-1 carry no tax_class: the placed line's stands.)
     const s = snap.lines.find((x) => x.line_no === l.line_no);
+    const cls = snap.repriced?.lines.find((x) => x.line_no === l.line_no)?.tax_class ?? s?.tax_class;
     const pick = snap.picks?.find((x) => x.line_no === l.line_no && x.mrp_minor !== null);
-    const re = snap.repriced?.lines.find((x) => x.line_no === l.line_no);
-    if (!s) throw new ApiError("internal");
+    if (!s || !cls) throw new ApiError("internal");
     return {
       name: l.name_key, qty_milli: Number(l.qty_milli), unit_price_minor: Number(l.unit_price_minor),
-      line_discount_minor: re ? re.line_discount_minor : Number(l.line_discount_minor), tax_class: s.tax_class, mrp_minor: null,
+      line_discount_minor: Number(l.line_discount_minor), tax_class: cls, mrp_minor: null,
       batch: pick ? { mrp_minor: pick.mrp_minor } : null,
     };
   });
@@ -93,5 +96,21 @@ export async function receiptView(c: Queryable, orderId: string) {
       tax_class: l.tax_class, components: l.components,
     })),
     net_minor: t.net_minor, tax_minor: t.tax_minor, total_minor: t.total_minor, components: t.components,
+  };
+}
+
+/** One drawer shift's own row fields (verify reads the float and counted cash from here, not from a key). */
+export async function shiftView(c: Queryable, shiftId: string) {
+  const r = await c.query<Record<string, any>>(
+    `SELECT id, outlet_id, device_id, status, opened_by, opened_at, float_minor, currency, closed_by, closed_at,
+            counted_cash_minor, expected_cash_minor, variance_minor
+       FROM core.shift WHERE id = $1`, [shiftId]);
+  const s = r.rows[0];
+  if (!s) throw new ApiError("not_found");
+  const num = (v: string | null) => (v === null ? null : Number(v));
+  return {
+    shift_id: s.id, outlet_id: s.outlet_id, device_id: s.device_id, status: s.status, opened_by: s.opened_by, opened_at: s.opened_at.toISOString(),
+    float_minor: Number(s.float_minor), currency: s.currency, closed_by: s.closed_by, closed_at: iso(s.closed_at),
+    counted_cash_minor: num(s.counted_cash_minor), expected_cash_minor: num(s.expected_cash_minor), variance_minor: num(s.variance_minor),
   };
 }

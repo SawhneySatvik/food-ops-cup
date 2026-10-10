@@ -1,21 +1,18 @@
 // T-022 gates — preview and placement. Expected totals are HAND-WRITTEN below (IN pack: restaurant_5 = CGST 2.5% +
 // SGST 2.5%, goods_18 = 9% + 9%, each component rounded half-up per line; prices exclusive), never computed by
-// the code under test. Seams: local fakes (orders.kit.ts) — catalogue/inventory/customers/finance not landed.
+// the code under test. Seams: the REAL owners' functions (R3-M3) — catalogue priceLines, inventory FEFO picks and
+// consumption, kitchen tickets.
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OrdersPreviewResponse } from "@munim/contracts/orders";
 import { placeOrder } from "../src/modules/orders/place.ts";
-import { type Env, installFakes, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
+import { type Env, placePayload, startEnv, uuidv7 } from "./orders.kit.ts";
 
 let env: Env;
-let undo: () => void;
 beforeAll(async () => {
   env = await startEnv("IN");
-  undo = installFakes();
 });
-afterAll(async () => {
-  undo?.();
-  await env?.stop();
-});
+afterAll(async () => env?.stop());
 
 type Cart = { name: string; lines: Array<[keyof Env["menu"], number, boolean?]>; coupons?: string[]; expect: [number, number, number, number] };
 // [item, qty (units ×1000 = qty_milli), +chutney option] → expected [subtotal, discount, tax, total], by hand.
@@ -83,6 +80,17 @@ describe("placement: server pricing, client totals ignored", () => {
     expect((await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.biscuits }]))).status).toBe(201);
   });
 
+  it("exclusive tax on a deal plus a coupon (R3-M3): thali 20000, deal 20% → 16000, SAVE10 → 14400, tax 360 + 360 → 15120", async () => {
+    await env.db.withContext("munim_core", { tenant_id: env.w.tenant, outlet_ids: "*", role: "owner", member_id: env.w.owner, command_type: "catalogue.deal.upsert.v1" }, (c) =>
+      c.query(`INSERT INTO core.deal (tenant_id, id, kind, name_key, rule, windows, valid_from) VALUES ($1, $2, 'percent_off', 'deal.thali_any_time', $3, '[]', '2026-01-01')`,
+        [env.w.tenant, uuidv7(), { kind: "percent_off", bp: 2000, item_ids: [env.menu.thali] }]));
+    const p = placePayload(env, [{ item: env.menu.thali }], { coupon_codes: ["SAVE10"] });
+    expect((await env.cmd("/v1/orders", "staff", "orders.place.v1", p)).status).toBe(201);
+    const o = await env.one<Record<string, string>>(`SELECT subtotal_minor, discount_minor, tax_minor, total_minor FROM core."order" WHERE id = $1`, [p.order_id]);
+    expect([o.subtotal_minor, o.discount_minor, o.tax_minor, o.total_minor].map(Number)).toEqual([20000, 5600, 720, 15120]);
+    expect(await env.rows(`SELECT discount_minor::int AS d FROM core.coupon_use WHERE order_id = $1`, [p.order_id])).toEqual([{ d: 1600 }]);
+  });
+
   it("a coupon's global cap holds: CAP1 (cap 1) → first 201, second 409 coupon_cap_reached", async () => {
     const a = await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.coffee }], { coupon_codes: ["CAP1"] }));
     const b = await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.coffee }], { coupon_codes: ["CAP1"] }));
@@ -138,12 +146,12 @@ describe("preview (R40 C1)", () => {
     expect(Object.keys(before.tables).length).toBeGreaterThan(100);
     const r = await env.call("POST", "/v1/orders:preview", "staff", previewReq());
     expect(r.status).toBe(200);
-    const body = await r.json();
+    const body = OrdersPreviewResponse.parse(await r.json());
     // Hand-written: 2 × (12000 + 1500) = 27000; SAVE10 2700; tax 2 × round(24300 × 2.5%) = 2 × 608.
     expect([body.label, body.subtotal_minor, body.discount_minor, body.tax_minor, body.total_minor]).toEqual(["preview", 27000, 2700, 1216, 25516]);
-    expect(body.lines[0].price_ref).toMatch(/^⟨cite:row:core\.price:/);
-    expect(body.lines[0].option_refs).toEqual([`⟨cite:row:core.option:${env.menu.chutney}⟩`]);
-    expect(body.lines[0].coupon_refs).toEqual([`⟨cite:row:core.coupon:${env.menu.save10}⟩`]);
+    expect(body.lines[0]!.price_ref).toMatch(/^⟨cite:row:core\.price:/);
+    expect(body.lines[0]!.option_refs).toEqual([`⟨cite:row:core.option:${env.menu.chutney}⟩`]);
+    expect(body.lines[0]!.coupon_refs).toEqual([`⟨cite:row:core.coupon:${env.menu.save10}⟩`]);
     expect(body.tax_rule).toEqual({ pack_code: "IN", pack_version: 1 });
     expect(await counts()).toEqual(before);
 
@@ -190,6 +198,25 @@ describe("pickup-window capacity under the row lock", () => {
     const w = await env.one<{ booked: number; n: string }>(
       `SELECT booked, (SELECT count(*) FROM core."order" WHERE pickup_window_id = $1) AS n FROM core.pickup_window WHERE id = $1`, [window]);
     expect([w.booked, Number(w.n)]).toEqual([10, 10]);
+  });
+});
+
+describe("R3-M2: seams fail closed", () => {
+  it("an owner's export that cannot be resolved refuses the sale with 503 unavailable and writes nothing (no stand-in)", async () => {
+    // The process-wide resolution cache (orders/seams.ts): null = the owner's module or export was not found.
+    const state = (globalThis as Record<symbol, { real: Map<string, unknown> }>)[Symbol.for("munim.orders.seams")]!;
+    const real = state.real.get("priceLines");
+    state.real.set("priceLines", null);
+    try {
+      const p = placePayload(env, [{ item: env.menu.coffee }]);
+      const r = await env.cmd("/v1/orders", "staff", "orders.place.v1", p);
+      expect([r.status, (await r.json()).error.code]).toEqual([503, "unavailable"]);
+      expect(Number((await env.one<{ n: string }>(`SELECT count(*) AS n FROM core."order" WHERE id = $1`, [p.order_id])).n)).toBe(0);
+    } finally {
+      if (real === undefined) state.real.delete("priceLines");
+      else state.real.set("priceLines", real);
+    }
+    expect((await env.cmd("/v1/orders", "staff", "orders.place.v1", placePayload(env, [{ item: env.menu.coffee }]))).status).toBe(201);
   });
 });
 

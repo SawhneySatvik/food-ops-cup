@@ -6,7 +6,7 @@ const guest = { name: "Asha (synthetic)", phone: "+919800000000", email: null, c
 
 export const SAMPLES: Record<string, unknown> = {
   "storefront.guest.create.v1": guest,
-  "storefront.order.cancel.v1": { order_id: u(10), reason: null },
+  "storefront.order.cancel.v1": { order_id: u(10), reason: "changed_mind" },
   "storefront.order.reschedule.v1": { order_id: u(10), pickup_window_id: u(60), promised_at: T, preview_total_minor: 33600 },
   "storefront.reschedule.preview.request": { pickup_window_id: null, promised_at: T },
   "storefront.reschedule.preview.response": { order_id: u(10), promised_at: T, current_total_minor: 30240, preview: ORDERS["orders.preview.response"] },

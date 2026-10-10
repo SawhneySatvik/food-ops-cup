@@ -1,9 +1,9 @@
 // Cross-module seams orders calls (W2 brief "Cross-module seams"; signatures fixed there). Each resolves lazily
-// from its owner's `index.ts` when that module has landed and exports the function; until then a stand-in
-// serves (pricing and redemption refuse with `unavailable`; derivations record the call and write nothing).
-// T-034 (W2 integration) wires the real ones; gates replace them with `setOrderSeams` fakes that write real,
-// guarded rows. Every seam runs inside the caller's transaction and writes only what its seeded rule/command
-// allows; a derivation seam sets app.posting_rule + app.source_ref itself and clears them before returning.
+// from its owner's `index.ts` (lazily: the owners import orders back). A missing owner or export FAILS CLOSED with
+// `unavailable` (R3-M2): a sale without its pricing, picks, consumption, loyalty, posting or tickets is refused,
+// never recorded half-done. Gates may inject a seam explicitly with `setOrderSeams`. Every seam runs inside the
+// caller's transaction and writes only what its seeded rule/command allows; a derivation seam sets
+// app.posting_rule + app.source_ref itself and clears them before returning.
 import type { ReasonCode } from "@munim/contracts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -22,8 +22,10 @@ export type PriceLinesInput = {
   at: string;
   lines: Array<{ item_id: string; variant_id: string | null; option_ids: string[]; qty_milli: number }>;
   coupon_codes?: string[];
-  /** From the verified principal only (per-customer coupon caps). */
+  /** From the verified principal, or the order's own row on a re-price (per-customer coupon caps). */
   customer_id?: string | null;
+  /** A re-price of this order: its own coupon uses do not count against their caps (R2-S2-1). */
+  exclude_order_id?: string;
 };
 export type PricedLine = {
   line_no: number;
@@ -74,7 +76,7 @@ export type TicketsResult = { applicable: boolean; events: EventDraft[]; audit: 
 export interface OrderSeams {
   priceLines(tx: Queryable, input: PriceLinesInput): Promise<PriceLinesResult>;
   /** T-021 catalogue: a coupon's live uses (tenant-wide; uses on cancelled / rejected orders excluded). */
-  couponUses(tx: Queryable, coupon_id: string, customer_id: string | null): Promise<{ all: number; mine: number }>;
+  couponUses(tx: Queryable, coupon_id: string, customer_id: string | null, exclude_order_id?: string): Promise<{ all: number; mine: number }>;
   pickSaleBatches(tx: Queryable, outlet_id: string, lines: PickInput): Promise<PickResult>;
   /** Rules inventory.consume_order / consume_sku (source: the order); `events` go into the caller's HandlerOutput. */
   deriveOrderConsumption(tx: Queryable, order_id: string): Promise<{ events?: EventDraft[] } | void>;
@@ -109,52 +111,13 @@ const OWNER: Record<Name, string> = {
 
 // One state per process even if this file is loaded twice (vitest imports by path, loadRouters by file URL).
 const KEY = Symbol.for("munim.orders.seams");
-type State = { override: Partial<OrderSeams>; real: Map<Name, unknown>; calls: Array<{ seam: Name; ref: string }> };
+type State = { override: Partial<OrderSeams>; real: Map<Name, unknown> };
 const g = globalThis as unknown as Record<symbol, State | undefined>;
-const state: State = (g[KEY] ??= { override: {}, real: new Map(), calls: [] });
+const state: State = (g[KEY] ??= { override: {}, real: new Map() });
 
-/** Calls served by a stand-in (the owner has not landed). Ids and rule names only. */
-export const standInCalls = state.calls;
-const record = (seam: Name, ref: string) => standInCalls.push({ seam, ref });
-
-const STAND_IN: OrderSeams = {
-  async priceLines() {
-    throw new ApiError("unavailable");
-  },
-  async couponUses() {
-    throw new ApiError("unavailable");
-  },
-  async pickSaleBatches(_tx, outlet_id) {
-    record("pickSaleBatches", outlet_id);
-    return { picks: [], refusals: [] };
-  },
-  async deriveOrderConsumption(_tx, order_id) {
-    record("deriveOrderConsumption", order_id);
-  },
-  async reverseOrderConsumption(_tx, order_id) {
-    record("reverseOrderConsumption", order_id);
-  },
-  async loyaltyRedeem() {
-    throw new ApiError("unavailable");
-  },
-  async consumeExpiredOverrides(_tx, order_id) {
-    record("consumeExpiredOverrides", order_id);
-    return [];
-  },
-  async loyaltyEarnFor(_tx, order_id) {
-    record("loyaltyEarnFor", order_id);
-  },
-  async loyaltyReverseFor(_tx, order_id) {
-    record("loyaltyReverseFor", order_id);
-  },
-  async postFor(_tx, rule_id, source_ref) {
-    record("postFor", `${rule_id} ${source_ref}`);
-  },
-  async createTicketsFor(_tx, order_id) {
-    record("createTicketsFor", order_id);
-    return { applicable: false, events: [], audit: [] };
-  },
-};
+/** Kept for w2-seams.test.ts (not this lane's file): nothing is ever recorded here now that there are no
+ *  stand-ins. Remove with that assertion. */
+export const standInCalls: Array<{ seam: Name; ref: string }> = [];
 
 /** Replaces seams for the process (gates; T-034 wiring). Returns the undo. */
 export function setOrderSeams(s: Partial<OrderSeams>): () => void {
@@ -164,7 +127,6 @@ export function setOrderSeams(s: Partial<OrderSeams>): () => void {
     state.override = prev;
   };
 }
-
 
 const real = state.real;
 async function resolve<K extends Name>(name: K): Promise<OrderSeams[K]> {
@@ -179,7 +141,9 @@ async function resolve<K extends Name>(name: K): Promise<OrderSeams[K]> {
     }
     real.set(name, typeof fn === "function" ? fn : null);
   }
-  return (real.get(name) ?? STAND_IN[name]) as OrderSeams[K];
+  const fn = real.get(name);
+  if (!fn) throw new ApiError("unavailable");
+  return fn as OrderSeams[K];
 }
 
 export const seams: OrderSeams = {

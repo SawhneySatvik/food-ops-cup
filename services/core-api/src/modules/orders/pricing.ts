@@ -74,7 +74,7 @@ export const saleLine = (l: PricedLine, mrp: number | null): SaleLine => ({
  *  placement refuses with the first. */
 export async function priceCart(
   c: Queryable,
-  input: { outlet_id: string; channel_kind: string; at: string; lines: CartLine[]; coupon_codes: string[]; customer_id?: string | null },
+  input: { outlet_id: string; channel_kind: string; at: string; lines: CartLine[]; coupon_codes: string[]; customer_id?: string | null; exclude_order_id?: string },
 ): Promise<PricedCart> {
   const pack = await loadPack(c);
   const priced = await seams.priceLines(c, {
@@ -82,6 +82,7 @@ export async function priceCart(
     lines: input.lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id, option_ids: l.option_ids, qty_milli: l.qty_milli })),
     ...(input.coupon_codes.length ? { coupon_codes: input.coupon_codes } : {}),
     ...(input.customer_id ? { customer_id: input.customer_id } : {}),
+    ...(input.exclude_order_id ? { exclude_order_id: input.exclude_order_id } : {}),
   });
   const refusals = [...priced.refusals];
   const zero = { subtotal_minor: 0, discount_minor: 0, tax_minor: 0, total_minor: 0 };

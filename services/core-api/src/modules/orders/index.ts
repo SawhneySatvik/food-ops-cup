@@ -6,9 +6,10 @@
 //   POST /v1/orders/{id}:accept · :reject · :advance   orders.order.accept.v1 / .reject.v1 / .advance.v1 (status steps)
 //   POST /v1/orders/{id}:push-back           orders.promise.push_back.v1
 //   POST /v1/orders/{id}/tenders             orders.tender.record.v1
-//   POST /v1/orders/{id}/voids               orders.void.record.v1
-//   POST /v1/orders/{id}/refunds             orders.refund.record.v1   (cap binds staff: see authorise)
+//   POST /v1/orders/{id}/voids               orders.void.record.v1    (a whole-order void cancels the order)
+//   POST /v1/orders/{id}/refunds             orders.refund.record.v1   (role cap, cumulative per order: refundHandler)
 //   POST /v1/shifts · /v1/shifts/{id}:close  orders.shift.open.v1 / orders.shift.close.v1
+//   GET  /v1/shifts/{id}                     the shift row: float, counted / expected cash, variance
 //   POST /v1/pickup-windows                  orders.pickup_window.generate.v1 (idempotent per slot)
 // Seams for other modules: placeHandler / previewIn on the caller's transaction (T-032 storefront), placeOrder /
 // previewOrder, advanceOrder / mover / orderStatusHandler (kitchen, storefront cancel, the POS status routes).
@@ -26,10 +27,10 @@ import type { Queryable } from "../../runtoken/index.ts";
 import { posStatusHandler, pushBackHandler } from "./lifecycle.ts";
 import { pickupWindowHandler, refundHandler, shiftCloseHandler, shiftOpenHandler, tenderHandler, voidHandler } from "./money.ts";
 import { authorise, placeOrder, previewOrder } from "./place.ts";
-import { orderView, receiptView } from "./read.ts";
+import { orderView, receiptView, shiftView } from "./read.ts";
 
-export { advanceOrder, mover, orderStatusHandler, repriceLines } from "./lifecycle.ts";
-export { placeHandler, placeOrder, previewIn, previewOrder } from "./place.ts";
+export { advanceOrder, applyReprice, mover, orderStatusHandler, quoteReprice, refuseIfTendered } from "./lifecycle.ts";
+export { placeHandler, placeOrder, previewBody, previewIn, previewOrder } from "./place.ts";
 export { setOrderSeams } from "./seams.ts";
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -133,6 +134,7 @@ export const router = new Hono<AppEnv>()
     await read(c, (db) => authorise(db, m, "orders.shift.open.v1", env.data.payload.outlet_id));
     return run(c, m, env.data, shiftOpenHandler);
   })
+  .get(`/v1/shifts/:id{${ID}}`, requireMember, async (c) => c.json(await read(c, (db) => shiftView(db, c.req.param("id"))), 200))
   .post(`/v1/shifts/:action{${ID}:close}`, requireMember, async (c) => {
     const m = member(c);
     const env = ShiftClose.safeParse(await body(c));

@@ -79,7 +79,8 @@ export const KdsTicket = z.strictObject({
       item_id: Uuid7,
       name_key: NonEmpty,
       qty_milli: QtyMilli,
-      options: z.array(z.unknown()),
+      /** The chosen options, in the order taken, with their names for the station. */
+      options: z.array(z.strictObject({ option_id: Uuid7, name_key: NonEmpty })),
       note: z.string().nullable(),
     }),
   ),

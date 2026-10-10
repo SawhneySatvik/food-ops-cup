@@ -138,7 +138,7 @@ export interface BoardTicket {
   ticket_id: string; order_id: string; ticket_no: number; business_date: string; station: string; status: TicketStatus;
   kind: string; table_ref: string | null; channel_kind: string; started_at: string; accepted_at: string | null; ready_at: string | null;
   due_at: string | null; promised_at: string | null; lane: "now" | "later"; surface_at: string | null; colour: "normal" | "amber" | "red";
-  lines: Array<{ line_no: number; item_id: string; name_key: string; qty_milli: number; options: unknown[]; note: string | null }>;
+  lines: Array<{ line_no: number; item_id: string; name_key: string; qty_milli: number; options: Array<{ option_id: string; name_key: string }>; note: string | null }>;
 }
 export interface Board { outlet_id: string; as_of: string; stations: string[]; tickets: BoardTicket[] }
 
@@ -162,8 +162,11 @@ export async function buildBoard(c: Queryable, outletId: string, now: Date, stat
   const kept = station ? rows.filter((r) => r.station === station) : rows;
   const orderIds = [...new Set(kept.map((r) => r.order_id))];
   const lineRows = orderIds.length
-    ? (await c.query<{ order_id: string; line_no: number; item_id: string; name_key: string; qty_milli: string; options: unknown[]; note: string | null; stations: string[] }>(
-        `SELECT l.order_id, l.line_no, l.item_id, i.name_key, l.qty_milli::text AS qty_milli, l.options, l.note,
+    ? (await c.query<{ order_id: string; line_no: number; item_id: string; name_key: string; qty_milli: string; options: Array<{ option_id: string; name_key: string }>; note: string | null; stations: string[] }>(
+        `SELECT l.order_id, l.line_no, l.item_id, i.name_key, l.qty_milli::text AS qty_milli, l.note,
+                coalesce((SELECT jsonb_agg(jsonb_build_object('option_id', op.id, 'name_key', op.name_key) ORDER BY x.n)
+                            FROM jsonb_array_elements_text(l.options) WITH ORDINALITY AS x(id, n)
+                            JOIN core.option op ON op.tenant_id = l.tenant_id AND op.id = x.id::uuid), '[]') AS options,
                 coalesce((SELECT array_agg(p.station) FROM core.prep_time p
                            WHERE p.outlet_id = l.outlet_id AND p.item_id = l.item_id
                              AND p.valid_from <= o.business_date AND (p.valid_to IS NULL OR p.valid_to > o.business_date)), '{}') AS stations

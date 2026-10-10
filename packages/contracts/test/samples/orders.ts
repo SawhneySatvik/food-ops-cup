@@ -57,6 +57,10 @@ export const SAMPLES: Record<string, unknown> = {
     lines: [{ line_id: u(40), line_no: 1, item_id: u(20), variant_id: null, option_ids: [u(23)], qty_milli: 2000, unit_price_minor: 27800, line_discount_minor: 0, tax_minor: 2780 }],
     tenders: [], created_at: T_Z,
   },
+  "v1.shift": {
+    shift_id: u(18), outlet_id: u(2), device_id: u(5), status: "closed", opened_by: MEMBER, opened_at: T_PG, float_minor: 200000, currency: "INR",
+    closed_by: MEMBER, closed_at: T_PG, counted_cash_minor: 217000, expected_cash_minor: 217400, variance_minor: -400,
+  },
   "v1.order.receipt": {
     order_id: u(10), kind: "tax_invoice", title: "Tax Invoice", operator: null, seller: { name: "Outlet A", address: "1 Synthetic Road" },
     tax_ids: [{ code: "GSTIN", label: "GSTIN", value: "29ABCDE1234F1Z5" }], number: "POS1-1203", date: "09/10/2026", currency: "INR",

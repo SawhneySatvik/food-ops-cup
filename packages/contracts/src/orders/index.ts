@@ -27,8 +27,10 @@ export const OrdersPlaceV1 = z.strictObject({
   lines: z
     .array(
       z.strictObject({
-        /** Client-generated order_line id (02-schema §0). An expired-sale override is bound to it before placement
-         *  (0014 #49: override.cart_line_id = this id; placement consumes the override once). */
+        /** REQUIRED, client-generated UUIDv7: becomes the core.order_line id (02-schema §0), unique across the tenant
+         *  (a repeat in one order → 422; reusing another order's line id fails the insert). An expired-sale override is
+         *  bound to it before placement (0014 #49: override.cart_line_id = this id; placement consumes the override once).
+         *  Preview lines (`orders.preview.request`) carry no line_id: a preview writes nothing and binds no override. */
         line_id: Uuid7,
         item_id: Uuid7,
         variant_id: Uuid7.nullable(),
@@ -333,6 +335,24 @@ export const OrdersPlaceGuestResponse = z.strictObject({
   guest_access_token: z.string().min(16).max(256).nullable(),
 });
 
+/** One drawer shift as stored (core.shift row fields, R26): the opening float and, once closed, the counted cash,
+ *  core's expected cash and the variance (counted − expected). */
+export const ShiftView = z.strictObject({
+  shift_id: Uuid7,
+  outlet_id: Uuid7,
+  device_id: Uuid7.nullable(),
+  status: z.enum(["open", "closed"]),
+  opened_by: Uuid7,
+  opened_at: IsoDateTime,
+  float_minor: MinorAmount,
+  currency: CurrencyCode,
+  closed_by: Uuid7.nullable(),
+  closed_at: IsoDateTime.nullable(),
+  counted_cash_minor: MinorAmount.nullable(),
+  expected_cash_minor: MinorAmount.nullable(),
+  variance_minor: z.int().nullable(),
+});
+
 export const SCHEMAS = {
   "orders.place.v1": OrdersPlaceV1,
   "orders.pickup_window.generate.v1": OrdersPickupWindowGenerateV1,
@@ -350,6 +370,7 @@ export const SCHEMAS = {
   "orders.order.advance.v1": OrdersOrderAdvanceV1,
   "v1.order": OrderView,
   "v1.order.receipt": ReceiptView,
+  "v1.shift": ShiftView,
   "orders.place.guest-response": OrdersPlaceGuestResponse,
 };
 export const ROUTES = ORDER_ROUTES;

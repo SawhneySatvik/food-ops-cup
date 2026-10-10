@@ -272,9 +272,9 @@ describe("priceLines — 20 hand-computed carts", () => {
     expect(refusals(r)).toEqual([[null, "coupon_cap_reached", "CAPPED"]]);
     expect(totals(r)).toEqual({ subtotal: 9900, discount: 0, tax: 496, total: 10396 });
   });
-  it("13 · expired, other-outlet, unknown, and customer-only-without-a-customer codes → 4 × coupon_invalid; total as cart 1", async () => {
+  it("13 · expired, other-outlet, unknown, and customer-only-without-a-customer codes → coupon_expired, coupon_out_of_scope, coupon_invalid, coupon_out_of_scope; total as cart 1", async () => {
     const r = await sale(IN, { at: WED_1230, lines: [line(I.A, 1, [I.sMild])], coupon_codes: ["EXPIRED", "OUTLET2", "NOPE1", "MEMBERONLY"] });
-    expect(refusals(r)).toEqual([[null, "coupon_invalid", "EXPIRED"], [null, "coupon_invalid", "OUTLET2"], [null, "coupon_invalid", "NOPE1"], [null, "coupon_invalid", "MEMBERONLY"]]);
+    expect(refusals(r)).toEqual([[null, "coupon_expired", "EXPIRED"], [null, "coupon_out_of_scope", "OUTLET2"], [null, "coupon_invalid", "NOPE1"], [null, "coupon_out_of_scope", "MEMBERONLY"]]);
     expect(totals(r)).toEqual({ subtotal: 24900, discount: 0, tax: 1246, total: 26146 });
   });
   it("14 · shop SKU D × 3 (goods_18) after it sold out here: priced 7500 + 675 × 2 = 8850, refused item_sold_out", async () => {
@@ -352,8 +352,8 @@ describe("priceLines — 20 hand-computed carts", () => {
     expect(await asOutlet2()).toEqual({ all: 0, mine: 0 });
     expect(Number((await db.admin<{ n: string }>(`SELECT count(*) AS n FROM core.coupon_use WHERE coupon_id = $1`, [coupon.CAPPED])).rows[0]!.n)).toBe(1);
   });
-  it("one sellable rule (sellableAs): naan has active variants, so a bare naan line is refused 409 conflict and the menu never lists it bare; a variant line prices", async () => {
-    await expect(sale(IN, { at: WED_1230, lines: [line(I.B, 1)] })).rejects.toMatchObject({ code: "conflict" });
+  it("one sellable rule (sellableAs): naan has active variants, so a bare naan line is refused 409 conflict / item_unavailable and the menu never lists it bare; a variant line prices", async () => {
+    await expect(sale(IN, { at: WED_1230, lines: [line(I.B, 1)] })).rejects.toMatchObject({ code: "conflict", reason_code: "item_unavailable" });
     const menu = await db.withContext("munim_core", ownerCtx(IN), (c) => itemsForSale(c, IN.outlets[0], "counter", { item_id: I.B }));
     expect(menu.entries.map((e) => e.variant_id).sort()).toEqual([I.vGarlic, I.vPlain].sort());
     expect(shape(await sale(IN, { at: WED_1230, lines: [line(I.B, 1, [], I.vGarlic)] }))[0]!.slice(0, 2)).toEqual([1, 7500]);
@@ -440,10 +440,10 @@ describe("authority", () => {
     const origin = (await db.admin(`SELECT origin FROM core.price WHERE id = $1`, [other.price_id])).rows[0]!.origin;
     expect(origin).toMatchObject({ kind: "command" });
   });
-  it("SKU without stock_ingredient_id → 400 and 0 rows; with one → 200", async () => {
+  it("SKU without stock_ingredient_id → 422 invalid_payload and 0 rows; with one → 200", async () => {
     const item = uuidv7();
     const missing = await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", { ...sku(item, "shop.t21_nostock", "8900000000031", I.ingBisc, 1000), stock_ingredient_id: null });
-    expect([missing.status, (await missing.json()).error.code]).toEqual([400, "bad_request"]);
+    expect([missing.status, (await missing.json()).error.code]).toEqual([422, "invalid_payload"]);
     expect(await count(`SELECT count(*) n FROM core.item WHERE id = $1`, [item])).toBe(0);
     await ok(await send("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", sku(item, "shop.t21_nostock", "8900000000031", I.ingBisc, 1000)));
     expect(await count(`SELECT count(*) n FROM core.item WHERE id = $1 AND kind = 'sku' AND stock_ingredient_id = $2`, [item, I.ingBisc])).toBe(1);
@@ -517,7 +517,7 @@ describe("deals, coupons and drafts", () => {
     const extend = await send("owner", `/v1/catalogue/deals/${d}:end`, "catalogue.deal.end.v1", { deal_id: d, valid_to: "2026-10-25" });
     expect(extend.status).toBe(409);
     const mismatch = await send("owner", `/v1/catalogue/deals/${d}:end`, "catalogue.deal.end.v1", { deal_id: uuidv7(), valid_to: "2026-10-12" });
-    expect(mismatch.status).toBe(400);
+    expect([mismatch.status, (await mismatch.json()).error.code]).toEqual([422, "invalid_payload"]);
     await ok(await send("owner", `/v1/catalogue/deals/${d}:end`, "catalogue.deal.end.v1", { deal_id: d, valid_to: "2026-10-12" }));
   });
   it("coupon set: caps and end date change (200); the offered terms cannot (409)", async () => {

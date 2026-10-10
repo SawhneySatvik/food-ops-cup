@@ -2,17 +2,20 @@
 // current status (`WHERE status = from`), legal per core.order_status_transition (trigger, MB004) and allowed to
 // the caller's role per its `min_role` (here). Every order_event is paired with an outbox event (#80). Entering
 // `completed` derives, in the same transaction, the loyalty earn and the sale's journal entry through their
-// owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` reverses redeemed points,
-// gives the consumed stock back (W2-R6, inventory's seam) and frees the pickup slot. `orderStatusHandler(type)` binds the
-// move to the seeded command that carries it: the POS's orders.order.accept.v1 / .reject.v1 / .advance.v1 (each limited
-// to its own steps by posStatusHandler — the database binds all three to the same tables), the kitchen's kitchen.ticket.advance.v1 and
-// the shopper's storefront.order.cancel.v1 (0015 A4, #41).
-import type { CommandHandler, EventDraft, HandlerOutput } from "../../commit/index.ts";
+// owners' seams (stock is consumed at placement — place.ts); entering `cancelled`/`rejected` is refused while
+// payments stand unrefunded (the POS refunds first, R2-S1-3), then reverses redeemed points, gives the consumed
+// stock back (W2-R6, inventory's seam) and frees the pickup slot. `orderStatusHandler(type)` binds the move to the
+// seeded command that carries it: the POS's orders.order.accept.v1 / .reject.v1 / .advance.v1 (each limited to its
+// own steps by posStatusHandler — the database binds all three to the same tables), the kitchen's
+// kitchen.ticket.advance.v1, the shopper's storefront.order.cancel.v1 and a whole-order void (0015 A4/A8, #41).
+// Re-pricing an order at a new promised time (push-back here, the shopper's reschedule in storefront) is one
+// function pair, quoteReprice / applyReprice.
+import type { AuditEntry, CommandHandler, EventDraft, HandlerOutput } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { asCore, underRule } from "./place.ts";
-import { loadChannel, priceCart } from "./pricing.ts";
+import { loadChannel, type PricedCart, priceCart } from "./pricing.ts";
 import { seams } from "./seams.ts";
 
 export const ORDER_STATUSES = ["placed", "accepted", "rejected", "preparing", "ready", "completed", "cancelled"] as const;
@@ -30,7 +33,18 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
   const rule = t.rows[0];
   if (!rule) throw new ApiError("illegal_transition");
   if ((RANK[by.role] ?? -1) < RANK[rule.min_role]!) throw new ApiError("forbidden", "authority_denied");
-  if ((move.to_status === "rejected" || move.to_status === "cancelled") && !move.reason_code) throw new ApiError("invalid_payload");
+  const ending = move.to_status === "rejected" || move.to_status === "cancelled";
+  if (ending && !move.reason_code) throw new ApiError("invalid_payload", "reason_required");
+  // A reason is a code (it reaches the tracker and the KDS); free text is never stored (R1-m1).
+  if (move.reason_code !== null && !REASON.test(move.reason_code)) throw new ApiError("invalid_payload");
+  if (ending) {
+    // The same paid − refunded quantity that bounds a refund (money.ts), so a fully refunded order can end.
+    const left = await asCore(c, (await outletOf(c, move.order_id)), async () => (await c.query<{ n: string }>(
+      `SELECT (SELECT coalesce(sum(amount_minor - rounding_minor), 0) FROM core.tender WHERE order_id = $1)
+            - (SELECT coalesce(sum(amount_minor), 0) FROM core.refund WHERE order_id = $1) AS n`, [move.order_id])).rows[0]!.n);
+    // Reason code "refund_first" requested from f-4 (contracts); until it exists the refusal carries none.
+    if (Number(left) > 0) throw new ApiError("conflict");
+  }
 
   const u = await c.query<{ outlet_id: string; customer_id: string | null; pickup_window_id: string | null }>(
     `UPDATE core."order" SET status = $3 WHERE id = $1 AND status = $2 RETURNING outlet_id, customer_id, pickup_window_id`,
@@ -56,7 +70,7 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
     type: "munim.orders.order.status_changed.v1", subject: move.order_id, aggregateType: "order",
     data: { order_id: move.order_id, outlet_id: o.outlet_id, from_status: move.from_status, to_status: move.to_status },
   }];
-  if (move.to_status === "cancelled" || move.to_status === "rejected") {
+  if (ending) {
     if (o.customer_id) await asCore(c, o.outlet_id, () => seams.loyaltyReverseFor(c, move.order_id));
     if (o.pickup_window_id) {
       await asCore(c, o.outlet_id, () =>
@@ -82,7 +96,6 @@ export function orderStatusHandler(type: string): CommandHandler {
       const p = cmd.payload as Partial<StatusMove>;
       const ok = (s: unknown): s is OrderStatus => typeof s === "string" && (ORDER_STATUSES as readonly string[]).includes(s);
       if (typeof p.order_id !== "string" || !ok(p.from_status) || !ok(p.to_status)) throw new ApiError("invalid_payload");
-      if (p.reason_code != null && !/^[a-z][a-z0-9_]*$/.test(p.reason_code)) throw new ApiError("invalid_payload");
       return advanceOrder(c, { order_id: p.order_id, from_status: p.from_status, to_status: p.to_status, reason_code: p.reason_code ?? null }, await mover(c));
     },
   };
@@ -106,6 +119,15 @@ export function posStatusHandler(type: "orders.order.accept.v1" | "orders.order.
   };
 }
 
+const REASON = /^[a-z][a-z0-9_]*$/;
+
+/** The order's outlet, or not_found (RLS: an order outside the caller's view looks absent). */
+async function outletOf(c: Queryable, orderId: string): Promise<string> {
+  const r = await c.query<{ outlet_id: string }>(`SELECT outlet_id FROM core."order" WHERE id = $1`, [orderId]);
+  if (!r.rows[0]) throw new ApiError("not_found");
+  return r.rows[0].outlet_id;
+}
+
 export async function mover(c: Queryable): Promise<Mover> {
   const r = await c.query<{ role: string | null; member: string | null; customer: string | null }>(
     `SELECT nullif(current_setting('app.role', true), '') AS role, nullif(current_setting('app.member_id', true), '') AS member,
@@ -116,20 +138,20 @@ export async function mover(c: Queryable): Promise<Mover> {
   throw new ApiError("forbidden");
 }
 
-// ── Push-back (orders.promise.push_back.v1) ────────────────────────────────────────────────────────────────
+// ── Push-back (orders.promise.push_back.v1) and the shared re-price ────────────────────────────────────────
 
 const PUSHABLE = new Set(["placed", "accepted", "preparing"]);
 
 /** Moves the promise later, records why, and re-judges the order's deals at the new time with the one pricing
  *  function. While the order is `placed`/`accepted` (the orders.reprice source state) a changed price is applied
- *  to the header, its lines and the snapshot under that derivation. Later states keep their price. */
+ *  to the header, its lines and the snapshot under that derivation. Later states keep their price. Refused once a
+ *  payment is recorded (R2-S2-6): a re-price would move a total that was already paid. */
 export const pushBackHandler: CommandHandler = {
   type: "orders.promise.push_back.v1",
   async run(c, cmd) {
     const p = cmd.payload as { order_id: string; from_promised_at: string | null; to_promised_at: string; reason_code: string };
-    const r = await c.query<{
-      outlet_id: string; channel_id: string; status: string; promised_at: Date | null; total_minor: string; pricing_snapshot: Record<string, unknown>;
-    }>(`SELECT outlet_id, channel_id, status, promised_at, total_minor, pricing_snapshot FROM core."order" WHERE id = $1 FOR UPDATE`, [p.order_id]);
+    const r = await c.query<{ outlet_id: string; status: string; promised_at: Date | null }>(
+      `SELECT outlet_id, status, promised_at FROM core."order" WHERE id = $1 FOR UPDATE`, [p.order_id]);
     const o = r.rows[0];
     if (!o) throw new ApiError("not_found");
     const before = o.promised_at?.toISOString() ?? null;
@@ -137,17 +159,18 @@ export const pushBackHandler: CommandHandler = {
     if (before !== asked || !PUSHABLE.has(o.status)) throw new ApiError("conflict");
     const to = new Date(p.to_promised_at);
     if (to.getTime() <= Date.now() || (o.promised_at && to <= o.promised_at)) throw new ApiError("invalid_payload");
+    await refuseIfTendered(c, p.order_id, o.outlet_id);
 
     await c.query(`UPDATE core."order" SET promised_at = $2 WHERE id = $1`, [p.order_id, to.toISOString()]);
     await c.query(
       `INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_promised_at, to_promised_at, actor, reason)
        VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'promised_at', $4, $5, $6, $7)`,
       [uuidv7(), o.outlet_id, p.order_id, before, to.toISOString(), JSON.stringify({ kind: "member", id: (await mover(c)).id }), p.reason_code]);
-    const audit: HandlerOutput["audit"] = [{ entity: "core.order", entityId: p.order_id, before: { promised_at: before }, after: { promised_at: to.toISOString() } }];
+    const audit: AuditEntry[] = [{ entity: "core.order", entityId: p.order_id, before: { promised_at: before }, after: { promised_at: to.toISOString() } }];
 
     if (o.status === "placed" || o.status === "accepted") {
-      const changed = await rejudge(c, p.order_id, o.outlet_id, o.channel_id, to.toISOString(), Number(o.total_minor), o.pricing_snapshot);
-      if (changed) audit.push({ entity: "core.order", entityId: p.order_id, action: "orders.reprice", before: { total_minor: Number(o.total_minor) }, after: changed });
+      const quote = await quoteReprice(c, p.order_id, to.toISOString());
+      audit.push(...(await applyReprice(c, p.order_id, quote)));
     }
     return {
       entityId: p.order_id,
@@ -158,40 +181,80 @@ export const pushBackHandler: CommandHandler = {
   },
 };
 
-/** Re-prices the order's own lines at `at`. Returns the new header when it changed, else null. Coupons stay
- *  as applied at placement (their uses are recorded rows); deals are what moves with time. */
-async function rejudge(c: Queryable, orderId: string, outletId: string, channelId: string, at: string, total: number, snap: Record<string, unknown>) {
-  const lines = (await c.query<{ line_no: number; item_id: string; variant_id: string | null; options: string[]; qty_milli: string }>(
-    `SELECT line_no, item_id, variant_id, options, qty_milli FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [orderId])).rows;
-  const codes = (await c.query<{ code: string }>(
-    `SELECT k.code FROM core.coupon_use u JOIN core.coupon k ON k.tenant_id = u.tenant_id AND k.id = u.coupon_id WHERE u.order_id = $1`, [orderId])).rows.map((x) => x.code);
-  const channel = await loadChannel(c, channelId);
-  const cart = await priceCart(c, {
-    outlet_id: outletId, channel_kind: channel.kind, at, coupon_codes: codes,
-    lines: lines.map((l) => ({ line_no: l.line_no, item_id: l.item_id, variant_id: l.variant_id, option_ids: l.options, qty_milli: Number(l.qty_milli) })),
+/** R2-S2-6: no re-price once any payment is recorded on the order (read as core: a shopper's context sees it too). */
+export async function refuseIfTendered(c: Queryable, orderId: string, outletId: string): Promise<void> {
+  const t = await asCore(c, outletId, () => c.query(`SELECT 1 FROM core.tender WHERE order_id = $1 LIMIT 1`, [orderId]));
+  // Reason code "order_tendered" requested from f-4 (contracts); until it exists the refusal carries none.
+  if (t.rowCount) throw new ApiError("conflict");
+}
+
+type Snapshot = Record<string, unknown> & { coupons?: Array<{ coupon_id: string }> };
+export type RepriceQuote = { at: string; cart: PricedCart; snapshot: Snapshot; header: { subtotal_minor: number; discount_minor: number; tax_minor: number; total_minor: number } };
+
+/** The order priced again at `at` exactly as it was placed: its own lines, its coupons in the order they were
+ *  applied at placement (R2-S2-3), this order's own coupon uses not counted against their caps (R2-S2-1), and its
+ *  customer (R2-S2-2). Core's own read of the order's rows (asCore): the caller authorised the change first.
+ *  Writes nothing; refusals are returned on the cart. */
+export async function quoteReprice(c: Queryable, orderId: string, at: string): Promise<RepriceQuote> {
+  const outlet = await outletOf(c, orderId);
+  return asCore(c, outlet, async () => {
+    const o = (await c.query<{ channel_id: string; customer_id: string | null; pricing_snapshot: Snapshot; subtotal_minor: string; discount_minor: string; tax_minor: string; total_minor: string }>(
+      `SELECT channel_id, customer_id, pricing_snapshot, subtotal_minor, discount_minor, tax_minor, total_minor FROM core."order" WHERE id = $1`, [orderId])).rows[0]!;
+    const lines = (await c.query<{ line_no: number; item_id: string; variant_id: string | null; options: string[]; qty_milli: string }>(
+      `SELECT line_no, item_id, variant_id, options, qty_milli FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [orderId])).rows;
+    const ids = (o.pricing_snapshot.coupons ?? []).map((k) => k.coupon_id);
+    const found = ids.length
+      ? (await c.query<{ id: string; code: string }>(`SELECT id, code FROM core.coupon WHERE id = ANY ($1::uuid[])`, [ids])).rows
+      : [];
+    const codes = ids.map((id) => found.find((k) => k.id === id)!.code);
+    const channel = await loadChannel(c, o.channel_id);
+    const cart = await priceCart(c, {
+      outlet_id: outlet, channel_kind: channel.kind, at, coupon_codes: codes, customer_id: o.customer_id, exclude_order_id: orderId,
+      lines: lines.map((l) => ({ line_no: l.line_no, item_id: l.item_id, variant_id: l.variant_id, option_ids: l.options, qty_milli: Number(l.qty_milli) })),
+    });
+    const header = { subtotal_minor: Number(o.subtotal_minor), discount_minor: Number(o.discount_minor), tax_minor: Number(o.tax_minor), total_minor: Number(o.total_minor) };
+    return { at, cart, snapshot: o.pricing_snapshot, header };
   });
-  if (cart.refusals.length) throw new ApiError("conflict", cart.refusals[0]!.reason_code);
-  if (cart.totals.total_minor === total) return null;
-  const repriced = {
-    judged_at: at,
-    lines: cart.priced.lines.map((l) => ({
-      line_no: l.line_no, deal_refs: l.deal_refs, coupon_refs: l.coupon_refs, line_discount_minor: l.line_discount_minor, tax_minor: l.tax_minor,
-    })),
+}
+
+/** Writes a quote under orders.reprice: the header, each line whose money moved, and the snapshot MERGED (R2-S1-1:
+ *  loyalty, picks, coupons, pack and judged_at stay; `repriced` records this judgement — per-line refs, tax class,
+ *  discount and each coupon's new share, R2-S3-7). Returns the audit entries: the header and every changed line
+ *  with before / after (R2-S1-2). A refused quote is refused here with its first reason; nothing moved → no write. */
+export async function applyReprice(c: Queryable, orderId: string, q: RepriceQuote): Promise<AuditEntry[]> {
+  if (q.cart.refusals.length) throw new ApiError("conflict", q.cart.refusals[0]!.reason_code);
+  const was = (await c.query<{ id: string; line_no: number; unit_price_minor: string; line_discount_minor: string; tax_minor: string }>(
+    `SELECT id, line_no, unit_price_minor, line_discount_minor, tax_minor FROM core.order_line WHERE order_id = $1 ORDER BY line_no`, [orderId])).rows;
+  const moved = q.cart.priced.lines.flatMap((l) => {
+    const w = was.find((x) => x.line_no === l.line_no)!;
+    const before = { unit_price_minor: Number(w.unit_price_minor), line_discount_minor: Number(w.line_discount_minor), tax_minor: Number(w.tax_minor) };
+    const after = { unit_price_minor: l.unit_price_minor + l.options_minor, line_discount_minor: l.line_discount_minor, tax_minor: l.tax_minor };
+    return before.unit_price_minor === after.unit_price_minor && before.line_discount_minor === after.line_discount_minor && before.tax_minor === after.tax_minor
+      ? [] : [{ id: w.id, l, before, after }];
+  });
+  const t = q.cart.totals;
+  if (!moved.length && t.total_minor === q.header.total_minor && t.tax_minor === q.header.tax_minor && t.discount_minor === q.header.discount_minor) return [];
+  const snapshot = {
+    ...q.snapshot,
+    repriced: {
+      judged_at: q.at,
+      lines: q.cart.priced.lines.map((l) => ({
+        line_no: l.line_no, price_ref: l.price_ref, option_refs: l.option_refs, deal_refs: l.deal_refs, coupon_refs: l.coupon_refs,
+        tax_class: l.tax_class, line_discount_minor: l.line_discount_minor, tax_minor: l.tax_minor,
+      })),
+      coupons: q.cart.priced.coupons.map((k) => ({ coupon_id: k.coupon_id, discount_minor: k.discount_minor })),
+    },
   };
   await underRule(c, "orders.reprice", `core.order:${orderId}`, async () => {
     await c.query(`UPDATE core."order" SET subtotal_minor = $2, discount_minor = $3, tax_minor = $4, total_minor = $5, pricing_snapshot = $6 WHERE id = $1`,
-      [orderId, cart.totals.subtotal_minor, cart.totals.discount_minor, cart.totals.tax_minor, cart.totals.total_minor, JSON.stringify({ ...snap, repriced })]);
-    await repriceLines(c, orderId, cart.priced.lines);
+      [orderId, t.subtotal_minor, t.discount_minor, t.tax_minor, t.total_minor, JSON.stringify(snapshot)]);
+    for (const m of moved) {
+      await c.query(`UPDATE core.order_line SET unit_price_minor = $2, line_discount_minor = $3, tax_minor = $4 WHERE id = $1`,
+        [m.id, m.after.unit_price_minor, m.after.line_discount_minor, m.after.tax_minor]);
+    }
   });
-  return cart.totals;
-}
-
-/** The order's lines follow its header under orders.reprice (0015 A8): unit (price + options), discount and tax
- *  per line_no, as the one pricing function judged them. The caller has set the rule. */
-export async function repriceLines(c: Queryable, orderId: string,
-  lines: ReadonlyArray<{ line_no: number; unit_price_minor: number; options_minor: number; line_discount_minor: number; tax_minor: number }>) {
-  for (const l of lines) {
-    await c.query(`UPDATE core.order_line SET unit_price_minor = $3, line_discount_minor = $4, tax_minor = $5 WHERE order_id = $1 AND line_no = $2`,
-      [orderId, l.line_no, l.unit_price_minor + l.options_minor, l.line_discount_minor, l.tax_minor]);
-  }
+  return [
+    { entity: "core.order", entityId: orderId, action: "orders.reprice", before: q.header, after: { ...t, judged_at: q.at } },
+    ...moved.map((m) => ({ entity: "core.order_line", entityId: m.id, action: "orders.reprice", before: m.before, after: m.after })),
+  ];
 }
