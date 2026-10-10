@@ -1,1 +1,12 @@
 storefront.guest.create.v1
+storefront.order.cancel.v1
+storefront.order.reschedule.v1
+storefront.reschedule.preview.request
+storefront.reschedule.preview.response
+storefront.outlets.response
+storefront.menu.response
+storefront.accepting.response
+storefront.pickup_windows.response
+storefront.order.place.request
+storefront.order.placed
+storefront.order.view
