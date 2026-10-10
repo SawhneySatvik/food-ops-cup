@@ -42,8 +42,7 @@ export async function advanceOrder(c: Queryable, move: StatusMove, by: Mover): P
     const left = await asCore(c, (await outletOf(c, move.order_id)), async () => (await c.query<{ n: string }>(
       `SELECT (SELECT coalesce(sum(amount_minor - rounding_minor), 0) FROM core.tender WHERE order_id = $1)
             - (SELECT coalesce(sum(amount_minor), 0) FROM core.refund WHERE order_id = $1) AS n`, [move.order_id])).rows[0]!.n);
-    // Reason code "refund_first" requested from f-4 (contracts); until it exists the refusal carries none.
-    if (Number(left) > 0) throw new ApiError("conflict");
+    if (Number(left) > 0) throw new ApiError("conflict", "refund_first");
   }
 
   const u = await c.query<{ outlet_id: string; customer_id: string | null; pickup_window_id: string | null }>(
@@ -184,8 +183,7 @@ export const pushBackHandler: CommandHandler = {
 /** R2-S2-6: no re-price once any payment is recorded on the order (read as core: a shopper's context sees it too). */
 export async function refuseIfTendered(c: Queryable, orderId: string, outletId: string): Promise<void> {
   const t = await asCore(c, outletId, () => c.query(`SELECT 1 FROM core.tender WHERE order_id = $1 LIMIT 1`, [orderId]));
-  // Reason code "order_tendered" requested from f-4 (contracts); until it exists the refusal carries none.
-  if (t.rowCount) throw new ApiError("conflict");
+  if (t.rowCount) throw new ApiError("conflict", "order_tendered");
 }
 
 type Snapshot = Record<string, unknown> & { coupons?: Array<{ coupon_id: string }> };

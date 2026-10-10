@@ -592,6 +592,23 @@ describe("shoppers: customer and guest order tracking (W1 fix #33, #47)", () => 
     expect(again.msgs.map((m) => [m.id, m.cursor])).toEqual([[e2, "n=2"], [e3, "n=3"]]);
   });
 
+  it("two events of one transaction arrive in the order's seq, not by id (the ids are written out of order)", async () => {
+    const x = await Raw.open(two, [`order:${A.orderMine}`], customer(A, A.customerSub));
+    await until(() => x.ready, 5_000, "ready");
+    const [late, early] = ["ffffffff-ffff-4fff-8fff-ffffffffffff", "00000000-0000-4000-8000-000000000001"];
+    await db.withContext("munim_core", { tenant_id: A.tenant, outlet_ids: "*", role: "owner", member_id: A.owner, command_type: "kitchen.ticket.advance.v1" }, async (c) => {
+      const outlet = (await c.query<{ outlet_id: string }>(`SELECT outlet_id FROM core."order" WHERE id = $1`, [A.orderMine])).rows[0]!.outlet_id;
+      for (const [id, from, to] of [[late, "accepted", "preparing"], [early, "preparing", "ready"]]) {
+        await c.query(`INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor, reason)
+                       VALUES ($1, $2, $3, $4, 'status', $5, $6, $7, null)`, [A.tenant, id, outlet, A.orderMine, from, to, { kind: "member", id: A.owner }]);
+      }
+      await c.query(`INSERT INTO core.outbox (tenant_id, id, aggregatetype, aggregateid, type, payload) VALUES ($1, $2, 'order', $3, 'munim.kitchen.ticket.advanced.v1', $4)`,
+        [A.tenant, randomUUID(), A.orderMine, { data: { order_id: A.orderMine, outlet_id: outlet, status: "ready" } }]);
+    });
+    await until(() => x.msgs.length === 2, 2_000, "both events");
+    expect(x.msgs.map((m) => [m.id, m.data.to_status])).toEqual([[late, "preparing"], [early, "ready"]]);
+  });
+
   it("a guest with the order's token follows that order only", async () => {
     const g = await Raw.open(two, [`order:${A.guestOrder}`], guest(A));
     await until(() => g.ready, 5_000, "ready");

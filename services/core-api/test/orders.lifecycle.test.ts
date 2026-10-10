@@ -426,15 +426,16 @@ describe("W2 fix cycle 1 (f-1): money rules on the real seams, hand values", () 
     c.query(`INSERT INTO core.coupon (tenant_id, id, code, kind, value_bp, currency, valid_from${extra ? `, ${extra}` : ""})
              VALUES ($1, $2, $3, 'percent', 500, 'INR', '2026-01-01'${values.map((_, i) => `, $${i + 4}`).join("")})`, [env.w.tenant, uuidv7(), code, ...values]));
   const errorOf = async (r: Awaited<ReturnType<Env["cmd"]>>) => [r.status, (await r.json()).error?.code ?? null];
+  const refusalOf = async (r: Awaited<ReturnType<Env["cmd"]>>) => { const e = (await r.json()).error; return [r.status, e?.code ?? null, e?.reason_code ?? null]; };
 
   it("R2-S1-3: a paid order cannot be cancelled until its payment is refunded (409); refunded, the cancel stands (200)", async () => {
     const id = await place("staff", [{ item: env.menu.coffee }]); // 4200
     expect((await pay(id, "cash", 5000, null)).status).toBe(200); // cash 4200 (IN step 100: already whole)
     const cancel = () => env.cmd(`/v1/orders/${id}:advance`, "staff", "orders.order.advance.v1", { order_id: id, from_status: "placed", to_status: "cancelled", reason_code: "customer_left" });
-    expect(await errorOf(await cancel())).toEqual([409, "conflict"]);
+    expect(await refusalOf(await cancel())).toEqual([409, "conflict", "refund_first"]);
     expect((await env.one<{ status: string }>(`SELECT status FROM core."order" WHERE id = $1`, [id])).status).toBe("placed");
     expect((await refundOf("mgr1", id, 4199)).status).toBe(200);
-    expect(await errorOf(await cancel())).toEqual([409, "conflict"]); // 1 still unrefunded
+    expect(await refusalOf(await cancel())).toEqual([409, "conflict", "refund_first"]); // 1 still unrefunded
     expect((await refundOf("mgr1", id, 1)).status).toBe(200);
     expect((await cancel()).status).toBe(200);
   });
@@ -463,7 +464,7 @@ describe("W2 fix cycle 1 (f-1): money rules on the real seams, hand values", () 
   it("R2-S3-1: 49 paise left after a card part-payment is below the cash step — a clean 409, not a 500; UPI takes it", async () => {
     const id = await place("staff", [{ item: env.menu.dosa }]); // 12600
     expect((await pay(id, "card", null, 12551)).status).toBe(200);
-    expect(await errorOf(await pay(id, "cash", 100, null))).toEqual([409, "conflict"]);
+    expect(await refusalOf(await pay(id, "cash", 100, null))).toEqual([409, "conflict", "cash_below_rounding"]);
     expect(await n(`SELECT count(*) AS n FROM core.tender WHERE order_id = $1`, [id])).toBe(1);
     expect((await pay(id, "upi", null, 49)).status).toBe(200);
     expect((await (await env.call("GET", `/v1/orders/${id}`, "staff")).json()).remaining_minor).toBe(0);
@@ -523,7 +524,7 @@ describe("W2 fix cycle 1 (f-1): money rules on the real seams, hand values", () 
     const at = new Date(Date.now() + 2 * 3600_000).toISOString();
     const id = await place("staff", [{ item: env.menu.coffee }], { promised_at: at });
     expect((await pay(id, "card", null, 1000)).status).toBe(200);
-    expect(await errorOf(await pushBack(id, at, 3))).toEqual([409, "conflict"]);
+    expect(await refusalOf(await pushBack(id, at, 3))).toEqual([409, "conflict", "order_tendered"]);
     expect(new Date((await env.one<{ p: Date }>(`SELECT promised_at AS p FROM core."order" WHERE id = $1`, [id])).p).toISOString()).toBe(at);
   });
 

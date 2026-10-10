@@ -11,6 +11,7 @@ describe("reason-code messages", () => {
   it("each has a message distinct from the generic conflict text", () => {
     for (const named of ["window_full", "outlet_paused", "item_sold_out", "deal_rejudged", "coupon_invalid", "coupon_cap_reached", "coupon_min_spend", "change_window_closed",
       "not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change",
+      "refund_first", "order_tendered", "cash_below_rounding",
       "coupon_expired", "coupon_out_of_scope", "price_above_mrp", "expired_batch", "preview_total_changed", "unit_mismatch", "tax_id_missing", "period_closed", "model_blocked"]) expect(codes).toContain(named);
     expect(codes.length).toBeGreaterThanOrEqual(26);
     for (const r of codes) {
@@ -22,5 +23,10 @@ describe("reason-code messages", () => {
   it("guest_cannot_change carries the ruled copy; no reason code keeps the code's text", () => {
     expect(errorBody("forbidden", "guest_cannot_change").error.message).toBe("Call the outlet to change this order");
     expect(errorBody("conflict").error.message).toBe("This changed since you loaded it.");
+  });
+  it("the three order-money refusals carry their ruled copy", () => {
+    expect(errorBody("conflict", "refund_first").error.message).toBe("Refund the payments on this order before cancelling it.");
+    expect(errorBody("conflict", "order_tendered").error.message).toBe("A payment is recorded on this order, so its time can't change.");
+    expect(errorBody("conflict", "cash_below_rounding").error.message).toBe("Less than the smallest cash amount is due; take it by card or UPI.");
   });
 });

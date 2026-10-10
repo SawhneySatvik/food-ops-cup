@@ -115,10 +115,6 @@ type State = { override: Partial<OrderSeams>; real: Map<Name, unknown> };
 const g = globalThis as unknown as Record<symbol, State | undefined>;
 const state: State = (g[KEY] ??= { override: {}, real: new Map() });
 
-/** Kept for w2-seams.test.ts (not this lane's file): nothing is ever recorded here now that there are no
- *  stand-ins. Remove with that assertion. */
-export const standInCalls: Array<{ seam: Name; ref: string }> = [];
-
 /** Replaces seams for the process (gates; T-034 wiring). Returns the undo. */
 export function setOrderSeams(s: Partial<OrderSeams>): () => void {
   const prev = state.override;

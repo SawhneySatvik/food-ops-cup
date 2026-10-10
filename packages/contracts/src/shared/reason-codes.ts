@@ -64,8 +64,9 @@ export const PACK_RULE_REASON_CODES = ["buyer_identity_required", "tax_id_missin
 
 /** W2 refusals (B13): a pack rule that does not apply, an unavailable item, a missing reason on a void/refund, a
  *  deal edited in the cart or re-judged at a new time, a repeated supplier invoice number, a guest asked to
- *  change an order online (W2-R2: guests call the outlet). */
-export const W2_REASON_CODES = ["not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change"] as const;
+ *  change an order online (W2-R2: guests call the outlet), a cancel with money still held, a re-time after a payment,
+ *  and a cash amount below the pack's smallest step. */
+export const W2_REASON_CODES = ["not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change", "refund_first", "order_tendered", "cash_below_rounding"] as const;
 
 export const REASON_CODES = [
   ...CORE_REASON_CODES,

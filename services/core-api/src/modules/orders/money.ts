@@ -66,8 +66,8 @@ export const tenderHandler: CommandHandler = {
       const pack = (await loadPack(c)).doc;
       const r = cashTender(pack, "cash", due);
       // What is left is below the pack's smallest cash step (e.g. 49 paise after a card part-payment): it can only
-      // be taken by card / UPI. Reason code "cash_below_rounding" requested from f-4; until then none (R2-S3-1).
-      if (r.amount_minor === 0) throw new ApiError("conflict");
+      // be taken by card / UPI (R2-S3-1).
+      if (r.amount_minor === 0) throw new ApiError("conflict", "cash_below_rounding");
       if (p.tendered_minor! >= r.amount_minor) {
         amount = r.amount_minor;
         rounding = r.rounding_minor;

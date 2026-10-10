@@ -15,9 +15,7 @@ import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { composeWorker } from "../../core-worker/src/main.ts";
 import { type CommandHandler, executeCommand } from "../src/commit/index.ts";
 import { orderStatusHandler } from "../src/modules/orders/index.ts";
-import { standInCalls as orderStandIns } from "../src/modules/orders/seams.ts";
 import { payrollDraftHandler } from "../src/modules/people/payroll.ts";
-import { standInCalls as peopleStandIns } from "../src/modules/people/seams.ts";
 import { grnReceive, invoiceApprove, invoiceRecord, supplierUpsert } from "../src/modules/purchasing/handlers.ts";
 import { staffUpsertHandler } from "../src/modules/people/commands.ts";
 import { composeCoreApi } from "../src/server.ts";
@@ -73,7 +71,7 @@ describe("B6: the real finance.postFor on each owner's default path", () => {
     expect(await env.rows(`SELECT amount_minor::int AS a FROM core.payable WHERE source_id = $1`, [inv])).toEqual([{ a: 63000 }]);
   });
 
-  it("payroll draft (created approved) → the payroll entry (finance.post_payroll), Dr 3,035,000; no people stand-in call", async () => {
+  it("payroll draft (created approved) → the payroll entry (finance.post_payroll), Dr 3,035,000", async () => {
     const staff = uuidv7();
     await run(staffUpsertHandler, { staff_id: staff, member_id: null, outlet_id: fx.outlets[0], name: "Synthetic cook", phone: null, role_key: "cook", pay_basis: "monthly",
       wage_rate_minor: null, monthly_salary_minor: 3000000, contract_min_per_month: 12000, ot_multiplier_bp: 15000, currency: "INR", joined_on: "2026-01-01", left_on: null, active: true });
@@ -81,10 +79,9 @@ describe("B6: the real finance.postFor on each owner's default path", () => {
     await run(payrollDraftHandler, { payroll_draft_id: draft, outlet_id: fx.outlets[0], period_month: "2026-09-01", currency: "INR",
       lines: [{ staff_id: staff, base_minor: 3000000, overtime_minor: 30000, advance_recovery_minor: 0, tips_minor: 5000, net_minor: 3035000 }] });
     expect(await entry(draft)).toEqual([{ kind: "derivation", rule: "finance.post_payroll", dr: 3035000, net: 0 }]);
-    expect(peopleStandIns).toEqual([]);
   });
 
-  it("order completion (orders.advanceOrder under the kitchen's command) → the sale entry (finance.post_order), Dr 10,500; no orders stand-in call", async () => {
+  it("order completion (orders.advanceOrder under the kitchen's command) → the sale entry (finance.post_order), Dr 10,500", async () => {
     const order = uuidv7();
     await env.db.withContext("munim_core", { ...member(), command_type: "orders.place.v1" }, (c) =>
       c.query(`INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot)
@@ -93,7 +90,24 @@ describe("B6: the real finance.postFor on each owner's default path", () => {
       await run(orderStatusHandler("kitchen.ticket.advance.v1"), { order_id: order, from_status: a, to_status: b, reason_code: null });
     }
     expect(await entry(order)).toEqual([{ kind: "derivation", rule: "finance.post_order", dr: 10500, net: 0 }]);
-    expect(orderStandIns.filter((x) => x.ref.includes(order))).toEqual([]);
+  });
+});
+
+describe("seams fail closed", () => {
+  it("a missing orders seam refuses the sale with 503 unavailable and writes nothing (no stand-in)", async () => {
+    // The process-wide resolution cache (orders/seams.ts): null = the owner's module or export was not found.
+    const state = (globalThis as Record<symbol, { real: Map<string, unknown> }>)[Symbol.for("munim.orders.seams")]!;
+    const real = state.real.get("priceLines");
+    state.real.set("priceLines", null);
+    try {
+      const p = placePayload(env, [{ item: env.menu.coffee }]);
+      const r = await env.cmd("/v1/orders", "staff", "orders.place.v1", p);
+      expect([r.status, (await r.json()).error.code]).toEqual([503, "unavailable"]);
+      expect(await env.rows(`SELECT 1 FROM core."order" WHERE id = $1`, [p.order_id])).toEqual([]);
+    } finally {
+      if (real === undefined) state.real.delete("priceLines");
+      else state.real.set("priceLines", real);
+    }
   });
 });
 

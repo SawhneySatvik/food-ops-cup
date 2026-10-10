@@ -301,14 +301,17 @@ export class Feed implements Listener {
     this.write(`${idLine}data: ${JSON.stringify({ id, type, data })}\n\n`);
   }
 
-  /** The subscribed orders' events, oldest first (≤ a few dozen per order). Under a shopper's context RLS
+  /** The subscribed orders' events, oldest first (≤ a few dozen per order). `at` is the transaction's start, so
+   *  events written in one transaction tie on it and the random-looking uuid `id` is no order: `seq` (0016,
+   *  per order, commit-ordered) breaks the tie. `at` stays the major key so the list across orders keeps growing
+   *  at its tail, which the positional `n=` cursor relies on. Under a shopper's context RLS
    *  returns only their own orders' rows. */
   private async orderEvents(db: pg.ClientBase) {
     return (await db.query<{ id: string; order_id: string; kind: string; from_status: string | null; to_status: string | null;
       from_promised_at: string | null; to_promised_at: string | null; at: string }>(
       `SELECT id, order_id, kind, from_status, to_status, ${tsSql("from_promised_at")} AS from_promised_at,
               ${tsSql("to_promised_at")} AS to_promised_at, ${tsSql("at")} AS at
-         FROM core.order_event WHERE order_id = ANY ($1::uuid[]) ORDER BY at, id LIMIT 1000`,
+         FROM core.order_event WHERE order_id = ANY ($1::uuid[]) ORDER BY at, order_id, seq LIMIT 1000`,
       [this.topics.orders],
     )).rows;
   }

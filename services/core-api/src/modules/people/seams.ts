@@ -10,10 +10,6 @@ import type { Queryable } from "../../runtoken/index.ts";
 
 export type PostFor = (tx: Queryable, rule_id: string, source_ref: string) => Promise<unknown>;
 
-/** Kept for w2-seams.test.ts (not this lane's file): nothing is ever recorded here now that there is no
- *  stand-in. Remove with that assertion. */
-export const standInCalls: Array<{ rule_id: string; source_ref: string }> = [];
-
 let override: PostFor | undefined;
 /** Test hook: replaces the seam for the process; returns the undo. */
 export function setPostFor(fn: PostFor | undefined): () => void {
