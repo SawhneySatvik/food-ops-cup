@@ -32,6 +32,12 @@ export const SAMPLES: Record<string, unknown> = {
       reservations: [{ reservation_id: u(3508), outlet_id: u(2), name: "Asha (synthetic)", phone: null, party_size: 2, starts_at: T_Z,
         status: "booked", note: null, created_at: T_PG }],
       bulk_orders: [],
+      order_events: [{ order_event_id: u(3509), order_id: u(3502), kind: "status", from_status: "placed", to_status: "accepted", from_promised_at: null, to_promised_at: null, reason: null, at: T_PG }],
+      tenders: [{ tender_id: u(3510), order_id: u(3502), method: "cash", amount_minor: 33600, tendered_minor: 34000, change_minor: 400, currency: "INR", ref: null, at: T_PG }],
+      refunds: [{ refund_id: u(3511), order_id: u(3502), tender_id: u(3510), method: "cash", amount_minor: 16000, currency: "INR", reason_code: "wrong_item", note: "synthetic", at: T_PG }],
+      coupon_uses: [{ coupon_use_id: u(3512), coupon_id: u(3513), order_id: u(3502), discount_minor: 500, currency: "INR", at: T_PG }],
+      voids: [{ void_id: u(3514), order_id: u(3502), order_line_id: u(3504), reason_code: "remake", note: "synthetic", amount_minor: 16000, currency: "INR", at: T_PG }],
+      sale_returns: [{ sale_return_id: u(3515), order_id: u(3502), order_line_id: u(3504), qty_milli: 1000, restock: false, reason_code: "damaged", note: "synthetic", at: T_PG }],
     },
   },
 };

@@ -3,6 +3,8 @@
 export interface Identity {
   sub: string;
   email: string | null;
+  /** The IdP says this address was confirmed. An unverified email never claims an invite (B16); absent = false. */
+  email_verified: boolean;
 }
 
 export interface IdP {

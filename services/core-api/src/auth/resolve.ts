@@ -7,7 +7,7 @@
 // Bad or missing token → 401. A tenant, storefront or profile that does not resolve → 404, so a request can
 // never learn that another tenant exists (gotcha 16).
 import { createHash, timingSafeEqual } from "node:crypto";
-import { STOREFRONT_KEY_HEADER, TENANT_HEADER } from "@munim/contracts";
+import { GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, TENANT_HEADER } from "@munim/contracts";
 import { outletScopeOf } from "@munim/core-domain/authority";
 import type { Context, MiddlewareHandler } from "hono";
 import type pg from "pg";
@@ -16,9 +16,7 @@ import { type AppContext, withContext } from "../lib/db.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { AppEnv } from "../lib/types.ts";
 
-export { STOREFRONT_KEY_HEADER, TENANT_HEADER };
-/** The guest access token returned once at placement (W1 fix #47). Not yet declared in contracts (T-004 report). */
-export const GUEST_TOKEN_HEADER = "X-Munim-Guest-Token";
+export { GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, TENANT_HEADER };
 
 export type MemberRole = "owner" | "manager" | "staff" | "advisor" | "judge";
 export type Principal =

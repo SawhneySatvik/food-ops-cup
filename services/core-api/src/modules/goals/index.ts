@@ -9,12 +9,16 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
-import { draftHandler } from "../approvals/handlers.ts";
 import * as cmd from "./commands.ts";
 import * as read from "./read.ts";
 
 // Loaded twice in one process (vitest by path, loadRouters by URL): register once.
-for (const h of [cmd.goalCreate, cmd.taskCreate]) if (!draftHandler(h.type)) registerDraftHandler(h);
+const ONCE = Symbol.for("munim.goals.draftHandlers");
+const g = globalThis as unknown as Record<symbol, boolean | undefined>;
+if (!g[ONCE]) {
+  for (const h of [cmd.goalCreate, cmd.taskCreate]) registerDraftHandler(h);
+  g[ONCE] = true;
+}
 
 function member(c: Context<AppEnv>) {
   const p = c.var.principal;

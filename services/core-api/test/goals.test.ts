@@ -1,6 +1,7 @@
 // T-029 gates — goals and tasks through the real app. Goal / task creation is a member's own command (R27) or an
 // approved draft (R16); a task may cite a finding; progress is never stored. Expected values are hand-written.
 // Synthetic data only.
+import { SCHEMAS } from "@munim/contracts/goals";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addTemplate, type Env, snapRef, startEnv, uuidv7 } from "./compliance.kit.ts";
 
@@ -135,5 +136,16 @@ describe("tasks", () => {
     const row = await e.one<{ finding_id: string; origin: { kind: string; decision_id: string } }>(`SELECT finding_id, origin FROM core.task WHERE id = $1`, [t.task_id]);
     expect([row.finding_id, row.origin.kind]).toEqual([e.w.finding, "decision"]);
     expect((await e.one<{ decided_by: string }>(`SELECT decided_by FROM core.decision WHERE id = $1`, [row.origin.decision_id])).decided_by).toBe(e.ids.mgr1);
+  });
+});
+
+// B12: the published read schemas (strict) accept what the routes really return.
+describe("read shapes parse with the published contracts", () => {
+  it("goals and tasks lists", async () => {
+    const g = SCHEMAS["v1.goals"].parse(await (await e.call("GET", "/v1/goals", "owner")).json());
+    const t = SCHEMAS["v1.tasks"].parse(await (await e.call("GET", "/v1/tasks", "owner")).json());
+    expect(g.items.length).toBeGreaterThan(0);
+    expect(t.items.length).toBeGreaterThan(0);
+    expect(g.items.some((x) => x.metric === "orders" && x.currency === null)).toBe(true);
   });
 });

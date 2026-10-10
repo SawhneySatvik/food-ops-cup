@@ -4,6 +4,7 @@
 //   temperature readings are flagged against the asset's own safe range;
 //   a maintenance draft writes nothing until a named person approves it.
 // Expected values are written by hand below, never derived from the code under test. Synthetic data only.
+import { SCHEMAS } from "@munim/contracts/compliance";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addTemplate, type Env, snapRef, startEnv, uuidv7 } from "./compliance.kit.ts";
 
@@ -312,5 +313,24 @@ describe("AMCs and maintenance", () => {
     // The number is the snapshot cell's (250000), written under the approver's decision.
     expect([row.estimated_cost_minor, row.status, row.origin.kind]).toEqual(["250000", "scheduled", "decision"]);
     expect((await e.one<{ decided_by: string }>(`SELECT decided_by FROM core.decision WHERE id = $1`, [row.origin.decision_id])).decided_by).toBe(e.ids.mgr1);
+  });
+});
+
+// B12: the published read schemas (strict) accept what the routes really return, and each list has rows to prove it.
+describe("read shapes parse with the published contracts", () => {
+  it.each([
+    ["/v1/compliance/licences", "v1.compliance.licences"],
+    ["/v1/compliance/licences/expiring?within_days=9999", "v1.compliance.licences-expiring"],
+    ["/v1/compliance/assets", "v1.compliance.assets"],
+    ["/v1/compliance/checklists", "v1.compliance.checklists"],
+    ["/v1/compliance/checklist-runs", "v1.compliance.checklist-runs"],
+    ["/v1/compliance/temp-logs", "v1.compliance.temp-logs"],
+    ["/v1/compliance/amcs", "v1.compliance.amcs"],
+    ["/v1/compliance/maintenance", "v1.compliance.maintenance"],
+  ] as const)("%s", async (path, schema) => {
+    const r = await e.call("GET", path, "owner");
+    expect(r.status).toBe(200);
+    const body = SCHEMAS[schema].parse(await r.json());
+    expect(body.items.length).toBeGreaterThan(0);
   });
 });

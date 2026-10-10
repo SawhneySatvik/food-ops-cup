@@ -1,7 +1,7 @@
 // Tenancy setup commands (02-schema §2.1). Field names follow the core.* columns. Currency, FY start,
 // tax rules and time zones come from the tenant's country pack, never from a request (R21, R30).
 import { z } from "zod";
-import { CountryCode, Email, IanaZone, IsoDateTime, LocalTime, MemberRole, NonEmpty, Uuid7 } from "../shared/primitives.ts";
+import { CountryCode, CurrencyCode, Email, IanaZone, IsoDateTime, LocalTime, MemberRole, NonEmpty, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
 
 /** Operator command (R27; `/platform/v1/tenants:provision`). The country chosen here is fixed once
@@ -175,6 +175,47 @@ export const MeTenantsResponse = z.strictObject({
   tenants: z.array(z.strictObject({ tenant_id: Uuid7, tenant_name: NonEmpty, role: MemberRole })),
 });
 
+// ---- Settings reads (T-020): the rows' own fields. Outlet times leave as postgres renders them ("04:00:00").
+const ClockTime = z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/);
+export const TenantView = z.strictObject({
+  tenant_id: Uuid7,
+  name: NonEmpty,
+  country_code: CountryCode,
+  base_currency: CurrencyCode,
+  fy_start_month: z.int().min(1).max(12),
+  status: z.enum(["active", "retired"]),
+  is_demo: z.boolean(),
+  onboarded_at: IsoDateTime.nullable(),
+  home_tz: IanaZone.nullable(),
+});
+export const OutletView = z.strictObject({
+  id: Uuid7,
+  name: NonEmpty,
+  kind: OutletKind,
+  tz: IanaZone,
+  address: z.string(),
+  tax_ids: TaxIds,
+  accepting_orders: AcceptingOrders,
+  busy_extra_min: Minutes(240),
+  default_prep_min: Minutes(240),
+  cancel_window_min: Minutes(1440),
+  reschedule_window_min: Minutes(1440),
+  pickup_slot_min: Minutes(120, 5),
+  pickup_lead_min: Minutes(1440),
+  upi_vpa: z.string().nullable(),
+  business_day_cutoff: ClockTime,
+});
+export const OutletsResponse = z.strictObject({ outlets: z.array(OutletView) });
+export const BrandsResponse = z.strictObject({ brands: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, outlet_ids: z.array(Uuid7), active: z.boolean() })) });
+export const ChannelsResponse = z.strictObject({ channels: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, kind: ChannelKind, active: z.boolean() })) });
+export const DevicesResponse = z.strictObject({
+  devices: z.array(z.strictObject({ id: Uuid7, outlet_id: Uuid7, kind: z.enum(["pos", "kds"]), invoice_series: z.string().nullable(), last_seen_at: IsoDateTime.nullable() })),
+});
+/** Owner (or judge) only. `signed_in` = the invite has been bound to a sign-in. */
+export const MembersResponse = z.strictObject({
+  members: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, email: Email, active: z.boolean(), signed_in: z.boolean(), role: MemberRole, outlet_ids: z.array(Uuid7) })),
+});
+
 export const SCHEMAS = {
   "tenancy.provision.v1": TenancyProvisionV1,
   "tenancy.outlet.create.v1": TenancyOutletCreateV1,
@@ -192,6 +233,12 @@ export const SCHEMAS = {
   "tenancy.storefront-key.list": StorefrontKeyList,
   "tenancy.storefront-key.revoked": StorefrontKeyRevoked,
   "tenancy.me.tenants": MeTenantsResponse,
+  "v1.tenant": TenantView,
+  "v1.outlets": OutletsResponse,
+  "v1.brands": BrandsResponse,
+  "v1.channels": ChannelsResponse,
+  "v1.devices": DevicesResponse,
+  "v1.members": MembersResponse,
 };
 
 export const ROUTES: readonly Route[] = [
@@ -217,5 +264,14 @@ export const ROUTES: readonly Route[] = [
   { surface: "public", method: "post", path: "/platform/v1/demo-sessions", operationId: "startDemoSession", summary: "demo.session.start.v1 — operator starts an ephemeral judge session on a fresh demo tenant", auth: "operator", command: "demo.session.start.v1", response: "command-result", status: 201, conflict: true },
   { surface: "public", method: "post", path: "/v1/storefront-keys", operationId: "createStorefrontKey", summary: "Create a storefront key; the raw key is returned once (owner)", auth: "member", request: "tenancy.storefront-key.create", response: "tenancy.storefront-key.created", status: 201, conflict: true },
   { surface: "public", method: "get", path: "/v1/storefront-keys", operationId: "listStorefrontKeys", summary: "Storefront keys (no key material)", auth: "member", response: "tenancy.storefront-key.list", status: 200 },
+  { surface: "public", method: "post", path: "/v1/onboarding", operationId: "onboard", summary: "tenancy.onboard.v1 — a signed-in person with no tenant creates one: tenant, first outlet, owner membership, pack defaults. The owner's email is the verified IdP email; the same envelope twice makes one tenant", auth: "identity", command: "tenancy.onboard.v1", response: "command-result", status: 201, conflict: true },
+  { surface: "public", method: "get", path: "/v1/me/tenants", operationId: "listMyTenants", summary: "Where this sign-in is an active member", auth: "identity", response: "tenancy.me.tenants", status: 200 },
+  { surface: "public", method: "post", path: "/v1/members:bind", operationId: "bindMember", summary: "tenancy.member.bind.v1 — the invitee's first sign-in binds the IdP subject to the invited member, once. Tenant from the invite link (X-Munim-Tenant); the email must match the invite AND be verified by the IdP, else 404", auth: "member", command: "tenancy.member.bind.v1", response: "command-result", status: 200, conflict: true },
+  { surface: "public", method: "get", path: "/v1/tenant", operationId: "getTenant", summary: "The business's settings row", auth: "member", response: "v1.tenant", status: 200 },
+  { surface: "public", method: "get", path: "/v1/outlets", operationId: "listOutlets", summary: "Outlets in the caller's scope", auth: "member", response: "v1.outlets", status: 200 },
+  { surface: "public", method: "get", path: "/v1/brands", operationId: "listBrands", summary: "Brands", auth: "member", response: "v1.brands", status: 200 },
+  { surface: "public", method: "get", path: "/v1/channels", operationId: "listChannels", summary: "Sales channels", auth: "member", response: "v1.channels", status: 200 },
+  { surface: "public", method: "get", path: "/v1/devices", operationId: "listDevices", summary: "POS and KDS devices", auth: "member", response: "v1.devices", status: 200 },
+  { surface: "public", method: "get", path: "/v1/members", operationId: "listMembers", summary: "Members and their roles (owner only)", auth: "member", response: "v1.members", status: 200 },
   { surface: "public", method: "post", path: "/v1/storefront-keys/{id}:revoke", operationId: "revokeStorefrontKey", summary: "Revoke a storefront key; it stops resolving at once (owner)", auth: "member", response: "tenancy.storefront-key.revoked", status: 200, pathParams: [{ name: "id", uuid: true }] },
 ];

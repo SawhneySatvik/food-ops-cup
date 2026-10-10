@@ -38,6 +38,25 @@ const MESSAGES = {
   internal: "Something went wrong.",
 } as const;
 export type ErrorCode = keyof typeof MESSAGES;
+
+/** Fixed customer-facing text for the refusals a shopper or counter sees (storefront O2/O3 copy, B13). Chosen by
+ *  reason code; parameters ({item}, {time}…) are resolved by the web app from the `order.refuse.*` keys. */
+const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
+  window_full: "That pickup time just filled up. Please choose another.",
+  outlet_paused: "This outlet stopped taking orders a moment ago.",
+  item_sold_out: "An item just sold out. Remove it to continue.",
+  deal_rejudged: "A deal is not available at that time, so your total changed.",
+  coupon_invalid: "This coupon is not valid.",
+  coupon_cap_reached: "This coupon has reached its limit.",
+  coupon_min_spend: "Spend a little more to use this coupon.",
+  change_window_closed: "It's too late to change this order online. Please call the outlet.",
+  not_applicable: "This does not apply here.",
+  item_unavailable: "This item is not available.",
+  reason_required: "A reason is required.",
+  deal_changed: "A deal was updated. Please review your cart.",
+  duplicate_invoice: "This supplier invoice number was already recorded.",
+  guest_cannot_change: "Call the outlet to change this order",
+};
 export const ERROR_CODES = Object.keys(MESSAGES) as ErrorCode[];
 
 const STATUS: Record<ErrorCode, ContentfulStatusCode> = {
@@ -95,7 +114,7 @@ export class ApiError extends Error {
 }
 
 export function errorBody(code: ErrorCode, reason_code: ReasonCode | null = null): ErrorResponse {
-  return { error: { code, message: MESSAGES[code], reason_code } };
+  return { error: { code, message: (reason_code && REASON_MESSAGES[reason_code]) || MESSAGES[code], reason_code } };
 }
 
 // Database refusals (db/README "SQLSTATEs"): the trigger's verdict is mapped to a code; its text is not used.

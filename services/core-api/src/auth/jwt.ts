@@ -20,6 +20,8 @@ export interface VerifyOptions {
   /** Seconds of clock skew tolerated on exp/nbf. */
   leeway?: number;
   now?: () => number;
+  /** Where this IdP puts "the email was confirmed". Default: a top-level `email_verified` claim. */
+  emailVerified?: (claims: Record<string, unknown>) => boolean;
 }
 
 export function verifyJwt(token: string, jwks: Jwks, opts: VerifyOptions = {}): Identity {
@@ -51,7 +53,9 @@ export function verifyJwt(token: string, jwks: Jwks, opts: VerifyOptions = {}): 
     if (!aud.includes(opts.audience)) throw new IdpError("audience");
   }
   if (typeof claims.sub !== "string" || claims.sub === "") throw new IdpError("sub");
-  return { sub: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
+  const email = typeof claims.email === "string" ? claims.email : null;
+  const verified = (opts.emailVerified ?? ((c) => c.email_verified === true))(claims);
+  return { sub: claims.sub, email, email_verified: email !== null && verified };
 }
 
 function decode(part: string): Record<string, unknown> {

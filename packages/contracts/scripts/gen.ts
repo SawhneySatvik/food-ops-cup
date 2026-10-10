@@ -107,6 +107,7 @@ function requestBody(r: Route): Json | undefined {
 const SECURITY: Record<Route["auth"], Json[]> = {
   member: [{ memberToken: [], tenantHeader: [] }],
   operator: [{ operatorToken: [] }],
+  identity: [{ memberToken: [] }],
   intel: [{ runToken: [], serviceCredential: [] }],
   storefront: [{ storefrontKey: [] }, { storefrontKey: [], customerToken: [] }],
 };
@@ -150,7 +151,7 @@ function openapi(surface: Surface | "all", schemas: Record<string, Json>): Json 
     components: {
       schemas,
       securitySchemes: {
-        memberToken: { type: "http", scheme: "bearer", description: "IdP ID token of a tenant member" },
+        memberToken: { type: "http", scheme: "bearer", description: "IdP ID token of a signed-in person (a tenant member; alone on identity routes)" },
         operatorToken: { type: "http", scheme: "bearer", description: "IdP ID token of a platform operator" },
         runToken: { type: "http", scheme: "bearer", bearerFormat: "JWT (EdDSA)", description: "Run token minted by core-api (Ed25519)" },
         serviceCredential: { type: "apiKey", in: "header", name: "X-Munim-Service-Credential", description: "Service-to-service credential of the intel service" },

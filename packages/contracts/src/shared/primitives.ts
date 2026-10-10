@@ -40,6 +40,8 @@ export const CouponCode = z.string().regex(new RegExp(COUPON_CODE_PATTERN));
 /** HTTP headers core-api reads / sets (declared in the generated OpenAPI and set by the SDK). */
 export const TENANT_HEADER = "X-Munim-Tenant";
 export const STOREFRONT_KEY_HEADER = "X-Munim-Storefront-Key";
+/** The guest access token returned once at placement (W1 fix #47); only its sha256 is stored. */
+export const GUEST_TOKEN_HEADER = "X-Munim-Guest-Token";
 /** Set to "true" on a replayed command response; the body is byte-identical to the first response. */
 export const REPLAYED_HEADER = "X-Munim-Replayed";
 

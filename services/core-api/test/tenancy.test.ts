@@ -8,6 +8,7 @@
 // requests; everything else uses seeded commands. Expected values are typed by hand. Synthetic data only.
 import { createHash } from "node:crypto";
 import { createLogger } from "@munim/config";
+import { SCHEMAS } from "@munim/contracts/tenancy";
 import type { TestDb } from "@munim/db";
 import { uuidv7 } from "@munim/db";
 import { Hono } from "hono";
@@ -26,7 +27,7 @@ let app: Hono<AppEnv>;
 let probe: Hono<AppEnv>;
 
 type Res = Omit<Response, "json"> & { json(): Promise<any> };
-const tok = (sub: string, email?: string) => idp.sign({ sub, ...(email ? { email } : {}) });
+const tok = (sub: string, email?: string, verified = true) => idp.sign({ sub, ...(email ? { email, email_verified: verified } : {}) });
 const call = async (method: string, path: string, token: string | null, body?: unknown, tenant?: string): Promise<Res> =>
   (await app.request(path, {
     method,
@@ -55,6 +56,20 @@ async function onboard(o: { kind?: string; country?: string; outlet?: Record<str
   expect(r.status).toBe(201);
   return b;
 }
+
+describe("onboarding requires a verified email (F2)", () => {
+  it("an unverified identity is refused 422 and no tenant exists; the same envelope with a verified token creates one", async () => {
+    const sub = `owner-${uuidv7()}`, email = `${sub}@example.test`;
+    const b: Biz = { tenant: uuidv7(), owner: uuidv7(), outlet: uuidv7(), sub, email, token: tok(sub, email, false) };
+    const body = onboardBody(b, {});
+    const refused = await call("POST", "/v1/onboarding", b.token, body);
+    expect(refused.status).toBe(422);
+    expect((await refused.json()).error.code).toBe("invalid_payload");
+    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(0);
+    expect((await call("POST", "/v1/onboarding", tok(sub, email, true), body)).status).toBe(201);
+    expect(await count(`SELECT count(*) n FROM core.tenant WHERE tenant_id = $1`, [b.tenant])).toBe(1);
+  });
+});
 
 beforeAll(async () => {
   db = await openDb();
@@ -281,7 +296,10 @@ describe("members: invite → first sign-in binds idp_sub exactly once", () => {
     // wrong email → 404 and still unbound
     expect((await bind(tok(subA, "someone-else@example.test"))).status).toBe(404);
     expect(await count(`SELECT count(*) n FROM core.member WHERE id = $1 AND idp_sub IS NULL`, [mgr])).toBe(1);
-    // the invited person signs in → bound
+    // B16: the matching email but NOT verified by the IdP → 404, still unbound (accept for the verified token follows)
+    expect((await bind(tok(subA, "mgr@example.test", false))).status).toBe(404);
+    expect(await count(`SELECT count(*) n FROM core.member WHERE id = $1 AND idp_sub IS NULL`, [mgr])).toBe(1);
+    // the invited person signs in with a verified email → bound
     expect((await bind(tok(subA, "mgr@example.test"))).status).toBe(200);
     expect(await count(`SELECT count(*) n FROM core.member WHERE id = $1 AND idp_sub = $2`, [mgr, subA])).toBe(1);
     // a second subject with the same email → refused, binding unchanged
@@ -421,5 +439,24 @@ describe("demo.session.start.v1 (operator)", () => {
                          WHERE m.tenant_id = $1 AND m.id = $2 AND m.is_ephemeral_judge AND m.name = 'Judge 7f3a (demo)' AND ms.role = 'judge'`, [T, judge])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1`, [T])).toBe(6);
     expect(await count(`SELECT count(*) n FROM core.audit_log WHERE tenant_id = $1 AND actor->>'kind' = 'operator' AND actor->>'id' = $2`, [T, op])).toBe(2);
+  });
+});
+
+// B12: the published read schemas (strict) accept what the routes really return.
+describe("read shapes parse with the published contracts", () => {
+  it("tenant, outlets, brands, channels, devices, members, my tenants", async () => {
+    const a = await onboard();
+    const get = async (path: string) => {
+      const r = await call("GET", path, a.token, undefined, path === "/v1/me/tenants" ? undefined : a.tenant);
+      expect(r.status).toBe(200);
+      return r.json();
+    };
+    expect(SCHEMAS["v1.tenant"].parse(await get("/v1/tenant")).tenant_id).toBe(a.tenant);
+    expect(SCHEMAS["v1.outlets"].parse(await get("/v1/outlets")).outlets.map((o) => o.id)).toEqual([a.outlet]);
+    expect(SCHEMAS["v1.brands"].parse(await get("/v1/brands")).brands.length).toBeGreaterThan(0);
+    expect(SCHEMAS["v1.channels"].parse(await get("/v1/channels")).channels.length).toBeGreaterThan(0);
+    SCHEMAS["v1.devices"].parse(await get("/v1/devices"));
+    expect(SCHEMAS["v1.members"].parse(await get("/v1/members")).members.map((m) => [m.id, m.role, m.signed_in])).toEqual([[a.owner, "owner", true]]);
+    expect(SCHEMAS["tenancy.me.tenants"].parse(await get("/v1/me/tenants")).tenants.map((t) => t.tenant_id)).toEqual([a.tenant]);
   });
 });

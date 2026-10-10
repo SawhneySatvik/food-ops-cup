@@ -10,7 +10,7 @@ import { Placeholders, toProposal } from "../src/shared/draft.ts";
 import { defineDraftable, draftableTypes } from "../src/shared/draftables.ts";
 import { Uuid7 } from "../src/shared/primitives.ts";
 import { snapRef } from "../src/shared/refs.ts";
-import { loadSamples } from "./helpers.ts";
+import { loadSamples, manifestNames } from "./helpers.ts";
 
 await loadRegistry();
 const SAMPLES = await loadSamples();
@@ -21,17 +21,26 @@ const U = "0199e0a0-0000-7000-8000-000000000384";
 const issuesAt = (r: z.ZodSafeParseResult<unknown>) => (r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
 
 describe("draftable registry", () => {
-  it("the three W1 draftables are registered by their own modules", () => {
-    expect(draftableTypes()).toEqual(["catalogue.price.set.v1", "inventory.reorder_level.set.v1", "purchasing.po.create.v1"]);
+  it("the registry is exactly the W1 + W2 draftable set named by MANIFEST (proposal.* entries)", () => {
+    const fromManifest = manifestNames().filter((n) => n.startsWith("proposal.")).map((n) => n.slice("proposal.".length)).sort();
+    const registered = draftableTypes().filter((t) => !t.startsWith("zzmodule."));
+    expect(registered).toEqual(fromManifest);
+    // W1's three are still in it, and W2 added to them.
+    expect(registered).toEqual(expect.arrayContaining(["catalogue.price.set.v1", "inventory.reorder_level.set.v1", "purchasing.po.create.v1"]));
+    expect(registered.length).toBeGreaterThan(3);
+    // Each W2 module that proposes registers from its own index (no approvals import names them).
+    for (const t of ["goals.goal.create.v1", "people.payroll_draft.create.v1", "imports.run.commit.v1", "finance.journal.adjust.v1"]) expect(registered).toContain(t);
+    // A command a person only runs themselves is not in it.
+    expect(registered).not.toContain("people.staff.upsert.v1");
   });
 
   it.each([
-    ["internal.drafts.request", () => DraftsRequest.safeParse({ ...req, command_type: "people.roster.create.v1" })],
-    ["drafts.approve.v1 (edited)", () => DraftsApproveV1.safeParse({ ...approve, command_type: "people.roster.create.v1" })],
-    ["drafts.approve.v1 (as proposed, null payload)", () => DraftsApproveV1.safeParse({ ...approve, command_type: "people.roster.create.v1", edited_payload: null })],
-    ["v1.draft", () => DraftView.safeParse({ ...view, command_type: "people.roster.create.v1" })],
+    ["internal.drafts.request", () => DraftsRequest.safeParse({ ...req, command_type: "people.staff.upsert.v1" })],
+    ["drafts.approve.v1 (edited)", () => DraftsApproveV1.safeParse({ ...approve, command_type: "people.staff.upsert.v1" })],
+    ["drafts.approve.v1 (as proposed, null payload)", () => DraftsApproveV1.safeParse({ ...approve, command_type: "people.staff.upsert.v1", edited_payload: null })],
+    ["v1.draft", () => DraftView.safeParse({ ...view, command_type: "people.staff.upsert.v1" })],
   ])("unregistered command type is refused: %s", (_l, run) => {
-    expect(issuesAt(run())).toEqual(["command_type: 'people.roster.create.v1' is not a registered draftable command type"]);
+    expect(issuesAt(run())).toEqual(["command_type: 'people.staff.upsert.v1' is not a registered draftable command type"]);
   });
 
   it("registered types are accepted (paired accepts)", () => {

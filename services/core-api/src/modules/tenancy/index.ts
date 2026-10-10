@@ -43,7 +43,7 @@ function envelope(body: unknown): CommandEnvelope {
 }
 
 /** The verified IdP identity of a request that has no tenant yet (onboarding, discovery, bind). */
-async function whoami(c: Context<AppEnv>): Promise<{ sub: string; email: string | null }> {
+async function whoami(c: Context<AppEnv>): Promise<{ sub: string; email: string | null; email_verified: boolean }> {
   const m = /^Bearer ([A-Za-z0-9._~+/=-]+)$/.exec(c.req.header("Authorization") ?? "");
   if (!m) throw new ApiError("unauthenticated");
   try {
@@ -88,7 +88,8 @@ export const router = new Hono<AppEnv>()
   // ---- self-serve onboarding: the caller has a sign-in and no tenant yet ----
   .post("/v1/onboarding", async (c) => {
     const who = await whoami(c);
-    if (!who.email) throw new ApiError("invalid_payload", null, { refs: ["identity:email"] });
+    // The owner's email is the IdP's; an unconfirmed address is not an identity to build a tenant on (F2).
+    if (!who.email || !who.email_verified) throw new ApiError("invalid_payload", null, { refs: ["identity:email"] });
     const env = envelope(await json(c));
     const p = env.payload as { tenant_id?: unknown; owner_member_id?: unknown };
     if (typeof p.tenant_id !== "string" || typeof p.owner_member_id !== "string" || !UUID.test(p.tenant_id) || !UUID.test(p.owner_member_id)) {
@@ -113,7 +114,8 @@ export const router = new Hono<AppEnv>()
   .post("/v1/members:bind", async (c) => {
     const who = await whoami(c);
     const tenant = c.req.header(TENANT_HEADER);
-    if (!who.email || !tenant || !UUID.test(tenant)) throw new ApiError("not_found");
+    // An unverified address must never claim an invite that matches it (B16): 404, same as any other mismatch.
+    if (!who.email || !who.email_verified || !tenant || !UUID.test(tenant)) throw new ApiError("not_found");
     const env = envelope(await json(c));
     const member_id = (env.payload as { member_id?: unknown }).member_id;
     if (typeof member_id !== "string" || !UUID.test(member_id)) throw new ApiError("invalid_payload");

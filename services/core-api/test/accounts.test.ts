@@ -17,24 +17,14 @@ import { type TestDb, uuidv7 } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type AppEnv, createApp, GUEST_TOKEN_HEADER, type IdP, requireCustomer, storefrontResolver } from "../src/app.ts";
+import { type AppEnv, createApp, GUEST_TOKEN_HEADER, requireCustomer, storefrontResolver } from "../src/app.ts";
 import { EMAIL_MERGE_FN, ensureProfile } from "../src/modules/accounts/index.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { openDb } from "./db.ts";
 import { addCustomer, addGuestOrder, buildTenant, type Tenant } from "./world.ts";
 
-// idp-local, plus the `email_verified` claim the port does not carry yet (requested from T-004): a test-only
-// wrapper that passes the signed claim through after full verification.
-const local = createLocalIdp();
-const idp: IdP = {
-  async verify(token) {
-    const id = await local.verify(token);
-    const claims = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8")) as { email_verified?: unknown };
-    return { ...id, email_verified: claims.email_verified === true } as typeof id;
-  },
-};
-const sign = (sub: string, email?: string, verified = false) =>
-  local.sign({ sub, ...(email ? { email } : {}), ...(verified ? { email_verified: true } : {}) } as { sub: string; email?: string });
+const idp = createLocalIdp();
+const sign = (sub: string, email?: string, verified = false) => idp.sign({ sub, ...(email ? { email } : {}), ...(verified ? { email_verified: true } : {}) });
 
 let db: TestDb;
 let pools: { core: pg.Pool; svc: pg.Pool };
@@ -235,6 +225,69 @@ describe("self-service: consent, profile, loyalty", () => {
 });
 
 describe("data export", () => {
+  // Hand fixture (B14): on the customer's 3 orders — 1 order_event, 2 tenders (cash 33,600 with 34,000 handed over, upi 33,600),
+  // 1 refund (16,000 of the cash tender), 1 coupon use (500 off), 1 void (16,000, a line), 1 sale return (1 unit) — and, on
+  // other people's orders, 1 tender + 1 order_event + 1 coupon use + 1 refund that must NOT appear.
+  const foreign: string[] = [];
+  const asOwner = (type: string, fn: (c: pg.ClientBase) => Promise<unknown>) =>
+    db.withContext("munim_core", { tenant_id: A.tenant, outlet_ids: "*", role: "owner", member_id: A.owner, command_type: type }, fn);
+  const tender = async (order: string, method: string, tendered: number | null) => {
+    const id = uuidv7();
+    await asOwner("orders.tender.record.v1", (c) => c.query(
+      `INSERT INTO core.tender (tenant_id, id, outlet_id, order_id, method, amount_minor, tendered_minor, change_minor, currency, recorded_by)
+       VALUES ($1, $2, $3, $4, $5, 33600, $6, $7, $8, $9)`, [A.tenant, id, A.outlets[0], order, method, tendered, tendered === null ? null : tendered - 33600, A.currency, A.owner]));
+    return id;
+  };
+  beforeAll(async () => {
+    const [o0, o1, o2] = guestOrders.map((g) => g.order) as [string, string, string];
+    const line = async (o: string) => (await db.admin<{ id: string }>(`SELECT id FROM core.order_line WHERE order_id = $1`, [o])).rows[0]!.id;
+    const [l0, l1] = [await line(o0), await line(o1)];
+    const cash = await tender(o0, "cash", 34000);
+    await tender(o1, "upi", null);
+    foreign.push(await tender(otherOrder.order, "card", null));
+    await asOwner("orders.place.v1", async (c) => {
+      await c.query(`INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor) VALUES ($1, $2, $3, $4, 'status', 'placed', 'accepted', '{"kind":"member"}')`,
+        [A.tenant, uuidv7(), A.outlets[0], o0]);
+      const foreignEvent = uuidv7();
+      foreign.push(foreignEvent);
+      await c.query(`INSERT INTO core.order_event (tenant_id, id, outlet_id, order_id, kind, from_status, to_status, actor) VALUES ($1, $2, $3, $4, 'status', 'placed', 'accepted', '{"kind":"member"}')`,
+        [A.tenant, foreignEvent, A.outlets[0], unrelatedGuest.order]);
+      const coupon = (await db.admin<{ id: string }>(`SELECT id FROM core.coupon WHERE tenant_id = $1 LIMIT 1`, [A.tenant])).rows[0]!.id;
+      const foreignUse = uuidv7();
+      foreign.push(foreignUse);
+      await c.query(`INSERT INTO core.coupon_use (tenant_id, id, coupon_id, order_id, customer_id, discount_minor, currency, applied_by) VALUES ($1, $2, $3, $4, $5, 500, $6, $7)`,
+        [A.tenant, uuidv7(), coupon, o2, idA, A.currency, A.owner]);
+      await c.query(`INSERT INTO core.coupon_use (tenant_id, id, coupon_id, order_id, customer_id, discount_minor, currency, applied_by) VALUES ($1, $2, $3, $4, $5, 500, $6, $7)`,
+        [A.tenant, foreignUse, coupon, otherOrder.order, otherAccount, A.currency, A.owner]);
+    });
+    await asOwner("orders.refund.record.v1", (c) => c.query(
+      `INSERT INTO core.refund (tenant_id, id, outlet_id, order_id, tender_id, method, amount_minor, currency, reason_code, note, actor) VALUES ($1, $2, $3, $4, $5, 'cash', 16000, $6, 'wrong_item', 'synthetic', $7)`,
+      [A.tenant, uuidv7(), A.outlets[0], o0, cash, A.currency, A.owner]));
+    await asOwner("orders.void.record.v1", (c) => c.query(
+      `INSERT INTO core.void (tenant_id, id, outlet_id, order_id, order_line_id, reason_code, note, amount_minor, currency, actor) VALUES ($1, $2, $3, $4, $5, 'remake', 'synthetic', 16000, $6, $7)`,
+      [A.tenant, uuidv7(), A.outlets[0], o1, l1, A.currency, A.owner]));
+    await asOwner("orders.sale_return.record.v1", (c) => c.query(
+      `INSERT INTO core.sale_return (tenant_id, id, outlet_id, order_id, order_line_id, qty_milli, restock, reason_code, note, actor) VALUES ($1, $2, $3, $4, $5, 1000, false, 'damaged', 'synthetic', $6)`,
+      [A.tenant, uuidv7(), A.outlets[0], o0, l0, A.owner]));
+  });
+
+  it("contains the customer's order events, tenders, refunds, coupon uses, voids and sale returns (hand counts) and nothing of anyone else's", async () => {
+    const r = await call("POST", "/v1/account:export", { key: A.storefrontKey, sub: LOGIN, body: env("customers.data.export.v1", { format: "json" }) });
+    expect(r.status).toBe(200);
+    const x = AccountExport.parse(await r.json()).export;
+    expect([x.order_events.length, x.tenders.length, x.refunds.length, x.coupon_uses.length, x.voids.length, x.sale_returns.length]).toEqual([1, 2, 1, 1, 1, 1]);
+    expect(x.tenders.map((t) => [t.method, t.amount_minor, t.tendered_minor, t.change_minor]).sort()).toEqual([["cash", 33600, 34000, 400], ["upi", 33600, null, null]]);
+    expect(x.refunds[0]).toMatchObject({ amount_minor: 16000, method: "cash", reason_code: "wrong_item" });
+    expect(x.coupon_uses[0]).toMatchObject({ discount_minor: 500, order_id: guestOrders[2]!.order });
+    expect(x.voids[0]).toMatchObject({ amount_minor: 16000, order_id: guestOrders[1]!.order });
+    expect(x.sale_returns[0]).toMatchObject({ qty_milli: 1000, restock: false, order_id: guestOrders[0]!.order });
+    expect(x.order_events[0]).toMatchObject({ from_status: "placed", to_status: "accepted", order_id: guestOrders[0]!.order });
+    const text = JSON.stringify(x);
+    for (const id of foreign) expect(text.includes(id)).toBe(false);
+    // staff ids never leave: neither the owner's member id nor an actor object
+    expect(text.includes(A.owner)).toBe(false);
+  });
+
   it("contains only this customer's rows at this merchant", async () => {
     const r = await call("POST", "/v1/account:export", { key: A.storefrontKey, sub: LOGIN, body: env("customers.data.export.v1", { format: "json" }) });
     expect(r.status).toBe(200);
@@ -251,7 +304,7 @@ describe("data export", () => {
     for (const foreign of [otherOrder.order, unrelatedGuest.order, A.orders[0], A.orders[1], otherAccount, guestProfile, A.customer, idB, B.tenant]) {
       expect(text.includes(foreign)).toBe(false);
     }
-    expect(await n(`SELECT count(*) AS n FROM core.audit_log WHERE tenant_id = $1 AND action = 'customers.data.export.v1' AND entity_id = $2`, [A.tenant, idA])).toBe(1);
+    expect(await n(`SELECT count(*) AS n FROM core.audit_log WHERE tenant_id = $1 AND action = 'customers.data.export.v1' AND entity_id = $2`, [A.tenant, idA])).toBe(2); // two exports have run in this file
   });
 });
 

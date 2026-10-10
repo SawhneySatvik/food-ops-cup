@@ -59,12 +59,18 @@ export const COMMAND_REASON_CODES = ["price_above_mrp", "expired_batch", "period
  *  (#50: a recipe or option-delta line's unit must equal the ingredient's base unit). */
 export const PACK_RULE_REASON_CODES = ["buyer_identity_required", "tax_id_missing", "unknown_tax_class", "unknown_channel", "unit_mismatch"] as const;
 
+/** W2 refusals (B13): a pack rule that does not apply, an unavailable item, a missing reason on a void/refund, a
+ *  deal edited in the cart or re-judged at a new time, a repeated supplier invoice number, a guest asked to
+ *  change an order online (W2-R2: guests call the outlet). */
+export const W2_REASON_CODES = ["not_applicable", "item_unavailable", "reason_required", "deal_changed", "duplicate_invoice", "guest_cannot_change"] as const;
+
 export const REASON_CODES = [
   ...CORE_REASON_CODES,
   ...PACK_REASON_CODES,
   ...STOREFRONT_REASON_CODES,
   ...COMMAND_REASON_CODES,
   ...PACK_RULE_REASON_CODES,
+  ...W2_REASON_CODES,
 ] as const;
 export const ReasonCode = z.enum(REASON_CODES);
 export type ReasonCode = z.infer<typeof ReasonCode>;

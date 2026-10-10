@@ -181,7 +181,7 @@ export const invoiceRecord: CommandHandler = {
     const p = PurchasingInvoiceRecordV1.parse(command.payload);
     if (!(await first(c, `SELECT 1 FROM core.supplier WHERE id = $1`, [p.supplier_id]))) throw bad();
     // A repeated supplier + number is refused (409); near-duplicates ("INV-1" / "INV1") are findings, not refusals.
-    if (await first(c, `SELECT 1 FROM core.supplier_invoice WHERE supplier_id = $1 AND invoice_no = $2`, [p.supplier_id, p.invoice_no])) throw new ApiError("conflict");
+    if (await first(c, `SELECT 1 FROM core.supplier_invoice WHERE supplier_id = $1 AND invoice_no = $2`, [p.supplier_id, p.invoice_no])) throw new ApiError("conflict", "duplicate_invoice");
     if (p.po_id) {
       const po = await first<{ supplier_id: string }>(c, `SELECT supplier_id FROM core.purchase_order WHERE id = $1`, [p.po_id]);
       if (!po || po.supplier_id !== p.supplier_id) throw bad();
@@ -273,6 +273,11 @@ export const invoiceDispute: CommandHandler = {
 };
 
 // ---- supplier returns ----
+// Stock lives in the ingredient's base unit. A return line in kg against a g ingredient is ×1000 (l → ml likewise);
+// any other mismatch is refused, never guessed. Same table as inventory's toBaseFactor (not exported across modules).
+const BASE_FACTORS: Record<string, Record<string, number>> = { kg: { g: 1000 }, l: { ml: 1000 } };
+const factorToBase = (unit: string, base: string): number | null => (unit === base ? 1 : BASE_FACTORS[unit]?.[base] ?? null);
+
 export const supplierReturnCreate: CommandHandler = {
   type: "purchasing.supplier_return.create.v1",
   async run(c, command) {
@@ -282,16 +287,22 @@ export const supplierReturnCreate: CommandHandler = {
 
     // The unit cost is what was paid on the receipt, never the payload: the batch's own receipt line, else the
     // named receipt, else the supplier's latest receipt of the ingredient. None → cannot verify.
+    // Lines are stored and moved in the ingredient's base unit, cost per base unit (half-up).
     const costed: Array<(typeof p.lines)[number] & { unit_cost_minor: number; currency: string }> = [];
     for (const l of p.lines) {
       if (l.batch_id && !(await first(c, `SELECT 1 FROM core.batch WHERE id = $1 AND outlet_id = $2 AND ingredient_id = $3`, [l.batch_id, p.outlet_id, l.ingredient_id]))) throw bad();
-      const cost = await first<{ unit_cost_minor: string; currency: string }>(c,
-        `SELECT g.unit_cost_minor, g.currency FROM core.grn_line g JOIN core.goods_received r ON r.tenant_id = g.tenant_id AND r.id = g.goods_received_id
+      const ing = await first<{ base_unit: string }>(c, `SELECT base_unit FROM core.ingredient WHERE id = $1`, [l.ingredient_id]);
+      if (!ing) throw bad();
+      const cost = await first<{ unit_cost_minor: string; currency: string; unit: string }>(c,
+        `SELECT g.unit_cost_minor, g.currency, g.unit FROM core.grn_line g JOIN core.goods_received r ON r.tenant_id = g.tenant_id AND r.id = g.goods_received_id
           WHERE g.ingredient_id = $1 AND r.supplier_id = $2
             AND ($3::uuid IS NULL OR g.batch_id = $3) AND ($4::uuid IS NULL OR g.goods_received_id = $4)
           ORDER BY r.received_at DESC LIMIT 1`, [l.ingredient_id, p.supplier_id, l.batch_id, p.goods_received_id]);
       if (!cost) throw new ApiError("cannot_verify", "cost_price_missing");
-      costed.push({ ...l, unit_cost_minor: Number(cost.unit_cost_minor), currency: cost.currency });
+      const qf = factorToBase(l.unit, ing.base_unit);
+      const cf = factorToBase(cost.unit, ing.base_unit);
+      if (qf === null || cf === null) throw new ApiError("bad_request", "unit_mismatch");
+      costed.push({ ...l, qty_milli: l.qty_milli * qf, unit: ing.base_unit, unit_cost_minor: mulDiv(Number(cost.unit_cost_minor), 1, cf), currency: cost.currency });
     }
     await c.query(
       `INSERT INTO core.supplier_return (tenant_id, id, outlet_id, supplier_id, goods_received_id, reason_code, note, returned_by)

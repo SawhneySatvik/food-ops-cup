@@ -4,3 +4,5 @@ goals.task.create.v1
 goals.task.update.v1
 proposal.goals.goal.create.v1
 proposal.goals.task.create.v1
+v1.goals
+v1.tasks

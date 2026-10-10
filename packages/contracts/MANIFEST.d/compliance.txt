@@ -7,3 +7,11 @@ compliance.amc.record.v1
 compliance.maintenance.schedule.v1
 compliance.maintenance.record.v1
 proposal.compliance.maintenance.schedule.v1
+v1.compliance.licences
+v1.compliance.licences-expiring
+v1.compliance.assets
+v1.compliance.temp-logs
+v1.compliance.checklists
+v1.compliance.checklist-runs
+v1.compliance.amcs
+v1.compliance.maintenance

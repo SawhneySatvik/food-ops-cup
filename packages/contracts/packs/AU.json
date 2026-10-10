@@ -607,8 +607,18 @@
       "type": "asset"
     },
     {
+      "code": "1110",
+      "name": "Counter sales clearing",
+      "type": "asset"
+    },
+    {
       "code": "1200",
       "name": "Inventory",
+      "type": "asset"
+    },
+    {
+      "code": "1250",
+      "name": "Staff advances",
       "type": "asset"
     },
     {
@@ -619,6 +629,11 @@
     {
       "code": "2000",
       "name": "Supplier payables",
+      "type": "liability"
+    },
+    {
+      "code": "2050",
+      "name": "Goods received not invoiced",
       "type": "liability"
     },
     {
@@ -634,6 +649,11 @@
     {
       "code": "4000",
       "name": "Food and beverage sales",
+      "type": "income"
+    },
+    {
+      "code": "4900",
+      "name": "Cash rounding",
       "type": "income"
     },
     {
@@ -674,6 +694,11 @@
     {
       "code": "6400",
       "name": "Merchant service fees",
+      "type": "expense"
+    },
+    {
+      "code": "6900",
+      "name": "Other operating expenses",
       "type": "expense"
     }
   ]

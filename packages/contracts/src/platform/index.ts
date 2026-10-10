@@ -158,6 +158,7 @@ export const ROUTES: readonly Route[] = [
   get("/platform/v1/operators", "listOperators", "Operators", "platform.operators"),
   get("/platform/v1/config-drafts", "listConfigDrafts", "Config drafts (status: proposed (default) | applied | rejected | stale | all)", "platform.config-drafts",
     { query: [{ name: "status", required: false, schema: { type: "string", enum: ["proposed", "applied", "rejected", "stale", "all"] } }] }),
+  get("/platform/v1/config-drafts/{id}", "getConfigDraft", "One config draft (404 for an unknown id)", "platform.config-draft", { pathParams: [{ name: "id", uuid: true }] }),
   { surface: "public", method: "post", path: "/platform/v1/config-drafts", operationId: "proposeConfigDraft", summary: "Propose a platform config change (nothing applies until approved)",
     auth: "operator", request: "platform.config-draft-propose", response: "platform.config-draft", status: 201, conflict: true },
   { surface: "public", method: "post", path: "/platform/v1/config-drafts/{id}:approve", operationId: "approveConfigDraft", summary: "Approve and apply a config draft (an operator's own command is its approval, R27)",

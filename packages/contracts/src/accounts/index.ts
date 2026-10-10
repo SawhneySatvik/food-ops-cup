@@ -141,6 +141,27 @@ const ExportBulkOrder = z.strictObject({
   created_at: IsoDateTime,
 });
 
+/** The order's other own rows (B14). Staff ids (actor, recorded_by, applied_by) are never exported. */
+const ExportOrderEvent = z.strictObject({
+  order_event_id: Id, order_id: Id, kind: z.enum(["status", "promised_at"]), from_status: z.string().nullable(), to_status: z.string().nullable(),
+  from_promised_at: IsoDateTime.nullable(), to_promised_at: IsoDateTime.nullable(), reason: z.string().nullable(), at: IsoDateTime,
+});
+const ExportTender = z.strictObject({
+  tender_id: Id, order_id: Id, method: z.enum(["cash", "card", "upi"]), amount_minor: z.int(), tendered_minor: z.int().nullable(),
+  change_minor: z.int().nullable(), currency: CurrencyCode, ref: z.string().nullable(), at: IsoDateTime,
+});
+const ExportRefund = z.strictObject({
+  refund_id: Id, order_id: Id, tender_id: Id.nullable(), method: z.enum(["cash", "card", "upi"]), amount_minor: z.int(), currency: CurrencyCode,
+  reason_code: z.string(), note: z.string(), at: IsoDateTime,
+});
+const ExportCouponUse = z.strictObject({ coupon_use_id: Id, coupon_id: Id, order_id: Id, discount_minor: z.int(), currency: CurrencyCode, at: IsoDateTime });
+const ExportVoid = z.strictObject({
+  void_id: Id, order_id: Id, order_line_id: Id.nullable(), reason_code: z.string(), note: z.string(), amount_minor: z.int(), currency: CurrencyCode, at: IsoDateTime,
+});
+const ExportSaleReturn = z.strictObject({
+  sale_return_id: Id, order_id: Id, order_line_id: Id, qty_milli: z.int(), restock: z.boolean(), reason_code: z.string(), note: z.string(), at: IsoDateTime,
+});
+
 /** `customers.data.export.v1`: the customer's own rows at this merchant (read under their own RLS scope). */
 export const AccountExport = z.strictObject({
   command: CommandResult,
@@ -153,6 +174,12 @@ export const AccountExport = z.strictObject({
     loyalty_entries: z.array(AccountLoyaltyEntry),
     reservations: z.array(ExportReservation),
     bulk_orders: z.array(ExportBulkOrder),
+    order_events: z.array(ExportOrderEvent),
+    tenders: z.array(ExportTender),
+    refunds: z.array(ExportRefund),
+    coupon_uses: z.array(ExportCouponUse),
+    voids: z.array(ExportVoid),
+    sale_returns: z.array(ExportSaleReturn),
   }),
 });
 

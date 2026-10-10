@@ -14,3 +14,9 @@ tenancy.storefront-key.created
 tenancy.storefront-key.list
 tenancy.storefront-key.revoked
 tenancy.me.tenants
+v1.tenant
+v1.outlets
+v1.brands
+v1.channels
+v1.devices
+v1.members

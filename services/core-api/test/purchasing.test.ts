@@ -298,7 +298,7 @@ describe("supplier invoices: duplicate refused, approval derives the payable", (
   it("duplicate number → 409 and no second row; a new number → 201; the same number for another supplier → 201; near-duplicate INV9001 → 201 (a finding, not a refusal)", async () => {
     const dupe = await post("owner", "/v1/supplier-invoices", "purchasing.invoice.record.v1", invPayload({ id: uuidv7(), supplier: T.real, no: "INV-9001", lines: [uuidv7(), uuidv7()] }));
     expect(dupe.status).toBe(409);
-    expect(await codeOf(dupe)).toBe("conflict");
+    expect((await dupe.json()).error).toMatchObject({ code: "conflict", reason_code: "duplicate_invoice", message: "This supplier invoice number was already recorded." });
     expect(await count(`SELECT count(*) n FROM core.supplier_invoice WHERE supplier_id = $1 AND invoice_no = 'INV-9001'`, [T.real])).toBe(1);
     const fresh = await post("owner", "/v1/supplier-invoices", "purchasing.invoice.record.v1", invPayload({ id: S.inv2, supplier: T.real, no: "INV-9002", lines: [uuidv7(), uuidv7()] }));
     expect(fresh.status).toBe(201);
@@ -381,6 +381,38 @@ describe("supplier returns: movements out at the received cost", () => {
       lines: [{ batch_id: null, ingredient_id: T.tomato, qty_milli: 1000, unit: "kg" }] }));
     expect(sim.status).toBe(201);
     expect((await one<{ c: number }>(`SELECT unit_cost_minor::int AS c FROM core.supplier_return_line WHERE supplier_return_id = $1`, [S.ret2])).c).toBe(3600);
+  });
+});
+
+describe("supplier returns: unit conversion into the ingredient's base unit", () => {
+  const flour = uuidv7();
+  const retBody = (id: string, ing: string, unit: string, qty: number) => ({ supplier_return_id: id, outlet_id: T.outlets[0], supplier_id: T.real, goods_received_id: null, reason_code: "damaged", note: "hand fixture",
+    lines: [{ batch_id: null, ingredient_id: ing, qty_milli: qty, unit }] });
+
+  it("2 kg returned against a gram ingredient received at 8,000 per kg: movement −2,000,000 milli-g (2,000 g), cost 8 per g; a mass↔volume or g→kg mismatch is refused, nothing written", async () => {
+    await db.withContext("munim_core", own("inventory.ingredient.upsert.v1"), async (c) => {
+      await c.query(`INSERT INTO core.ingredient (tenant_id, id, name, base_unit, tracked_by_batch) VALUES ($1, $2, 'Flour', 'g', false)`, [T.tenant, flour]);
+    });
+    const grn = await post("m1", "/v1/goods-received", GRN_TYPE, { grn_id: uuidv7(), outlet_id: T.outlets[0], supplier_id: T.real, po_id: null, received_at: null, note: null,
+      lines: [{ grn_line_id: uuidv7(), po_line_id: null, ingredient_id: flour, qty_milli: 5000, unit: "kg", unit_cost_minor: 8000, currency: "INR", batch: null }] });
+    expect(grn.status).toBe(201);
+
+    const id = uuidv7();
+    expect((await post("m1", "/v1/supplier-returns", "purchasing.supplier_return.create.v1", retBody(id, flour, "kg", 2000))).status).toBe(201);
+    expect(await one(`SELECT qty_milli::int AS q, unit, unit_cost_minor::int AS c FROM core.supplier_return_line WHERE supplier_return_id = $1`, [id])).toEqual({ q: 2000000, unit: "g", c: 8 });
+    expect(await one(`SELECT qty_milli::int AS q, unit, unit_cost_minor::int AS c FROM core.stock_movement WHERE ref_id = $1`, [id])).toEqual({ q: -2000000, unit: "g", c: 8 });
+
+    // the same unit as the base passes through unchanged (paired accept): 500 g
+    const same = uuidv7();
+    expect((await post("m1", "/v1/supplier-returns", "purchasing.supplier_return.create.v1", retBody(same, flour, "g", 500000))).status).toBe(201);
+    expect((await one<{ q: number }>(`SELECT qty_milli::int AS q FROM core.stock_movement WHERE ref_id = $1`, [same])).q).toBe(-500000);
+
+    // refusals: litres against a gram ingredient; grams against a kg ingredient (no down-conversion to a larger unit)
+    const bad1 = uuidv7(), bad2 = uuidv7();
+    const r1 = await post("m1", "/v1/supplier-returns", "purchasing.supplier_return.create.v1", retBody(bad1, flour, "l", 1000));
+    const r2 = await post("m1", "/v1/supplier-returns", "purchasing.supplier_return.create.v1", retBody(bad2, T.paneer, "g", 1000));
+    expect([r1.status, r2.status]).toEqual([400, 400]);
+    expect(await count(`SELECT count(*) n FROM core.supplier_return WHERE id = ANY($1::uuid[])`, [[bad1, bad2]])).toBe(0);
   });
 });
 

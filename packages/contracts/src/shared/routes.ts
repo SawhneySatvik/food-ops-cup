@@ -3,8 +3,9 @@
 // typed command envelope `{command_id, idempotency_key, type, payload: <command schema>}`.
 export type Surface = "public" | "internal";
 /** member: IdP token + X-Munim-Tenant · operator: IdP token · intel: run token + service credential ·
- *  storefront: X-Munim-Storefront-Key (+ an optional customer token). */
-export type Auth = "member" | "operator" | "intel" | "storefront";
+ *  storefront: X-Munim-Storefront-Key (+ an optional customer token) · identity: an IdP token alone, for a
+ *  person with no tenant yet (onboarding, "my tenants"). */
+export type Auth = "member" | "operator" | "intel" | "storefront" | "identity";
 export type QueryParam = { name: string; required: boolean; schema: Record<string, unknown> };
 export type Route = {
   surface: Surface;
