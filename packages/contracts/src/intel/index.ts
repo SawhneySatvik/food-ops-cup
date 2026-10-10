@@ -11,6 +11,9 @@ import type { QueryParam, Route } from "../shared/routes.ts";
 import { RunTrigger } from "../shared/run-token.ts";
 import { MintSnapshotRequest } from "../shared/snapshot.ts";
 import { TraceEvent } from "../shared/trace.ts";
+import { SpecialistRegistry } from "./specialists.ts";
+
+export { SPECIALIST_REGISTRY, SpecialistEntry, SpecialistRegistry } from "./specialists.ts";
 
 export const FindingStatus = z.enum(["open", "dismissed", "resolved"]);
 
@@ -62,6 +65,7 @@ export const SCHEMAS = {
   "v1.run.response": RunView,
   "v1.traces.response": TracesResponse,
   /** Same shape as the intel mint request; a distinct schema object so each registry name owns one. */
+  "intel.specialists.registry": SpecialistRegistry,
   "v1.snapshots.request": z.strictObject({ ...MintSnapshotRequest.shape }),
 };
 

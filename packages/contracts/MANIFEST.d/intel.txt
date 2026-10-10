@@ -4,3 +4,4 @@ v1.inbox.response
 v1.run.response
 v1.traces.response
 v1.snapshots.request
+intel.specialists.registry

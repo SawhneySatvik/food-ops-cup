@@ -1,4 +1,5 @@
 import { draftView } from "./approvals.ts";
+import { SPECIALIST_REGISTRY } from "../../src/intel/specialists.ts";
 import { findingEnvelope, reviewTrace, traceInput } from "./shared.ts";
 import { S1, T, T_PG, snapRef, u } from "./_ids.ts";
 
@@ -27,5 +28,6 @@ export const SAMPLES: Record<string, unknown> = {
   "v1.inbox.response": { items: [{ kind: "finding", finding: findingView }, { kind: "draft", draft: draftView }], next_cursor: "c2VxOjQy" },
   "v1.run.response": { run_id: u(81), trigger: "event", actor: "watcher:inventory_purchasing", outlet_scope: ["*"], issued_at: T, expires_at: "2026-10-09T12:15:00+05:30", ended_at: null },
   "v1.traces.response": { run_id: u(81), events: [{ run_id: u(81), ...traceInput }, { run_id: u(81), ...reviewTrace }], next_after_seq: 3 },
+  "intel.specialists.registry": SPECIALIST_REGISTRY,
   "v1.snapshots.request": { template_id: "catalogue.dish_margin", params: { outlet_id: u(2), from_on: "2026-09-25", to_on: "2026-10-08" } },
 };
