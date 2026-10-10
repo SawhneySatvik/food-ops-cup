@@ -4,6 +4,7 @@
 // never fill in or recompute a figure: a row whose net does not equal its parts is quarantined, not fixed.
 import type { ImportKind } from "@munim/contracts/imports";
 import { DATE_UNITS, FIELDS, MONEY_UNITS, type MappingEntry } from "./formats.ts";
+import { dateRefusal, type HistoryCtx } from "./history.ts";
 
 export type Staged = { target_table: string; data: Record<string, unknown>; amount_minor: number | null; external_ref: string | null };
 export type RowOutcome = { ok: true; row: Staged } | { ok: false; reason: string };
@@ -22,6 +23,8 @@ export interface RowContext {
   existing: Set<string>;
   labels: Readonly<Record<string, Readonly<Record<string, string>>>>;
   fixed: Readonly<Record<string, string>>;
+  /** Dated rows (POS exports and the history kinds): channels, existing bills, outlet business dates, closed periods. */
+  history?: HistoryCtx;
 }
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
@@ -106,12 +109,14 @@ const label = (ctx: RowContext, field: string, value: string, canonical: readonl
 };
 
 /** Outlet by exact name (case-insensitive). Two outlets with one name cannot be told apart: unknown. */
-function outletOf(ctx: RowContext, name: Value): { id: string | null } | undefined {
+export function outletOf(ctx: RowContext, name: Value): { id: string | null } | undefined {
   if (name === null) return { id: null };
   const ids = ctx.outlets.get(String(name).trim().toLowerCase());
   return ids?.length === 1 ? { id: ids[0]! } : undefined;
 }
 
+const POS_KINDS: readonly string[] = ["dine_in", "takeaway", "pickup", "delivery"];
+const POS_METHODS: readonly string[] = ["cash", "card", "upi"];
 const LINE_KINDS = ["order", "ad_fee", "promo_share", "adjustment", "other"] as const;
 const METHODS = ["upi", "card", "bank_transfer", "neft", "imps", "rtgs", "cash_deposit", "cheque", "fee", "other"] as const;
 const SIGNAL_KINDS = ["weather", "festival", "holiday", "local_event", "competitor_price", "other"] as const;
@@ -200,14 +205,26 @@ export class RowChecker {
         } } };
       }
       case "pos_export": {
+        const h = ctx.history!;
         const outlet = outletOf(ctx, s("outlet"));
         if (!outlet?.id) return no("outlet_unknown");
         if (["subtotal", "discount", "tax", "total"].some((k) => n(k) < 0)) return no("amount_negative");
         if (n("total") !== n("subtotal") - n("discount") + n("tax")) return no("total_mismatch");
-        if (this.#dup(`bill:${outlet.id}:${s("bill_no")}`)) return no("duplicate_row");
+        // D4: an order type or payment mode this layout does not name is quarantined, never guessed (an unknown mode
+        // would leave the sale's receivable open for ever); a blank order type is a takeaway, as before.
+        const kind = (s("order_type") ?? "takeaway").toLowerCase();
+        if (!POS_KINDS.includes(kind)) return no("order_type_unknown");
+        const method = (s("payment_mode") ?? "").toLowerCase();
+        if (n("total") > 0 && !POS_METHODS.includes(method)) return no("payment_mode_unknown");
+        const refused = dateRefusal(h, outlet.id, s("bill_date")!);
+        if (refused) return no(refused);
+        // D4: bills are unique per channel (core.order external_ref), not per outlet — a number repeated across outlets is
+        // quarantined here instead of failing the whole approval on the unique index.
+        if (h.existing.has(`${h.channels.get("counter")}\u001f${s("bill_no")}`)) return no("already_imported");
+        if (this.#dup(`bill:${s("bill_no")}`)) return no("duplicate_row");
         return { ok: true, row: { target_table: "core.order", amount_minor: n("total"), external_ref: s("bill_no"), data: {
-          bill_no: s("bill_no"), bill_date: s("bill_date"), outlet_id: outlet.id, order_type: s("order_type"),
-          payment_mode: s("payment_mode"), subtotal_minor: n("subtotal"), discount_minor: n("discount"), tax_minor: n("tax"),
+          bill_no: s("bill_no"), bill_date: s("bill_date"), outlet_id: outlet.id, order_type: kind,
+          payment_mode: n("total") > 0 ? method : null, subtotal_minor: n("subtotal"), discount_minor: n("discount"), tax_minor: n("tax"),
           total_minor: n("total"),
         } } };
       }
@@ -227,6 +244,9 @@ export class RowChecker {
           on_date: s("on_date"), kind, label: v.label, outlet_id: outlet.id, value_milli: value, unit, source: s("source"),
         } } };
       }
+      case "pos_bills":
+      case "waste_log":
+        throw new Error("imports: history kinds are checked by history.ts");
     }
   }
 }

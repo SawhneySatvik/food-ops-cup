@@ -26,7 +26,7 @@ import { BUILT_INS, checkMapping, headerSignature } from "./formats.ts";
 export { blobKey, localBlobStore, type BlobStore } from "./blob.ts";
 export { parseRun, type ParseOutcome } from "./parse.ts";
 export { BUILT_INS, checkMapping, headerSignature } from "./formats.ts";
-export { formatApproveHandler, runCommitHandler } from "./commit.ts";
+export { commitRun, formatApproveHandler, runCommitHandler } from "./commit.ts";
 
 // One registration per process even if this file is evaluated twice (vitest by path, loadRouters by URL).
 const REGISTERED = Symbol.for("munim.imports.draftHandlers");

@@ -1,0 +1,11 @@
+Bill No,Bill Date,Outlet,Order Type,Payment Mode,Subtotal,Discount,Tax,Total
+SYN-D4-01,2026-10-03,Outlet 1,dine_in,cash,100.00,0,5.00,105.00
+SYN-D4-02,2026-10-03,Outlet 1,banquet,cash,100.00,0,5.00,105.00
+SYN-D4-03,2026-10-03,Outlet 1,takeaway,voucher,100.00,0,5.00,105.00
+SYN-D4-04,2026-10-03,Outlet 1,takeaway,,100.00,0,5.00,105.00
+SYN-D4-05,2026-10-03,Outlet 1,takeaway,upi,100.00,0,5.00,105.00
+SYN-D4-05,2026-10-03,Outlet 2,takeaway,upi,200.00,0,10.00,210.00
+SYN-D4-06,2099-01-01,Outlet 1,takeaway,upi,100.00,0,5.00,105.00
+SYN-D4-07,2025-03-20,Outlet 1,takeaway,upi,100.00,0,5.00,105.00
+SYN-D4-08,2026-10-03,Outlet 2,,card,100.00,0,5.00,105.00
+TOTAL,,,,,,,,315.00

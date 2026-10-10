@@ -8,8 +8,9 @@ import { defineDraftable } from "../shared/draftables.ts";
 import { CurrencyCode, IsoDateTime, MinorAmount, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
 
-/** The file kinds this module parses (core.import_run.kind, a subset of core.document.kind). */
-export const ImportKind = z.enum(["payout_statement", "bank_statement", "pos_export", "tally_export", "market_signal"]);
+/** The file kinds this module parses (core.import_run.kind, a subset of core.document.kind). `pos_bills` and
+ *  `waste_log` are dated history (R44b, 0018): bills with lines, tenders, refunds and voids; waste entries. */
+export const ImportKind = z.enum(["payout_statement", "bank_statement", "pos_export", "tally_export", "market_signal", "pos_bills", "waste_log"]);
 export type ImportKind = z.infer<typeof ImportKind>;
 
 export const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);

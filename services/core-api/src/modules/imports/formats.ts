@@ -12,6 +12,7 @@ export type MappingEntry = { source: string; target: string; unit?: string | und
 const t = (required = false): Field => ({ type: "text", required });
 const m = (required = false): Field => ({ type: "money", required });
 const d = (required = false): Field => ({ type: "date", required });
+const n = (required = false): Field => ({ type: "decimal", required });
 
 /** The Munim fields each kind of file can fill. A tenant mapping must cover every required one. */
 export const FIELDS: Record<ImportKind, Record<string, Field>> = {
@@ -35,11 +36,22 @@ export const FIELDS: Record<ImportKind, Record<string, Field>> = {
   market_signal: {
     on_date: d(true), kind: t(true), label: t(true), outlet: t(), value: { type: "decimal", required: false }, unit: t(), source: t(true),
   },
+  // History (R44b): one row per bill line; the bill's own columns repeat on each of its lines and must agree.
+  pos_bills: {
+    bill_no: t(true), bill_date: d(true), bill_time: t(), outlet: t(true), channel: t(), brand: t(), order_type: t(true),
+    customer_phone: t(), bill_status: t(), item_code: t(true), variant_code: t(), qty: n(true), unit_price: m(true), tax_class: t(),
+    line_discount: m(), line_total: m(true), void_reason: t(), cash: m(), card: m(), upi: m(), refund: m(), refund_mode: t(),
+    refund_reason: t(), refund_date: d(), currency: t(),
+  },
+  waste_log: {
+    waste_date: d(true), waste_time: t(), outlet: t(true), ingredient: t(true), qty: n(true), unit: t(true), reason: t(true), note: t(),
+  },
 };
 
 /** The field whose TOTAL row is the file's printed control total (none for market signals). */
 export const CONTROL_FIELD: Record<ImportKind, string | null> = {
   payout_statement: "net", bank_statement: "amount", tally_export: "amount", pos_export: "total", market_signal: null,
+  pos_bills: "line_total", waste_log: null,
 };
 
 /** Units a column may be declared in. Money: the currency's major or minor unit (named or generic). */
@@ -144,6 +156,20 @@ const tallyMap = map([
   ["Date", "voucher_date", "date_dmy"], ["Voucher Type", "voucher_type"], ["Voucher No", "voucher_no"], ["Ledger", "ledger"],
   ["Party", "party"], ["Amount", "amount", "major"], ["GST", "tax", "major"], ["Narration", "narration"], ["Cost Centre", "outlet"],
 ]);
+// History layouts (R44b). Money in the currency's major unit; Unit Price in the pack's price display (tax-exclusive
+// for IN, tax-inclusive for AU); Line Total is the other POS's figure, checked against core's own (never used).
+const posBillsMap = map([
+  ["Bill No", "bill_no"], ["Bill Date", "bill_date", "date_ymd"], ["Bill Time", "bill_time"], ["Outlet", "outlet"], ["Channel", "channel"],
+  ["Brand", "brand"], ["Order Type", "order_type"], ["Customer Phone", "customer_phone"], ["Bill Status", "bill_status"],
+  ["Item Code", "item_code"], ["Variant Code", "variant_code"], ["Qty", "qty", "decimal"], ["Unit Price", "unit_price", "major"],
+  ["Tax Class", "tax_class"], ["Line Discount", "line_discount", "major"], ["Line Total", "line_total", "major"], ["Void Reason", "void_reason"],
+  ["Cash", "cash", "major"], ["Card", "card", "major"], ["UPI", "upi", "major"], ["Refund", "refund", "major"], ["Refund Mode", "refund_mode"],
+  ["Refund Reason", "refund_reason"], ["Refund Date", "refund_date", "date_ymd"],
+]);
+const wasteMap = map([
+  ["Date", "waste_date", "date_ymd"], ["Time", "waste_time"], ["Outlet", "outlet"], ["Ingredient", "ingredient"], ["Qty", "qty", "decimal"],
+  ["Unit", "unit"], ["Reason", "reason"], ["Note", "note"],
+]);
 const marketMap = map([
   ["on_date", "on_date", "date_ymd"], ["kind", "kind"], ["label", "label"], ["outlet_ref", "outlet"], ["value", "value", "decimal"],
   ["unit", "unit"], ["source", "source"],
@@ -171,6 +197,8 @@ export const BUILT_INS: readonly BuiltIn[] = [
   { parser: "pos_export_v1", kind: "pos_export", countries: null, header: headerOf(posMap), mapping: posMap, fixed: {}, labels: {} },
   { parser: "tally_export_v1", kind: "tally_export", countries: null, header: headerOf(tallyMap), mapping: tallyMap, fixed: {}, labels: {} },
   { parser: "market_signal_v1", kind: "market_signal", countries: null, header: headerOf(marketMap), mapping: marketMap, fixed: {}, labels: {} },
+  { parser: "pos_bills_v2", kind: "pos_bills", countries: null, header: headerOf(posBillsMap), mapping: posBillsMap, fixed: {}, labels: {} },
+  { parser: "waste_log_v1", kind: "waste_log", countries: null, header: headerOf(wasteMap), mapping: wasteMap, fixed: {}, labels: {} },
 ];
 
 export const builtInBySignature = (sig: string): BuiltIn | undefined => BUILT_INS.find((b) => headerSignature(b.header) === sig);

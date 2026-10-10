@@ -1,0 +1,20 @@
+{
+  "_note": "Hand-written answer key for the history import fixtures (h-1, R44b). Synthetic data only. Row numbers are file lines (the header is line 1). Money in paise / cents. The parse gates in services/core-api/test/imports-history.test.ts compare every run with this key; never regenerate it from a run.",
+  "files": {
+    "synthetic_bills_1.csv": { "country": "IN", "kind": "pos_bills", "parser": "pos_bills_v2", "rows_ok": 7, "control_total_minor": 233100, "staged_total_minor": 233100, "quarantine": {} },
+    "synthetic_bills_2.csv": { "country": "IN", "kind": "pos_bills", "parser": "pos_bills_v2", "rows_ok": 1, "control_total_minor": null, "staged_total_minor": 33600, "quarantine": {
+      "2": "item_unknown", "3": "channel_unknown", "4": "order_type_unknown", "5": "customer_unknown", "6": "tender_mismatch", "7": "total_mismatch",
+      "8": "bill_header_differs", "9": "bill_header_differs", "10": "date_not_past", "11": "period_closed", "12": "bill_rejected", "13": "variant_unknown",
+      "14": "refund_mode_unknown", "15": "tax_class_unknown", "16": "price_above_mrp", "17": "tender_on_aggregator", "18": "refund_exceeds_paid",
+      "19": "amount_unreadable" } },
+    "synthetic_bills_au.csv": { "country": "AU", "kind": "pos_bills", "parser": "pos_bills_v2", "rows_ok": 1, "control_total_minor": 2100, "staged_total_minor": 2100, "quarantine": {} },
+    "synthetic_bills_sept.csv": { "country": "IN", "kind": "pos_bills", "parser": "pos_bills_v2", "rows_ok": 1, "control_total_minor": null, "staged_total_minor": 33600, "quarantine": {} },
+    "synthetic_waste_1.csv": { "country": "IN", "kind": "waste_log", "parser": "waste_log_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": null, "quarantine": {
+      "5": "ingredient_unknown", "6": "unit_mismatch", "7": "reason_unknown", "8": "note_missing", "9": "period_closed", "10": "time_unreadable" } },
+    "synthetic_pos_d4.csv": { "country": "IN", "kind": "pos_export", "parser": "pos_export_v1", "rows_ok": 3, "control_total_minor": 31500, "staged_total_minor": 31500, "quarantine": {
+      "3": "order_type_unknown", "4": "payment_mode_unknown", "5": "payment_mode_unknown", "7": "duplicate_row", "8": "date_not_past", "9": "period_closed" } }
+  },
+  "after_bills_1": {
+    "synthetic_bills_again.csv": { "country": "IN", "kind": "pos_bills", "parser": "pos_bills_v2", "rows_ok": 1, "control_total_minor": null, "staged_total_minor": 33600, "quarantine": { "2": "already_imported" } }
+  }
+}

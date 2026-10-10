@@ -1,0 +1,3 @@
+Bill No,Bill Date,Bill Time,Outlet,Channel,Brand,Order Type,Customer Phone,Bill Status,Item Code,Variant Code,Qty,Unit Price,Tax Class,Line Discount,Line Total,Void Reason,Cash,Card,UPI,Refund,Refund Mode,Refund Reason,Refund Date
+SYN-H-0005,2026-10-01,,Outlet 2,counter,,pickup,,,8901234567890,,3,80.00,goods_5,0,252.00,,252.00,,,,,,
+SYN-H-0099,2026-10-04,,Outlet 2,counter,,pickup,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,,336.00,,,,,

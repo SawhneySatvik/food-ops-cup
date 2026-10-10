@@ -1,0 +1,10 @@
+Date,Time,Outlet,Ingredient,Qty,Unit,Reason,Note
+2026-10-01,22:10,Outlet 1,Paneer,250,g,overprep,
+2026-10-02,,Outlet 3,paneer,1.5,g,other,Dropped tray (synthetic)
+2026-10-03,23:59,Outlet 2,Paneer,100,g,expired,
+2026-10-03,,Outlet 1,Ghee,10,g,damaged,
+2026-10-03,,Outlet 1,Paneer,0.25,kg,damaged,
+2026-10-03,,Outlet 1,Paneer,10,g,spilled,
+2026-10-03,,Outlet 1,Paneer,10,g,other,
+2025-03-10,,Outlet 1,Paneer,10,g,damaged,
+2026-10-03,25:00,Outlet 1,Paneer,10,g,damaged,

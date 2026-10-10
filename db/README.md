@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (17 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (18 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -27,7 +27,8 @@ cycle 1 (order_event.seq, loyalty reversal by refund, redemption posting rule, r
 pricing freezes read the reprice source state, guest hash cleared on claim, merge moves coupon uses, erasure of merged
 guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the payable), 0017 W2 fix cycle 2 (origin
 never re-stamped, re-approval re-opens the payable, the guest-token claim merges an emptied guest profile, coupon discount
-follows a re-price) — gates see 16 applied.
+follows a re-price), 0018 history imports (R44 b, c: the `pos_bills` / `waste_log` kinds, what an approved import writes,
+`core.write_derived`) — gates see 17 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -74,7 +75,7 @@ and `make test` exit non-zero.
 **Canonical world (`buildWorld(db, { country: "IN" | "AU" })`, exported from `@munim/db`).** One synthetic tenant
 with a row in every tenant table: 3 outlets (outlet-scoped rows in outlets 1–2), owner + staff members, devices,
 brand, channel, customer, items/variants/options, recipe, price, deal, coupon, simulated supplier, PO → GRN →
-stock, orders with tenders/voids/refunds, finance (chart, terms, a balanced entry, a closed September, settlement,
+stock, orders with tenders/voids/refunds, finance (chart, terms, a balanced entry, a closed March 2025 at outlet 1, settlement,
 bank line, dispute…), people, loyalty, compliance, documents/imports, intel rows, and two approved drafts. Every
 book write runs under the command type whose `target_tables` list that table (the guard enforces it — see
 below); payroll rows only for IN. `ownerCtx(world, extra)` builds an owner context; `approveDraft(db, world,
@@ -236,8 +237,38 @@ second post (no `reverses_id`) is still 23505.
   `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
   write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
   'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
-- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0018` per item and requires `tests/w2fixcycle2.test.ts` to exit
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0019` per item and requires `tests/w2fixcycle2.test.ts` to exit
   non-zero naming that item's tests (the plant is removed after each run).
+
+**History imports (0018, R44 b, c) — shapes other lanes code against.**
+- **Kinds.** `core.document.kind`, `core.import_format.kind` and `core.import_run.kind` also admit `pos_bills` (built-in parser
+  `pos_bills_v2`: one row per bill line with channel, brand, customer, tender split, refund, voids) and `waste_log`
+  (`waste_log_v1`). The file layouts are core-api's (`services/core-api/src/modules/imports/formats.ts`).
+- **Binding.** `imports.run.commit.v1` (draft-only) now lists `core.order_line`, `core.refund`, `core.void`, `core.waste_log` on top of
+  0008/0011/0015 (`bank_line, expense, order, review, settlement, settlement_line, supplier_invoice, supplier_invoice_line,
+  tender`). It deliberately does **not** list `journal_entry`, `posting` or `stock_movement`: under an import decision those are
+  admitted only as derivations of the approved rows (finance.post_order / post_tender / post_refund, inventory.consume_order /
+  consume_sku / record_waste — each rule's source state judged per row); a plain insert there is MB008.
+- **`core.write_derived(groups jsonb) → integer`** (SECURITY INVOKER, owner munim_migrator, EXECUTE munim_core only). The batched
+  form of `underRule(rule, source) + INSERT`: `groups = [{rule, source_ref, journal_entry?, posting?, stock_movement?}, …]` in write
+  order; per group it sets `app.posting_rule` / `app.source_ref` (transaction-local), inserts the group's rows (entries before
+  postings) and, after the last group, restores the previous values. What a row derives from is the group's, never the row's: an
+  entry's `posting_rule`, `source_type`, `source_id` and a movement's `ref_type`, `ref_id` are the group's rule and source; a
+  posting must name an entry of its own group (22023 otherwise, before any write); unknown group keys → 22023. `tenant_id` is
+  `app.tenant_id`; a movement's `created_by` is `app.member_id`. Every row passes the book guard, RLS, currency, period, balance
+  and unit-cost triggers exactly as the same INSERT sent alone would (no `session_replication_role`, nothing bypassed). Columns:
+  entry `{id, outlet_id, brand_id, channel_id, entry_date, reverses_id?, memo_key?}`; posting `{id, journal_entry_id, account_id,
+  amount_minor, currency}`; movement `{id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, unit_cost_per_1000_minor?,
+  currency?, expired_sale_override_id?, at?}`. Callers fire the deferred balance checks after it (`SET CONSTRAINTS
+  core.entry_balanced, core.posting_balanced IMMEDIATE`), as finance's `checkBalancedNow` does.
+- **Dates and numbers.** No new trigger: an order inserted under the approved import keeps its business date and takes no
+  invoice number (0015); its ticket number comes from its own date's counter. core-api quarantines any history row dated on or
+  after the outlet's current business date (`date_not_past`) or in a closed month (`period_closed`), and refuses an approval
+  (409 `period_closed`, nothing written) when a month closed after the preview.
+- **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
+  run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0019` per item and requires `tests/history.test.ts` to exit non-zero naming
+  that item's tests.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

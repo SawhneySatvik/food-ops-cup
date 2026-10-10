@@ -1,0 +1,3 @@
+Bill No,Bill Date,Bill Time,Outlet,Channel,Brand,Order Type,Customer Phone,Bill Status,Item Code,Variant Code,Qty,Unit Price,Tax Class,Line Discount,Line Total,Void Reason,Cash,Card,UPI,Refund,Refund Mode,Refund Reason,Refund Date
+SYN-AU-01,2026-10-02,12:30,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,2,11.00,gst_10,1.00,21.00,,21.00,,,,,,
+TOTAL,,,,,,,,,,,,,,,21.00,,,,,,,,

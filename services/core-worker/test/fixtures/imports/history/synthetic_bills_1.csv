@@ -1,0 +1,9 @@
+Bill No,Bill Date,Bill Time,Outlet,Channel,Brand,Order Type,Customer Phone,Bill Status,Item Code,Variant Code,Qty,Unit Price,Tax Class,Line Discount,Line Total,Void Reason,Cash,Card,UPI,Refund,Refund Mode,Refund Reason,Refund Date
+SYN-H-0001,2026-10-01,13:05,Outlet 1,counter,Brand,dine_in,+919800000000,,menu.paneer_tikka,menu.paneer_tikka.full,2,320.00,restaurant_5,0,672.00,,500.00,0,256.00,0,,,
+SYN-H-0001,2026-10-01,13:05,Outlet 1,counter,Brand,dine_in,+919800000000,,8901234567890,,1,80.00,goods_5,0,84.00,,500.00,0,256.00,0,,,
+SYN-H-0002,2026-10-01,20:30,Outlet 3,aggregator:swiggy,,delivery,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,,,,100.00,upi,late_delivery,2026-10-02
+SYN-H-0003,2026-10-02,09:15,Outlet 3,counter,,takeaway,,,menu.paneer_tikka,,1,320.00,restaurant_5,20.00,315.00,,,651.00,,315.00,card,customer_complaint,
+SYN-H-0003,2026-10-02,09:15,Outlet 3,counter,,takeaway,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,remake,,651.00,,315.00,card,customer_complaint,
+SYN-H-0004,2026-10-02,02:30,Outlet 3,counter,,takeaway,,void,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,customer_left,,,,,,,
+SYN-H-0005,2026-10-01,,Outlet 2,counter,,pickup,,,8901234567890,,3,80.00,goods_5,0,252.00,,252.00,,,,,,
+TOTAL,,,,,,,,,,,,,,,2331.00,,,,,,,,

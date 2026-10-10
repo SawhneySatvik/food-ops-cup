@@ -1,5 +1,5 @@
 // Gates for 0017 (W2 fix cycle 2, migrator row m-5). Each refusal is paired with its accepted case; expected values
-// are typed by hand. Red-proofs: db/tests/redproof-0017.sh plants a 0018 per item and requires this file to exit
+// are typed by hand. Red-proofs: db/tests/redproof-0017.sh plants a 0019 per item (0018 is applied since h-1) and requires this file to exit
 // non-zero naming the item's tests. Synthetic data only.
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
