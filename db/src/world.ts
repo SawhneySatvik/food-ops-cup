@@ -59,6 +59,8 @@ const STRUCTURAL_ACCOUNTS: readonly Account[] = [
   { code: "1110", name: "Counter sales clearing", type: "asset" },
   { code: "1250", name: "Staff advances", type: "asset" },
   { code: "2050", name: "Goods received not invoiced", type: "liability" },
+  // 0016 (R2-S1-4): finance.post_loyalty_redemption's debit side; 0016 backfills it for existing tenants.
+  { code: "4100", name: "Loyalty redemptions", type: "income" },
   { code: "4900", name: "Cash rounding", type: "income" },
   { code: "6900", name: "Other operating expenses", type: "expense" },
 ];

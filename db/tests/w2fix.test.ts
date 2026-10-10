@@ -317,7 +317,9 @@ describe("A6 — derivations", () => {
     expect(await back()).toBeNull();
   });
 
-  test("loyalty reversal: a completed order with a refund → accepted; a completed order without one → MB001", async () => {
+  // 0016 (R1-m5) moved the refund path to a core.refund source (tests/w2fixcycle1.test.ts); by order, a completed
+  // order is refused whether or not it was refunded.
+  test("loyalty reversal by order: a completed order, refunded or not → MB001 (0016: the refund path reads the refund)", async () => {
     const earn = async (order: string) => {
       const id = uuidv7();
       expect(await attempt(db, "munim_core", rule("customers.loyalty_earn", `core.order:${order}`),
@@ -333,10 +335,10 @@ describe("A6 — derivations", () => {
     const refusedEarn = await earn(plain);
     const refundedEarn = await earn(A.orders[0]);
     const refused = await reverse(plain, refusedEarn);
-    const ok = await reverse(A.orders[0], refundedEarn);
-    console.log(`A6 loyalty reverse: no refund → ${refused?.code}; refunded → ${ok ? ok.code : "accepted"}`);
+    const byOrder = await reverse(A.orders[0], refundedEarn);
+    console.log(`A6 loyalty reverse by order: no refund → ${refused?.code}; refunded → ${byOrder?.code}`);
     expect(refused?.code).toBe("MB001");
-    expect(ok).toBeNull();
+    expect(byOrder?.code).toBe("MB001");
     // A9: one earn per order.
     const twice = await attempt(db, "munim_core", rule("customers.loyalty_earn", `core.order:${plain}`),
       `INSERT INTO core.loyalty_entry (tenant_id, id, customer_id, kind, points, order_id) VALUES ($1, gen_random_uuid(), $2, 'earn', 20, $3)`, [A.tenant, A.customer, plain]);

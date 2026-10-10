@@ -15,15 +15,18 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (15 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (16 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
 skipped loudly on embedded PG), 0014 W1 fix cycle 1 (guard scope/customer/pricing rules, customer RLS, run scope,
 derivation source states, status transitions, riders #17–#62), 0015 W2 fix Batch A (draft-only commands, settlement
 needs a committed run, outlet RLS on compliance/goal tables, W2 command rows, refund caps per role, W2 derivations,
-POS-export imports, order-line pricing freeze, loyalty policy, verified-email merge, model-role defaults) — gates see
-14 applied. Every migration from 0007 ends with
+POS-export imports, order-line pricing freeze, loyalty policy, verified-email merge, model-role defaults), 0016 W2 fix
+cycle 1 (order_event.seq, loyalty reversal by refund, redemption posting rule, reconcile rules need a committed run,
+pricing freezes read the reprice source state, guest hash cleared on claim, merge moves coupon uses, erasure of merged
+guests, unit cost per 1000 base units, D1 policy backfill, D2 dispute moves the payable) — gates see 15 applied.
+Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
 grants, definer objects, intel_ro ownership).
@@ -100,7 +103,7 @@ own-row rule (R41): with `app.role = 'customer'` only the row `id = app.customer
 | `MB008` | `command_table_mismatch` | the command (own command, or the approved draft's command type) does not list the table in `core.command_authority.target_tables`, and no later branch admits the row |
 | `MB009` | `period_closed` | a journal entry dated in a closed month (`core.period_close`, outlet or tenant-wide) |
 | `MB010` | `books_unbalanced` | at COMMIT: an entry with < 2 postings or Σ ≠ 0 in a currency, or not visible in the committing context; a posting added outside its entry's transaction |
-| `MB011` | `loyalty_refused` | a loyalty entry that would take the balance below 0 (under the customer's row lock) |
+| `MB011` | `loyalty_refused` | a loyalty entry that would take the balance below 0 (under the customer's row lock); a `reverse` entry that does not undo an entry of the same customer and order with the opposite sign and at most its points (0016) |
 | `MB012` | `claim_quote_mismatch` | `intel.claim.quote` ≠ the source chunk/message text at `[span_start, span_end)` |
 | `MB013` | `out_of_pack_scope` | a payroll draft where the pack's `payroll_scope` ≠ `drafts`; a licence kind not in the pack's `licence_kinds` |
 | `MB014` | `sequence_gap` | an `intel.trace_event` seq that is not the run's last seq + 1 |
@@ -160,6 +163,42 @@ entry per (rule, source). A source reversed by `finance.reverse_supplier_invoice
 (`reverses_id` = the reversal entry, `posting_rule` = the original rule) — neither unique index blocks it; a plain
 second post (no `reverses_id`) is still 23505.
 
+**W2 fix cycle 1 (0016) — shapes other lanes code against.**
+- **`core.order_event.seq`** (bigint NOT NULL, ≥ 1): per order, gapless from 1, set by the insert trigger under a
+  per-order transaction lock (supplied values overwritten; no UPDATE grant). Unique `(tenant_id, order_id, seq)`.
+  Order an order's history by `seq`, never by `at`. Rows before 0016 were numbered by `(at, id)`.
+- **Loyalty reversal (`customers.loyalty_reverse`).** Cancel path: source `core.order:<id>`, state `cancelled` /
+  `rejected`, `refund_id` NULL, `order_id` = that order. Refund path: source **`core.refund:<id>`**, state = the
+  refund's order is `completed`, the row carries **`loyalty_entry.refund_id`** = that refund (composite FK
+  `(tenant_id, order_id, refund_id)` → `core.refund`, so the refund is of the entry's order); **one entry per refund**
+  (unique `(tenant_id, refund_id)`). Every `reverse` entry undoes an entry of the same customer and order, opposite sign,
+  at most its points (MB011); 0011's one-reversal-per-entry unique is unchanged, so an earn is reversed by at most one
+  refund (a second partial refund cannot reverse the same earn again).
+- **`finance.post_loyalty_redemption`** (source `core.order`, targets `journal_entry` + `posting`): the order is
+  `completed` and has an unreversed `redeem` entry. Account **4100 "Loyalty redemptions" (income, contra-revenue)**:
+  Dr 4100 / Cr 1110 by the redeemed value. 0016 adds 4100 to every existing tenant that has a chart.
+- **Reconcile rules.** `finance.reconcile_settlement` / `finance.reconcile_bank` need `import_run_id` set and that run
+  `committed` (as `finance.post_settlement` since 0015).
+- **Pricing freezes.** `core."order"` and `core.order_line` money changes need `app.posting_rule = 'orders.reprice'`,
+  `app.source_ref = 'core.order:<id>'` **and** the order in that rule's `source_state` (placed / accepted), whichever
+  guard branch admitted the write.
+- **D2.** `purchasing.invoice.dispute.v1` lists `core.payable` (open → disputed).
+- **Unit cost per 1000 base units (R2-S2-8).** `core.stock_movement` and `core.supplier_return_line` carry
+  **`unit_cost_per_1000_minor`** = the cost of 1000 units of the row's `unit`, in minor units (₹410.01/kg → 41001 per
+  1000 g). Value = round(`qty_milli` × `unit_cost_per_1000_minor` / 1 000 000). Write it instead of a per-unit
+  `mulDiv(cost, 1, factor)`: for a purchase unit of `factor` base units, `unit_cost_per_1000_minor =
+  round(cost_per_purchase_unit × 1000 / factor)` (exact for kg→g, L→ml). `unit_cost_minor` stays for old readers: the
+  insert trigger fills whichever of the two is missing (per-1000 = minor × 1000; minor = round half up of per-1000 /
+  1000); supplying both requires that relation (CHECK). `core.grn_line.unit_cost_minor` is unchanged (per purchase unit).
+- **Erasure (R1-M1).** `reservation.name` and `bulk_order.contact_name` stay NOT NULL (`<> ''`): erasure writes the fixed
+  redaction literal `'[erased]'` there (no schema change, no contract change) and NULLs `phone`/`contact_phone` and `note`; `order_line.note` → NULL. Guest profiles merged
+  into the erased profile: `core.customer_erase_merged_guests(id)` (below).
+- **D1 and other backfills.** Run per existing tenant with the book guard disabled for that transaction only; inserted
+  rows (`business_policy`, account 4100) carry `origin = {"kind": "migration", "migration": "0016_w2_fix_cycle_1"}`,
+  `created_by` NULL and one `core.audit_log` entry each (`actor = {"kind": "migration", "id": "0016_w2_fix_cycle_1"}`,
+  action `db.migration.backfill`). The D1 policy is tenant-wide with the column defaults, valid from the earlier of the
+  tenant's creation date and its first order's business date (tenant zone) — INFERENCE.
+
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
 exactly when their asset is (`tenant_via_asset`). A future migration that re-issues every `tenant_outlet_isolation`
@@ -202,15 +241,24 @@ Replay indexes: `core.outbox (tenant_id, created_at, id)`, `core.draft (tenant_i
 filters on `app.tenant_id`, but needs BYPASSRLS to see guest profiles a customer context cannot): callable only
 inside the customer's own `customers.account.link.v1` (`app.role = 'customer'`, else MB001). When the caller's profile
 is signed in, live, not a guest and email-verified, every live unmerged guest profile of the tenant with the same
-email (case-insensitive) hands over its orders, reservations and bulk orders and gets `merged_into` = caller; loyalty
-rows stay. Writes pass the guard through the rule `customers.merge_verified_email`, whose source state includes
-`current_user = 'munim_crosstenant'` (it admits nothing outside this function). Returns one row per changed book
-row, ordered by (entity, entity_id): each moved `core.order` / `core.reservation` / `core.bulk_order` with its previous
-customer, and each merged guest as `core.customer` (entity_id = from_customer_id = the guest). The caller must write
-one audit entry per row.
-Definer objects: 6 (5 functions + `platform.tenant_registry`).
+email (case-insensitive) hands over its orders, reservations, bulk orders and (0016) coupon uses and gets
+`merged_into` = caller; loyalty rows stay. Writes pass the guard through the rule `customers.merge_verified_email`,
+whose source state includes `current_user = 'munim_crosstenant'` (it admits nothing outside this function). Returns
+one row per changed book row, ordered by (entity, entity_id): each moved `core.bulk_order` / `core.coupon_use` /
+`core.order` / `core.reservation` with its previous customer, and each merged guest as `core.customer` (entity_id =
+from_customer_id = the guest). The caller must write one audit entry per row.
+`core.customer_erase_merged_guests(erased_customer_id uuid) → (entity text, entity_id uuid)` (0016, R1-M1; not
+cross-tenant either): inside `customers.erasure.request.v1` only, by the customer itself (`app.role = 'customer'`,
+`erased_customer_id = app.customer_id`) or an owner holding `'{*}'`, and only once that profile is erased (MB001
+otherwise). Sets `erased_at` on every live guest profile `merged_into` it (`core.customer_erasure` blanks their personal
+columns) through the rule `customers.erase_merged_guests` (source = the erased profile, `current_user` clause as above).
+Returns one `core.customer` row per erased guest, ordered by id, for the caller's audit entries.
+Definer objects: 7 (6 functions + `platform.tenant_registry`).
 
 **Guest orders.** `core."order".guest_access_hash` = sha256 (32 bytes) of a random token returned once at placement.
+Since 0016 the database clears it whenever the order's `customer_id` changes (the token claim in
+`customers.account.link.v1`, the verified-email merge): a claimed order is reached through the profile, never the token.
+munim_core has no UPDATE on the column.
 
 **Customer requests (F4, 0014) — core-api must follow this.** Every tenant table carries a RESTRICTIVE
 `customer_scope` policy: with `app.role = 'customer'` a context sees its own customer row, orders (own, or by

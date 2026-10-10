@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0015 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0016 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -18,6 +18,7 @@ export const MIGRATIONS = [
   "0012_compliance_goals_intel",
   "0014_w1_fix_cycle_1",
   "0015_w2_fix",
+  "0016_w2_fix_cycle_1",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -256,7 +257,8 @@ export const LEGAL_ORDER_TRANSITIONS = [
 
 /** SECURITY DEFINER / munim_crosstenant-owned objects (03-architecture §1.2). */
 export const CROSSTENANT_OBJECTS = [
-  "core.active_tenants", "core.customer_claim_verified_email_guests", "core.memberships_for_sub", "core.outbox_claim",
+  "core.active_tenants", "core.customer_claim_verified_email_guests", "core.customer_erase_merged_guests", "core.memberships_for_sub",
+  "core.outbox_claim",
   "core.tenant_for_storefront_key",
   "platform.tenant_registry",
 ];

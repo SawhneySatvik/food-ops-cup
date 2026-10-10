@@ -163,9 +163,19 @@
       "target_tables": [
         "core.loyalty_entry"
       ],
-      "source_state": "(s.status IN ('cancelled', 'rejected') OR (s.status = 'completed' AND EXISTS (SELECT 1 FROM core.refund f WHERE f.tenant_id = s.tenant_id AND f.order_id = s.id)))",
+      "source_state": "s.status IN ('cancelled', 'rejected')",
       "seeded_in": "0011",
       "implemented_by": "T-028"
+    },
+    {
+      "rule_id": "customers.loyalty_reverse",
+      "source_table": "core.refund",
+      "target_tables": [
+        "core.loyalty_entry"
+      ],
+      "source_state": "EXISTS (SELECT 1 FROM core.\"order\" o WHERE o.tenant_id = s.tenant_id AND o.id = s.order_id AND o.status = 'completed')",
+      "seeded_in": "0016",
+      "implemented_by": "T-028 (f-2, R2-S2-4)"
     },
     {
       "rule_id": "finance.post_refund",
@@ -217,7 +227,7 @@
       "target_tables": [
         "core.reconciliation_break"
       ],
-      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -227,7 +237,7 @@
       "target_tables": [
         "core.reconciliation_break"
       ],
-      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -291,11 +301,33 @@
         "core.order",
         "core.reservation",
         "core.bulk_order",
-        "core.customer"
+        "core.customer",
+        "core.coupon_use"
       ],
       "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.erased_at IS NULL AND s.email_verified_at IS NOT NULL AND current_user = 'munim_crosstenant'",
       "seeded_in": "0015",
       "implemented_by": "0015 core.customer_claim_verified_email_guests() (T-035)"
+    },
+    {
+      "rule_id": "finance.post_loyalty_redemption",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status = 'completed' AND EXISTS (SELECT 1 FROM core.loyalty_entry l WHERE l.tenant_id = s.tenant_id AND l.order_id = s.id AND l.kind = 'redeem' AND NOT EXISTS (SELECT 1 FROM core.loyalty_entry r WHERE r.tenant_id = l.tenant_id AND r.reverses_id = l.id))",
+      "seeded_in": "0016",
+      "implemented_by": "T-026 (f-2, R2-S1-4)"
+    },
+    {
+      "rule_id": "customers.erase_merged_guests",
+      "source_table": "core.customer",
+      "target_tables": [
+        "core.customer"
+      ],
+      "source_state": "s.erased_at IS NOT NULL AND current_user = 'munim_crosstenant'",
+      "seeded_in": "0016",
+      "implemented_by": "0016 core.customer_erase_merged_guests(uuid) (f-3, R1-M1)"
     }
   ]
 }
