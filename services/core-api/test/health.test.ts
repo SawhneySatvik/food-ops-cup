@@ -52,7 +52,7 @@ describe("/health", () => {
 
     const up = await app.request("/health");
     expect(up.status).toBe(200);
-    expect(await up.json()).toEqual({ status: "ok", migration_version: expectedVersion });
+    expect(await up.json()).toEqual({ status: "ok", migration_version: expectedVersion, idp: "devhost" });
 
     await db.stop();
     stopped = true;

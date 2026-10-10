@@ -3,6 +3,8 @@
 //   MUNIM_API_URL        default http://127.0.0.1:${PORT:-8787}
 //   MUNIM_SEED_TOKENS    JSON {"owner": "<jwt>", "manager": "<jwt>", …} — one token per persona the world names
 //   MUNIM_SEED_TOKEN     shorthand for {"owner": "<jwt>"} (enough for worlds whose only persona is the owner)
+// `make seed` fills MUNIM_SEED_TOKENS itself for a core-api started with MUNIM_IDP=local (R44a) — see the Makefile and
+// adapters/dev/idp-local/mint-seed-tokens.ts (worldgen's src may not spawn processes or reach adapters, gate d).
 // --plan runs the world against a fake transport and prints the request log (no server, no tokens).
 import { DEFAULT_SEED, loadWorld, runWorld, WORLDS, type WorldName } from "./run.ts";
 import { localDate } from "./time.ts";
@@ -40,7 +42,7 @@ async function main() {
   const missing = mod.meta.personas.filter((p) => !tokens[p]);
   if (missing.length) {
     throw new Error(`no bearer token for persona(s): ${missing.join(", ")}. Set MUNIM_SEED_TOKENS='{"${missing[0]}":"<jwt>",…}'. `
-      + "core-api in `make up` verifies the dev host sign-ins only (no local IdP), so each persona needs a real verified sign-in; see the T-033 report (auth gap).");
+      + "A the dev host-mode core-api needs real verified sign-ins; for the dev-only local sign-in start it with `MUNIM_IDP=local make up LOCAL_DB=1` and run `make seed` (it mints the tokens).");
   }
   const baseUrl = process.env.MUNIM_API_URL ?? `http://127.0.0.1:${process.env.PORT ?? "8787"}`;
   const r = await runWorld({ world: world as WorldName, seed, asOf, days, baseUrl, token: (p) => tokens[p]! });

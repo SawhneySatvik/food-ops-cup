@@ -3,14 +3,15 @@
 // alone reads the founder's `.env` and redacts its secrets); the smoke test hands it embedded-Postgres URLs.
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
-import { type Config, createLogger, type Logger, loadRepoConfig } from "@munim/config";
+import { type Config, createLogger, type IdpMode, type Logger, loadRepoConfig, resolveIdpMode } from "@munim/config";
 import type { Hono } from "hono";
 import pg from "pg";
 import { createApp } from "./app.ts";
 import type { IdP } from "./auth/port.ts";
 import { storefrontResolver } from "./auth/resolve.ts";
 import type { PublishDeps } from "./commit/index.ts";
-import { createHttpPublisher, devhostIdp } from "./dev-root.ts";
+import { createHttpPublisher, createPersistentLocalIdp, devhostIdp } from "./dev-root.ts";
+import { setIdpMode } from "./health/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
@@ -31,6 +32,8 @@ export interface CoreApiWiring {
   /** munim_core on a session-mode connection, for the stream's LISTEN (a transaction pooler drops NOTIFY). */
   listenUrl: string;
   idp: IdP;
+  /** Reported by /health; default "devhost". */
+  idpMode?: IdpMode;
   config: Pick<Config, "nodeEnv" | "redact">;
   log: Logger;
   keys: { privateKeyPem: string; publicKeyPem: string };
@@ -64,6 +67,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   const svc = svcTxOf(pools.svc);
   const publish: PublishDeps = { publisher: createHttpPublisher({ url: w.intelUrl, serviceSecret: w.serviceSecret }), svc, keys };
   const deps: Deps = { pools, idp: w.idp, storefronts: storefrontResolver(pools.core), publish, blobs: w.blobs ?? defaultBlobs(), config: w.config, log: w.log };
+  setIdpMode(deps, w.idpMode ?? "devhost");
   // Keyed by this exact Deps object (a WeakMap in stream/index.ts) — never pass createApp a copy.
   configureStream(deps, {
     connect: () => new pg.Client({ connectionString: w.listenUrl, application_name: "munim_stream_listen", keepAlive: true }),
@@ -91,13 +95,19 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
   const config = loadRepoConfig(root);
   const log = createLogger(config);
   try {
+    // Before anything connects: a refused MUNIM_IDP (unknown value, production, non-dev) fails the boot here.
+    const idpMode = resolveIdpMode(process.env, process.argv.slice(2));
+    if (idpMode === "local") log("core-api: DEV LOCAL SIGN-IN ENABLED — not for real users");
     const api = await composeCoreApi({
+      idpMode,
       coreUrl: config.dbUrl("munim_core"),
       svcUrl: config.dbUrl("munim_svc"),
       platformUrl: config.dbUrl("munim_platform"),
       blobs: localBlobStore(join(config.runDir, "blobs")),
       listenUrl: config.sessionDbUrl("munim_core"),
-      idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
+      idp: idpMode === "local"
+        ? createPersistentLocalIdp(config.runDir)
+        : devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
       config,
       log,
       keys: ensureDevRunTokenKeys(config.runTokenKeyDir),

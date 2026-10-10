@@ -282,3 +282,25 @@ function safeDecode(s: string): string {
 export function loadRepoConfig(root: string, env: Record<string, string | undefined> = process.env): Config {
   return loadConfig({ envFile: env.MUNIM_ENV_FILE?.trim() || join(root, ".env"), runDir: join(root, ".run"), env });
 }
+
+export type IdpMode = "local" | "devhost";
+
+/** Which IdP core-api verifies against (R44a): `--idp=<v>` / `--idp <v>` beats `MUNIM_IDP`; default `devhost`.
+ *  Anything but exactly "local" or "devhost" throws (gotcha 17). "local" is refused unless this is a dev
+ *  environment: `NODE_ENV=production` or a `MUNIM_ENV` other than `dev` → ConfigError, before anything starts. */
+export function resolveIdpMode(env: Record<string, string | undefined> = process.env, argv: readonly string[] = []): IdpMode {
+  let raw = env.MUNIM_IDP;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--idp") raw = argv[++i] ?? "";
+    else if (a.startsWith("--idp=")) raw = a.slice("--idp=".length);
+  }
+  const mode = raw === undefined ? "devhost" : raw;
+  if (mode !== "local" && mode !== "devhost") throw new ConfigError(`MUNIM_IDP must be exactly "local" or "devhost"`);
+  if (mode === "local") {
+    if (env.NODE_ENV === "production") throw new ConfigError("MUNIM_IDP=local is refused when NODE_ENV=production");
+    // Explicit: an unset MUNIM_ENV is not "dev" (a deploy that forgot NODE_ENV must not accept local tokens). `make up` sets it.
+    if (env.MUNIM_ENV !== "dev") throw new ConfigError(`MUNIM_IDP=local is refused unless MUNIM_ENV is "dev"`);
+  }
+  return mode;
+}
