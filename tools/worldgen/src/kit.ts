@@ -1,12 +1,10 @@
 // The commands a merchant's day is made of, each sent as a named person's own command through the SDK.
 // Keys (`key` arguments) are the stable seed keys: the same key is the same id and the same idempotency key.
-import { personaIdentity } from "./api.ts";
+import { CommandRefused, personaIdentity } from "./api.ts";
 import type { Ctx, J } from "./ctx.ts";
-import { payoutFile, type Layout, type PayoutLine } from "./files.ts";
-import { csv, major } from "./csv.ts";
+import { payoutFile, payoutFileMany, type Layout, type PayoutLine } from "./files.ts";
 import { idemOf } from "./ids.ts";
-import { addDays, at, isoWeekday, mondayOf } from "./time.ts";
-import { Prng } from "./prng.ts";
+import { addDays, at, mondayOf } from "./time.ts";
 
 export interface OutletInfo { id: string; name: string; tz: string; device: string | null }
 export interface Business {
@@ -59,20 +57,26 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
       outlets[0]!.device = api.alias(d.id as string, "device:1");
     } else if (d.kind === "kds") api.alias(d.id as string, `kds:${(d.outlet_id as string).slice(0, 8)}`);
   }
+  // Synthetic outlets are open all day: the storefront refuses an order when the outlet's hours exclude the real now (409
+  // outlet_paused), and a seed run must work at any wall-clock time. LocalTime caps at 23:59, so that one minute stays closed;
+  // storefrontOrder waits it out.
+  for (const [i, o] of outlets.entries()) {
+    await api.cmd("owner", "/v1/outlets/{id}:update", "tenancy.outlet.update.v1", `hours:${i + 1}`, { outlet_id: o.id, hours: { opens: "00:00", closes: "23:59" } }, { params: { id: o.id } });
+  }
   const t = (await api.get("owner", "/v1/tenant")) as J;
   return { country: spec.country, currency: t.base_currency as string, outlets, channels };
 }
 
 // ---- stock and catalogue -------------------------------------------------------------------------------------
 
-export interface Ingredient { id: string; unit: string }
+export interface Ingredient { id: string; unit: string; name: string }
 
 export async function ingredient(c: Ctx, key: string, name: string, unit: string, o: { shelfDays?: number; batch?: boolean } = {}): Promise<Ingredient> {
   const id = c.api.id(`ing:${key}`);
   await c.api.cmd("owner", "/v1/inventory/ingredients", "inventory.ingredient.upsert.v1", `ing:${key}`, {
     ingredient_id: id, name, base_unit: unit, shelf_life_days: o.shelfDays ?? null, tracked_by_batch: o.batch ?? false,
   });
-  return { id, unit };
+  return { id, unit, name };
 }
 
 export interface Item { id: string; key: string; name: string }
@@ -267,30 +271,47 @@ export async function expense(c: Ctx, key: string, outletId: string, category: s
 
 // ---- imports (a file → parsed run → the owner approves the draft; nothing reaches the books before that) ------------
 
-/** Uploads a file as the owner, waits for its parse, and approves the run's draft as the owner. */
-export async function importFile(c: Ctx, key: string, kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal", filename: string, text: string, reason: string | null = null) {
+export type ImportKindName = "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+interface Queued { key: string; kind: ImportKindName; filename: string; text: string; reason: string | null }
+const queueOf = (c: Ctx): Queued[] => ((c.s.importQueue as Queued[] | undefined) ??= []);
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+/** Queues a file; `flushImports` uploads the queue in order, waits for the parses together (the worker parses on a timer — against
+ *  `make up` that is once a minute, so one wait per batch, not one per file), then approves in the same order as the owner. */
+export function importFile(c: Ctx, key: string, kind: ImportKindName, filename: string, text: string, reason: string | null = null): void {
+  queueOf(c).push({ key, kind, filename, text, reason });
+}
+
+export async function flushImports(c: Ctx): Promise<void> {
   const { api } = c;
-  const up = await api.post("owner", "/v1/imports/documents", {
-    kind, filename, media_type: "text/csv", content_base64: Buffer.from(text, "utf8").toString("base64"),
-  });
-  const run0 = up.run as J | null;
-  if (!run0) throw new Error(`import ${key}: header not recognised`);
-  const runId = api.alias(run0.import_run_id as string, `run:${key}`);
-  api.alias((up.document as J).document_id as string, `doc:${key}`);
-  // The same bytes again (re-seeding a world): the existing run is already committed under its approver.
-  if (up.duplicate === true && run0.status === "committed") return runId;
-  let run: J = run0;
-  for (let i = 0; i < 200 && run.status === "parsing"; i++) {
-    await new Promise((ok) => setTimeout(ok, 100));
-    run = await api.get("owner", "/v1/imports/runs/{id}", { params: { id: runId } });
+  const queue = queueOf(c).splice(0);
+  const pending: Array<{ q: Queued; runId: string; run: J }> = [];
+  for (const q of queue) {
+    const up = await api.post("owner", "/v1/imports/documents", {
+      kind: q.kind, filename: q.filename, media_type: "text/csv", content_base64: Buffer.from(q.text, "utf8").toString("base64"),
+    });
+    const run0 = up.run as J | null;
+    if (!run0) throw new Error(`import ${q.key}: header not recognised`);
+    const runId = api.alias(run0.import_run_id as string, `run:${q.key}`);
+    api.alias((up.document as J).document_id as string, `doc:${q.key}`);
+    // The same bytes again (re-seeding a world): the existing run is already committed under its approver.
+    if (up.duplicate === true && run0.status === "committed") continue;
+    pending.push({ q, runId, run: run0 });
   }
-  if (run.status !== "previewed") throw new Error(`import ${key}: run is ${String(run.status)}`);
-  if ((run.rows_quarantined as number) !== 0) throw new Error(`import ${key}: ${String(run.rows_quarantined)} rows quarantined`);
-  const draft = api.alias(run.draft_id as string, `draft:${key}`);
-  await api.cmd("owner", "/v1/drafts/{id}:approve", "drafts.approve.v1", `approve:${key}`, {
-    draft_id: draft, command_type: "imports.run.commit.v1", edited_payload: null, reason,
-  }, { params: { id: draft } });
-  return runId;
+  for (const p of pending) {
+    for (let i = 0; i < 600 && p.run.status === "parsing"; i++) {
+      await sleep(i < 20 ? 100 : 500);
+      p.run = await api.get("owner", "/v1/imports/runs/{id}", { params: { id: p.runId } });
+    }
+    if (p.run.status !== "previewed") throw new Error(`import ${p.q.key}: run is ${String(p.run.status)}`);
+    if ((p.run.rows_quarantined as number) !== 0) throw new Error(`import ${p.q.key}: ${String(p.run.rows_quarantined)} rows quarantined`);
+  }
+  for (const p of pending) {
+    const draft = api.alias(p.run.draft_id as string, `draft:${p.q.key}`);
+    await api.cmd("owner", "/v1/drafts/{id}:approve", "drafts.approve.v1", `approve:${p.q.key}`, {
+      draft_id: draft, command_type: "imports.run.commit.v1", edited_payload: null, reason: p.q.reason,
+    }, { params: { id: draft } });
+  }
 }
 
 // ---- orders (server-stamped: they land on the day the seed runs — see the report's clock note) -------------------
@@ -407,15 +428,12 @@ export async function countStock(c: Ctx, key: string, outletId: string, lines: A
   });
 }
 
-// ---- clean history (the full six-month profile only) ---------------------------------------------------------------
-
-export interface PosHistory { outlet: OutletInfo; prefix: string; billsPerDay: [number, number]; ticketMinor: [number, number]; taxBp: number }
+// ---- clean history (the full profile only) -----------------------------------------------------------------------------
 
 export interface HistorySpec {
-  /** Another POS's bills for every day of the timeline before today, as export files (the approved import path:
-   *  orders cannot be backdated through POST /v1/orders, but a POS export commits completed orders on the bill date). */
-  pos?: PosHistory[];
-  payouts: Array<{ layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number }>;
+  /** Baseline statements, one file per weekly cycle, listing the history bills of that outlet and channel (the planted window's own
+   *  statements are written by the world). `bills` is the history plan's aggregator bills for a cycle. */
+  payouts: Array<{ layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number; bills: (from: string, to: string) => Array<{ no: string; date: string; gross: number }> }>;
   temp?: { outlet: OutletInfo; assetId: string; assetKey: string; milliC: number; hhmm: string };
   rent?: { outlet: OutletInfo; amountMinor: number };
 }
@@ -424,67 +442,59 @@ export interface HistorySpec {
  *  Nothing here is a problem; the window itself is where every planted problem sits. */
 export async function history(c: Ctx, spec: HistorySpec): Promise<void> {
   const D = (n: number) => addDays(c.asOf, -n);
-  for (const p of spec.pos ?? []) await posHistory(c, p);
   const weeks = Math.floor((c.days - 14) / 7);
-  for (let w = 1; w <= weeks; w++) {
-    for (const p of spec.payouts) {
-      const ref = `${p.prefix}-H${w}`;
-      const lines: PayoutLine[] = Array.from({ length: 5 }, (_, i) => ({
-        kind: "order", orderRef: `${ref}-${i + 1}`, orderDate: addDays(D(7 * w + 13), i), gross: 30000 + i * 5000, commission: ((30000 + i * 5000) * p.commissionBp) / 10000, ad: 0, promo: 0, tax: 0,
+  // One statement file per aggregator holding every weekly cycle (each row names its own payout ref): the worker parses a few runs a
+  // minute, so the number of files, not their size, is what a seed run waits for.
+  for (const p of spec.payouts) {
+    const cycles = Array.from({ length: weeks }, (_, i) => {
+      const w = i + 1;
+      const meta = { ref: `${p.prefix}-H${w}`, outlet: p.outlet.name, from: D(7 * w + 13), to: D(7 * w + 7), paidOn: D(7 * w + 5) };
+      const lines: PayoutLine[] = p.bills(meta.from, meta.to).map((b) => ({
+        kind: "order", orderRef: b.no, orderDate: b.date, gross: b.gross, commission: Math.round((b.gross * p.commissionBp) / 10000), ad: 0, promo: 0, tax: 0,
       }));
-      await importFile(c, ref, "payout_statement", `${ref}.csv`, payoutFile(p.layout, { ref, outlet: p.outlet.name, from: D(7 * w + 13), to: D(7 * w + 7), paidOn: D(7 * w + 5) }, lines));
-    }
+      return { meta, lines };
+    }).filter((x) => x.lines.length > 0);
+    if (cycles.length) importFile(c, `${p.prefix}-history`, "payout_statement", `${p.prefix}-history.csv`, payoutFileMany(p.layout, cycles));
   }
   if (spec.temp) {
-    for (let n = c.days; n >= 4; n--) await tempLog(c, `${spec.temp.assetKey}h:${n}`, spec.temp.outlet.id, spec.temp.assetId, spec.temp.milliC, at(D(n), spec.temp.hhmm, spec.temp.outlet.tz));
+    for (let n = c.liveDays; n >= 4; n--) await tempLog(c, `${spec.temp.assetKey}h:${n}`, spec.temp.outlet.id, spec.temp.assetId, spec.temp.milliC, at(D(n), spec.temp.hhmm, spec.temp.outlet.tz));
   }
   if (spec.rent) {
     for (let n = c.days; n >= 14; n -= 30) await expense(c, `rent:h${n}`, spec.rent.outlet.id, "rent", D(n), spec.rent.amountMinor, 0, "Synthetic Landlord LLP");
   }
 }
 
-const POS_HEADER = ["Bill No", "Bill Date", "Outlet", "Order Type", "Payment Mode", "Subtotal", "Discount", "Tax", "Total"];
+// ---- storefront and customers --------------------------------------------------------------------------------------
 
-/** Weekly POS-export files (Monday-anchored, so a day's bills are the same whatever the profile length). */
-async function posHistory(c: Ctx, p: PosHistory): Promise<void> {
-  const first = addDays(c.asOf, -c.days);
-  const last = addDays(c.asOf, -1);
-  for (let wk = mondayOf(first); wk <= last; wk = addDays(wk, 7)) {
-    const rows: Array<Array<string | number>> = [POS_HEADER];
-    let total = 0;
-    for (let d = wk < first ? first : wk; d < addDays(wk, 7) && d <= last; d = addDays(d, 1)) {
-      const rng = new Prng(c.seed, c.world, "pos", p.prefix, d);
-      const n = Math.round(rng.int(...p.billsPerDay) * (isoWeekday(d) >= 5 ? 1.4 : 1));
-      for (let i = 0; i < n; i++) {
-        const subtotal = rng.int(Math.round(p.ticketMinor[0] / 100), Math.round(p.ticketMinor[1] / 100)) * 100;
-        const discount = rng.chance(0.08) ? Math.round(subtotal / 1000) * 100 : 0;
-        const tax = Math.round(((subtotal - discount) * p.taxBp) / 10000);
-        const bill = subtotal - discount + tax;
-        total += bill;
-        const u = rng.next();
-        rows.push([`${p.prefix}-${d.replaceAll("-", "")}-${String(i + 1).padStart(3, "0")}`, d, p.outlet.name, rng.pick(["dine_in", "takeaway", "takeaway", "pickup"]),
-          u < 0.3 ? "cash" : u < 0.8 ? "upi" : "card", major(subtotal), major(discount), major(tax), major(bill)]);
-      }
-    }
-    const t: Array<string | number> = POS_HEADER.map(() => "");
-    t[0] = "TOTAL";
-    t[8] = major(total);
-    rows.push(t);
-    const ref = `pos:${p.prefix}:${wk}`;
-    await importFile(c, ref, "pos_export", `${p.prefix}-${wk}.csv`, csv(rows));
+/** The owner creates a storefront key for the own-site channel; the raw key is returned once and never logged. Seeding a world again finds the
+ *  key already made (409) and has no raw key to use: null, and the storefront legs, already in the books, are skipped. */
+export async function storefrontKey(c: Ctx, biz: Business): Promise<string | null> {
+  try {
+    const r = await c.api.post("owner", "/v1/storefront-keys", { key_id: c.api.id("sfkey:1"), channel_id: biz.channels["own_site"], allowed_origins: ["https://order.example.test"] });
+    return (r.key as string | undefined) ?? "plan-key";
+  } catch (e) {
+    if (e instanceof CommandRefused && e.status === 409) return null;
+    throw e;
   }
 }
 
-// ---- storefront and customers --------------------------------------------------------------------------------------
-
-/** The owner creates a storefront key for the own-site channel; the raw key is returned once and never logged. */
-export async function storefrontKey(c: Ctx, biz: Business): Promise<string> {
-  const r = await c.api.post("owner", "/v1/storefront-keys", { key_id: c.api.id("sfkey:1"), channel_id: biz.channels["own_site"], allowed_origins: ["https://order.example.test"] });
-  return (r.key as string | undefined) ?? "plan-key";
+/** The storefront refuses while the outlet's calendar is closed at the real now. Hours are 00:00-23:59 (see onboard), so the only closed
+ *  minute is 23:59 local: when the outlet says it opens within two minutes, wait for it (a read, never logged, so the request log is the
+ *  same at any hour). A longer closure is left to the placement, which refuses with the server's own reason (outlet_paused). */
+async function untilOpen(c: Ctx, sfKey: string, outlet: OutletInfo): Promise<void> {
+  if (c.api.lenient) return;
+  for (let i = 0; i < 150; i++) {
+    const st = await c.api.storefrontGet(sfKey, "/v1/storefront/outlets/{outlet_id}/state", { params: { outlet_id: outlet.id } });
+    const opensIn = st.next_open ? Date.parse(String(st.next_open)) - Date.parse(String(st.as_of)) : Number.POSITIVE_INFINITY;
+    if (st.state !== "closed" || opensIn > 120_000) return;
+    await new Promise((ok) => setTimeout(ok, 1000));
+  }
 }
 
 /** A guest checks out on the public storefront (pay at the counter): guest record + order in one request. */
-export async function storefrontOrder(c: Ctx, sfKey: string, key: string, biz: Business, outlet: OutletInfo, it: Item, guest: { name: string; phone: string }) {
+export async function storefrontOrder(c: Ctx, sfKey: string | null, key: string, biz: Business, outlet: OutletInfo, it: Item, guest: { name: string; phone: string }) {
+  if (sfKey === null) return;
+  await untilOpen(c, sfKey, outlet);
   await c.api.storefront(sfKey, "/v1/storefront/orders", {
     order: {
       command_id: c.api.id(`cmd:${key}`), idempotency_key: idemOf(c.seed, c.world, key), type: "orders.place.v1",

@@ -22,6 +22,8 @@ export interface RunOptions {
   asOf: string;
   /** 14 = the gate profile; 183 ≈ six months. */
   days: number;
+  /** Reach of the live-command legs (default 35): see Ctx.liveDays. */
+  liveDays?: number;
   /** Real API: its base URL and a bearer token per persona. Omit both for plan mode. */
   baseUrl?: string;
   token?: (persona: string) => string | Promise<string>;
@@ -35,7 +37,7 @@ export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log:
     baseUrl: o.baseUrl ?? "http://plan.invalid", seed, world: o.world, token: o.token ?? (() => "plan"),
     ...(dry ? { fetch: dryFetch(mod.meta), lenient: true } : {}),
   });
-  const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days });
+  const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}) });
   await mod.build(c);
-  return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days}\n${api.logText()}`, api };
+  return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days} live_days=${c.liveDays}\n${api.logText()}`, api };
 }

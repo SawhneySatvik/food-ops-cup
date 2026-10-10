@@ -143,6 +143,24 @@ export class Api {
     return (r.data ?? {}) as J;
   }
 
+  /** True in plan mode (a fake transport): reads return placeholders, so a caller must not wait on what they say. */
+  get lenient(): boolean {
+    return this.#o.lenient === true;
+  }
+
+  /** A storefront read with the public key (not logged). */
+  async storefrontGet(storefrontKey: string, path: string, o: { params: Record<string, string> }) {
+    const k = `storefront|${storefrontKey}`;
+    let c = this.#clients.get(k);
+    if (!c) {
+      c = createMunimClient({ baseUrl: this.#o.baseUrl, storefrontKey, fetch: this.#fetch });
+      this.#clients.set(k, c);
+    }
+    const r = await (c as unknown as { GET(p: string, i: unknown): Promise<{ data?: J; error?: J; response: Response }> }).GET(path, { params: { path: o.params } });
+    if (!this.#o.lenient && r.response.status !== 200) throw new CommandRefused(r.response.status, "?", `GET ${path}`);
+    return (r.data ?? {}) as J;
+  }
+
   /** A read (not logged: reads never change the world). */
   async get(persona: string, path: string, o: { params?: Record<string, string>; query?: Record<string, string> } = {}) {
     const c = this.#client(persona, true) as unknown as { GET(p: string, i: unknown): Promise<{ data?: J; error?: J; response: Response }> };

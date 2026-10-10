@@ -1,4 +1,4 @@
-// make seed WORLD=<name>  →  node tools/worldgen/src/cli.ts --world=<name> [--as-of=YYYY-MM-DD] [--days=183] [--seed=…] [--plan]
+// make seed WORLD=<name>  →  node tools/worldgen/src/cli.ts --world=<name> [--as-of=YYYY-MM-DD] [--days=183] [--live-days=35] [--seed=…] [--plan]
 // Live mode talks to a running core-api (`make up`) as personas, with their IdP bearer tokens:
 //   MUNIM_API_URL        default http://127.0.0.1:${PORT:-8787}
 //   MUNIM_SEED_TOKENS    JSON {"owner": "<jwt>", "manager": "<jwt>", …} — one token per persona the world names
@@ -7,9 +7,9 @@
 // adapters/dev/idp-local/mint-seed-tokens.ts (worldgen's src may not spawn processes or reach adapters, gate d).
 // --plan runs the world against a fake transport and prints the request log (no server, no tokens).
 import { DEFAULT_SEED, loadWorld, runWorld, WORLDS, type WorldName } from "./run.ts";
-import { localDate } from "./time.ts";
+import { businessToday } from "./time.ts";
 
-const FLAGS = new Set(["world", "as-of", "days", "seed", "plan"]);
+const FLAGS = new Set(["world", "as-of", "days", "live-days", "seed", "plan"]);
 
 function parse(argv: string[]): Map<string, string> {
   const out = new Map<string, string>();
@@ -29,12 +29,14 @@ async function main() {
   const mod = await loadWorld(world as WorldName);
   const days = Number(args.get("days") ?? 183);
   if (!Number.isInteger(days) || days < 14 || days > 400) throw new Error("--days must be a whole number from 14 to 400");
-  const asOf = args.get("as-of") ?? localDate(new Date(), mod.meta.tz);
+  const liveDays = args.has("live-days") ? Number(args.get("live-days")) : undefined;
+  if (liveDays !== undefined && (!Number.isInteger(liveDays) || liveDays < 14 || liveDays > days)) throw new Error("--live-days must be a whole number from 14 to --days");
+  const asOf = args.get("as-of") ?? businessToday(new Date(), mod.meta.tz);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error("--as-of must be YYYY-MM-DD");
   const seed = args.get("seed") ?? DEFAULT_SEED;
 
   if (args.has("plan")) {
-    process.stdout.write((await runWorld({ world: world as WorldName, seed, asOf, days })).log);
+    process.stdout.write((await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}) })).log);
     return;
   }
   const tokens: Record<string, string> = process.env.MUNIM_SEED_TOKENS ? (JSON.parse(process.env.MUNIM_SEED_TOKENS) as Record<string, string>) : {};
@@ -45,7 +47,7 @@ async function main() {
       + "A the dev host-mode core-api needs real verified sign-ins; for the dev-only local sign-in start it with `MUNIM_IDP=local make up LOCAL_DB=1` and run `make seed` (it mints the tokens).");
   }
   const baseUrl = process.env.MUNIM_API_URL ?? `http://127.0.0.1:${process.env.PORT ?? "8787"}`;
-  const r = await runWorld({ world: world as WorldName, seed, asOf, days, baseUrl, token: (p) => tokens[p]! });
+  const r = await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), baseUrl, token: (p) => tokens[p]! });
   console.log(`worldgen: ${world} seeded (${r.api.lines.length} writes, as_of=${asOf}, days=${days}); planted ${r.planted.length}: ${r.planted.join(" ")}`);
   console.log(`verify:   node tools/worldgen/verify/run.ts --world=${world} --as-of=${asOf}   (MUNIM_API_URL, MUNIM_SEED_TOKEN)`);
 }

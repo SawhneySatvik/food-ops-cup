@@ -1,8 +1,13 @@
 // All wall-clock work goes through core-domain's tz module (gotcha 14): outlet-local dates and times in, instants
 // out. Calendar arithmetic uses Date.UTC and the getUTC* readers only, so the process TZ cannot leak in.
-import { localDate, localToInstant } from "../../../packages/core-domain/tz/index.ts";
+import { businessDate, DEFAULT_BUSINESS_DAY_CUTOFF, localDate, localToInstant } from "../../../packages/core-domain/tz/index.ts";
 
 export { localDate };
+
+/** Outlet-local "today" as the server counts it: the business date (a sale at 02:00 still belongs to the day before), with the outlet default
+ *  cutoff (0014: 04:00). History must be dated strictly before the server's business date, so a seed run starting between 00:00 and the cutoff
+ *  must not use the calendar date. */
+export const businessToday = (now: Date, tz: string): string => businessDate(now, tz, DEFAULT_BUSINESS_DAY_CUTOFF);
 
 export function addDays(date: string, n: number): string {
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];

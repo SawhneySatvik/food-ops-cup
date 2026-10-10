@@ -49,17 +49,20 @@ const SPEC: Record<Layout, Spec> = {
   },
 };
 
-export function payoutFile(layout: Layout, p: { ref: string; outlet: string; from: string; to: string; paidOn: string }, lines: PayoutLine[]): string {
+/** One statement file holding several payout cycles (every row names its own payout ref); the TOTAL row sums all of them. */
+export function payoutFileMany(layout: Layout, cycles: Array<{ meta: { ref: string; outlet: string; from: string; to: string; paidOn: string }; lines: PayoutLine[] }>): string {
   const s = SPEC[layout];
   const rows: Array<Array<string | number>> = [s.header];
   let total = 0;
-  for (const l of lines) {
-    const net = netOf(l);
-    total += net;
-    rows.push([
-      p.ref, s.date(p.from), s.date(p.to), s.date(p.paidOn), p.outlet, l.orderRef, s.date(l.orderDate), l.kind === "order" ? s.labels.order : s.labels.ads,
-      s.money(l.gross), s.money(l.commission), s.money(l.ad), s.money(l.promo), s.money(l.tax), s.money(net), ...(s.currency ? [s.currency] : []),
-    ]);
+  for (const { meta: p, lines } of cycles) {
+    for (const l of lines) {
+      const net = netOf(l);
+      total += net;
+      rows.push([
+        p.ref, s.date(p.from), s.date(p.to), s.date(p.paidOn), p.outlet, l.orderRef, s.date(l.orderDate), l.kind === "order" ? s.labels.order : s.labels.ads,
+        s.money(l.gross), s.money(l.commission), s.money(l.ad), s.money(l.promo), s.money(l.tax), s.money(net), ...(s.currency ? [s.currency] : []),
+      ]);
+    }
   }
   const t: Array<string | number> = s.header.map(() => "");
   t[0] = "TOTAL";
@@ -67,3 +70,6 @@ export function payoutFile(layout: Layout, p: { ref: string; outlet: string; fro
   rows.push(t);
   return csv(rows);
 }
+
+export const payoutFile = (layout: Layout, p: { ref: string; outlet: string; from: string; to: string; paidOn: string }, lines: PayoutLine[]): string =>
+  payoutFileMany(layout, [{ meta: p, lines }]);
