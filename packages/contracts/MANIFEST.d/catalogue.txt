@@ -1,4 +1,13 @@
 catalogue.item.upsert.v1
 catalogue.recipe.version.create.v1
 catalogue.price.set.v1
+catalogue.deal.upsert.v1
+catalogue.deal.end.v1
+catalogue.coupon.set.v1
+catalogue.availability.set.v1
 proposal.catalogue.price.set.v1
+proposal.catalogue.recipe.version.create.v1
+proposal.catalogue.deal.end.v1
+proposal.catalogue.coupon.set.v1
+v1.catalogue.menu
+v1.catalogue.barcode

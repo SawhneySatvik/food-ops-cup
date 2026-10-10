@@ -1,4 +1,4 @@
-import { u } from "./_ids.ts";
+import { S1, T, snapRef, u } from "./_ids.ts";
 
 export const priceSet = {
   price_id: u(30),
@@ -15,6 +15,24 @@ export const priceSet = {
 
 /** A shop SKU: stocked through its 1:1 ingredient row, MRP printed. */
 export const skuItem = { item_id: u(21), name_key: "sku.butter_100g", category: "dairy", brand_id: null, barcode: "8901262010016", mrp_minor: 5800, currency: "INR", active: true, variants: [], option_groups: [], kind: "sku", stock_ingredient_id: u(43) };
+
+/** 2-for-1 on paneer tikka, weekday tea time, outlet 2 only. */
+export const dealUpsert = {
+  deal_id: u(50), name_key: "deal.tea_time_2for1", rule: { kind: "buy_x_get_y", buy_qty: 1, get_qty: 1, item_ids: [u(20)] },
+  windows: [{ days: [1, 2, 3, 4, 5], from: "15:00", to: "18:00" }, { days: [5, 6], from: "22:00", to: "02:00" }],
+  outlet_ids: [u(2)], valid_from: "2026-10-01", valid_to: null, active: true,
+};
+export const couponSet = {
+  coupon_id: u(51), code: "WELCOME10", kind: "percent", value_bp: 1000, value_minor: null, currency: "INR", min_spend_minor: 30000,
+  global_cap: 500, per_customer_cap: null, requires_customer: false, outlet_ids: [], valid_from: T, valid_to: null, active: true,
+};
+const menuEntry = {
+  item_id: u(20), variant_id: u(24), kind: "dish", name_key: "dish.paneer_tikka", variant_name_key: "dish.paneer_tikka.half", category: "starters",
+  barcode: null, price_id: u(30), price_minor: 24900, currency: "INR", tax_class: "restaurant_5", mrp_minor: null, available: true,
+  option_groups: [{ option_group_id: u(25), name_key: "opt.extras", min_select: 0, max_select: 2, required: false,
+    options: [{ option_id: u(23), name_key: "opt.extra_paneer", price_delta_minor: 3000, currency: "INR" }] }],
+  deals: [{ deal_id: u(50), name_key: "deal.tea_time_2for1", kind: "buy_x_get_y", windows: dealUpsert.windows }],
+};
 
 export const SAMPLES: Record<string, unknown> = {
   "catalogue.item.upsert.v1": {
@@ -45,4 +63,20 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "catalogue.recipe.version.create.v1": { recipe_version_id: u(22), item_id: u(20), variant_id: null, version: 1, valid_from: "2026-10-01", valid_to: null, yield_qty_milli: 1000, lines: [{ ingredient_id: u(40), qty_milli: 150, unit: "kg", waste_pct_bp: 500 }] },
   "catalogue.price.set.v1": priceSet,
+  "catalogue.deal.upsert.v1": dealUpsert,
+  "catalogue.deal.end.v1": { deal_id: u(50), valid_to: "2026-10-20" },
+  "catalogue.coupon.set.v1": couponSet,
+  "catalogue.availability.set.v1": { outlet_id: u(2), item_id: u(20), variant_id: null, available: false },
+  "proposal.catalogue.recipe.version.create.v1": {
+    recipe_version_id: u(29), item_id: u(20), variant_id: null, version: snapRef(S1, 0, "next_version"), valid_from: "2026-10-12", valid_to: null,
+    yield_qty_milli: snapRef(S1, 0, "yield_qty_milli"),
+    lines: [{ ingredient_id: u(40), qty_milli: snapRef(S1, 0, "qty_milli"), unit: "kg", waste_pct_bp: snapRef(S1, 0, "observed_waste_bp") }],
+  },
+  "proposal.catalogue.deal.end.v1": { deal_id: u(50), valid_to: "2026-10-12" },
+  "proposal.catalogue.coupon.set.v1": {
+    ...couponSet, value_bp: snapRef(S1, 0, "value_bp"), min_spend_minor: snapRef(S1, 0, "min_spend_minor"),
+    global_cap: snapRef(S1, 0, "global_cap"), per_customer_cap: snapRef(S1, 0, "per_customer_cap"), requires_customer: true,
+  },
+  "v1.catalogue.menu": { outlet_id: u(2), channel_kind: "counter", business_date: "2026-10-09", entries: [menuEntry] },
+  "v1.catalogue.barcode": { barcode: "8901262010016", item_id: u(21), variant_id: null, on_sale: true, entry: { ...menuEntry, item_id: u(21), kind: "sku", name_key: "sku.butter_100g", variant_id: null, variant_name_key: null, barcode: "8901262010016", mrp_minor: 5800, option_groups: [], deals: [] } },
 };
