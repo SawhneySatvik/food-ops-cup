@@ -34,6 +34,7 @@ export const SAMPLES: Record<string, unknown> = {
     ...adjust, postings: adjust.postings.map((p) => ({ ...p, amount_minor: snapRef(S1, 0, "unapproved_minor") })),
   },
   "proposal.finance.period.close.v1": { ...close, net_minor: snapRef(S1, 0, "net_minor") },
+  "v1.finance.channel-terms": { channel_terms: [terms, { ...terms, channel_terms_id: u(1109), ads_opted_in: false, ad_spend_cap_minor: null, valid_from: "2026-01-01", valid_to: "2026-09-01" }] },
   "v1.finance.tally-export": {
     file_name: "munim-tally-2026-09-01-to-2026-09-30.csv", content_type: "text/csv",
     content: `Date,Voucher Type,Voucher No,Ledger Code,Ledger,Debit,Credit,Narration\r\n30-09-2026,Journal,${u(1106)},1000,Cash on hand,10.00,,finance.post_tender\r\n`,

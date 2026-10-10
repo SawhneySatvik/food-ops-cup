@@ -41,6 +41,7 @@ export type Role =
   | "utilities"
   | "wages"
   | "payment_fees"
+  | "loyalty_redemption"
   | "other_expense";
 
 /** role → candidate codes (first present wins) and the account type the role must have. */
@@ -65,6 +66,9 @@ export const ROLES: Readonly<Record<Role, { codes: readonly string[]; type: Acco
   utilities: { codes: ["6200"], type: "expense" },
   wages: { codes: ["6300"], type: "expense" },
   payment_fees: { codes: ["6400"], type: "expense" },
+  // Points carry no liability when earned (no earn posting): what they paid for is revenue given up — a contra-revenue
+  // income account (debit balance), the account 0016 backfills into existing charts.
+  loyalty_redemption: { codes: ["4100"], type: "income" },
   other_expense: { codes: ["6900"], type: "expense" },
 };
 

@@ -30,10 +30,14 @@ export async function listCustomers(c: Queryable, f: CustomerFilter): Promise<{ 
   const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, boolean>; has_account: boolean; erased: boolean; created_at: Date }>(
     `SELECT id, name, phone, email, consent, idp_sub IS NOT NULL AS has_account, erased_at IS NOT NULL AS erased, created_at
        FROM core.customer
-      WHERE ($1 = '' OR name ILIKE $2 OR email ILIKE $2 OR ($3 <> '' AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') LIKE '%' || $3 || '%'))
+      WHERE ($1 = '' OR name ILIKE $2 OR ($6::boolean AND email ILIKE $2)
+             OR ($3 <> '' AND (CASE WHEN $6 THEN regexp_replace(coalesce(phone, ''), '\\D', '', 'g')
+                                    ELSE right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 4) END) LIKE '%' || $3 || '%'))
         AND ($4::uuid IS NULL OR id < $4::uuid)
       ORDER BY id DESC LIMIT $5`,
-    [q, like, digits, f.cursor ?? null, f.limit + 1]);
+    // R1-m2: a caller shown masked contacts matches only what it is shown — the name and the phone's last four digits,
+    // never the email or the hidden digits (a search that matched them would reveal them one guess at a time).
+    [q, like, digits, f.cursor ?? null, f.limit + 1, f.full]);
   const page = r.rows.slice(0, f.limit);
   return {
     customers: page.map((x) => ({

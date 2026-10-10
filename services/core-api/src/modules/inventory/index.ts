@@ -10,6 +10,7 @@
 //   POST /v1/inventory/expired-sale-overrides         inventory.expired_sale.override.v1 (R40 C7; pack flag)
 //   GET  /v1/inventory/movements?outlet=&ingredient=&limit=&cursor=
 //   GET  /v1/inventory/batches?outlet=&ingredient=
+//   GET  /v1/inventory/reorder-levels?outlet=&ingredient=
 // Seams (W2 lane brief): pickSaleBatches, deriveOrderConsumption, deriveGoodsReceipt; also consumeExpiredOverrides
 // and deriveSaleReturn for orders (T-022), onNegativeOnHand for the alert path.
 import { commandEnvelopeOf, type CommandEnvelope } from "@munim/contracts";
@@ -27,7 +28,7 @@ import { registerDraftHandler } from "../approvals/index.ts";
 import {
   batchUpdate, countSubmit, expiredSaleOverride, ingredientUpsert, reorderLevelSet, stockReceive, transferCreate, transferReceive, wasteRecord,
 } from "./handlers.ts";
-import { listBatches, listMovements } from "./read.ts";
+import { listBatches, listMovements, listReorderLevels } from "./read.ts";
 
 export { consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, pickSaleBatches, reverseOrderConsumption } from "./seams.ts";
 export type { ConsumptionResult, DerivationResult, SaleLineIn, SalePick, SalePickRefusal, SalePicks } from "./seams.ts";
@@ -122,4 +123,9 @@ export const router = new Hono<AppEnv>()
     const m = member(c);
     const q = { outlet: readOutlet(c, m), ingredient: optionalId(c, "ingredient") };
     return c.json(await withContext(c.var.deps.pools.core, contextOf(m), (db) => listBatches(db, q)), 200);
+  })
+  .get("/v1/inventory/reorder-levels", requireMember, async (c) => {
+    const m = member(c);
+    const q = { outlet: readOutlet(c, m), ingredient: optionalId(c, "ingredient") };
+    return c.json(await withContext(c.var.deps.pools.core, contextOf(m), (db) => listReorderLevels(db, q)), 200);
   });

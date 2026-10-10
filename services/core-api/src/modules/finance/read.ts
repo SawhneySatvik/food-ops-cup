@@ -118,3 +118,18 @@ export async function tallyExport(tx: Tx, from: string, to: string): Promise<{ f
   const pack = await tenantPack(tx);
   return { file_name: `munim-tally-${from}-to-${to}.csv`, content_type: "text/csv", content: tallyCsv(vouchers, pack.currency.minor_unit) };
 }
+
+/** Recorded channel terms, the rows' own fields, newest window first (one channel when `channelId` is given). */
+export async function listChannelTerms(tx: Tx, channelId: string | null) {
+  const r = await tx.query<{ id: string; channel_id: string; commission_bp: number; ads_opted_in: boolean; ad_spend_cap_minor: string | null;
+    promo_share_bp: number; payout_cycle_days: number; currency: string; valid_from: string; valid_to: string | null }>(
+    `SELECT id, channel_id, commission_bp, ads_opted_in, ad_spend_cap_minor::text, promo_share_bp, payout_cycle_days, currency, valid_from::text, valid_to::text
+       FROM core.channel_terms WHERE $1::uuid IS NULL OR channel_id = $1 ORDER BY channel_id, valid_from DESC, id`, [channelId]);
+  return {
+    channel_terms: r.rows.map((t) => ({
+      channel_terms_id: t.id, channel_id: t.channel_id, commission_bp: t.commission_bp, ads_opted_in: t.ads_opted_in,
+      ad_spend_cap_minor: t.ad_spend_cap_minor === null ? null : Number(t.ad_spend_cap_minor), promo_share_bp: t.promo_share_bp,
+      payout_cycle_days: t.payout_cycle_days, currency: t.currency, valid_from: t.valid_from, valid_to: t.valid_to,
+    })),
+  };
+}

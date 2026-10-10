@@ -11,6 +11,7 @@ import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { dbRefusal } from "./errors.ts";
 import { outstandingAdvance } from "./payroll.ts";
+import { postFor } from "./seams.ts";
 
 const T = `current_setting('app.tenant_id')::uuid`;
 const ME = `current_setting('app.member_id')::uuid`;
@@ -32,10 +33,21 @@ function parse<S extends { parse(v: unknown): unknown }>(schema: S, v: unknown):
   }
 }
 
+// R1-m11: a pay change is audited with its amounts (before → after); name and phone never ride in the audit.
+const PAY = `pay_basis, wage_rate_minor::text, monthly_salary_minor::text, contract_min_per_month, ot_multiplier_bp, currency`;
+type Pay = { pay_basis: string; wage_rate_minor: string | null; monthly_salary_minor: string | null; contract_min_per_month: number | null; ot_multiplier_bp: number; currency: string };
+const payOf = (r: Pay) => ({
+  pay_basis: r.pay_basis, wage_rate_minor: r.wage_rate_minor === null ? null : Number(r.wage_rate_minor),
+  monthly_salary_minor: r.monthly_salary_minor === null ? null : Number(r.monthly_salary_minor),
+  contract_min_per_month: r.contract_min_per_month, ot_multiplier_bp: r.ot_multiplier_bp, currency: r.currency,
+});
+
 export const staffUpsertHandler: CommandHandler = {
   type: "people.staff.upsert.v1",
   async run(c, cmd) {
     const p = parse(PeopleStaffUpsertV1, cmd.payload);
+    const prior = (await c.query<Pay & { outlet_id: string; role_key: string; active: boolean }>(
+      `SELECT ${PAY}, outlet_id, role_key, active FROM core.staff WHERE id = $1 FOR UPDATE`, [p.staff_id])).rows[0];
     const r = await guarded(() => c.query<{ member_id: string | null; joined_on: string; currency: string }>(
       `INSERT INTO core.staff (tenant_id, id, member_id, outlet_id, name, phone, role_key, pay_basis, wage_rate_minor, monthly_salary_minor,
                                contract_min_per_month, ot_multiplier_bp, currency, joined_on, left_on, active, created_by)
@@ -44,25 +56,40 @@ export const staffUpsertHandler: CommandHandler = {
          role_key = EXCLUDED.role_key, pay_basis = EXCLUDED.pay_basis, wage_rate_minor = EXCLUDED.wage_rate_minor,
          monthly_salary_minor = EXCLUDED.monthly_salary_minor, contract_min_per_month = EXCLUDED.contract_min_per_month,
          ot_multiplier_bp = EXCLUDED.ot_multiplier_bp, left_on = EXCLUDED.left_on, active = EXCLUDED.active
-       RETURNING member_id, to_char(joined_on, 'YYYY-MM-DD') AS joined_on, currency`,
+       RETURNING member_id, to_char(joined_on, 'YYYY-MM-DD') AS joined_on, ${PAY}`,
       [p.staff_id, p.member_id, p.outlet_id, p.name, p.phone, p.role_key, p.pay_basis, p.wage_rate_minor, p.monthly_salary_minor,
        p.contract_min_per_month, p.ot_multiplier_bp, p.currency, p.joined_on, p.left_on, p.active]));
     // member_id, joined_on and currency are fixed at creation (not in the column grant): a change is refused, not dropped.
-    const row = r.rows[0]!;
+    const row = r.rows[0]! as Pay & { member_id: string | null; joined_on: string };
     if (row.member_id !== p.member_id || row.joined_on !== p.joined_on || row.currency !== p.currency) throw new ApiError("invalid_payload");
-    return { entityId: p.staff_id, audit: [{ entity: "core.staff", entityId: p.staff_id, after: { outlet_id: p.outlet_id, role_key: p.role_key, active: p.active } }] };
+    const after = { outlet_id: p.outlet_id, role_key: p.role_key, active: p.active, ...payOf(row) };
+    return {
+      entityId: p.staff_id,
+      audit: [{ entity: "core.staff", entityId: p.staff_id,
+        ...(prior ? { before: { outlet_id: prior.outlet_id, role_key: prior.role_key, active: prior.active, ...payOf(prior) } } : {}), after }],
+    };
   },
 };
 
 type ShiftIn = { roster_shift_id: string; staff_id: string; starts_at: string; ends_at: string; role_key: string };
+type ShiftAudit = { entity: "core.roster_shift"; entityId: string; before?: unknown; after: unknown };
 
-async function insertShifts(c: Queryable, rosterId: string, outletId: string, shifts: ShiftIn[]) {
+// R1-M2: every roster_shift row written is audited on its own, with what it was before and after. Times are UTC ISO.
+const SHIFT = `staff_id, to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
+               to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS ends_at, role_key, status`;
+type ShiftRow = { id: string; staff_id: string; starts_at: string; ends_at: string; role_key: string; status: string };
+const shiftOf = ({ id: _id, ...r }: ShiftRow) => r;
+
+async function insertShifts(c: Queryable, rosterId: string, outletId: string, shifts: ShiftIn[]): Promise<ShiftAudit[]> {
+  const out: ShiftAudit[] = [];
   for (const s of shifts) {
-    await c.query(
+    const r = await c.query<ShiftRow>(
       `INSERT INTO core.roster_shift (tenant_id, id, roster_id, outlet_id, staff_id, starts_at, ends_at, role_key, created_by)
-       VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, ${ME})`,
+       VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, ${ME}) RETURNING id, ${SHIFT}`,
       [s.roster_shift_id, rosterId, outletId, s.staff_id, s.starts_at, s.ends_at, s.role_key]);
+    out.push({ entity: "core.roster_shift", entityId: s.roster_shift_id, after: shiftOf(r.rows[0]!) });
   }
+  return out;
 }
 
 /** Every scheduled shift of the roster must start on a local date inside its week. */
@@ -79,15 +106,16 @@ export const rosterCreateHandler: CommandHandler = {
   type: "people.roster.create.v1",
   async run(c, cmd) {
     const p = parse(PeopleRosterCreateV1, cmd.payload);
-    await guarded(async () => {
+    const shifts = await guarded(async () => {
       await c.query(
         `INSERT INTO core.roster (tenant_id, id, outlet_id, week_start, draft_id, created_by)
          VALUES (${T}, $1, $2, $3, (SELECT draft_id FROM core.decision WHERE id = nullif(current_setting('app.decision_id', true), '')::uuid), ${ME})`,
         [p.roster_id, p.outlet_id, p.week_start]);
-      await insertShifts(c, p.roster_id, p.outlet_id, p.shifts);
+      const added = await insertShifts(c, p.roster_id, p.outlet_id, p.shifts);
       await assertShiftsInWeek(c, p.roster_id);
+      return added;
     });
-    return { entityId: p.roster_id, audit: [{ entity: "core.roster", entityId: p.roster_id, after: { outlet_id: p.outlet_id, week_start: p.week_start, shifts: p.shifts.length } }] };
+    return { entityId: p.roster_id, audit: [{ entity: "core.roster", entityId: p.roster_id, after: { outlet_id: p.outlet_id, week_start: p.week_start, shifts: p.shifts.length } }, ...shifts] };
   },
 };
 
@@ -96,28 +124,39 @@ export const rosterUpdateHandler: CommandHandler = {
   async run(c, cmd) {
     const p = parse(PeopleRosterUpdateV1, cmd.payload);
     if (!p.cancel_roster && !p.add_shifts.length && !p.edit_shifts.length && !p.cancel_shift_ids.length) throw new ApiError("invalid_payload");
-    await guarded(async () => {
+    const rows = await guarded(async () => {
       const ro = await c.query<{ outlet_id: string; status: string }>(`SELECT outlet_id, status FROM core.roster WHERE id = $1 FOR UPDATE`, [p.roster_id]);
       if (!ro.rows[0]) throw new ApiError("not_found");
       if (ro.rows[0].status !== "active") throw new ApiError("illegal_transition");
+      const out: ShiftAudit[] = [];
+      // One shift's update, audited with the row as it was (locked) and as it is now.
+      const change = async (id: string, set: string, args: unknown[]) => {
+        const before = (await c.query<ShiftRow>(`SELECT id, ${SHIFT} FROM core.roster_shift WHERE id = $1 AND roster_id = $2 AND status = 'scheduled' FOR UPDATE`,
+          [id, p.roster_id])).rows[0];
+        if (!before) throw new ApiError("illegal_transition");
+        const after = (await c.query<ShiftRow>(`UPDATE core.roster_shift SET ${set} WHERE id = $1 RETURNING id, ${SHIFT}`, [id, ...args])).rows[0]!;
+        out.push({ entity: "core.roster_shift", entityId: id, before: shiftOf(before), after: shiftOf(after) });
+      };
       if (p.cancel_roster) {
-        await c.query(`UPDATE core.roster_shift SET status = 'cancelled' WHERE roster_id = $1 AND status = 'scheduled'`, [p.roster_id]);
+        const open = await c.query<{ id: string }>(`SELECT id FROM core.roster_shift WHERE roster_id = $1 AND status = 'scheduled' ORDER BY id`, [p.roster_id]);
+        for (const s of open.rows) await change(s.id, `status = 'cancelled'`, []);
         await c.query(`UPDATE core.roster SET status = 'cancelled' WHERE id = $1`, [p.roster_id]);
-        return;
+        return out;
       }
-      for (const id of p.cancel_shift_ids) {
-        const r = await c.query(`UPDATE core.roster_shift SET status = 'cancelled' WHERE id = $1 AND roster_id = $2 AND status = 'scheduled'`, [id, p.roster_id]);
-        if (r.rowCount !== 1) throw new ApiError("illegal_transition");
-      }
-      for (const e of p.edit_shifts) {
-        const r = await c.query(`UPDATE core.roster_shift SET starts_at = $3, ends_at = $4, role_key = $5 WHERE id = $1 AND roster_id = $2 AND status = 'scheduled'`,
-          [e.roster_shift_id, p.roster_id, e.starts_at, e.ends_at, e.role_key]);
-        if (r.rowCount !== 1) throw new ApiError("illegal_transition");
-      }
-      await insertShifts(c, p.roster_id, ro.rows[0].outlet_id, p.add_shifts);
+      for (const id of p.cancel_shift_ids) await change(id, `status = 'cancelled'`, []);
+      for (const e of p.edit_shifts) await change(e.roster_shift_id, `starts_at = $2, ends_at = $3, role_key = $4`, [e.starts_at, e.ends_at, e.role_key]);
+      out.push(...(await insertShifts(c, p.roster_id, ro.rows[0].outlet_id, p.add_shifts)));
       await assertShiftsInWeek(c, p.roster_id);
+      return out;
     });
-    return { entityId: p.roster_id, audit: [{ entity: "core.roster", entityId: p.roster_id, after: { cancel_roster: p.cancel_roster, added: p.add_shifts.length, edited: p.edit_shifts.length, cancelled: p.cancel_shift_ids.length } }] };
+    return {
+      entityId: p.roster_id,
+      audit: [
+        { entity: "core.roster", entityId: p.roster_id, ...(p.cancel_roster ? { before: { status: "active" } } : {}),
+          after: { status: p.cancel_roster ? "cancelled" : "active", added: p.add_shifts.length, edited: p.edit_shifts.length, cancelled: p.cancel_shift_ids.length } },
+        ...rows,
+      ],
+    };
   },
 };
 
@@ -155,8 +194,10 @@ export const advanceHandler: CommandHandler = {
         `INSERT INTO core.advance (tenant_id, id, staff_id, kind, amount_minor, currency, on_date, note, recorded_by)
          VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, ${ME})`,
         [p.advance_id, p.staff_id, p.kind, p.amount_minor, p.currency, p.on_date, p.note]);
+      // R2-S1-5: money handed to (or paid back by) a staff member moves staff advances (1250) — finance.post_advance.
+      await postFor(c, "finance.post_advance", `core.advance:${p.advance_id}`);
     });
-    return { entityId: p.advance_id, audit: [{ entity: "core.advance", entityId: p.advance_id, after: { staff_id: p.staff_id, kind: p.kind } }] };
+    return { entityId: p.advance_id, audit: [{ entity: "core.advance", entityId: p.advance_id, after: { staff_id: p.staff_id, kind: p.kind, amount_minor: p.amount_minor } }] };
   },
 };
 

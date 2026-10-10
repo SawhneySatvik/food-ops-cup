@@ -7,3 +7,4 @@ proposal.finance.dispute.draft.v1
 proposal.finance.journal.adjust.v1
 proposal.finance.period.close.v1
 v1.finance.tally-export
+v1.finance.channel-terms

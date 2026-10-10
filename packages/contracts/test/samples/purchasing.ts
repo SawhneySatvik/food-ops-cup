@@ -27,7 +27,7 @@ export const invoiceView = {
 };
 export const returnView = {
   supplier_return_id: u(90), outlet_id: u(2), supplier, goods_received_id: u(70), reason_code: "damaged", note: "torn pack", returned_by: u(8), returned_at: T,
-  lines: [{ ingredient_id: u(40), batch_id: u(72), qty_milli: 2000, unit: "kg", unit_cost_minor: 34000, currency: "INR" }],
+  lines: [{ ingredient_id: u(40), batch_id: u(72), qty_milli: 2000, unit: "kg", unit_cost_minor: 34000, unit_cost_per_1000_minor: 34000000, currency: "INR" }],
 };
 
 export const SAMPLES: Record<string, unknown> = {

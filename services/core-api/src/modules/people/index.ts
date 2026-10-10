@@ -3,6 +3,7 @@
 //   POST /v1/people/staff:upsert · /rosters · /rosters:update · /attendance · /payroll-drafts · /advances ·
 //        /tip-pools · /training · /candidates:upsert     (command envelope → CommandResult)
 //   GET  /v1/people/overtime?outlet=&from=&to=         GET /v1/people/payroll-preview?outlet=&month=
+//   GET  /v1/people/staff?outlet=                      (staff with pay terms; not for staff-role members)
 // Two commands are draftable (R16): people.roster.create.v1 and people.payroll_draft.create.v1. Their handlers are
 // registered with approvals; a draft writes nothing until a person with authority approves it.
 import {
@@ -24,7 +25,7 @@ import {
   advanceHandler, attendanceHandler, candidateHandler, rosterCreateHandler, rosterUpdateHandler, staffUpsertHandler, tipPoolHandler, trainingHandler,
 } from "./commands.ts";
 import { overtimeRows, requireAttendance } from "./overtime.ts";
-import { payrollDraftHandler, payrollStatusHandler, previewPayroll } from "./payroll.ts";
+import { listStaff, payrollDraftHandler, payrollStatusHandler, previewPayroll } from "./payroll.ts";
 
 // Register once per process even if this file is loaded twice (vitest imports by path, loadRouters by URL).
 const REGISTERED = Symbol.for("munim.people.draftHandlersRegistered");
@@ -105,6 +106,14 @@ export const router = new Hono<AppEnv>()
       return overtimeRows(db, outlet, from, to);
     });
     return c.json({ outlet_id: outlet, from, to, rows }, 200);
+  })
+  .get("/v1/people/staff", requireMember, async (c) => {
+    const m = readerOf(c);
+    const outlet = c.req.query("outlet") ?? "";
+    if (!UUID.test(outlet)) throw new ApiError("bad_request");
+    inScope(m, outlet);
+    const staff = await withContext(c.var.deps.pools.core, contextOf(m), (db) => listStaff(db, outlet));
+    return c.json({ outlet_id: outlet, staff }, 200);
   })
   .get("/v1/people/payroll-preview", requireMember, async (c) => {
     const m = readerOf(c);

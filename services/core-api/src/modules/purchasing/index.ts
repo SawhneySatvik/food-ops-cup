@@ -65,7 +65,7 @@ function mapDb(e: unknown): unknown {
 async function command(c: Context<AppEnv>, handler: CommandHandler, schema: Parameters<typeof commandEnvelopeOf>[1], status: 200 | 201, body: unknown) {
   const m = member(c);
   const env = commandEnvelopeOf(handler.type, schema).safeParse(body);
-  if (!env.success) throw new ApiError("bad_request");
+  if (!env.success) throw new ApiError("invalid_payload");
   const deps = c.var.deps;
   try {
     const out = await executeCommand(

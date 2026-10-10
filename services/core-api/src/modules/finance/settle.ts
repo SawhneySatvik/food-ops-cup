@@ -7,6 +7,7 @@
 //                              settlements; the lines are what those are matched against).
 // Order matters: the posting and reconcile rules' source_state needs the run to be 'committed', so both seams
 // refuse a run in any other state before writing anything.
+import { channelTreatment } from "@munim/core-domain/finance";
 import { ApiError } from "../../lib/errors.ts";
 import { uuidv7 } from "../../commit/index.ts";
 import { postFor, tenantPack, type Tx, underRule } from "./post.ts";
@@ -92,7 +93,11 @@ type Terms = { commission_bp: number; ads_opted_in: boolean; ad_spend_cap_minor:
 
 /** finance.reconcile_settlement — breaks a person can dispute (packs/finance.md §2):
  *   short_payout: an order line paid less than expected net = order total − contracted commission on gross
- *     − tax withheld − our refunds, by at least the pack's line threshold (detectors.finance.short_payout);
+ *     − the tax the pack says the operator keeps − our refunds, by at least the pack's line threshold
+ *     (detectors.finance.short_payout). R2-S2-9: where the operator collects the tax (IN Sec 9(5)) that is the
+ *     ORDER's own tax, never the file's figure — a statement withholding more is short by the excess. Where the
+ *     merchant collects it, the file's withholding is a credit against our output tax (post_settlement), not money
+ *     lost, so the file's figure is expected;
  *   unapproved_deduction: an ad fee when the channel's terms say not opted in (per line), or the month's ad
  *     fees above the recorded cap (one break for the excess not already broken).
  *  No terms for the settlement date → no break (cannot verify; intel refuses with consent_record_missing).
@@ -105,7 +110,10 @@ export async function reconcileSettlement(tx: Tx, settlementId: string): Promise
     `SELECT commission_bp, ads_opted_in, ad_spend_cap_minor FROM core.channel_terms
       WHERE channel_id = $1 AND valid_from <= $2::date AND (valid_to IS NULL OR valid_to > $2::date)`, [s.channel_id, s.period_to])).rows[0];
   if (!terms) return [];
-  const th = (await tenantPack(tx)).detectors["finance.short_payout"]?.thresholds ?? {};
+  const pack = await tenantPack(tx);
+  const th = pack.detectors["finance.short_payout"]?.thresholds ?? {};
+  const kind = (await tx.query<{ kind: string }>(`SELECT kind FROM core.channel WHERE id = $1`, [s.channel_id])).rows[0]!.kind;
+  const operatorTax = channelTreatment(pack, kind).operator_collects;
   const minLine = th.line_short_minor_gte ?? 1;
   const minBp = th.line_short_bp_gte ?? 0;
 
@@ -115,12 +123,12 @@ export async function reconcileSettlement(tx: Tx, settlementId: string): Promise
     `SELECT sl.id AS line_id, o.id AS order_id, x.expected_minor, x.expected_minor - sl.net_minor AS short_minor
        FROM core.settlement_line sl
        JOIN core."order" o ON o.tenant_id = sl.tenant_id AND o.id = sl.matched_order_id
-       CROSS JOIN LATERAL (SELECT o.total_minor - round(sl.gross_minor * $2::numeric / 10000)::bigint - sl.tax_withheld_minor
+       CROSS JOIN LATERAL (SELECT o.total_minor - round(sl.gross_minor * $2::numeric / 10000)::bigint - CASE WHEN $3::boolean THEN o.tax_minor ELSE sl.tax_withheld_minor END
                                   - coalesce((SELECT sum(f.amount_minor) FROM core.refund f WHERE f.tenant_id = o.tenant_id AND f.order_id = o.id), 0)
                                   AS expected_minor) x
       WHERE sl.settlement_id = $1 AND sl.line_kind = 'order'
         AND NOT EXISTS (SELECT 1 FROM core.reconciliation_break b WHERE b.settlement_line_id = sl.id AND b.kind = 'short_payout')
-      ORDER BY sl.line_no`, [settlementId, terms.commission_bp]);
+      ORDER BY sl.line_no`, [settlementId, terms.commission_bp, operatorTax]);
   for (const r of shorts.rows) {
     const short = Number(r.short_minor);
     if (short > 0 && short >= Math.max(minLine, Math.ceil((Number(r.expected_minor) * minBp) / 10000))) {

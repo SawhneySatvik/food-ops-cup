@@ -22,8 +22,9 @@ export const SAMPLES: Record<string, unknown> = {
   "proposal.inventory.transfer.create.v1": { ...transfer, lines: [{ ...transfer.lines[0], qty_milli: snapRef(S1, 0, "at_risk_qty_milli") }] },
   "v1.inventory.movements": {
     movements: [{ movement_id: u(45), outlet_id: u(2), ingredient_id: u(40), batch_id: u(47), qty_milli: -1000, unit: "kg", kind: "sale_consumption",
-      ref_type: "core.order", ref_id: u(60), unit_cost: null, expired_sale_override_id: null, at: T_PG }],
+      ref_type: "core.order", ref_id: u(60), unit_cost: null, unit_cost_per_1000: null, expired_sale_override_id: null, at: T_PG }],
     next_cursor: null,
   },
+  "v1.inventory.reorder-levels": { reorder_levels: [{ reorder_level_id: u(48), outlet_id: u(2), ingredient_id: u(40), min_qty_milli: 5000000, par_qty_milli: 20000000, updated_at: T }] },
   "v1.inventory.batches": { batches: [{ batch_id: u(47), outlet_id: u(2), ingredient_id: u(40), batch_code: "B-12", expires_on: "2026-10-14", received_at: T, mrp: { amount_minor: 9000, currency: "INR" } }] },
 };

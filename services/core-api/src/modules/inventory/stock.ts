@@ -49,7 +49,9 @@ export type MovementInsert = {
   kind: Kind;
   ref_type: string | null;
   ref_id: string | null;
-  unit_cost_minor?: number | null;
+  /** R2-S2-8 (0016): the cost of 1000 base units in minor units — exact for a price per kg / l / 1000 units, where a
+   *  per-base-unit cost (paise per g) is not. The database fills unit_cost_minor from it (rounded). */
+  unit_cost_per_1000_minor?: number | null;
   currency?: string | null;
   expired_sale_override_id?: string | null;
   at?: string | Date | null;
@@ -60,10 +62,10 @@ export async function insertMovement(c: Queryable, m: MovementInsert): Promise<s
   const id = m.id ?? uuidv7();
   await c.query(
     `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id,
-                                      unit_cost_minor, currency, expired_sale_override_id, at, created_by)
+                                      unit_cost_per_1000_minor, currency, expired_sale_override_id, at, created_by)
      VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, coalesce($13::timestamptz, now()), ${ME})`,
     [id, m.outlet_id, m.ingredient_id, m.batch_id, m.qty_milli, m.unit, m.kind, m.ref_type, m.ref_id,
-     m.unit_cost_minor ?? null, m.unit_cost_minor == null ? null : m.currency, m.expired_sale_override_id ?? null, m.at ?? null]);
+     m.unit_cost_per_1000_minor ?? null, m.unit_cost_per_1000_minor == null ? null : m.currency, m.expired_sale_override_id ?? null, m.at ?? null]);
   return id;
 }
 

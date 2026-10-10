@@ -91,6 +91,10 @@ export const TallyExport = z.strictObject({
   content: z.string(),
 });
 
+/** A channel's recorded terms, every validity window (the rows' own fields: the inputs short-payout and ad-fee checks
+ *  read). Owner, advisor, judge — like the Tally export. */
+export const ChannelTermsListResponse = z.strictObject({ channel_terms: z.array(FinanceChannelTermsSetV1) });
+
 export const SCHEMAS = {
   "finance.channel_terms.set.v1": FinanceChannelTermsSetV1,
   "finance.expense.record.v1": FinanceExpenseRecordV1,
@@ -101,6 +105,7 @@ export const SCHEMAS = {
   "proposal.finance.journal.adjust.v1": JOURNAL_ADJUST_DRAFT.proposal,
   "proposal.finance.period.close.v1": PERIOD_CLOSE_DRAFT.proposal,
   "v1.finance.tally-export": TallyExport,
+  "v1.finance.channel-terms": ChannelTermsListResponse,
 };
 
 const post = (path: string, operationId: string, command: string, summary: string): Route => ({
@@ -117,5 +122,10 @@ export const ROUTES: readonly Route[] = [
     surface: "public", method: "get", path: "/v1/finance/exports/tally", operationId: "exportTally",
     summary: "Journal vouchers for a date range as a Tally-importable CSV (owner, advisor, judge)", auth: "member", response: "v1.finance.tally-export", status: 200,
     query: [{ name: "from", required: true, schema: date }, { name: "to", required: true, schema: date }],
+  },
+  {
+    surface: "public", method: "get", path: "/v1/finance/channel-terms", operationId: "listChannelTerms",
+    summary: "Recorded channel terms (commission, ad consent and cap, validity), newest window first (owner, advisor, judge)", auth: "member",
+    response: "v1.finance.channel-terms", status: 200, query: [{ name: "channel_id", required: false, schema: { type: "string", format: "uuid" } }],
   },
 ];

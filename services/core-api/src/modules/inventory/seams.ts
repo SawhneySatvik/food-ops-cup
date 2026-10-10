@@ -280,8 +280,8 @@ export async function reverseOrderConsumption(c: Queryable, orderId: string): Pr
 }
 
 /** Rule inventory.receive_grn: one receipt movement per GRN line, in the ingredient's base unit (kg → g and
- *  l → ml convert exactly; the per-base-unit cost is rounded half-up — INFERENCE), into the line's batch, at
- *  the receipt time. Idempotent per GRN. */
+ *  l → ml convert exactly, and so does the cost of 1000 base units — a ₹/kg price is that cost per 1000 g), into the
+ *  line's batch, at the receipt time. Idempotent per GRN. */
 export async function deriveGoodsReceipt(c: Queryable, grnId: string): Promise<DerivationResult> {
   const grn = await first<{ id: string; outlet_id: string; received_at: Date }>(c, `SELECT id, outlet_id, received_at FROM core.goods_received WHERE id = $1`, [grnId]);
   if (!grn) throw new ApiError("not_found");
@@ -302,7 +302,7 @@ export async function deriveGoodsReceipt(c: Queryable, grnId: string): Promise<D
       const f = factors[i]!;
       const id = await insertMovement(c, { outlet_id: grn.outlet_id, ingredient_id: l.ingredient_id, batch_id: l.batch_id, qty_milli: Number(l.qty_milli) * f,
         unit: l.base_unit, kind: "receipt", ref_type: "core.goods_received", ref_id: grnId,
-        unit_cost_minor: mulDiv(Number(l.unit_cost_minor), 1, f), currency: l.currency, at: grn.received_at });
+        unit_cost_per_1000_minor: mulDiv(Number(l.unit_cost_minor), 1000, f), currency: l.currency, at: grn.received_at });
       moves.push({ id, outlet_id: grn.outlet_id, ingredient_id: l.ingredient_id, kind: "receipt" });
     }
   });

@@ -7,7 +7,7 @@ import {
   InventoryStockReceiveV1, InventoryTransferCreateV1, InventoryTransferReceiveV1, InventoryWasteRecordV1,
 } from "@munim/contracts/inventory";
 import { mulDiv } from "@munim/core-domain/money";
-import { type CommandHandler, uuidv7 } from "../../commit/index.ts";
+import { type AuditEntry, type CommandHandler, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { isExpired } from "./fefo.ts";
@@ -80,7 +80,7 @@ export const stockReceive: CommandHandler = {
         await batchAt(c, l.batch_id, p.outlet_id, l.ingredient_id);
       }
       const id = await insertMovement(c, { id: l.movement_id, outlet_id: p.outlet_id, ingredient_id: l.ingredient_id, batch_id: l.batch_id, qty_milli: l.qty_milli * f,
-        unit: ing.base_unit, kind: "receipt", ref_type: null, ref_id: null, unit_cost_minor: mulDiv(l.unit_cost.amount_minor, 1, f), currency: l.unit_cost.currency, at: p.at });
+        unit: ing.base_unit, kind: "receipt", ref_type: null, ref_id: null, unit_cost_per_1000_minor: mulDiv(l.unit_cost.amount_minor, 1000, f), currency: l.unit_cost.currency, at: p.at });
       moves.push({ id, outlet_id: p.outlet_id, ingredient_id: l.ingredient_id, kind: "receipt" });
     }
     // No event: opening stock has no source row to cite (movement.recorded.v1 requires ref_type + ref_id).
@@ -224,32 +224,50 @@ export const transferReceive: CommandHandler = {
   type: "inventory.transfer.receive.v1",
   async run(c, command) {
     const p = InventoryTransferReceiveV1.parse(command.payload);
-    const t = await first<{ status: string; to_outlet_id: string }>(c, `SELECT status, to_outlet_id FROM core.transfer WHERE id = $1`, [p.transfer_id]);
+    const t = await first<{ status: string; from_outlet_id: string; to_outlet_id: string }>(c,
+      `SELECT status, from_outlet_id, to_outlet_id FROM core.transfer WHERE id = $1`, [p.transfer_id]);
     if (!t) throw new ApiError("not_found");
     if (t.status !== "sent") throw new ApiError("illegal_transition");
     await c.query(`UPDATE core.transfer SET status = 'received', received_by = ${ME}, received_at = now() WHERE id = $1`, [p.transfer_id]);
-    // A batch belongs to one outlet (FK): the stock lands in the receiving outlet's batch with the same code when
-    // one exists, else unbatched (receive.v1 cannot create batches — schema request in the T-024 report).
-    const lines = (await c.query<{ ingredient_id: string; qty_milli: string; unit: string; dest_batch: string | null }>(
-      `SELECT l.ingredient_id, l.qty_milli::text, l.unit,
-              (SELECT d.id FROM core.batch s JOIN core.batch d ON d.tenant_id = s.tenant_id AND d.ingredient_id = s.ingredient_id AND d.batch_code = s.batch_code
-                WHERE s.id = l.batch_id AND d.outlet_id = $2) AS dest_batch
-         FROM core.transfer_line l WHERE l.transfer_id = $1 ORDER BY l.id`, [p.transfer_id, t.to_outlet_id])).rows;
+    const lines = (await c.query<{ ingredient_id: string; qty_milli: string; unit: string; batch_id: string | null }>(
+      `SELECT l.ingredient_id, l.qty_milli::text, l.unit, l.batch_id FROM core.transfer_line l WHERE l.transfer_id = $1 ORDER BY l.id`, [p.transfer_id])).rows;
     const moves: Move[] = [];
+    const audit: AuditEntry[] = [{ entity: "core.transfer", entityId: p.transfer_id, before: { status: "sent" }, after: { status: "received" } }];
     await underRule(c, "inventory.transfer_in", `core.transfer:${p.transfer_id}`, async () => {
       for (const l of lines) {
-        const id = await insertMovement(c, { outlet_id: t.to_outlet_id, ingredient_id: l.ingredient_id, batch_id: l.dest_batch, qty_milli: Number(l.qty_milli),
+        const batch = l.batch_id ? await destinationBatch(c, l.batch_id, t.from_outlet_id, t.to_outlet_id, audit) : null;
+        const id = await insertMovement(c, { outlet_id: t.to_outlet_id, ingredient_id: l.ingredient_id, batch_id: batch, qty_milli: Number(l.qty_milli),
           unit: l.unit, kind: "transfer_in", ref_type: "core.transfer", ref_id: p.transfer_id });
         moves.push({ id, outlet_id: t.to_outlet_id, ingredient_id: l.ingredient_id, kind: "transfer_in" });
       }
     });
-    return {
-      entityId: p.transfer_id,
-      audit: [{ entity: "core.transfer", entityId: p.transfer_id, before: { status: "sent" }, after: { status: "received" } }],
-      events: movementEvents({ type: "core.transfer", id: p.transfer_id }, moves),
-    };
+    return { entityId: p.transfer_id, audit, events: movementEvents({ type: "core.transfer", id: p.transfer_id }, moves) };
   },
 };
+
+/** R2-S1-7: a batch belongs to one outlet (FK), so transferred batch stock lands in the receiving outlet's batch of the
+ *  same code — created here (inventory.transfer_in, 0015 A6) with the source batch's expiry, MRP and supplier when the
+ *  destination has none, so FEFO and the expired-sale refusal see it at the destination too. The source batch sits at
+ *  the sending outlet, outside a destination manager's scope: core reads it with the scope narrowed to that outlet,
+ *  then restores the caller's scope before writing. */
+async function destinationBatch(c: Queryable, srcId: string, fromOutlet: string, toOutlet: string, audit: AuditEntry[]): Promise<string> {
+  const prev = (await c.query<{ o: string | null }>(`SELECT current_setting('app.outlet_ids', true) AS o`)).rows[0]!.o ?? "";
+  await c.query(`SELECT set_config('app.outlet_ids', $1, true)`, [`{${fromOutlet}}`]);
+  const src = await first<{ ingredient_id: string; batch_code: string; expires_on: string | null; mrp_minor: string | null; currency: string | null; supplier_id: string | null }>(c,
+    `SELECT ingredient_id, batch_code, expires_on::text, mrp_minor::text, currency, supplier_id FROM core.batch WHERE id = $1 AND outlet_id = $2`, [srcId, fromOutlet]);
+  await c.query(`SELECT set_config('app.outlet_ids', $1, true)`, [prev]);
+  if (!src) throw bad();
+  const have = await first<{ id: string }>(c, `SELECT id FROM core.batch WHERE outlet_id = $1 AND ingredient_id = $2 AND batch_code = $3`,
+    [toOutlet, src.ingredient_id, src.batch_code]);
+  if (have) return have.id;
+  const id = uuidv7();
+  await c.query(
+    `INSERT INTO core.batch (tenant_id, id, outlet_id, ingredient_id, batch_code, expires_on, supplier_id, mrp_minor, currency, created_by)
+     VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8, ${ME})`,
+    [id, toOutlet, src.ingredient_id, src.batch_code, src.expires_on, src.supplier_id, src.mrp_minor, src.currency]);
+  audit.push({ entity: "core.batch", entityId: id, after: { outlet_id: toOutlet, batch_code: src.batch_code, expires_on: src.expires_on, mrp_minor: src.mrp_minor === null ? null : Number(src.mrp_minor), from_batch_id: srcId } });
+  return id;
+}
 
 // ---- expired-sale override (R40 C7) ----
 export const expiredSaleOverride: CommandHandler = {

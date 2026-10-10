@@ -25,8 +25,9 @@ const NOT_IN_CORE_DOMAIN_YET: Record<string, string> = {
   "inventory.reverse_order_consumption": "T-022", // written by orders on cancel / reject (W2-R6, B5)
   "finance.reverse_supplier_invoice": "T-026",
   "finance.reverse_payroll": "T-026",
-  "finance.post_advance": "T-026",
   "customers.merge_verified_email": "T-035",
+  // 0016 (W2 fix cycle 1)
+  "customers.erase_merged_guests": "T-035", // the definer core.customer_erase_merged_guests (R1-M1)
 };
 
 function seededRows(): Array<{ rule_id: string; source_table: string; target_table: string }> {

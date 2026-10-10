@@ -28,17 +28,17 @@ afterAll(async () => db?.stop());
 const sqlstate = async (p: Promise<unknown>) => p.then(() => "ok", (e: { code?: string }) => e.code ?? String(e));
 
 describe("seedChart", () => {
-  it("IN: 16 pack accounts + 5 structural = 21; AU: 17 + 5 = 22 (hand counts from the pack files); re-seeding adds none", async () => {
-    expect(Object.keys(fx.accounts).length).toBe(21);
+  it("IN: 22 pack accounts (the 5 structural ones and 4100 loyalty redemptions included); AU: 23 (hand counts from the pack files); re-seeding adds none", async () => {
+    expect(Object.keys(fx.accounts).length).toBe(22);
     expect(fx.accounts["1110"]).toBeDefined(); // counter sales clearing (structural)
     expect(fx.accounts["1300"]).toBeUndefined(); // IN pack carries no input-tax account
     const au = await buildFinanceTenant(db, "AU");
-    expect(Object.keys(au.accounts).length).toBe(22);
+    expect(Object.keys(au.accounts).length).toBe(23);
     expect(au.accounts["1300"]).toBeDefined();
     const again = await db.withContext("munim_core", { tenant_id: fx.tenant, outlet_ids: "*", role: "operator", operator_id: fx.operator, command_type: "tenancy.provision.v1" },
       (c) => seedChart(c, PACKS.IN!));
     expect(again).toEqual(fx.accounts);
-    expect(await count(db, `SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [fx.tenant])).toBe(21);
+    expect(await count(db, `SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [fx.tenant])).toBe(22);
   });
 
   it("refused outside a command that may write the chart (paired with the accepted provisioning above)", async () => {

@@ -5,7 +5,7 @@
 import { PACKS } from "@munim/contracts/packs";
 import { describe, expect, it } from "vitest";
 import {
-  chartFor, channelTreatment, codesOf, finish, type Line, PNL_GROUPS, postExpense, postGrn, postOrder, postPayroll, postRefund, postSettlement,
+  chartFor, channelTreatment, codesOf, finish, type Line, PNL_GROUPS, postAdvance, postExpense, postGrn, postLoyaltyRedemption, postOrder, postPayroll, postRefund, postSettlement,
   postSupplierInvoice, postTender, reverse, roleResolver, ROLES, STRUCTURAL_ACCOUNTS, tallyCsv,
 } from "../finance/index.ts";
 
@@ -23,6 +23,16 @@ describe("posting goldens (hand-computed)", () => {
     expect(postOrder({ ...counter, total_minor: 0, tax_minor: 0 })).toBeNull();
   });
 
+  it("finance.post_loyalty_redemption: the points' value leaves 1110; with the order and its tender 1110 nets to 0 (R2-S1-4)", () => {
+    // total 25,200 (tax 1,200); 100 points × 10 = 1,000 redeemed; the till takes the remaining 24,200 by card.
+    const o = postOrder({ ...counter, total_minor: 25200, tax_minor: 1200 })!;
+    const r = postLoyaltyRedemption({ aggregator: false, value_minor: 1000 });
+    expect(r).toEqual(L(["loyalty_redemption", 1000], ["counter_receivable", -1000]));
+    const t = postTender({ aggregator: false, method: "card", amount_minor: 24200, rounding_minor: 0 })!;
+    expect([...o, ...r!, ...t].filter((l) => l.role === "counter_receivable").reduce((a, l) => a + l.amount_minor, 0)).toBe(0);
+    expect(postLoyaltyRedemption({ aggregator: false, value_minor: 0 })).toBeNull();
+  });
+
   it("finance.post_tender (cash rounding to its own account)", () => {
     expect(postTender({ aggregator: false, method: "cash", amount_minor: 33600, rounding_minor: 0 })).toEqual(L(["cash", 33600], ["counter_receivable", -33600]));
     expect(postTender({ aggregator: false, method: "cash", amount_minor: 33600, rounding_minor: 2 })).toEqual(L(["cash", 33600], ["counter_receivable", -33598], ["rounding", -2]));
@@ -37,11 +47,50 @@ describe("posting goldens (hand-computed)", () => {
     expect(postRefund({ operator_collects: true, method: "upi", amount_minor: 1000, order_total_minor: 52500, order_tax_minor: 2500 })).toEqual(L(["sales", 1000], ["bank", -1000]));
   });
 
+  it("finance.post_refund: partial refunds reverse exactly the order's tax (cumulative shares, R2-S3-2)", () => {
+    // 1,050 order with 50 tax refunded 351 + 351 + 348: shares round(351·50/1050)=17, round(702·50/1050)=33 → 16, 50 − 33 = 17.
+    const parts = [[0, 351], [351, 351], [702, 348]].map(([prior, a]) =>
+      postRefund({ operator_collects: false, method: "cash", amount_minor: a!, order_total_minor: 1050, order_tax_minor: 50, prior_refunded_minor: prior! })!);
+    expect(parts).toEqual([L(["sales", 334], ["output_tax", 17], ["cash", -351]), L(["sales", 335], ["output_tax", 16], ["cash", -351]), L(["sales", 331], ["output_tax", 17], ["cash", -348])]);
+    expect(parts.flat().filter((l) => l.role === "output_tax").reduce((a, l) => a + l.amount_minor, 0)).toBe(50);
+  });
+
+  it("finance.post_refund of an aggregator order is a deduction from the channel, never our till (R2-S2-10)", () => {
+    // AU merchant-collects: 11,000 with 1,000 GST refunded 5,500 → sales 5,000, GST 500, against the channel receivable.
+    expect(postRefund({ aggregator: true, operator_collects: false, method: "card", amount_minor: 5500, order_total_minor: 11000, order_tax_minor: 1000 }))
+      .toEqual(L(["sales", 5000], ["output_tax", 500], ["channel_receivable", -5500]));
+    // IN Sec 9(5): the operator's tax is not ours; the whole refund is sales.
+    expect(postRefund({ aggregator: true, operator_collects: true, method: "upi", amount_minor: 1000, order_total_minor: 52500, order_tax_minor: 2500 }))
+      .toEqual(L(["sales", 1000], ["channel_receivable", -1000]));
+  });
+
   it("finance.post_grn (purchases method) and finance.post_supplier_invoice (GRNI, no double count)", () => {
     // 12 kg × 340.00 = 4080.00; 2.5 × 19.99 = 49.975 → 49.98
     expect(postGrn({ lines: [{ qty_milli: 12000, unit_cost_minor: 34000 }, { qty_milli: 2500, unit_cost_minor: 1999 }] })).toEqual(L(["cogs", 412998], ["grni", -412998]));
     expect(postSupplierInvoice({ subtotal_minor: 408000, tax_minor: 20400, total_minor: 428400, input_tax: true })).toEqual(L(["grni", 408000], ["input_tax", 20400], ["payables", -428400]));
     expect(postSupplierInvoice({ subtotal_minor: 408000, tax_minor: 20400, total_minor: 428400, input_tax: false })).toEqual(L(["grni", 408000], ["cogs", 20400], ["payables", -428400]));
+  });
+
+  it("invoice above the GRN price: GRNI clears for what was received, the variance is cost (R2-S1-6)", () => {
+    // 10 kg received at ₹100/kg (GRN 1,00,000), billed at ₹105/kg + ₹52.50 tax (IN: no input-tax account).
+    const g = postGrn({ lines: [{ qty_milli: 10000, unit_cost_minor: 10000 }] })!;
+    const i = postSupplierInvoice({ subtotal_minor: 105000, tax_minor: 5250, total_minor: 110250, input_tax: false, grni_minor: 100000 })!;
+    expect(i).toEqual(L(["grni", 100000], ["cogs", 10250], ["payables", -110250]));
+    const net = (role: string) => [...g, ...i].filter((l) => l.role === role).reduce((a, l) => a + l.amount_minor, 0);
+    expect([net("cogs"), net("grni"), net("payables")]).toEqual([110250, 0, -110250]);
+    // Billed below the GRN (₹98/kg) with input tax (AU): the variance credits cost.
+    expect(postSupplierInvoice({ subtotal_minor: 98000, tax_minor: 9800, total_minor: 107800, input_tax: true, grni_minor: 100000 }))
+      .toEqual(L(["grni", 100000], ["cogs", -2000], ["input_tax", 9800], ["payables", -107800]));
+  });
+
+  it("finance.post_advance: given and paid back directly against the bank; a payroll recovery posts nothing here (R2-S1-5)", () => {
+    expect(postAdvance({ kind: "given", amount_minor: 200000, via_payroll: false })).toEqual(L(["staff_advances", 200000], ["bank", -200000]));
+    expect(postAdvance({ kind: "recovered", amount_minor: 50000, via_payroll: false })).toEqual(L(["staff_advances", -50000], ["bank", 50000]));
+    expect(postAdvance({ kind: "recovered", amount_minor: 200000, via_payroll: true })).toBeNull();
+    // ₹2,000 given, ₹2,000 recovered through a ₹30,000 payroll: 1250 ends at 0.
+    const p = postPayroll({ lines: [{ base_minor: 3000000, overtime_minor: 0, tips_minor: 0, advance_recovery_minor: 200000, net_minor: 2800000 }] })!;
+    const all = [...postAdvance({ kind: "given", amount_minor: 200000, via_payroll: false })!, ...p];
+    expect(all.filter((l) => l.role === "staff_advances").reduce((a, l) => a + l.amount_minor, 0)).toBe(0);
   });
 
   it("finance.post_settlement", () => {
@@ -167,7 +216,9 @@ export function generateDocs(n: number, seed = SEED): Array<{ kind: string; line
       }
       case "refund": {
         const total = int(1, 2_000_000);
-        out.push({ kind, lines: postRefund({ operator_collects: tr.operator_collects, method: pick(["cash", "card", "upi"] as const), amount_minor: int(1, total), order_total_minor: total, order_tax_minor: int(0, Math.floor(total / 5)) }), moves: true });
+        const prior = pick([0, int(0, total - 1)]);
+        out.push({ kind, lines: postRefund({ aggregator: tr.aggregator, operator_collects: tr.operator_collects, method: pick(["cash", "card", "upi"] as const), amount_minor: int(1, total - prior),
+          order_total_minor: total, order_tax_minor: int(0, Math.floor(total / 5)), prior_refunded_minor: prior }), moves: true });
         break;
       }
       case "grn": {
@@ -178,7 +229,8 @@ export function generateDocs(n: number, seed = SEED): Array<{ kind: string; line
       case "invoice": {
         const sub = int(0, 9_000_000);
         const tax = pick([0, int(0, Math.floor(sub / 5))]);
-        out.push({ kind, lines: postSupplierInvoice({ subtotal_minor: sub, tax_minor: tax, total_minor: sub + tax, input_tax: r() < 0.5 }), moves: sub + tax > 0 });
+        const grni = pick([sub, int(0, 9_000_000)]);
+        out.push({ kind, lines: postSupplierInvoice({ subtotal_minor: sub, tax_minor: tax, total_minor: sub + tax, input_tax: r() < 0.5, grni_minor: grni }), moves: sub + tax > 0 });
         break;
       }
       case "settlement": {
@@ -237,6 +289,37 @@ describe(`property: 1,000 generated source documents (seed ${SEED})`, () => {
     expect(bad).toEqual([]);
     // Most generated documents move money (the generator's zero cases are a minority).
     expect(posted).toBeGreaterThan(900);
+  });
+
+  it("loyalty redemptions: 1,000 generated values balance on two lines; only 0 is null", () => {
+    const r = rng(SEED + 2);
+    const bad: string[] = [];
+    for (let i = 0; i < 1000; i++) {
+      const v = r() < 0.05 ? 0 : 1 + Math.floor(r() * 5_000_000);
+      const lines = postLoyaltyRedemption({ aggregator: r() < 0.5, value_minor: v });
+      if ((lines === null) !== (v === 0)) bad.push(`#${i}: ${v}`);
+      if (lines && (lines.length !== 2 || lines.reduce((t, l) => t + l.amount_minor, 0) !== 0)) bad.push(`#${i}: unbalanced`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("advances: 1,000 generated rows balance; only a payroll recovery is null", () => {
+    const r = rng(SEED + 1);
+    const bad: string[] = [];
+    let posted = 0;
+    for (let i = 0; i < 1000; i++) {
+      const a = { kind: r() < 0.5 ? ("given" as const) : ("recovered" as const), amount_minor: 1 + Math.floor(r() * 5_000_000), via_payroll: r() < 0.3 };
+      if (a.kind === "given") a.via_payroll = false; // the table's CHECK: only a recovery names a payroll
+      const lines = postAdvance(a);
+      if (lines === null) {
+        if (!a.via_payroll) bad.push(`#${i}: null`);
+        continue;
+      }
+      posted++;
+      if (lines.length !== 2 || lines.reduce((t, l) => t + l.amount_minor, 0) !== 0) bad.push(`#${i}: unbalanced`);
+    }
+    expect(bad).toEqual([]);
+    expect(posted).toBeGreaterThan(600);
   });
 
   it("every kind is exercised (125 each)", () => {

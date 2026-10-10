@@ -652,6 +652,11 @@
       "type": "income"
     },
     {
+      "code": "4100",
+      "name": "Loyalty redemptions",
+      "type": "income"
+    },
+    {
       "code": "4900",
       "name": "Cash rounding",
       "type": "income"

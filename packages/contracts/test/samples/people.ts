@@ -32,6 +32,13 @@ export const SAMPLES: Record<string, unknown> = {
     outlet_id: u(2), from: "2026-08-01", to: "2026-08-31",
     rows: [{ staff_id: u(1000), iso_week: "2026-W32", rostered_min: 960, attended_min: 1035, extra_min: 75, extra_cost_minor: 37500 }],
   },
+  "v1.people.staff.list": {
+    outlet_id: u(2),
+    staff: [{
+      staff_id: u(1000), member_id: null, outlet_id: u(2), name: "Synthetic Cook", role_key: "cook", pay_basis: "hourly", wage_rate_minor: 20000, monthly_salary_minor: null,
+      contract_min_per_month: null, ot_multiplier_bp: 15000, currency: "INR", joined_on: "2026-01-01", left_on: null, active: true,
+    }],
+  },
   "v1.people.payroll-preview.response": {
     outlet_id: u(2), period_month: "2026-08-01", currency: "INR",
     lines: [{ staff_id: u(1000), base_minor: 500000, overtime_minor: 157500, advance_recovery_minor: 0, tips_minor: 5000, net_minor: 662500, outstanding_advance_minor: 19000 }],

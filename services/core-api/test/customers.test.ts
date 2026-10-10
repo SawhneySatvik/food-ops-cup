@@ -8,7 +8,9 @@
 // Synthetic data only.
 import { createLogger } from "@munim/config";
 import { CommandResult, snapRef } from "@munim/contracts";
-import { CampaignListResponse, CustomerListResponse, LoyaltyLedgerResponse, ReservationListResponse } from "@munim/contracts/customers";
+import {
+  BulkOrderListResponse, CampaignListResponse, CouponUseListResponse, CustomerListResponse, LoyaltyLedgerResponse, ReservationListResponse, ReviewListResponse,
+} from "@munim/contracts/customers";
 import { type AppContext, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -144,6 +146,39 @@ describe("loyalty: earn on complete, reverse on cancel (derived rows, hand-compu
     // Reversing a completed order is not a thing (only cancelled / rejected): nothing is written.
     expect(await db.withContext("munim_core", own("kitchen.ticket.advance.v1"), (c) => loyaltyReverseFor(c, n2))).toEqual([]);
     expect((await ledger(x)).length).toBe(4);
+  });
+
+  it("R2-S2-4 / W2-R10: a completed order's earn is taken back in full by the refund that makes it fully refunded; a partial refund keeps it", async () => {
+    const z = await customer("Synthetic Refunded");
+    const o = await order(z, 32000); // total 33,600 → earn 32
+    expect((await advance(o, "completed", (c) => loyaltyEarnFor(c, o)))?.points).toBe(32);
+    const money = (type: string, sql: string, params: unknown[]) => db.withContext("munim_core", own(type), (c) => c.query(sql, params));
+    const tender = uuidv7();
+    await money("orders.tender.record.v1", `INSERT INTO core.tender (tenant_id, id, outlet_id, order_id, method, amount_minor, rounding_minor, currency, recorded_by)
+                                           VALUES ($1, $2, $3, $4, 'card', 33600, 0, $5, $6)`, [t.tenant, tender, t.outlets[0], o, t.currency, t.owner]);
+    const refunds: string[] = [];
+    const refund = async (amount: number) => {
+      const id = uuidv7();
+      refunds.push(id);
+      await money("orders.refund.record.v1",
+        `INSERT INTO core.refund (tenant_id, id, outlet_id, order_id, tender_id, method, amount_minor, currency, reason_code, note, actor)
+         VALUES ($1, $2, $3, $4, $5, 'card', $6, $7, 'complaint', 'synthetic', $8)`, [t.tenant, id, t.outlets[0], o, tender, amount, t.currency, t.owner]);
+    };
+    const reverse = () => db.withContext("munim_core", own("orders.refund.record.v1"), (c) => loyaltyReverseFor(c, o));
+    // Completed, nothing refunded: nothing to take back.
+    expect(await reverse()).toEqual([]);
+    // Half refunded: money is still paid, the points stay.
+    await refund(16800);
+    expect(await reverse()).toEqual([]);
+    // The rest refunded: the order is fully refunded → the whole earn goes back, citing that refund (0016 refund_id).
+    await refund(16800);
+    expect((await reverse()).map((r) => r.points)).toEqual([-32]);
+    const l = await db.admin<{ kind: string; points: number; balance_after: number; refund_id: string | null; src: string }>(
+      `SELECT kind, points::int, balance_after::int, refund_id, origin ->> 'source_ref' AS src FROM core.loyalty_entry WHERE customer_id = $1 ORDER BY seq`, [z]);
+    expect(l.rows.map((e) => [e.kind, e.points, e.balance_after, e.refund_id, e.src])).toEqual([
+      ["earn", 32, 32, null, `core.order:${o}`], ["reverse", -32, 0, refunds[1], `core.refund:${refunds[1]}`]]);
+    // Idempotent: the earn has its one reversal.
+    expect(await reverse()).toEqual([]);
   });
 
   it("net amount: subtotal − discount; no customer / guest / not completed → no entry", async () => {
@@ -363,8 +398,14 @@ describe("customer records, role limits and the rest of the member surface", () 
 
     const byName = CustomerListResponse.parse(await (await get("owner", "/v1/customers?q=searchable")).json());
     expect(byName.customers.map((c) => [c.customer_id, c.phone, c.email])).toEqual([[id, "+919876543210", "zainab@example.test"]]);
-    const byPhone = CustomerListResponse.parse(await (await get("staff", "/v1/customers?q=98765%2043210")).json());
+    const byPhone = CustomerListResponse.parse(await (await get("staff", "/v1/customers?q=3210")).json());
     expect(byPhone.customers.map((c) => [c.customer_id, c.phone, c.email])).toEqual([[id, "+91••••••3210", null]]);
+    // R1-m2: staff match only what they are shown — the full number or the email finds nothing for staff, and the same
+    // searches find the customer for the owner (paired).
+    const found = async (who: "owner" | "staff", q: string) =>
+      CustomerListResponse.parse(await (await get(who, `/v1/customers?q=${encodeURIComponent(q)}`)).json()).customers.map((c) => c.customer_id);
+    expect([await found("staff", "98765 43210"), await found("staff", "zainab@example"), await found("staff", "876543")]).toEqual([[], [], []]);
+    expect([await found("owner", "98765 43210"), await found("owner", "zainab@example"), await found("owner", "876543")]).toEqual([[id], [id], [id]]);
     expect(await err(await get("advisor", "/v1/customers"))).toEqual({ status: 403, code: "forbidden", reason: null });
     expect((await get("owner", "/v1/customers?q=%25")).status).toBe(200); // a LIKE wildcard is a literal
     expect(CustomerListResponse.parse(await (await get("owner", "/v1/customers?q=%25")).json()).customers).toEqual([]);
@@ -377,6 +418,30 @@ describe("customer records, role limits and the rest of the member surface", () 
       { customer_id: id, name: "Zainab S.", phone: null, email: null, withdraw_consent: ["email"] });
     expect(edit.status).toBe(200);
     expect(await one(`SELECT name, phone, consent FROM core.customer WHERE id = $1`, [id])).toEqual({ name: "Zainab S.", phone: null, consent: { sms: false, email: false } });
+  });
+
+  it("R1-m3: staff cannot change a signed-in customer's name or phone; what staff cannot see (the full phone, the email) is kept", async () => {
+    const signedIn = uuidv7();
+    await db.withContext("munim_core", own("customers.customer.upsert.v1"), (c) =>
+      c.query(`INSERT INTO core.customer (tenant_id, id, name, phone, email, idp_sub, is_guest, origin) VALUES ($1, $2, 'Signed In', '+919811112222', 'si@example.test', $3, false, '{}')`,
+        [t.tenant, signedIn, `cust-${uuidv7()}`]));
+    const up = (who: "owner" | "staff", id: string, o: Record<string, unknown>) => post(who, "/v1/customers:upsert", "customers.customer.upsert.v1",
+      { customer_id: id, name: "Signed In", phone: null, email: null, withdraw_consent: [], ...o });
+    const row = (id: string) => one(`SELECT name, phone, email FROM core.customer WHERE id = $1`, [id]);
+    expect(await err(await up("staff", signedIn, { name: "Renamed by staff" }))).toEqual({ status: 403, code: "forbidden", reason: "authority_denied" });
+    expect(await err(await up("staff", signedIn, { phone: "+919800000000" }))).toEqual({ status: 403, code: "forbidden", reason: "authority_denied" });
+    // No phone and no email (staff see neither in full) with a consent withdrawal: accepted, contacts untouched.
+    expect((await up("staff", signedIn, { withdraw_consent: ["sms"] })).status).toBe(200);
+    expect(await row(signedIn)).toEqual({ name: "Signed In", phone: "+919811112222", email: "si@example.test" });
+    // A merchant-entered (no account) customer: staff may correct the name; the phone and email they cannot see are kept.
+    const walkIn = uuidv7();
+    expect((await post("owner", "/v1/customers:upsert", "customers.customer.upsert.v1",
+      { customer_id: walkIn, name: "Walk In", phone: "+919833334444", email: "wi@example.test", withdraw_consent: [] })).status).toBe(200);
+    expect((await up("staff", walkIn, { name: "Walk-in Corrected" })).status).toBe(200);
+    expect(await row(walkIn)).toEqual({ name: "Walk-in Corrected", phone: "+919833334444", email: "wi@example.test" });
+    // The owner (full view) may still edit the signed-in profile's contacts.
+    expect((await up("owner", signedIn, { name: "Signed In", phone: "+919811112223", email: "si2@example.test" })).status).toBe(200);
+    expect(await row(signedIn)).toEqual({ name: "Signed In", phone: "+919811112223", email: "si2@example.test" });
   });
 
   it("reservations: a booking, a refused insert-as-seated, an outlet-1 manager cannot book outlet 2; reviews are append-only per source ref", async () => {
@@ -398,6 +463,8 @@ describe("customer records, role limits and the rest of the member surface", () 
     expect(await err(await post("owner", "/v1/reviews:record", "customers.review.record.v1", { ...review, review_id: uuidv7() }))).toEqual({ status: 409, code: "conflict", reason: null });
     expect(await err(await post("staff", "/v1/reviews:record", "customers.review.record.v1", { ...review, review_id: uuidv7(), external_ref: "x1" }))).toMatchObject({ status: 403 });
     expect(await count(`SELECT count(*) n FROM core.review WHERE source = 'manual' AND external_ref = $1`, [review.external_ref])).toBe(1);
+    const reviews = ReviewListResponse.parse(await (await get("manager", `/v1/reviews?outlet_id=${o1}`)).json());
+    expect(reviews.reviews.filter((r) => r.review_id === review.review_id).map((r) => [r.rating, r.source])).toEqual([[4, "manual"]]);
   });
 
   it("bulk orders: an enquiry, a quote; a confirmed insert is refused; a staff member is refused", async () => {
@@ -410,6 +477,8 @@ describe("customer records, role limits and the rest of the member surface", () 
       .toEqual({ status: 422, code: "invalid_payload", reason: null });
     expect((await post("staff", "/v1/bulk-orders:upsert", "customers.bulk_order.upsert.v1", { ...b, bulk_order_id: uuidv7() })).status).toBe(403);
     expect(await one(`SELECT status, quote_minor::int q FROM core.bulk_order WHERE id = $1`, [id])).toEqual({ status: "quoted", q: 1800000 });
+    const list = BulkOrderListResponse.parse(await (await get("manager", `/v1/bulk-orders?outlet_id=${t.outlets[0]}`)).json());
+    expect(list.bulk_orders.filter((x) => x.bulk_order_id === id).map((x) => [x.status, x.quote_minor, x.headcount])).toEqual([["quoted", 1800000, 40]]);
   });
 
   it("coupon use history lists a customer's uses (row fields)", async () => {
@@ -423,7 +492,7 @@ describe("customer records, role limits and the rest of the member surface", () 
         [t.tenant, uuidv7(), coupon, o, cust, t.currency, t.owner]));
     const r = await get("owner", `/v1/customers/${cust}/coupon-uses`);
     expect(r.status).toBe(200);
-    expect((await r.json()).coupon_uses.map((u: any) => [u.coupon_id, u.order_id, u.discount_minor, u.currency])).toEqual([[coupon, o, 5000, t.currency]]);
+    expect(CouponUseListResponse.parse(await r.json()).coupon_uses.map((u) => [u.coupon_id, u.order_id, u.discount_minor, u.currency])).toEqual([[coupon, o, 5000, t.currency]]);
     expect((await get("owner", `/v1/customers/${uuidv7()}/coupon-uses`)).status).toBe(404);
   });
 });

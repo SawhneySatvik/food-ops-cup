@@ -4,6 +4,7 @@
 //   POST /v1/finance/disputes          finance.dispute.draft.v1 (own command; also draftable)
 //   POST /v1/finance/period-closes     finance.period.close.v1 (own command; also draftable)
 //   GET  /v1/finance/exports/tally     journal vouchers as CSV (owner, advisor, judge)
+//   GET  /v1/finance/channel-terms     recorded channel terms (owner, advisor, judge)
 // finance.journal.adjust.v1 has NO route: it executes only through an approved draft.
 // Seams for other modules (W2 brief), each inside the caller's transaction: postFor / reverseFor (every seeded
 // finance.post_* rule), seedChart (T-020), recordSettlement / recordBankLines (T-030's approved import commit),
@@ -19,7 +20,7 @@ import type { AppEnv } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
 import { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
-import { tallyExport } from "./read.ts";
+import { listChannelTerms, tallyExport } from "./read.ts";
 
 export { seedChart } from "./chart.ts";
 export { postFor, reverseFor, reverseSource, type PostResult, type ReversalRuleId } from "./post.ts";
@@ -57,7 +58,7 @@ function ownCommand(type: string, schema: Parameters<typeof commandEnvelopeOf>[1
       throw new ApiError("bad_request");
     }
     const env = Envelope.safeParse(body);
-    if (!env.success) throw new ApiError((body as { type?: unknown } | null)?.type === type ? "invalid_payload" : "bad_request");
+    if (!env.success) throw new ApiError("invalid_payload");
     const { pools, publish } = c.var.deps;
     const out = await executeCommand({
       tx: <T>(fn: (q: Queryable) => Promise<T>) => withContext(pools.core, contextOf(p), fn),
@@ -70,18 +71,30 @@ function ownCommand(type: string, schema: Parameters<typeof commandEnvelopeOf>[1
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EXPORT_ROLES = new Set(["owner", "advisor", "judge"]);
+
+/** The books of the whole business: tenant-wide finance roles only (a manager's outlet scope cannot be applied to
+ *  tenant-level rows). */
+function financeReader(c: Context<AppEnv>) {
+  const p = c.var.principal;
+  if (p.kind !== "member" || !EXPORT_ROLES.has(p.role) || p.outlet_ids !== "*") throw new ApiError("forbidden", "authority_denied");
+  return p;
+}
 
 export const router = new Hono<AppEnv>()
   .post("/v1/finance/channel-terms", requireMember, ownCommand("finance.channel_terms.set.v1", FinanceChannelTermsSetV1, channelTermsSet))
   .post("/v1/finance/expenses", requireMember, ownCommand("finance.expense.record.v1", FinanceExpenseRecordV1, expenseRecord))
   .post("/v1/finance/disputes", requireMember, ownCommand("finance.dispute.draft.v1", FinanceDisputeDraftV1, disputeDraft))
   .post("/v1/finance/period-closes", requireMember, ownCommand("finance.period.close.v1", FinancePeriodCloseV1, periodClose))
+  .get("/v1/finance/channel-terms", requireMember, async (c) => {
+    const p = financeReader(c);
+    const channel = c.req.query("channel_id") ?? null;
+    if (channel !== null && !UUID.test(channel)) throw new ApiError("bad_request");
+    return c.json(await withContext(c.var.deps.pools.core, contextOf(p), (q) => listChannelTerms(q, channel)), 200);
+  })
   .get("/v1/finance/exports/tally", requireMember, async (c) => {
-    const p = c.var.principal;
-    // The books of the whole business: tenant-wide finance roles only (a manager's outlet scope cannot be
-    // applied to tenant-level entries).
-    if (p.kind !== "member" || !EXPORT_ROLES.has(p.role) || p.outlet_ids !== "*") throw new ApiError("forbidden", "authority_denied");
+    const p = financeReader(c);
     const from = c.req.query("from") ?? "";
     const to = c.req.query("to") ?? "";
     if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || to < from) throw new ApiError("bad_request");

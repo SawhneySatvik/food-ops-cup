@@ -274,12 +274,15 @@ export const invoiceDispute: CommandHandler = {
     }
     const audit: AuditEntry[] = [{ entity: "core.dispute", entityId: p.dispute_id, after: { basis: p.basis, status: "recorded" } }];
     // 0015 A8: the dispute moves the invoice to disputed; an approved invoice's entry is reversed under
-    // finance.reverse_supplier_invoice (source state disputed) in this transaction. Its payable stays open
-    // (the dispute command does not write core.payable — schema request in the T-034 report).
+    // finance.reverse_supplier_invoice (source state disputed) in this transaction, and its open payable moves to
+    // disputed with it (D2, 0016: the dispute command may write core.payable).
     if (inv.status !== "disputed") {
       await c.query(`UPDATE core.supplier_invoice SET status = 'disputed' WHERE id = $1`, [p.supplier_invoice_id]);
       if (inv.status === "approved") await seams.reverseSource!(c, "finance.reverse_supplier_invoice", `core.supplier_invoice:${p.supplier_invoice_id}`);
       audit.push({ entity: "core.supplier_invoice", entityId: p.supplier_invoice_id, before: { status: inv.status }, after: { status: "disputed" } });
+      const held = await c.query<{ id: string }>(
+        `UPDATE core.payable SET status = 'disputed' WHERE source_type = 'core.supplier_invoice' AND source_id = $1 AND status = 'open' RETURNING id`, [p.supplier_invoice_id]);
+      for (const r of held.rows) audit.push({ entity: "core.payable", entityId: r.id, before: { status: "open" }, after: { status: "disputed" } });
     }
     return { entityId: p.dispute_id, audit };
   },
@@ -300,8 +303,9 @@ export const supplierReturnCreate: CommandHandler = {
 
     // The unit cost is what was paid on the receipt, never the payload: the batch's own receipt line, else the
     // named receipt, else the supplier's latest receipt of the ingredient. None → cannot verify.
-    // Lines are stored and moved in the ingredient's base unit, cost per base unit (half-up).
-    const costed: Array<(typeof p.lines)[number] & { unit_cost_minor: number; currency: string }> = [];
+    // Lines are stored and moved in the ingredient's base unit, at the cost of 1000 base units (R2-S2-8, 0016: exact for
+    // a per-kg / per-l price; the database fills the rounded per-unit column).
+    const costed: Array<(typeof p.lines)[number] & { unit_cost_per_1000_minor: number; currency: string }> = [];
     for (const l of p.lines) {
       if (l.batch_id && !(await first(c, `SELECT 1 FROM core.batch WHERE id = $1 AND outlet_id = $2 AND ingredient_id = $3`, [l.batch_id, p.outlet_id, l.ingredient_id]))) throw bad();
       const ing = await first<{ base_unit: string }>(c, `SELECT base_unit FROM core.ingredient WHERE id = $1`, [l.ingredient_id]);
@@ -315,15 +319,15 @@ export const supplierReturnCreate: CommandHandler = {
       const qf = factorToBase(l.unit, ing.base_unit);
       const cf = factorToBase(cost.unit, ing.base_unit);
       if (qf === null || cf === null) throw new ApiError("bad_request", "unit_mismatch");
-      costed.push({ ...l, qty_milli: l.qty_milli * qf, unit: ing.base_unit, unit_cost_minor: mulDiv(Number(cost.unit_cost_minor), 1, cf), currency: cost.currency });
+      costed.push({ ...l, qty_milli: l.qty_milli * qf, unit: ing.base_unit, unit_cost_per_1000_minor: mulDiv(Number(cost.unit_cost_minor), 1000, cf), currency: cost.currency });
     }
     await c.query(
       `INSERT INTO core.supplier_return (tenant_id, id, outlet_id, supplier_id, goods_received_id, reason_code, note, returned_by)
        VALUES (${T}, $1, $2, $3, $4, $5, $6, ${ME})`, [p.supplier_return_id, p.outlet_id, p.supplier_id, p.goods_received_id, p.reason_code, p.note]);
     for (const l of costed) {
       await c.query(
-        `INSERT INTO core.supplier_return_line (tenant_id, id, supplier_return_id, ingredient_id, batch_id, qty_milli, unit, unit_cost_minor, currency)
-         VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8)`, [uuidv7(), p.supplier_return_id, l.ingredient_id, l.batch_id, l.qty_milli, l.unit, l.unit_cost_minor, l.currency]);
+        `INSERT INTO core.supplier_return_line (tenant_id, id, supplier_return_id, ingredient_id, batch_id, qty_milli, unit, unit_cost_per_1000_minor, currency)
+         VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8)`, [uuidv7(), p.supplier_return_id, l.ingredient_id, l.batch_id, l.qty_milli, l.unit, l.unit_cost_per_1000_minor, l.currency]);
     }
     // inventory.supplier_return: the outgoing movements, derived from the return row just written.
     const movementIds: string[] = [];
@@ -332,9 +336,9 @@ export const supplierReturnCreate: CommandHandler = {
         const id = uuidv7();
         movementIds.push(id);
         await c.query(
-          `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id, unit_cost_minor, currency)
+          `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id, unit_cost_per_1000_minor, currency)
            VALUES (${T}, $1, $2, $3, $4, $5, $6, 'supplier_return', 'core.supplier_return', $7, $8, $9)`,
-          [id, p.outlet_id, l.ingredient_id, l.batch_id, -l.qty_milli, l.unit, p.supplier_return_id, l.unit_cost_minor, l.currency]);
+          [id, p.outlet_id, l.ingredient_id, l.batch_id, -l.qty_milli, l.unit, p.supplier_return_id, l.unit_cost_per_1000_minor, l.currency]);
       }
     });
     return {

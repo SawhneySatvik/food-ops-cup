@@ -9,7 +9,7 @@
 // Synthetic data only.
 import { createLogger } from "@munim/config";
 import { CommandResult, snapRef } from "@munim/contracts";
-import { GrnView, InvoiceView, PoView, SupplierReturnView, SupplierView } from "@munim/contracts/purchasing";
+import { InvoiceView, PoView, SCHEMAS } from "@munim/contracts/purchasing";
 import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -288,9 +288,9 @@ describe("supplier invoices: duplicate refused, approval derives the payable", (
       .toEqual({ s: 1030000, t: 31500, tot: 1061500, status: "recorded" });
     expect((await db.admin(`SELECT line_total_minor::int AS l FROM core.supplier_invoice_line WHERE supplier_invoice_id = $1 ORDER BY line_no`, [S.inv1])).rows.map((x) => x.l)).toEqual([400000, 661500]);
     expect(await count(`SELECT count(*) n FROM core.payable WHERE source_id = $1`, [S.inv1])).toBe(0);
-    // a client-sent total has no place in the schema
+    // a client-sent total has no place in the schema: a malformed envelope is 422 invalid_payload (one code across modules)
     const withTotal = await post("owner", "/v1/supplier-invoices", "purchasing.invoice.record.v1", invPayload({ id: uuidv7(), supplier: T.real, no: "INV-9100", extra: { total_minor: 1 } }));
-    expect(withTotal.status).toBe(400);
+    expect([withTotal.status, (await withTotal.json()).error.code]).toEqual([422, "invalid_payload"]);
   });
 
   it("duplicate number → 409 and no second row; a new number → 201; the same number for another supplier → 201; near-duplicate INV9001 → 201 (a finding, not a refusal)", async () => {
@@ -362,8 +362,12 @@ describe("supplier invoices: duplicate refused, approval derives the payable", (
       .toEqual({ t: 30000, basis: "overbilled", status: "recorded", supplier_id: T.real, counterparty: "supplier" });
     expect(await count(`SELECT count(*) n FROM core.dispute_line WHERE dispute_id = $1 AND supplier_invoice_line_id = $2`, [id, S.invLines[1]])).toBe(1);
     // 0015 A8 + A6: the invoice is now disputed and its entry reversed (the same 1,061,500 the other way) under the
-    // reversal rule; the payable stays (schema request: the dispute command cannot write core.payable).
+    // reversal rule; its open payable moves to disputed with it (D2, 0016), audited before/after.
     expect(await status()).toBe("disputed");
+    const payable = await one<{ id: string; status: string }>(`SELECT id, status FROM core.payable WHERE source_id = $1`, [S.inv1]);
+    expect(payable.status).toBe("disputed");
+    expect((await db.admin(`SELECT before, after FROM core.audit_log WHERE entity = 'core.payable' AND entity_id = $1 AND before IS NOT NULL`, [payable.id])).rows)
+      .toEqual([{ before: { status: "open" }, after: { status: "disputed" } }]);
     expect(await entries()).toEqual([
       { rule: "finance.post_supplier_invoice", reverses: false, total: 1061500 },
       { rule: "finance.reverse_supplier_invoice", reverses: true, total: 1061500 },
@@ -414,7 +418,9 @@ describe("supplier returns: unit conversion into the ingredient's base unit", ()
 
     const id = uuidv7();
     expect((await post("m1", "/v1/supplier-returns", "purchasing.supplier_return.create.v1", retBody(id, flour, "kg", 2000))).status).toBe(201);
-    expect(await one(`SELECT qty_milli::int AS q, unit, unit_cost_minor::int AS c FROM core.supplier_return_line WHERE supplier_return_id = $1`, [id])).toEqual({ q: 2000000, unit: "g", c: 8 });
+    // R2-S2-8: the cost of 1000 g is exactly the ₹80/kg received (8,000), the per-g column its rounding (8).
+    expect(await one(`SELECT qty_milli::int AS q, unit, unit_cost_minor::int AS c, unit_cost_per_1000_minor::int AS k FROM core.supplier_return_line WHERE supplier_return_id = $1`, [id]))
+      .toEqual({ q: 2000000, unit: "g", c: 8, k: 8000 });
     expect(await one(`SELECT qty_milli::int AS q, unit, unit_cost_minor::int AS c FROM core.stock_movement WHERE ref_id = $1`, [id])).toEqual({ q: -2000000, unit: "g", c: 8 });
 
     // the same unit as the base passes through unchanged (paired accept): 500 g
@@ -444,12 +450,13 @@ describe("read models: contract shapes and the simulated-supplier label", () => 
   };
 
   it("every supplier object in every purchasing view carries 'Simulated supplier' iff simulated; each view parses with its contract and shows a simulated row", async () => {
+    // Each list response parses whole with its route's contract schema (R3-M5).
     const views: Array<[string, (x: unknown) => unknown]> = [
-      ["/v1/suppliers", (x) => (x as { items: unknown[] }).items.map((i) => SupplierView.parse(i))],
-      ["/v1/purchase-orders", (x) => (x as { items: unknown[] }).items.map((i) => PoView.parse(i))],
-      ["/v1/goods-received", (x) => (x as { items: unknown[] }).items.map((i) => GrnView.parse(i))],
-      ["/v1/supplier-invoices", (x) => (x as { items: unknown[] }).items.map((i) => InvoiceView.parse(i))],
-      ["/v1/supplier-returns", (x) => (x as { items: unknown[] }).items.map((i) => SupplierReturnView.parse(i))],
+      ["/v1/suppliers", (x) => SCHEMAS["v1.suppliers"].parse(x).items],
+      ["/v1/purchase-orders", (x) => SCHEMAS["v1.purchase-orders"].parse(x).items],
+      ["/v1/goods-received", (x) => SCHEMAS["v1.goods-received.list"].parse(x).items],
+      ["/v1/supplier-invoices", (x) => SCHEMAS["v1.supplier-invoices"].parse(x).items],
+      ["/v1/supplier-returns", (x) => SCHEMAS["v1.supplier-returns"].parse(x).items],
     ];
     const kinds = new Map((await db.admin<{ id: string; kind: string }>(`SELECT id, kind FROM core.supplier`)).rows.map((r) => [r.id, r.kind]));
     for (const [path, parse] of views) {
@@ -464,10 +471,12 @@ describe("read models: contract shapes and the simulated-supplier label", () => 
       expect(found.some((s) => s.label === null), `${path} shows a real supplier`).toBe(true);
     }
     // details too (and the invoice detail carries its derived payable row)
+    expect(SCHEMAS["v1.supplier"].parse(await (await call("GET", `/v1/suppliers/${T.sim}`, "owner")).json()).label).toBe("Simulated supplier");
+    expect(SCHEMAS["v1.goods-received"].parse(await (await call("GET", `/v1/goods-received/${S.grn1}`, "owner")).json()).grn_id).toBe(S.grn1);
     const d = await (await call("GET", `/v1/purchase-orders/${S.poPool}`, "owner")).json();
     expect(PoView.parse(d).supplier.label).toBe("Simulated supplier");
     const inv = InvoiceView.parse(await (await call("GET", `/v1/supplier-invoices/${S.inv1}`, "owner")).json());
-    expect(inv.payable).toMatchObject({ due_on: "2026-10-20", amount_minor: 1061500, status: "open" });
+    expect(inv.payable).toMatchObject({ due_on: "2026-10-20", amount_minor: 1061500, status: "disputed" }); // disputed above (D2)
     expect(inv.supplier.label).toBeNull();
     // staff: supplier list without price observations
     const staff = await (await call("GET", "/v1/suppliers", "staff")).json();

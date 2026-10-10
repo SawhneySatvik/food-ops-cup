@@ -174,6 +174,11 @@ export const PeoplePayrollPreviewResponse = z.strictObject({
   ),
 });
 
+/** A staff record as wage-bearing reads show it (not to staff-role members): pay basis, rate or salary, contract
+ *  minutes and the overtime multiplier — the rows' own fields. The phone is not in the view. */
+export const StaffView = PeopleStaffUpsertV1.omit({ phone: true });
+export const PeopleStaffListResponse = z.strictObject({ outlet_id: Uuid7, staff: z.array(StaffView) });
+
 /** What every command route in this module returns (a module-own copy: contract names are global). */
 export const PeopleCommandResult = z.strictObject({ ...CommandResult.shape });
 
@@ -202,6 +207,7 @@ export const SCHEMAS = {
   "v1.people.command-result": PeopleCommandResult,
   "v1.people.overtime.response": PeopleOvertimeResponse,
   "v1.people.payroll-preview.response": PeoplePayrollPreviewResponse,
+  "v1.people.staff.list": PeopleStaffListResponse,
 };
 
 const command = (type: string, path: string, operationId: string, summary: string): Route => ({
@@ -235,5 +241,9 @@ export const ROUTES: readonly Route[] = [
       { name: "outlet", required: true, schema: { type: "string" } },
       { name: "month", required: true, schema: { type: "string" } },
     ],
+  },
+  {
+    surface: "public", method: "get", path: "/v1/people/staff", operationId: "peopleStaffList", summary: "Staff of an outlet with their pay terms (not for staff-role members)",
+    auth: "member", response: "v1.people.staff.list", status: 200, query: [{ name: "outlet", required: true, schema: { type: "string" } }],
   },
 ];

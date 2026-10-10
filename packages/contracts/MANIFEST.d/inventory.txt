@@ -11,3 +11,4 @@ proposal.inventory.reorder_level.set.v1
 proposal.inventory.transfer.create.v1
 v1.inventory.movements
 v1.inventory.batches
+v1.inventory.reorder-levels

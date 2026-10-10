@@ -138,7 +138,10 @@ export const InventoryMovementsResponse = z.strictObject({
       kind: MovementKind,
       ref_type: z.string().regex(/^core\.[a-z_]+$/).nullable(),
       ref_id: Uuid7.nullable(),
+      /** Per one base unit, rounded (kept for existing readers). */
       unit_cost: Money.nullable(),
+      /** The cost of 1000 base units — exact for a price per kg / l / 1000 units; value = qty_milli × this ÷ 1,000,000. */
+      unit_cost_per_1000: Money.nullable(),
       expired_sale_override_id: Uuid7.nullable(),
       at: IsoDateTime,
     }),
@@ -161,6 +164,19 @@ export const InventoryBatchesResponse = z.strictObject({
   ),
 });
 
+export const InventoryReorderLevelsResponse = z.strictObject({
+  reorder_levels: z.array(
+    z.strictObject({
+      reorder_level_id: Uuid7,
+      outlet_id: Uuid7,
+      ingredient_id: Uuid7,
+      min_qty_milli: QtyMilli.nonnegative(),
+      par_qty_milli: QtyMilli.nonnegative(),
+      updated_at: IsoDateTime,
+    }),
+  ),
+});
+
 export const SCHEMAS = {
   "inventory.ingredient.upsert.v1": InventoryIngredientUpsertV1,
   "inventory.reorder_level.set.v1": InventoryReorderLevelSetV1,
@@ -175,6 +191,7 @@ export const SCHEMAS = {
   "proposal.inventory.transfer.create.v1": TRANSFER_CREATE_DRAFT.proposal,
   "v1.inventory.movements": InventoryMovementsResponse,
   "v1.inventory.batches": InventoryBatchesResponse,
+  "v1.inventory.reorder-levels": InventoryReorderLevelsResponse,
 };
 
 const uuid = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" };
@@ -210,6 +227,14 @@ export const ROUTES: readonly Route[] = [
   {
     surface: "public", method: "get", path: "/v1/inventory/batches", operationId: "listBatches",
     summary: "Batches at an outlet with expiry and MRP, earliest expiry first", auth: "member", response: "v1.inventory.batches", status: 200,
+    query: [
+      { name: "outlet", required: true, schema: uuid },
+      { name: "ingredient", required: false, schema: uuid },
+    ],
+  },
+  {
+    surface: "public", method: "get", path: "/v1/inventory/reorder-levels", operationId: "listReorderLevels",
+    summary: "Min / par levels at an outlet", auth: "member", response: "v1.inventory.reorder-levels", status: 200,
     query: [
       { name: "outlet", required: true, schema: uuid },
       { name: "ingredient", required: false, schema: uuid },

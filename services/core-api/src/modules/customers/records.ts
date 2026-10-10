@@ -31,15 +31,23 @@ export const customerUpsert: CommandHandler = {
   async run(c, command): Promise<HandlerOutput> {
     const p = parse(CustomersCustomerUpsertV1, command.payload);
     const withdrawn = Object.fromEntries(p.withdraw_consent.map((ch) => [ch, false]));
-    const cur = await c.query<{ consent: Record<string, boolean>; erased: boolean }>(
-      `SELECT consent, erased_at IS NOT NULL AS erased FROM core.customer WHERE id = $1 FOR UPDATE`, [p.customer_id]);
+    const cur = await c.query<{ consent: Record<string, boolean>; erased: boolean; has_account: boolean; name: string | null; phone: string | null; email: string | null }>(
+      `SELECT consent, erased_at IS NOT NULL AS erased, idp_sub IS NOT NULL AS has_account, name, phone, email FROM core.customer WHERE id = $1 FOR UPDATE`, [p.customer_id]);
     let consent: Record<string, boolean>;
-    if (cur.rows[0]) {
-      if (cur.rows[0].erased) throw new ApiError("customer_erased");
+    const row = cur.rows[0];
+    if (row) {
+      if (row.erased) throw new ApiError("customer_erased");
+      // Staff see a masked phone and no email (reads.ts), so they cannot send either back: a staff save keeps the stored
+      // email, and a null phone means "unchanged" (a typed number replaces it). A signed-in customer's name and phone are
+      // their own: staff cannot change them (R1-m3) — only withdraw consent.
+      const staff = (await c.query<{ r: string | null }>(`SELECT nullif(current_setting('app.role', true), '') AS r`)).rows[0]!.r === "staff";
+      const phone = staff && p.phone === null ? row.phone : p.phone;
+      const email = staff ? row.email : p.email;
+      if (staff && row.has_account && (p.name !== row.name || phone !== row.phone)) throw new ApiError("forbidden", "authority_denied");
       // Only ever false: a member can withdraw a customer's consent, never grant it.
-      consent = { ...cur.rows[0].consent, ...withdrawn };
+      consent = { ...row.consent, ...withdrawn };
       await c.query(`UPDATE core.customer SET name = $2, phone = $3, email = $4, consent = $5 WHERE id = $1`,
-        [p.customer_id, p.name, p.phone, p.email, consent]);
+        [p.customer_id, p.name, phone, email, consent]);
     } else {
       consent = withdrawn;
       // A customer record entered by the merchant: known to the business, no account of its own (idp_sub null).

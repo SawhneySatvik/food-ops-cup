@@ -34,6 +34,18 @@ export async function payrollScope(c: Queryable): Promise<string | null> {
 const monthEnd = async (c: Queryable, month: string) =>
   (await c.query<{ d: string }>(`SELECT to_char(($1::date + interval '1 month - 1 day')::date, 'YYYY-MM-DD') AS d`, [month])).rows[0]!.d;
 
+/** R2-S2-7: the ISO weeks (Monday–Sunday, outlet-local dates) whose SUNDAY falls in the month — the month a week's
+ *  hours are paid in. Overtime is attended minus rostered over a WHOLE week, so a week that straddles two months
+ *  is judged once, in full, and paid in the month it ends (both its base hours and its overtime); a week split at
+ *  the month boundary would pay overtime on one half that the other half cancels. */
+export async function payWeeks(c: Queryable, month: string): Promise<{ from: string; to: string }> {
+  const r = await c.query<{ f: string; t: string }>(
+    `WITH m AS (SELECT $1::date AS s, ($1::date + interval '1 month - 1 day')::date AS e)
+     SELECT to_char(s + (7 - extract(isodow FROM s)::int) % 7 - 6, 'YYYY-MM-DD') AS f,
+            to_char(e - extract(isodow FROM e)::int % 7, 'YYYY-MM-DD') AS t FROM m`, [month]);
+  return { from: r.rows[0]!.f, to: r.rows[0]!.t };
+}
+
 /** Given less recovered; a recovery booked on a payroll that was later voided did not happen. */
 export async function outstandingAdvance(c: Queryable, staffId: string): Promise<number> {
   const r = await c.query<{ n: string }>(
@@ -45,6 +57,7 @@ export async function outstandingAdvance(c: Queryable, staffId: string): Promise
 
 /**
  * Proposed payroll lines. INFERENCE (documented, not in the pack text):
+ *   hours (base and overtime) are those of the ISO weeks ending in the month (payWeeks);
  *   hourly base  = round(base_min × wage_rate_minor / 60), base_min = attended minutes less overtime minutes;
  *   monthly base = monthly_salary_minor (the contract minutes only fix the hourly rate used for overtime);
  *   overtime     = Σ weekly extra_cost_minor, only for weeks the person was rostered (an unrostered week has no
@@ -55,11 +68,12 @@ export async function outstandingAdvance(c: Queryable, staffId: string): Promise
 export async function previewPayroll(c: Queryable, outletId: string, month: string): Promise<{ currency: string; lines: PayrollLine[] }> {
   if ((await payrollScope(c)) !== "drafts") throw new ApiError("out_of_pack_scope", "payroll_out_of_scope");
   const end = await monthEnd(c, month);
-  await requireAttendance(c, outletId, month, end);
+  const weeks = await payWeeks(c, month);
+  await requireAttendance(c, outletId, weeks.from, weeks.to);
   const staff = await c.query<{ id: string; pay_basis: string; wage_rate_minor: string | null; monthly_salary_minor: string | null; currency: string }>(
     `SELECT id, pay_basis, wage_rate_minor, monthly_salary_minor, currency FROM core.staff
       WHERE outlet_id = $1 AND joined_on <= $3::date AND (left_on IS NULL OR left_on >= $2::date) ORDER BY id`, [outletId, month, end]);
-  const ot = await overtimeRows(c, outletId, month, end);
+  const ot = await overtimeRows(c, outletId, weeks.from, weeks.to);
   const tips = await c.query<{ staff_id: string; n: string }>(
     `SELECT sh.staff_id, sum(sh.amount_minor) AS n FROM core.tip_pool_share sh JOIN core.tip_pool p ON p.tenant_id = sh.tenant_id AND p.id = sh.tip_pool_id
       WHERE p.outlet_id = $1 AND p.period_to BETWEEN $2::date AND $3::date GROUP BY 1`, [outletId, month, end]);
@@ -142,3 +156,18 @@ export const payrollStatusHandler: CommandHandler = {
     };
   },
 };
+
+/** Staff of an outlet with their pay terms — the rows' own fields (wage-bearing: the route keeps staff-role members
+ *  out). No phone. */
+export async function listStaff(c: Queryable, outletId: string) {
+  const r = await c.query<{ id: string; member_id: string | null; outlet_id: string; name: string; role_key: string; pay_basis: "hourly" | "monthly";
+    wage_rate_minor: string | null; monthly_salary_minor: string | null; contract_min_per_month: number | null; ot_multiplier_bp: number; currency: string;
+    joined_on: string; left_on: string | null; active: boolean }>(
+    `SELECT id, member_id, outlet_id, name, role_key, pay_basis, wage_rate_minor::text, monthly_salary_minor::text, contract_min_per_month, ot_multiplier_bp,
+            currency, joined_on::text, left_on::text, active
+       FROM core.staff WHERE outlet_id = $1 ORDER BY name, id`, [outletId]);
+  return r.rows.map(({ id, wage_rate_minor, monthly_salary_minor, ...s }) => ({
+    staff_id: id, ...s,
+    wage_rate_minor: wage_rate_minor === null ? null : Number(wage_rate_minor), monthly_salary_minor: monthly_salary_minor === null ? null : Number(monthly_salary_minor),
+  }));
+}

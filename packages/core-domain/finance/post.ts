@@ -49,6 +49,13 @@ export function postOrder(o: ChannelTreatment & { total_minor: number; tax_minor
   ]);
 }
 
+/** finance.post_loyalty_redemption (0016) — points redeemed on a completed order are never tendered: their value
+ *  (`value_minor`, what the till took off what is due) leaves the order's receivable for loyalty redemptions, so the
+ *  receivable clears exactly against the order's tenders (R2-S1-4). */
+export function postLoyaltyRedemption(r: { aggregator: boolean; value_minor: number }): Line[] | null {
+  return finish([{ role: "loyalty_redemption", amount_minor: r.value_minor }, { role: receivable(r.aggregator), amount_minor: -r.value_minor }]);
+}
+
 /** finance.post_tender — money taken at the counter clears the order's receivable. A cash tender's
  *  `amount_minor` is the rounded amount taken; `rounding_minor` (rounded − due) goes to cash rounding. */
 export function postTender(t: { aggregator: boolean; method: TenderMethod; amount_minor: number; rounding_minor: number }): Line[] | null {
@@ -59,14 +66,23 @@ export function postTender(t: { aggregator: boolean; method: TenderMethod; amoun
   ]);
 }
 
-/** finance.post_refund — money paid back: sales and (pro rata to the order) output tax reversed. The tax
- *  share is refund × order tax ÷ order total, half away from zero (INFERENCE: the refund row has no split). */
-export function postRefund(r: { operator_collects: boolean; method: TenderMethod; amount_minor: number; order_total_minor: number; order_tax_minor: number }): Line[] | null {
-  const tax = r.operator_collects || r.order_total_minor <= 0 ? 0 : mulDiv(r.amount_minor, r.order_tax_minor, r.order_total_minor);
+/** finance.post_refund — money paid back: sales and (pro rata to the order) output tax reversed. The tax share
+ *  is cumulative (R2-S3-2): round(refunded so far × order tax ÷ order total) less the same for the refunds before
+ *  this one (`prior_refunded_minor`), half away from zero — so partial refunds that add up to the order reverse
+ *  exactly its tax (INFERENCE: the refund row has no split). An aggregator's refund is a deduction from what the
+ *  channel owes us (R2-S2-10: the customer is refunded by the channel, never from our till), whatever the row's
+ *  method says. */
+export function postRefund(r: {
+  aggregator?: boolean; operator_collects: boolean; method: TenderMethod; amount_minor: number; order_total_minor: number; order_tax_minor: number;
+  prior_refunded_minor?: number;
+}): Line[] | null {
+  const prior = r.prior_refunded_minor ?? 0;
+  const share = (cum: number) => (r.operator_collects || r.order_total_minor <= 0 ? 0 : mulDiv(cum, r.order_tax_minor, r.order_total_minor));
+  const tax = share(prior + r.amount_minor) - share(prior);
   return finish([
     { role: "sales", amount_minor: r.amount_minor - tax },
     { role: "output_tax", amount_minor: tax },
-    { role: tenderAccount(r.method), amount_minor: -r.amount_minor },
+    { role: r.aggregator ? "channel_receivable" : tenderAccount(r.method), amount_minor: -r.amount_minor },
   ]);
 }
 
@@ -81,11 +97,16 @@ export function postGrn(g: { lines: ReadonlyArray<{ qty_milli: number; unit_cost
   return finish([{ role: "cogs", amount_minor: v }, { role: "grni", amount_minor: -v }]);
 }
 
-/** finance.post_supplier_invoice — an approved invoice moves its subtotal from GRNI to payables; its tax is
- *  input tax where the chart has an input-tax account, else part of the cost (COGS). */
-export function postSupplierInvoice(i: { subtotal_minor: number; tax_minor: number; total_minor: number; input_tax: boolean }): Line[] | null {
+/** finance.post_supplier_invoice — an approved invoice owes its total to payables. `grni_minor` is the part of the
+ *  subtotal that settles GRNI: the GRN value of the goods it bills that were received, plus goods billed before
+ *  they arrive (their GRN will credit GRNI). The rest of the subtotal — the price/quantity variance against the
+ *  GRN, and lines that are not goods (delivery and the like) — is cost (COGS, purchases method, W2-R5; no separate
+ *  price-variance account, R2-S1-6). Its tax is input tax where the chart has an input-tax account, else cost. */
+export function postSupplierInvoice(i: { subtotal_minor: number; tax_minor: number; total_minor: number; input_tax: boolean; grni_minor?: number }): Line[] | null {
+  const grni = i.grni_minor ?? i.subtotal_minor;
   return finish([
-    { role: "grni", amount_minor: i.subtotal_minor },
+    { role: "grni", amount_minor: grni },
+    { role: "cogs", amount_minor: i.subtotal_minor - grni },
     { role: i.input_tax ? "input_tax" : "cogs", amount_minor: i.tax_minor },
     { role: "payables", amount_minor: -i.total_minor },
   ]);
@@ -138,6 +159,16 @@ export function postExpense(e: { category: ExpenseCategory; amount_minor: number
     { role: e.input_tax ? "input_tax" : role, amount_minor: e.tax_minor },
     { role: "bank", amount_minor: -e.amount_minor },
   ]);
+}
+
+/** finance.post_advance — money given to a staff member ahead of pay, or paid back directly: staff advances
+ *  against the bank (INFERENCE: the row has no payment method; paid from the bank like expenses, W2-R5). A
+ *  recovery made through a payroll (`via_payroll`) posts nothing here — finance.post_payroll credits staff
+ *  advances with it, and a voided payroll reverses that. */
+export function postAdvance(a: { kind: "given" | "recovered"; amount_minor: number; via_payroll: boolean }): Line[] | null {
+  if (a.via_payroll) return null;
+  const v = a.kind === "given" ? a.amount_minor : -a.amount_minor;
+  return finish([{ role: "staff_advances", amount_minor: v }, { role: "bank", amount_minor: -v }]);
 }
 
 /** finance.post_payroll — an approved payroll: wages at gross (base + overtime + tips), net paid from the

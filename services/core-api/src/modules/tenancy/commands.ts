@@ -7,7 +7,7 @@ import {
   TenancyMemberInviteV1, TenancyMemberRoleSetV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyTenantUpdateV1,
 } from "@munim/contracts/tenancy";
 import type { Principal } from "../../auth/resolve.ts";
-import type { CommandHandler } from "../../commit/index.ts";
+import type { AuditEntry, CommandHandler } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
@@ -141,13 +141,24 @@ export const outletUpdateHandler = (m: Member): CommandHandler => ({
       const r = await c.query(`UPDATE core.outlet SET ${sets.join(", ")} WHERE id = $1`, args);
       if (r.rowCount !== 1) throw new ApiError("book_write_refused", "authority_denied");
     } else assertOutletInScope(m, p.outlet_id);
+    // R1-M2: each weekly calendar row changed is audited on its own, as it was (locked) and as it is now.
+    const hours: AuditEntry[] = [];
     if (p.hours) {
-      const r = await c.query(`UPDATE core.outlet_calendar SET opens_at = $2, closes_at = $3 WHERE outlet_id = $1 AND kind = 'weekly'`,
-        [p.outlet_id, p.hours.opens, p.hours.closes]);
+      const was = await c.query<{ id: string; weekday: number; opens_at: string | null; closes_at: string | null; closed: boolean }>(
+        `SELECT id, weekday, opens_at::text, closes_at::text, closed FROM core.outlet_calendar WHERE outlet_id = $1 AND kind = 'weekly' ORDER BY weekday FOR UPDATE`,
+        [p.outlet_id]);
+      const r = await c.query<{ id: string; weekday: number; opens_at: string | null; closes_at: string | null; closed: boolean }>(
+        `UPDATE core.outlet_calendar SET opens_at = $2, closes_at = $3 WHERE outlet_id = $1 AND kind = 'weekly'
+         RETURNING id, weekday, opens_at::text, closes_at::text, closed`, [p.outlet_id, p.hours.opens, p.hours.closes]);
       if (r.rowCount !== 7) throw new ApiError("book_write_refused", "authority_denied");
+      for (const a of r.rows) {
+        const { id: _b, ...before } = was.rows.find((b) => b.id === a.id)!;
+        const { id: _a, ...after } = a;
+        hours.push({ entity: "core.outlet_calendar", entityId: a.id, before, after });
+      }
     }
     const { outlet_id: _id, ...changed } = p;
-    return { entityId: p.outlet_id, audit: [{ entity: "core.outlet", entityId: p.outlet_id, after: changed }] };
+    return { entityId: p.outlet_id, audit: [{ entity: "core.outlet", entityId: p.outlet_id, after: changed }, ...hours] };
   },
 });
 

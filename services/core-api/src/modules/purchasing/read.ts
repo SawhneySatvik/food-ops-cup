@@ -63,7 +63,7 @@ const VIEWS = {
     sql: () => `SELECT json_build_object('supplier_return_id', r.id, 'outlet_id', r.outlet_id, 'supplier', ${SUPPLIER}, 'goods_received_id', r.goods_received_id,
         'reason_code', r.reason_code, 'note', r.note, 'returned_by', r.returned_by, 'returned_at', r.returned_at,
         'lines', coalesce((SELECT json_agg(json_build_object('ingredient_id', l.ingredient_id, 'batch_id', l.batch_id, 'qty_milli', l.qty_milli, 'unit', l.unit,
-          'unit_cost_minor', l.unit_cost_minor, 'currency', l.currency) ORDER BY l.id) FROM core.supplier_return_line l WHERE l.supplier_return_id = r.id), '[]')) AS v
+          'unit_cost_minor', l.unit_cost_minor, 'unit_cost_per_1000_minor', l.unit_cost_per_1000_minor, 'currency', l.currency) ORDER BY l.id) FROM core.supplier_return_line l WHERE l.supplier_return_id = r.id), '[]')) AS v
       FROM core.supplier_return r JOIN core.supplier s ON s.tenant_id = r.tenant_id AND s.id = r.supplier_id
       WHERE ($1::uuid[] IS NULL OR r.outlet_id = ANY ($1::uuid[])) AND ($2::uuid IS NULL OR r.id = $2)
       ORDER BY r.returned_at DESC, r.id LIMIT 200`,

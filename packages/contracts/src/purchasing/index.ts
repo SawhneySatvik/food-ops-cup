@@ -235,7 +235,10 @@ export const SupplierReturnView = z.strictObject({
       batch_id: Uuid7.nullable(),
       qty_milli: QtyMilli,
       unit: Unit,
+      /** Per one base unit, rounded. */
       unit_cost_minor: MinorAmount,
+      /** The cost of 1000 base units (exact; the return's value is qty_milli × this ÷ 1,000,000). */
+      unit_cost_per_1000_minor: MinorAmount,
       currency: CurrencyCode,
     }),
   ),

@@ -10,7 +10,7 @@
 // the code under test. The override with the flag TRUE is in inventory.override.test.ts (its own pack row).
 import { createLogger } from "@munim/config";
 import { CommandResult } from "@munim/contracts";
-import { InventoryBatchesResponse, InventoryMovementsResponse } from "@munim/contracts/inventory";
+import { InventoryBatchesResponse, InventoryMovementsResponse, InventoryReorderLevelsResponse } from "@munim/contracts/inventory";
 import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -171,6 +171,19 @@ describe("opening stock", () => {
       `SELECT unit, unit_cost_minor, origin FROM core.stock_movement WHERE tenant_id = $1 AND ingredient_id = $2`, [T.tenant, T.rice]);
     expect([m.unit, Number(m.unit_cost_minor), m.origin.kind, m.origin.command_type]).toEqual(["g", 9, "command", "inventory.stock.receive.v1"]);
   });
+  it("R2-S2-8: 12.5 kg received at ₹14.99/kg keeps its exact cost per 1000 g (1,499), valued 18,738 — not 1 paise/g (12,500)", async () => {
+    const dal = u();
+    expect((await call("POST", "/v1/inventory/ingredients", "owner", env("inventory.ingredient.upsert.v1", { ingredient_id: dal, name: "Dal (synthetic)", base_unit: "g", shelf_life_days: null, tracked_by_batch: false }))).status).toBe(200);
+    expect((await call("POST", "/v1/inventory/stock:receive", "owner", env("inventory.stock.receive.v1", { outlet_id: T.outlets[0], source: "opening", at: "2026-10-01T09:00:00+05:30",
+      lines: [{ movement_id: u(), ingredient_id: dal, batch_id: null, batch: null, qty_milli: 12_500, unit: "kg", unit_cost: { amount_minor: 1499, currency: T.currency } }] }))).status).toBe(200);
+    const m = await one<{ q: string; per1000: string; per1: string; value: string }>(
+      `SELECT qty_milli::text AS q, unit_cost_per_1000_minor::text AS per1000, unit_cost_minor::text AS per1,
+              round(qty_milli * unit_cost_per_1000_minor / 1000000.0)::text AS value FROM core.stock_movement WHERE tenant_id = $1 AND ingredient_id = $2`, [T.tenant, dal]);
+    expect([Number(m.q), Number(m.per1000), Number(m.per1), Number(m.value)]).toEqual([12_500_000, 1499, 1, 18738]);
+    const read = InventoryMovementsResponse.parse(await (await call("GET", `/v1/inventory/movements?outlet=${T.outlets[0]}&ingredient=${dal}`, "owner")).json());
+    expect(read.movements.map((x) => [x.unit_cost?.amount_minor, x.unit_cost_per_1000?.amount_minor])).toEqual([[1, 1499]]);
+  });
+
   it("untracked stock with a batch is refused; tracked stock without one is refused", async () => {
     const bad1 = await call("POST", "/v1/inventory/stock:receive", "owner", env("inventory.stock.receive.v1", { outlet_id: T.outlets[0], source: "opening", at: "2026-10-01T09:00:00+05:30",
       lines: [{ movement_id: u(), ingredient_id: T.rice, batch_id: u(), batch: { batch_code: "X", expires_on: null, mrp_minor: null }, qty_milli: 1000, unit: "g", unit_cost: { amount_minor: 9, currency: T.currency } }] }));
@@ -374,6 +387,33 @@ describe("waste, counts, transfers, reorder levels, batches", () => {
     expect(again.status).toBe(409);
   });
 
+  it("R2-S1-7: received by the destination's own manager, a batch transfer creates the destination batch with the source's code, expiry and MRP; a second transfer lands in it", async () => {
+    const mgr2 = u(), sub2 = `mgr2-${u()}`;
+    await db.withContext("munim_core", { tenant_id: T.tenant, outlet_ids: "*", role: "owner", member_id: T.owner, command_type: "tenancy.member.invite.v1" }, async (c) => {
+      await c.query(`INSERT INTO core.member (tenant_id, id, idp_sub, name, email) VALUES ($1, $2, $3, 'Synthetic mgr2', 'mgr2@example.test')`, [T.tenant, mgr2, sub2]);
+      await c.query(`INSERT INTO core.membership (tenant_id, member_id, role, outlet_ids) VALUES ($1, $2, 'manager', $3)`, [T.tenant, mgr2, [T.outlets[1]]]);
+    });
+    const asMgr2 = async (path: string, body: unknown) => (await app.request(path, { method: "POST", body: JSON.stringify(body),
+      headers: { Authorization: `Bearer ${idp.sign({ sub: sub2 })}`, [TENANT_HEADER]: T.tenant, "Content-Type": "application/json" } }));
+    // The expired JAM-OLD batch (2020-01-01) gets a printed MRP first, so both carry over.
+    expect((await call("POST", "/v1/inventory/batches:update", "mgr1", env("inventory.batch.update.v1", { batch_id: T.jamExpired, expires_on: "2020-01-01", mrp_minor: 6000 }))).status).toBe(200);
+    const send = async (qty: number) => {
+      const tr = u();
+      expect((await call("POST", "/v1/inventory/transfers", "owner", env("inventory.transfer.create.v1", {
+        transfer_id: tr, from_outlet_id: T.outlets[0], to_outlet_id: T.outlets[1], lines: [{ ingredient_id: T.jam, batch_id: T.jamExpired, qty_milli: qty, unit: "unit" }] }))).status).toBe(200);
+      expect((await asMgr2(`/v1/inventory/transfers/${tr}:receive`, env("inventory.transfer.receive.v1", { transfer_id: tr }))).status).toBe(200);
+    };
+    await send(2000);
+    const dest = (await db.admin<{ id: string; batch_code: string; expires_on: string; mrp_minor: string }>(
+      `SELECT id, batch_code, expires_on::text, mrp_minor::text FROM core.batch WHERE tenant_id = $1 AND outlet_id = $2 AND ingredient_id = $3`, [T.tenant, T.outlets[1], T.jam])).rows;
+    expect(dest.map((b) => [b.batch_code, b.expires_on, Number(b.mrp_minor)])).toEqual([["JAM-OLD", "2020-01-01", 6000]]);
+    expect(await batchLeft(dest[0]!.id)).toBe(2000);
+    await send(1000);
+    expect(await num(`SELECT count(*) AS n FROM core.batch WHERE tenant_id = $1 AND outlet_id = $2 AND ingredient_id = $3`, [T.tenant, T.outlets[1], T.jam])).toBe(1);
+    expect(await batchLeft(dest[0]!.id)).toBe(3000);
+    expect(await batchLeft(T.jamExpired)).toBe(2000); // 5,000 − 3,000 sent
+  });
+
   it("a manager scoped to the sending outlet only cannot create a transfer (transfer scope is both ends, 0014 'pair') — 403, nothing written", async () => {
     const tr = u();
     const r = await call("POST", "/v1/inventory/transfers", "mgr1", env("inventory.transfer.create.v1", {
@@ -391,6 +431,9 @@ describe("waste, counts, transfers, reorder levels, batches", () => {
     const rows = (await db.admin(`SELECT min_qty_milli, par_qty_milli FROM core.reorder_level WHERE tenant_id = $1 AND outlet_id = $2 AND ingredient_id = $3`,
       [T.tenant, T.outlets[0], T.milk])).rows.map((x) => [Number(x.min_qty_milli), Number(x.par_qty_milli)]);
     expect(rows).toEqual([[12_000, 36_000]]);
+    const read = await call("GET", `/v1/inventory/reorder-levels?outlet=${T.outlets[0]}&ingredient=${T.milk}`, "staff");
+    expect(InventoryReorderLevelsResponse.parse(await read.json()).reorder_levels.map((x) => [x.ingredient_id, x.min_qty_milli, x.par_qty_milli])).toEqual([[T.milk, 12_000, 36_000]]);
+    expect((await call("GET", `/v1/inventory/reorder-levels?outlet=${T.outlets[1]}`, "mgr1")).status).toBe(404);
   });
 
   it("reorder level and transfer are draftable: approvals executes this module's handlers", () => {

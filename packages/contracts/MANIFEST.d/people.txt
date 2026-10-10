@@ -13,3 +13,4 @@ proposal.people.payroll_draft.create.v1
 v1.people.command-result
 v1.people.overtime.response
 v1.people.payroll-preview.response
+v1.people.staff.list

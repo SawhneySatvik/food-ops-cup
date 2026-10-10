@@ -6,7 +6,9 @@
 //   loyaltyEarnFor   a LISTED DERIVATION (rule customers.loyalty_earn): call it AFTER the order's status has become
 //                    'completed'; the guard admits the row only while the source order is in that state.
 //   loyaltyReverseFor a LISTED DERIVATION (rule customers.loyalty_reverse): call it AFTER the order became
-//                    'cancelled' or 'rejected'; it gives back redeemed points (and takes back any earn).
+//                    'cancelled' or 'rejected' — it gives back redeemed points (and takes back any earn) — and AFTER
+//                    recording a refund of a 'completed' order, which takes the earn back once the order is fully
+//                    refunded (R2-S2-4, ruling W2-R10).
 //
 // The balance is never stored: every entry carries `seq` and `balance_after`, set by the database trigger while it
 // holds the customer's row lock, so concurrent writers queue per customer and a balance can never go below zero
@@ -57,23 +59,24 @@ async function lockCustomer(tx: Queryable, customerId: string): Promise<{ is_gue
   return r.rows[0] ?? null;
 }
 
-async function insertEntry(tx: Queryable, e: { customer_id: string; kind: string; points: number; order_id: string; reverses_id: string | null; note: string | null }) {
+async function insertEntry(tx: Queryable, e: { customer_id: string; kind: string; points: number; order_id: string; reverses_id: string | null; note: string | null; refund_id?: string }) {
   const id = uuidv7();
-  // seq and balance_after are overwritten by the trigger (values supplied here are placeholders).
+  // seq and balance_after are overwritten by the trigger (values supplied here are placeholders). refund_id: the refund a
+  // refund-path reversal answers (0016; the database binds it to the derivation's source).
   await tx.query(
-    `INSERT INTO core.loyalty_entry (tenant_id, id, customer_id, seq, kind, points, balance_after, order_id, reverses_id, note, created_by, origin)
+    `INSERT INTO core.loyalty_entry (tenant_id, id, customer_id, seq, kind, points, balance_after, order_id, reverses_id, note, created_by, origin${e.refund_id ? ", refund_id" : ""})
      VALUES (current_setting('app.tenant_id')::uuid, $1, $2, 0, $3, $4, 0, $5, $6, $7,
-             coalesce(nullif(current_setting('app.member_id', true), ''), nullif(current_setting('app.customer_id', true), ''))::uuid, '{}')`,
-    [id, e.customer_id, e.kind, e.points, e.order_id, e.reverses_id, e.note]);
+             coalesce(nullif(current_setting('app.member_id', true), ''), nullif(current_setting('app.customer_id', true), ''))::uuid, '{}'${e.refund_id ? ", $8" : ""})`,
+    [id, e.customer_id, e.kind, e.points, e.order_id, e.reverses_id, e.note, ...(e.refund_id ? [e.refund_id] : [])]);
   return id;
 }
 
-/** Runs `fn` with the derivation context for `rule` over `core.order:<id>`, then restores whatever was set before,
- *  so the context cannot admit a later write in the caller's transaction. */
-async function underRule<T>(tx: Queryable, rule: string, orderId: string, fn: () => Promise<T>): Promise<T> {
+/** Runs `fn` with the derivation context for `rule` over `source` (`core.order:<id>` unless given), then restores
+ *  whatever was set before, so the context cannot admit a later write in the caller's transaction. */
+async function underRule<T>(tx: Queryable, rule: string, orderId: string, fn: () => Promise<T>, source = `core.order:${orderId}`): Promise<T> {
   const prev = (await tx.query<{ r: string | null; s: string | null }>(
     `SELECT current_setting('app.posting_rule', true) AS r, current_setting('app.source_ref', true) AS s`)).rows[0]!;
-  await tx.query(`SELECT set_config('app.posting_rule', $1, true), set_config('app.source_ref', $2, true)`, [rule, `core.order:${orderId}`]);
+  await tx.query(`SELECT set_config('app.posting_rule', $1, true), set_config('app.source_ref', $2, true)`, [rule, source]);
   try {
     return await fn();
   } finally {
@@ -125,13 +128,45 @@ export async function loyaltyEarnFor(tx: Queryable, orderId: string): Promise<Lo
   });
 }
 
+/** W2-R10: a refund of a completed order takes its earn back IN FULL when it makes the order fully refunded (Σ refunds
+ *  reaches Σ paid — the order's tenders less cash rounding, the most that can be refunded); a partial refund that leaves
+ *  money paid keeps the points. An earn is reversed at most once (loyalty_entry_one_reversal) and one entry answers one
+ *  refund (0016); never below what the customer still holds (the part already spent stays spent, noted on the row). The
+ *  redeem stays redeemed. The derivation's source is the refund just recorded (the order's newest; refunds of one order
+ *  are serialised by its row lock), cited in refund_id. */
+async function reverseForRefund(tx: Queryable, orderId: string, customerId: string): Promise<LoyaltyWrite[]> {
+  const e = (await tx.query<{ id: string; points: string; refunded: string; paid: string; refund_id: string | null }>(
+    `SELECT e.id, e.points::text,
+            (SELECT f.id FROM core.refund f WHERE f.tenant_id = e.tenant_id AND f.order_id = e.order_id ORDER BY f.at DESC, f.id DESC LIMIT 1) AS refund_id,
+            (SELECT coalesce(sum(f.amount_minor), 0) FROM core.refund f WHERE f.tenant_id = e.tenant_id AND f.order_id = e.order_id)::text AS refunded,
+            (SELECT coalesce(sum(t.amount_minor - t.rounding_minor), 0) FROM core.tender t WHERE t.tenant_id = e.tenant_id AND t.order_id = e.order_id)::text AS paid
+       FROM core.loyalty_entry e
+      WHERE e.order_id = $1 AND e.kind = 'earn' AND NOT EXISTS (SELECT 1 FROM core.loyalty_entry r WHERE r.reverses_id = e.id)`, [orderId])).rows[0];
+  if (!e || !e.refund_id || Number(e.paid) <= 0) return [];
+  if (Number(e.refunded) < Number(e.paid)) return [];
+  const earned = Number(e.points);
+  const points = Math.min(earned, (await loyaltyBalance(tx, customerId)).balance);
+  if (points <= 0) return [];
+  const note = points < earned ? "refund: partial, points already spent" : "refund: order fully refunded";
+  const refund = e.refund_id;
+  const entry_id = await underRule(tx, "customers.loyalty_reverse", orderId, () =>
+    insertEntry(tx, { customer_id: customerId, kind: "reverse", points: -points, order_id: orderId, reverses_id: e.id, note, refund_id: refund }), `core.refund:${refund}`);
+  return [{ entry_id, points: -points }];
+}
+
 /** Reverse every not-yet-reversed redeem/earn entry of a cancelled or rejected order, newest first. A redeem is
  *  given back in full; an earn is taken back up to what the customer still holds (never below zero — the part
- *  already spent stays spent, noted on the row). One reversal per entry (database unique). */
+ *  already spent stays spent, noted on the row). One reversal per entry (database unique). For a completed order
+ *  with refunds, see reverseForRefund. */
 export async function loyaltyReverseFor(tx: Queryable, orderId: string): Promise<LoyaltyWrite[]> {
   return asSystem(tx, async () => {
     const order = await orderOf(tx, orderId);
-    if (!["cancelled", "rejected"].includes(order.status) || !order.customer_id) return [];
+    if (!order.customer_id) return [];
+    if (order.status === "completed") {
+      if (!(await lockCustomer(tx, order.customer_id))) return [];
+      return reverseForRefund(tx, orderId, order.customer_id);
+    }
+    if (!["cancelled", "rejected"].includes(order.status)) return [];
     if (!(await lockCustomer(tx, order.customer_id))) return [];
     const open = await tx.query<{ id: string; kind: string; points: string }>(
       `SELECT e.id, e.kind, e.points::text FROM core.loyalty_entry e

@@ -11,6 +11,7 @@
 // the code under test. Synthetic data only.
 import { createLogger } from "@munim/config";
 import { CommandResult, snapRef } from "@munim/contracts";
+import { ChannelTermsListResponse, TallyExport } from "@munim/contracts/finance";
 import { type TestDb, uuidv7 } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -208,6 +209,18 @@ describe("own commands: channel terms and expenses", () => {
     expect(t.rows).toEqual([{ vf: "2026-01-01", vt: "2027-01-01" }, { vf: "2027-01-01", vt: null }]);
   });
 
+  it("GET /v1/finance/channel-terms: the rows' own fields, newest window first (owner, advisor); a manager → 403", async () => {
+    const r = await call("GET", `/v1/finance/channel-terms?channel_id=${fx.agg}`, "advisor");
+    expect(r.status).toBe(200);
+    const terms = ChannelTermsListResponse.parse(await r.json()).channel_terms;
+    expect(terms.map((x) => [x.valid_from, x.valid_to, x.commission_bp, x.ads_opted_in, x.ad_spend_cap_minor])).toEqual([
+      ["2027-01-01", null, 2000, true, 500000], ["2026-01-01", "2027-01-01", 2200, false, null], ["2025-06-01", "2025-12-31", 2000, true, 500000],
+    ]);
+    expect((await call("GET", "/v1/finance/channel-terms", "owner")).status).toBe(200);
+    expect((await call("GET", "/v1/finance/channel-terms", "manager")).status).toBe(403);
+    expect((await call("GET", "/v1/finance/channel-terms?channel_id=nope", "owner")).status).toBe(400);
+  });
+
   it("period close via the own route; then an expense dated in that month → 409 period_closed, 0 rows; the other outlet → 201", async () => {
     const close = await call("POST", "/v1/finance/period-closes", "owner", envelope("finance.period.close.v1", {
       period_close_id: uuidv7(), outlet_id: fx.outlets[0], period_month: "2026-02-01", net_minor: 0, currency: "INR",
@@ -221,6 +234,19 @@ describe("own commands: channel terms and expenses", () => {
     expect([refused.status, (await refused.json()).error]).toEqual([409, { code: "period_closed", message: expect.any(String), reason_code: "period_closed" }]);
     expect(await count(db, `SELECT count(*) n FROM core.expense WHERE tenant_id = $1 AND incurred_on = '2026-02-10'`, [fx.tenant])).toBe(0);
     expect((await exp(fx.outlets[1])).status).toBe(201);
+  });
+});
+
+describe("malformed command envelopes (one code across modules)", () => {
+  it("a wrong type or a bad payload → 422 invalid_payload; a body that is not JSON → 400", async () => {
+    const good = { expense_id: uuidv7(), outlet_id: fx.outlets[0], category: "utilities", incurred_on: M, amount_minor: 100, tax_minor: 0, currency: "INR", payee: "Synthetic payee", note: null, document_id: null };
+    const code = async (r: Res) => [r.status, (await r.json()).error.code];
+    expect(await code(await call("POST", "/v1/finance/expenses", "owner", envelope("finance.wrong_type.v1", good)))).toEqual([422, "invalid_payload"]);
+    expect(await code(await call("POST", "/v1/finance/expenses", "owner", envelope("finance.expense.record.v1", { ...good, amount_minor: "lots" })))).toEqual([422, "invalid_payload"]);
+    const raw = await app.request("/v1/finance/expenses", { method: "POST", body: "{not json",
+      headers: { Authorization: `Bearer ${idp.sign({ sub: fx.subs.owner })}`, [TENANT_HEADER]: fx.tenant, "Content-Type": "application/json" } });
+    expect(await code(raw as Res)).toEqual([400, "bad_request"]);
+    expect(await count(db, `SELECT count(*) n FROM core.expense WHERE id = $1`, [good.expense_id])).toBe(0);
   });
 });
 
@@ -317,7 +343,7 @@ describe("Tally export", () => {
     const end = (await db.admin<{ e: string }>(`SELECT (date_trunc('month', $1::date) + interval '1 month - 1 day')::date::text e`, [M])).rows[0]!.e;
     const r = await call("GET", `/v1/finance/exports/tally?from=${M}&to=${end}`, "owner");
     expect(r.status).toBe(200);
-    const body = await r.json();
+    const body = TallyExport.parse(await r.json());
     expect(body.file_name).toBe(`munim-tally-${M}-to-${end}.csv`);
     const lines: string[] = body.content.trimEnd().split("\r\n");
     expect(lines[0]).toBe("Date,Voucher Type,Voucher No,Ledger Code,Ledger,Debit,Credit,Narration");

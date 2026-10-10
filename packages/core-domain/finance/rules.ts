@@ -13,6 +13,8 @@ export const POSTING_RULES = {
   "finance.post_refund": "core.refund",
   "finance.post_expense": "core.expense",
   "finance.post_payroll": "core.payroll_draft",
+  "finance.post_advance": "core.advance",
+  "finance.post_loyalty_redemption": "core.order",
 } as const;
 export type PostingRuleId = keyof typeof POSTING_RULES;
 

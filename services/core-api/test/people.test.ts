@@ -12,7 +12,7 @@
 // Synthetic data only.
 import { createLogger } from "@munim/config";
 import { CommandResult } from "@munim/contracts";
-import { OvertimeWeekRow, PeopleOvertimeResponse, PeoplePayrollPreviewResponse } from "@munim/contracts/people";
+import { OvertimeWeekRow, PeopleCommandResult, PeopleOvertimeResponse, PeoplePayrollPreviewResponse, PeopleStaffListResponse } from "@munim/contracts/people";
 import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
@@ -104,13 +104,22 @@ describe("staff, rosters and the overlap rule", () => {
     ] as const) {
       const r = await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(id, outlet, o));
       expect(r.status).toBe(200);
-      expect(CommandResult.parse(await r.json())).toMatchObject({ type: "people.staff.upsert.v1", entity_id: id });
+      expect(PeopleCommandResult.parse(await r.json())).toMatchObject({ type: "people.staff.upsert.v1", entity_id: id });
     }
     expect(await count(`SELECT count(*) n FROM core.staff WHERE id = ANY($1)`, [[S1, S2, S3]])).toBe(3);
     // Upsert edits a granted column, and refuses to change joined_on (not updatable).
     expect((await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(S1, O0(), { name: "Renamed" }))).status).toBe(200);
     expect((await one<{ name: string }>(`SELECT name FROM core.staff WHERE id = $1`, [S1])).name).toBe("Renamed");
     expect((await err(await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(S1, O0(), { joined_on: "2026-02-02" })))).code).toBe("invalid_payload");
+  });
+
+  it("GET /v1/people/staff: the outlet's staff with their pay terms (rows' own fields, no phone); staff-role 403; an outlet outside scope 404", async () => {
+    const list = PeopleStaffListResponse.parse(await (await call("GET", `/v1/people/staff?outlet=${O0()}`, t.managerSub, t.tenant)).json());
+    const pay = Object.fromEntries(list.staff.map((s) => [s.staff_id, [s.pay_basis, s.wage_rate_minor, s.monthly_salary_minor, s.contract_min_per_month, s.ot_multiplier_bp]]));
+    expect([pay[S1], pay[S2], pay[S3]]).toEqual([["hourly", 20000, null, null, 15000], ["monthly", null, 3000000, 12000, 20000], undefined]);
+    expect(JSON.stringify(list)).not.toContain("phone");
+    expect(await err(await call("GET", `/v1/people/staff?outlet=${O0()}`, staffSub, t.tenant))).toEqual({ status: 403, code: "forbidden", reason: "authority_denied" });
+    expect((await call("GET", `/v1/people/staff?outlet=${O1()}`, t.managerSub, t.tenant)).status).toBe(404);
   });
 
   it("builds the fixture rosters; an overlapping shift for one staff member is refused, an adjacent one accepted", async () => {
@@ -155,6 +164,39 @@ describe("staff, rosters and the overlap rule", () => {
     expect(await count(`SELECT count(*) n FROM core.roster_shift WHERE roster_id = $1 AND status = 'scheduled'`, [r])).toBe(1);
     // cancelling an already-cancelled shift is an illegal transition
     expect((await err(await upd("manager", { cancel_shift_ids: [s.roster_shift_id] }))).code).toBe("illegal_transition");
+  });
+
+  it("R1-M2: every roster_shift row written is audited on its own with before/after (cancel, add, edit)", async () => {
+    const r = uuidv7();
+    const a = shift(S2, "2026-09-08", "09:00", "17:00");
+    const b = shift(S2, "2026-09-09", "09:00", "17:00");
+    expect((await post("manager", "/v1/people/rosters", "people.roster.create.v1", { roster_id: r, outlet_id: O0(), week_start: "2026-09-07", shifts: [a, b] })).status).toBe(200);
+    const audit = async (id: string) => (await db.admin<{ before: unknown; after: unknown }>(
+      `SELECT before, after FROM core.audit_log WHERE tenant_id = $1 AND entity = 'core.roster_shift' AND entity_id = $2 ORDER BY seq`, [t.tenant, id])).rows;
+    const row = (st: string, en: string, status = "scheduled") => ({ staff_id: S2, starts_at: st, ends_at: en, role_key: "cook", status });
+    expect(await audit(a.roster_shift_id)).toEqual([{ before: null, after: row("2026-09-08T03:30:00Z", "2026-09-08T11:30:00Z") }]);
+    const upd = await post("manager", "/v1/people/rosters:update", "people.roster.update.v1", { roster_id: r, cancel_roster: false, add_shifts: [],
+      edit_shifts: [{ roster_shift_id: a.roster_shift_id, starts_at: ist("2026-09-08", "10:00"), ends_at: ist("2026-09-08", "14:00"), role_key: "cook" }],
+      cancel_shift_ids: [b.roster_shift_id] });
+    expect(upd.status).toBe(200);
+    // IST 10:00–14:00 = 04:30–08:30 UTC (hand).
+    expect((await audit(a.roster_shift_id))[1]).toEqual({ before: row("2026-09-08T03:30:00Z", "2026-09-08T11:30:00Z"), after: row("2026-09-08T04:30:00Z", "2026-09-08T08:30:00Z") });
+    expect((await audit(b.roster_shift_id))[1]).toEqual({ before: row("2026-09-09T03:30:00Z", "2026-09-09T11:30:00Z"), after: row("2026-09-09T03:30:00Z", "2026-09-09T11:30:00Z", "cancelled") });
+    // Cancelling the roster audits the one shift still scheduled.
+    expect((await post("manager", "/v1/people/rosters:update", "people.roster.update.v1", { roster_id: r, cancel_roster: true, add_shifts: [], edit_shifts: [], cancel_shift_ids: [] })).status).toBe(200);
+    expect((await audit(a.roster_shift_id))[2]).toEqual({ before: row("2026-09-08T04:30:00Z", "2026-09-08T08:30:00Z"), after: row("2026-09-08T04:30:00Z", "2026-09-08T08:30:00Z", "cancelled") });
+    expect((await audit(b.roster_shift_id)).length).toBe(2);
+  });
+
+  it("R1-m11: a pay change is audited with its amounts before and after (never the name or phone)", async () => {
+    const s5 = uuidv7();
+    expect((await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(s5, O1()))).status).toBe(200);
+    expect((await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(s5, O1(), { wage_rate_minor: 25000, phone: "+919800000001" }))).status).toBe(200);
+    const a = (await db.admin<{ before: Record<string, unknown> | null; after: Record<string, unknown> }>(
+      `SELECT before, after FROM core.audit_log WHERE tenant_id = $1 AND entity = 'core.staff' AND entity_id = $2 ORDER BY seq`, [t.tenant, s5])).rows;
+    const pay = (wage: number) => ({ outlet_id: O1(), role_key: "cook", active: true, pay_basis: "hourly", wage_rate_minor: wage, monthly_salary_minor: null,
+      contract_min_per_month: null, ot_multiplier_bp: 15000, currency: "INR" });
+    expect(a).toEqual([{ before: null, after: pay(20000) }, { before: pay(20000), after: pay(25000) }]);
   });
 });
 
@@ -271,6 +313,29 @@ describe("advances, tips, training, candidates", () => {
     expect((await post("manager", "/v1/people/advances", "people.advance.record.v1", adv("recovered", 1000))).status).toBe(200);
     expect(Number((await one<{ n: string }>(`SELECT sum(CASE kind WHEN 'given' THEN amount_minor ELSE -amount_minor END) n FROM core.advance WHERE staff_id = $1 AND on_date = '2026-08-02'`, [S1])).n)).toBe(19000);
     expect((await post("staff", "/v1/people/advances", "people.advance.record.v1", adv("given", 100))).status).toBe(403);
+    // R2-S1-5: each recorded advance asks finance for its posting (finance.post_advance); the refused ones do not.
+    expect(posted.map((x) => x.rule)).toEqual(["finance.post_advance", "finance.post_advance"]);
+    posted.length = 0;
+  });
+
+  it("R2-S1-5: with the real finance seam an advance moves 1250 against the bank (hand: given 2,000 → Dr 1250 / Cr 1010; repaid 500 → the reverse)", async () => {
+    const restore = setPostFor(undefined);
+    try {
+      const s6 = uuidv7();
+      expect((await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(s6, O0()))).status).toBe(200);
+      const give = { advance_id: uuidv7(), staff_id: s6, kind: "given", amount_minor: 200000, currency: "INR", on_date: "2026-08-05", note: null };
+      const back = { ...give, advance_id: uuidv7(), kind: "recovered", amount_minor: 50000, on_date: "2026-08-20" };
+      expect((await post("manager", "/v1/people/advances", "people.advance.record.v1", give)).status).toBe(200);
+      expect((await post("manager", "/v1/people/advances", "people.advance.record.v1", back)).status).toBe(200);
+      const lines = async (id: string) => (await db.admin<{ code: string; amount: string; d: string; o: string }>(
+        `SELECT a.code, p.amount_minor::text AS amount, j.entry_date::text AS d, j.outlet_id::text AS o FROM core.journal_entry j
+           JOIN core.posting p ON p.tenant_id = j.tenant_id AND p.journal_entry_id = j.id JOIN core.account a ON a.tenant_id = p.tenant_id AND a.id = p.account_id
+          WHERE j.posting_rule = 'finance.post_advance' AND j.source_id = $1 ORDER BY a.code`, [id])).rows.map((x) => [x.code, Number(x.amount), x.d, x.o]);
+      expect(await lines(give.advance_id)).toEqual([["1010", -200000, "2026-08-05", O0()], ["1250", 200000, "2026-08-05", O0()]]);
+      expect(await lines(back.advance_id)).toEqual([["1010", 50000, "2026-08-20", O0()], ["1250", -50000, "2026-08-20", O0()]]);
+    } finally {
+      restore();
+    }
   });
 
   it("tip pools: equal split of 10,001 → 5,001 + 5,000; hours basis without attendance is refused", async () => {
@@ -386,6 +451,24 @@ describe("payroll (IN only)", () => {
     } finally {
       restore();
     }
+  });
+
+  it("R2-S2-7: a week straddling June/July is judged whole and paid in July (the month it ends); no overtime when the week matches its roster", async () => {
+    // Hand (S7 hourly ₹200/h, OT 1.5x; ISO week Mon 29 Jun – Sun 5 Jul 2026): rostered Mon, Tue, Thu 09–17 = 1,440 min;
+    // attended Mon 600 + Tue 600 + Thu 240 = 1,440 → extra 0 → base 1,440 / 60 × 20,000 = 480,000, overtime 0.
+    // Split at the month end the June half alone (960 rostered, 1,200 attended) would pay 240 min as overtime (120,000).
+    const s7 = uuidv7();
+    expect((await post("owner", "/v1/people/staff:upsert", "people.staff.upsert.v1", staffBody(s7, O0()))).status).toBe(200);
+    const shifts = [shift(s7, "2026-06-29", "09:00", "17:00"), shift(s7, "2026-06-30", "09:00", "17:00"), shift(s7, "2026-07-02", "09:00", "17:00")];
+    expect((await post("manager", "/v1/people/rosters", "people.roster.create.v1", { roster_id: uuidv7(), outlet_id: O0(), week_start: "2026-06-29", shifts })).status).toBe(200);
+    await clock(O0(), s7, shifts[0]!.roster_shift_id, "2026-06-29", "09:00", "19:00")();
+    await clock(O0(), s7, shifts[1]!.roster_shift_id, "2026-06-30", "09:00", "19:00")();
+    await clock(O0(), s7, shifts[2]!.roster_shift_id, "2026-07-02", "09:00", "13:00")();
+    const preview = async (month: string) => call("GET", `/v1/people/payroll-preview?outlet=${O0()}&month=${month}`, t.ownerSub, t.tenant);
+    const july = PeoplePayrollPreviewResponse.parse(await (await preview("2026-07-01")).json()).lines.find((l) => l.staff_id === s7);
+    expect([july?.base_minor, july?.overtime_minor]).toEqual([480000, 0]);
+    // June's pay weeks (1–28 June) hold none of these hours: no line for S7 (and here, no attendance at all → refused).
+    expect(await err(await preview("2026-06-01"))).toEqual({ status: 422, code: "cannot_verify", reason: "attendance_missing" });
   });
 
   it("AU tenant: payroll draft refused (MB013 → out_of_pack_scope / payroll_out_of_scope), preview refused, rosters still work", async () => {
