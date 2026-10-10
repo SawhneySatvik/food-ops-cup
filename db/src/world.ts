@@ -4,6 +4,8 @@
 // list that table (0007), drafts approved in their own transaction — no superuser shortcuts, so building
 // the world is itself the "accepted" half of the guard and binding gates. Synthetic data only.
 // Pack-scoped rows: payroll exists only for an IN tenant (AU pack: payroll_scope = 'roster_only').
+// Draft-only commands (0015 A1: imports.run.commit.v1, finance.journal.adjust.v1, imports.format.approve.v1,
+// customers.campaign.create.v1) write only inside approveDraft.
 import { randomBytes, randomUUID } from "node:crypto";
 import type pg from "pg";
 import type { AppContext, TestDb } from "./harness.ts";
@@ -51,6 +53,15 @@ export function uuidv7(): string {
 }
 const u = uuidv7;
 type Q = (sql: string, params?: unknown[]) => Promise<pg.QueryResult>;
+type Account = { code: string; name: string; type: string };
+/** Munim's structural accounts (core-domain finance STRUCTURAL_ACCOUNTS), added where the pack lacks the code. */
+const STRUCTURAL_ACCOUNTS: readonly Account[] = [
+  { code: "1110", name: "Counter sales clearing", type: "asset" },
+  { code: "1250", name: "Staff advances", type: "asset" },
+  { code: "2050", name: "Goods received not invoiced", type: "liability" },
+  { code: "4900", name: "Cash rounding", type: "income" },
+  { code: "6900", name: "Other operating expenses", type: "expense" },
+];
 
 export function ownerCtx(w: Pick<World, "tenant" | "owner">, extra: AppContext = {}): AppContext {
   return {
@@ -144,9 +155,11 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await q(`INSERT INTO core.recipe_line (tenant_id, id, recipe_version_id, ingredient_id, qty_milli, unit) VALUES ($1, $2, $3, $4, 150000, 'g')`, [T, u(), idx.recipe, w.ingredient]);
     await cmd("catalogue.price.set.v1");
     await q(`INSERT INTO core.price (tenant_id, id, item_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from)
-             VALUES ($1, $2, $3, $4, 'counter', 32000, $5, 'restaurant_5', '2026-10-01')`, [T, u(), w.item, w.outlets[0], currency]);
+             VALUES ($1, $2, $3, $4, 'counter', 32000, $5, $6, '2026-10-01')`,
+      [T, u(), w.item, w.outlets[0], currency, country === "IN" ? "restaurant_5" : "gst_10"]);
     await cmd("catalogue.deal.upsert.v1");
-    await q(`INSERT INTO core.deal (tenant_id, id, kind, name_key, rule, valid_from) VALUES ($1, $2, 'percent_off', 'deal.lunch', '{"bp": 1000}', '2026-10-01')`, [T, u()]);
+    await q(`INSERT INTO core.deal (tenant_id, id, kind, name_key, rule, valid_from) VALUES ($1, $2, 'percent_off', 'deal.lunch', $3, '2026-10-01')`,
+      [T, u(), { kind: "percent_off", bp: 1000, item_ids: [w.item] }]);
     await cmd("catalogue.coupon.set.v1");
     await q(`INSERT INTO core.coupon (tenant_id, id, code, kind, value_bp, currency, valid_from) VALUES ($1, $2, 'WELCOME10', 'percent', 1000, $3, '2026-10-01')`, [T, idx.coupon, currency]);
     await cmd("purchasing.supplier.upsert.v1");
@@ -245,36 +258,27 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await q(`INSERT INTO core.transfer_line (tenant_id, id, transfer_id, ingredient_id, qty_milli, unit) VALUES ($1, $2, $3, $4, 1000, 'g')`, [T, u(), tr1, w.ingredient]);
 
     // Finance (0008).
+    // The full chart a provisioned tenant has: the pack's chart_of_accounts plus Munim's structural accounts for
+    // the codes the pack lacks — the rows finance's seedChart writes (core-api finance/chart.ts; db does not
+    // import core-domain, so the structural list is copied above by hand).
     await cmd("finance.account.upsert.v1");
-    await q(`INSERT INTO core.account (tenant_id, id, code, name, type) VALUES ($1, $2, '1000', 'Cash on hand', 'asset'), ($1, $3, '4000', 'Sales', 'income')`,
-      [T, w.accounts.cash, w.accounts.sales]);
+    const chart = (await q(`SELECT a ->> 'code' AS code, a ->> 'name' AS name, a ->> 'type' AS type
+                              FROM platform.country_pack p, jsonb_array_elements(p.doc -> 'chart_of_accounts') a
+                             WHERE p.code = $1 AND p.status = 'active'
+                               AND p.version = (SELECT max(x.version) FROM platform.country_pack x WHERE x.code = p.code AND x.status = 'active')`,
+      [country])).rows as Account[];
+    for (const s of STRUCTURAL_ACCOUNTS) if (!chart.some((a) => a.code === s.code)) chart.push(s);
+    for (const a of chart) {
+      const id = a.code === "1000" ? w.accounts.cash : a.code === "4000" ? w.accounts.sales : u();
+      await q(`INSERT INTO core.account (tenant_id, id, code, name, type) VALUES ($1, $2, $3, $4, $5)`, [T, id, a.code, a.name, a.type]);
+    }
     await cmd("finance.channel_terms.set.v1");
     await q(`INSERT INTO core.channel_terms (tenant_id, id, channel_id, commission_bp, ads_opted_in, promo_share_bp, payout_cycle_days, currency, valid_from)
              VALUES ($1, $2, $3, 2200, false, 0, 7, $4, '2026-10-01')`, [T, u(), idx.channel, currency]);
-    await cmd("finance.journal.adjust.v1");
-    idx.entry = u();
-    await q(`INSERT INTO core.journal_entry (tenant_id, id, outlet_id, entry_date, memo_key) VALUES ($1, $2, $3, '2026-10-05', 'finance.memo.opening')`, [T, idx.entry, w.outlets[0]]);
-    await q(`INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency) VALUES ($1, $2, $3, $4, 10000, $6), ($1, $7, $3, $5, -10000, $6)`,
-      [T, u(), idx.entry, w.accounts.cash, w.accounts.sales, currency, u()]);
+    // A closed month long before every fixture date (March 2025 at outlet 1), so October 2026 rows post.
     await cmd("finance.period.close.v1");
-    await q(`INSERT INTO core.period_close (tenant_id, id, outlet_id, period_month, checklist, net_minor, currency, closed_by) VALUES ($1, $2, $3, '2026-09-01', '[]', 0, $4, $5)`,
+    await q(`INSERT INTO core.period_close (tenant_id, id, outlet_id, period_month, checklist, net_minor, currency, closed_by) VALUES ($1, $2, $3, '2025-03-01', '[]', 0, $4, $5)`,
       [T, u(), w.outlets[0], currency, w.owner]);
-    await cmd("imports.run.commit.v1");
-    idx.settlement = u(); idx.settlementLine = u(); idx.bankLine = u();
-    await q(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency) VALUES ($1, $2, $3, '2026-10-01', '2026-10-07', 'PAYOUT-1', 26208, $4)`,
-      [T, idx.settlement, idx.channel, currency]);
-    await q(`INSERT INTO core.settlement_line (tenant_id, id, settlement_id, line_no, line_kind, matched_order_id, gross_minor, commission_minor, tax_withheld_minor, net_minor, currency)
-             VALUES ($1, $2, $3, 1, 'order', $4, 33600, 7392, 0, 26208, $5)`, [T, idx.settlementLine, idx.settlement, w.orders[0], currency]);
-    await q(`INSERT INTO core.bank_line (tenant_id, id, outlet_id, account_ref, value_date, amount_minor, currency, method, payee_vpa, external_ref)
-             VALUES ($1, $2, $3, 'BANK-1', '2026-10-08', 26208, $4, 'upi', 'outlet1@okbank', 'UTR-1')`, [T, idx.bankLine, w.outlets[0], currency]);
-    await cmd("finance.dispute.draft.v1");
-    idx.dispute = u();
-    await q(`INSERT INTO core.dispute (tenant_id, id, counterparty, channel_id, basis, total_claimed_minor, currency) VALUES ($1, $2, 'channel', $3, 'short_payout', 500, $4)`,
-      [T, idx.dispute, idx.channel, currency]);
-    await q(`INSERT INTO core.dispute_line (tenant_id, id, dispute_id, line_no, settlement_line_id, claimed_minor, currency) VALUES ($1, $2, $3, 1, $4, 500, $5)`,
-      [T, u(), idx.dispute, idx.settlementLine, currency]);
-    await q(`INSERT INTO core.reconciliation_break (tenant_id, id, kind, channel_id, settlement_line_id, amount_minor, currency, status, dispute_id)
-             VALUES ($1, $2, 'short_payout', $3, $4, 500, $5, 'disputed', $6)`, [T, u(), idx.channel, idx.settlementLine, currency, idx.dispute]);
     await cmd("finance.budget.set.v1");
     await q(`INSERT INTO core.budget (tenant_id, id, outlet_id, category, period_month, amount_minor, currency) VALUES ($1, $2, $3, 'purchases', '2026-10-01', 5000000, $4)`,
       [T, u(), w.outlets[0], currency]);
@@ -284,8 +288,6 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await cmd("finance.payable.update.v1");
     await q(`INSERT INTO core.payable (tenant_id, id, supplier_id, source_type, source_id, due_on, amount_minor, currency) VALUES ($1, $2, $3, 'core.supplier_invoice', $4, '2026-10-20', 400000, $5)`,
       [T, u(), w.supplier, idx.invoice, currency]);
-    await cmd("finance.receivable.update.v1");
-    await q(`INSERT INTO core.receivable (tenant_id, id, channel_id, dispute_id, amount_minor, currency) VALUES ($1, $2, $3, $4, 500, $5)`, [T, u(), idx.channel, idx.dispute, currency]);
     await cmd("finance.tax_return.prepare.v1");
     await q(`INSERT INTO core.tax_return_draft (tenant_id, id, return_code, period_from, period_to, output_tax_minor, input_tax_minor, net_payable_minor, currency)
              VALUES ($1, $2, $3, '2026-09-01', '2026-09-30', 3200, 0, 3200, $4)`, [T, u(), country === "IN" ? "gst.gstr3b" : "ato.bas", currency]);
@@ -349,17 +351,20 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
       [T, u(), w.outlets[0], idx.customer]);
 
     // Compliance, goals (0012).
-    await cmd("compliance.licence.upsert.v1");
-    await q(`INSERT INTO core.licence (tenant_id, id, outlet_id, kind, number, valid_from, valid_to) VALUES ($1, $2, $3, $4, 'LIC-1', '2026-01-01', '2026-12-31')`,
-      [T, u(), w.outlets[0], country === "IN" ? "fssai" : "food_business_registration"]);
+    // Outlet-scoped compliance and goal rows in outlets 1 and 2 (0015 A3), plus tenant-wide (outlet NULL) ones.
     const checklist = u();
     await cmd("compliance.checklist.upsert.v1");
     await q(`INSERT INTO core.checklist (tenant_id, id, name_key, kind, frequency, due_time, items) VALUES ($1, $2, 'ops.checklist.opening', 'opening', 'daily', '10:00', '["ops.item.lights"]')`,
       [T, checklist]);
-    let firstAsset = "";
     for (const k of [0, 1] as const) {
       const asset = u();
-      firstAsset ||= asset;
+      const amc = u();
+      await cmd("compliance.licence.upsert.v1");
+      await q(`INSERT INTO core.licence (tenant_id, id, outlet_id, kind, number, valid_from, valid_to) VALUES ($1, $2, $3, $4, $5, '2026-01-01', '2026-12-31')`,
+        [T, u(), w.outlets[k], country === "IN" ? "fssai" : "food_business_registration", `LIC-${k + 1}`]);
+      await cmd("compliance.checklist.upsert.v1");
+      await q(`INSERT INTO core.checklist (tenant_id, id, outlet_id, name_key, kind, frequency, due_time, items)
+               VALUES ($1, $2, $3, 'ops.checklist.closing', 'closing', 'daily', '23:00', '["ops.item.gas"]')`, [T, u(), w.outlets[k]]);
       await cmd("compliance.checklist.complete.v1");
       await q(`INSERT INTO core.checklist_run (tenant_id, id, checklist_id, outlet_id, business_date, results, completed_by) VALUES ($1, $2, $3, $4, '2026-10-09', '{"ops.item.lights": true}', $5)`,
         [T, u(), checklist, w.outlets[k], w.owner]);
@@ -368,20 +373,22 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
       await cmd("compliance.temp.record.v1");
       await q(`INSERT INTO core.temp_log (tenant_id, id, outlet_id, asset_id, reading_milli_c, read_at, recorded_by) VALUES ($1, $2, $3, $4, 3500, '2026-10-09T08:00:00Z', $5)`,
         [T, u(), w.outlets[k], asset, w.owner]);
+      await cmd("compliance.amc.record.v1");
+      await q(`INSERT INTO core.amc (tenant_id, id, asset_id, vendor, valid_from, valid_to, cost_minor, currency) VALUES ($1, $2, $3, 'Cool Care', '2026-01-01', '2026-12-31', 1200000, $4)`,
+        [T, amc, asset, currency]);
+      await cmd("compliance.maintenance.schedule.v1");
+      await q(`INSERT INTO core.maintenance (tenant_id, id, asset_id, kind, due_on, estimated_cost_minor, currency, amc_id) VALUES ($1, $2, $3, 'preventive', '2026-10-30', 250000, $4, $5)`,
+        [T, u(), asset, currency, amc]);
+      await cmd("goals.goal.create.v1");
+      await q(`INSERT INTO core.goal (tenant_id, id, outlet_id, metric, target_value, currency, period_from, due_on) VALUES ($1, $2, $3, 'net_sales', 50000000, $4, '2026-10-01', '2026-10-31')`,
+        [T, u(), w.outlets[k], currency]);
+      await cmd("goals.task.create.v1");
+      await q(`INSERT INTO core.task (tenant_id, id, outlet_id, title_key, assignee_member_id, due_on) VALUES ($1, $2, $3, 'goals.task.renew_licence', $4, '2026-10-15')`,
+        [T, u(), w.outlets[k], w.staff]);
     }
-    const amc = u();
-    await cmd("compliance.amc.record.v1");
-    await q(`INSERT INTO core.amc (tenant_id, id, asset_id, vendor, valid_from, valid_to, cost_minor, currency) VALUES ($1, $2, $3, 'Cool Care', '2026-01-01', '2026-12-31', 1200000, $4)`,
-      [T, amc, firstAsset, currency]);
-    await cmd("compliance.maintenance.schedule.v1");
-    await q(`INSERT INTO core.maintenance (tenant_id, id, asset_id, kind, due_on, estimated_cost_minor, currency, amc_id) VALUES ($1, $2, $3, 'preventive', '2026-10-30', 250000, $4, $5)`,
-      [T, u(), firstAsset, currency, amc]);
     await cmd("goals.goal.create.v1");
-    await q(`INSERT INTO core.goal (tenant_id, id, outlet_id, metric, target_value, currency, period_from, due_on) VALUES ($1, $2, $3, 'net_sales', 50000000, $4, '2026-10-01', '2026-10-31')`,
-      [T, u(), w.outlets[0], currency]);
-    await cmd("goals.task.create.v1");
-    await q(`INSERT INTO core.task (tenant_id, id, outlet_id, title_key, assignee_member_id, due_on) VALUES ($1, $2, $3, 'goals.task.renew_licence', $4, '2026-10-15')`,
-      [T, u(), w.outlets[0], w.staff]);
+    await q(`INSERT INTO core.goal (tenant_id, id, outlet_id, metric, target_value, currency, period_from, due_on) VALUES ($1, $2, NULL, 'net_sales', 90000000, $3, '2026-10-01', '2026-10-31')`,
+      [T, u(), currency]);
     await cmd("market.viability_case.upsert.v1");
     await q(`INSERT INTO core.viability_case (tenant_id, id, name, outlet_kind, comparable_outlet_id, rent_minor, capex_minor, avg_ticket_minor, expected_daily_orders, currency)
              VALUES ($1, $2, 'Second site', 'restaurant', $3, 15000000, 300000000, 45000, 120, $4)`, [T, u(), w.outlets[0], currency]);
@@ -450,9 +457,38 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await c.query(`INSERT INTO core.decision (tenant_id, id, draft_id, verdict, reason, decided_by) VALUES ($1, $2, $3, 'rejected', 'not now', $4)`,
       [T, u(), w.drafts[1], w.owner]);
   });
-  await approveDraft(db, w, "imports.run.commit.v1", (q) =>
-    q(`INSERT INTO core.market_signal (tenant_id, id, outlet_id, on_date, kind, label, source, import_run_id) VALUES ($1, $2, $3, '2026-10-20', 'festival', 'festival.diwali', 'calendar.csv', $4)`,
-      [T, u(), w.outlets[0], idx.importRun]).then(() => {}));
+  // The import run commits under its approved draft (R28): a market signal, a settlement from that run, a bank line.
+  idx.settlement = u(); idx.settlementLine = u(); idx.bankLine = u();
+  await approveDraft(db, w, "imports.run.commit.v1", async (q, decision) => {
+    await q(`UPDATE core.import_run SET status = 'committed', decision_id = $3 WHERE tenant_id = $1 AND id = $2`, [T, idx.importRun, decision]);
+    await q(`INSERT INTO core.market_signal (tenant_id, id, outlet_id, on_date, kind, label, source, import_run_id) VALUES ($1, $2, $3, '2026-10-20', 'festival', 'festival.diwali', 'calendar.csv', $4)`,
+      [T, u(), w.outlets[0], idx.importRun]);
+    await q(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
+             VALUES ($1, $2, $3, '2026-10-01', '2026-10-07', 'PAYOUT-1', 26208, $4, $5)`, [T, idx.settlement, idx.channel, currency, idx.importRun]);
+    await q(`INSERT INTO core.settlement_line (tenant_id, id, settlement_id, line_no, line_kind, matched_order_id, gross_minor, commission_minor, tax_withheld_minor, net_minor, currency)
+             VALUES ($1, $2, $3, 1, 'order', $4, 33600, 7392, 0, 26208, $5)`, [T, idx.settlementLine, idx.settlement, w.orders[0], currency]);
+    await q(`INSERT INTO core.bank_line (tenant_id, id, outlet_id, account_ref, value_date, amount_minor, currency, method, payee_vpa, external_ref, import_run_id)
+             VALUES ($1, $2, $3, 'BANK-1', '2026-10-08', 26208, $4, 'upi', 'outlet1@okbank', 'UTR-1', $5)`, [T, idx.bankLine, w.outlets[0], currency, idx.importRun]);
+  });
+  await approveDraft(db, w, "finance.journal.adjust.v1", async (q) => {
+    idx.entry = u();
+    await q(`INSERT INTO core.journal_entry (tenant_id, id, outlet_id, entry_date, memo_key) VALUES ($1, $2, $3, '2026-10-05', 'finance.memo.opening')`, [T, idx.entry, w.outlets[0]]);
+    await q(`INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency) VALUES ($1, $2, $3, $4, 10000, $6), ($1, $7, $3, $5, -10000, $6)`,
+      [T, u(), idx.entry, w.accounts.cash, w.accounts.sales, currency, u()]);
+  });
+  // The owner disputes the short payout (own commands).
+  await db.withContext("munim_core", ownerCtx(w, { command_type: "finance.dispute.draft.v1" }), async (c) => {
+    idx.dispute = u();
+    await c.query(`INSERT INTO core.dispute (tenant_id, id, counterparty, channel_id, basis, total_claimed_minor, currency) VALUES ($1, $2, 'channel', $3, 'short_payout', 500, $4)`,
+      [T, idx.dispute, idx.channel, currency]);
+    await c.query(`INSERT INTO core.dispute_line (tenant_id, id, dispute_id, line_no, settlement_line_id, claimed_minor, currency) VALUES ($1, $2, $3, 1, $4, 500, $5)`,
+      [T, u(), idx.dispute, idx.settlementLine, currency]);
+    await c.query(`INSERT INTO core.reconciliation_break (tenant_id, id, kind, channel_id, settlement_line_id, amount_minor, currency, status, dispute_id)
+                   VALUES ($1, $2, 'short_payout', $3, $4, 500, $5, 'disputed', $6)`, [T, u(), idx.channel, idx.settlementLine, currency, idx.dispute]);
+    await c.query("SELECT set_config('app.command_type', 'finance.receivable.update.v1', true)");
+    await c.query(`INSERT INTO core.receivable (tenant_id, id, channel_id, dispute_id, amount_minor, currency) VALUES ($1, $2, $3, $4, 500, $5)`,
+      [T, u(), idx.channel, idx.dispute, currency]);
+  });
   await approveDraft(db, w, "imports.format.approve.v1", (q, decision) =>
     q(`INSERT INTO core.import_format (tenant_id, id, kind, name, header_signature, mapping, decision_id)
        VALUES ($1, $2, 'payout_statement', 'My bank CSV', repeat('b', 64), '[{"source": "Order ID", "target": "external_order_ref"}, {"source": "Amount", "target": "gross_minor", "unit": "major"}]', $3)`,

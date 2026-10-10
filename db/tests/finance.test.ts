@@ -5,10 +5,10 @@
 // paired with an accepted case; red-proofs on clones.
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { setContext, type AppContext, type TestDb } from "../src/harness.ts";
+import { setContext, type TestDb } from "../src/harness.ts";
 import { openDb } from "./db.ts";
 import { attempt } from "./gates.ts";
-import { buildWorld, ownerCtx, type World } from "./world.ts";
+import { approveDraft, buildWorld, ownerCtx, type World } from "./world.ts";
 
 let db: TestDb;
 let A: World;
@@ -29,12 +29,15 @@ export async function completeOrder(x: TestDb, w: World, order: string) {
   }
 }
 
-const adjust = (w: World, extra: AppContext = {}) => ownerCtx(w, { command_type: "finance.journal.adjust.v1", ...extra });
+/** finance.journal.adjust.v1 is draft-only (0015 A1): runs `sql` inside an approved adjustment draft; the error or null. */
+const adjusted = (x: TestDb, w: World, sql: string, params: unknown[]) =>
+  approveDraft(x, w, "finance.journal.adjust.v1", async (q) => { await q(sql, params); })
+    .then(() => null, (e: { code?: string; message: string }) => ({ code: e.code ?? "?", message: e.message }));
 
 /** One journal entry with the given postings [account, amount] in one transaction; returns the error or null. */
 async function entry(x: TestDb, w: World, date: string, postings: [string, number][], opts: { outlet?: string | null; currency?: string } = {}) {
   const id = randomUUID();
-  const e = await attempt(x, "munim_core", adjust(w), `
+  const e = await adjusted(x, w, `
     WITH je AS (INSERT INTO core.journal_entry (tenant_id, id, outlet_id, entry_date) VALUES ($1, $2, $3, $4) RETURNING id)
     INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency)
     SELECT $1, gen_random_uuid(), (SELECT id FROM je), p.account, p.amount, $6
@@ -63,10 +66,18 @@ describe("balanced books", () => {
 
   test("switching app.tenant_id before COMMIT does not hide an unbalanced entry", async () => {
     // An unbalanced entry for A, then the context moved to tenant B before COMMIT (B's view has no such entry):
+    const draft = randomUUID();
+    await db.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, (s) =>
+      s.query(`INSERT INTO core.draft (tenant_id, id, source, command_type, command_payload) VALUES ($1, $2, 'member', 'finance.journal.adjust.v1', '{}')`, [A.tenant, draft]));
     const c = await db.connect("munim_core");
     try {
       await c.query("BEGIN");
-      await setContext(c, adjust(A));
+      await setContext(c, ownerCtx(A, { command_type: "drafts.approve.v1" }));
+      const decision = randomUUID();
+      await c.query(`UPDATE core.draft SET status = 'executing', exec_txid = txid_current() WHERE tenant_id = $1 AND id = $2`, [A.tenant, draft]);
+      await c.query(`INSERT INTO core.decision (tenant_id, id, draft_id, verdict, final_payload, decided_by) VALUES ($1, $2, $3, 'approved', '{}', $4)`,
+        [A.tenant, decision, draft, A.owner]);
+      await c.query("SELECT set_config('app.decision_id', $1, true)", [decision]);
       await c.query(`WITH je AS (INSERT INTO core.journal_entry (tenant_id, id, entry_date) VALUES ($1, gen_random_uuid(), '2026-10-12') RETURNING id)
         INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency)
         SELECT $1, gen_random_uuid(), (SELECT id FROM je), $2::uuid, 100, 'INR' UNION ALL SELECT $1, gen_random_uuid(), (SELECT id FROM je), $3::uuid, -1, 'INR'`,
@@ -84,12 +95,12 @@ describe("balanced books", () => {
   test("postings cannot be added to a committed entry; a second reversal is refused", async () => {
     const first = await entry(db, A, "2026-10-13", [[A.accounts.cash, 50], [A.accounts.sales, -50]]);
     expect(first.e).toBeNull();
-    const append = await attempt(db, "munim_core", adjust(A),
+    const append = await adjusted(db, A,
       `INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency)
        VALUES ($1, gen_random_uuid(), $2, $3, 10, 'INR'), ($1, gen_random_uuid(), $2, $4, -10, 'INR')`,
       [A.tenant, first.id, A.accounts.cash, A.accounts.sales]);
     expect(append?.code).toBe("MB010");
-    const reverse = () => attempt(db, "munim_core", adjust(A), `
+    const reverse = () => adjusted(db, A, `
       WITH je AS (INSERT INTO core.journal_entry (tenant_id, id, entry_date, reverses_id) VALUES ($1, gen_random_uuid(), '2026-10-14', $2) RETURNING id)
       INSERT INTO core.posting (tenant_id, id, journal_entry_id, account_id, amount_minor, currency)
       SELECT $1, gen_random_uuid(), (SELECT id FROM je), $3::uuid, -50, 'INR' UNION ALL SELECT $1, gen_random_uuid(), (SELECT id FROM je), $4::uuid, 50, 'INR'`,
@@ -149,11 +160,11 @@ describe("balanced books", () => {
 });
 
 describe("closed period", () => {
-  // World: outlet 1 closed September 2026.
+  // World: outlet 1 closed March 2025.
   test("an entry dated in the closed month at that outlet → MB009; the same month at outlet 2 and an open month → accepted", async () => {
-    const closed = await entry(db, A, "2026-09-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[0] });
-    const tenantWide = await entry(db, A, "2026-09-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: null });
-    const otherOutlet = await entry(db, A, "2026-09-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[1] });
+    const closed = await entry(db, A, "2025-03-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[0] });
+    const tenantWide = await entry(db, A, "2025-03-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: null });
+    const otherOutlet = await entry(db, A, "2025-03-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[1] });
     const open = await entry(db, A, "2026-10-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[0] });
     console.log(`closed period: closed outlet → ${closed.e?.code}, tenant-wide → ${tenantWide.e?.code}, other outlet → ${otherOutlet.e?.code ?? "accepted"}, open month → ${open.e?.code ?? "accepted"}`);
     expect(closed.e?.code).toBe("MB009");
@@ -187,7 +198,7 @@ describe("closed period", () => {
     const x = await db.clone();
     try {
       await x.admin("DROP TRIGGER period_open ON core.journal_entry");
-      const r = await entry(x, A, "2026-09-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[0] });
+      const r = await entry(x, A, "2025-03-15", [[A.accounts.cash, 10], [A.accounts.sales, -10]], { outlet: A.outlets[0] });
       console.log("RED-PROOF closed period:", r.e);
       // posting_with_entry relies on the entry's created_at stamp set by the dropped trigger; the default (now()) still matches.
       expect(r.e).toBeNull();
@@ -214,7 +225,6 @@ describe("channel terms and import formats", () => {
        VALUES ($1, gen_random_uuid(), 'bank_statement', 'X', repeat('c', 64), $2, coalesce($3::uuid, (SELECT id FROM core.decision WHERE tenant_id = $1 LIMIT 1)))`,
       [A.tenant, mapping, decision]);
     expect((await fmt(null, '[{"source": "a", "target": "b"}]'))?.code).toBe("MB006");
-    const { approveDraft } = await import("./world.ts");
     const e = await approveDraft(db, A, "imports.format.approve.v1", async (q, decision) => {
       await q(`INSERT INTO core.import_format (tenant_id, id, kind, name, header_signature, mapping, decision_id)
                VALUES ($1, gen_random_uuid(), 'bank_statement', 'X', repeat('d', 64), '[{"source": "a", "target": "b", "expr": "a * 2"}]', $2)`, [A.tenant, decision]);

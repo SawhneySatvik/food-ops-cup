@@ -72,7 +72,7 @@
         "core.journal_entry",
         "core.posting"
       ],
-      "source_state": "(s.import_run_id IS NULL OR EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed'))",
+      "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -120,7 +120,8 @@
       "rule_id": "inventory.transfer_in",
       "source_table": "core.transfer",
       "target_tables": [
-        "core.stock_movement"
+        "core.stock_movement",
+        "core.batch"
       ],
       "source_state": "s.status = 'received'",
       "seeded_in": "0008",
@@ -162,7 +163,7 @@
       "target_tables": [
         "core.loyalty_entry"
       ],
-      "source_state": "s.status IN ('cancelled', 'rejected')",
+      "source_state": "(s.status IN ('cancelled', 'rejected') OR (s.status = 'completed' AND EXISTS (SELECT 1 FROM core.refund f WHERE f.tenant_id = s.tenant_id AND f.order_id = s.id)))",
       "seeded_in": "0011",
       "implemented_by": "T-028"
     },
@@ -203,7 +204,8 @@
       "rule_id": "orders.reprice",
       "source_table": "core.order",
       "target_tables": [
-        "core.order"
+        "core.order",
+        "core.order_line"
       ],
       "source_state": "s.status IN ('placed', 'accepted')",
       "seeded_in": "0014",
@@ -238,6 +240,62 @@
       "source_state": "s.status = 'completed'",
       "seeded_in": "0014",
       "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "inventory.reverse_order_consumption",
+      "source_table": "core.order",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status IN ('cancelled', 'rejected')",
+      "seeded_in": "0015",
+      "implemented_by": "T-022 / T-024 (W2-R6)"
+    },
+    {
+      "rule_id": "finance.reverse_supplier_invoice",
+      "source_table": "core.supplier_invoice",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status IN ('disputed', 'void')",
+      "seeded_in": "0015",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.reverse_payroll",
+      "source_table": "core.payroll_draft",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "s.status = 'void'",
+      "seeded_in": "0015",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "finance.post_advance",
+      "source_table": "core.advance",
+      "target_tables": [
+        "core.journal_entry",
+        "core.posting"
+      ],
+      "source_state": "true",
+      "seeded_in": "0015",
+      "implemented_by": "T-026"
+    },
+    {
+      "rule_id": "customers.merge_verified_email",
+      "source_table": "core.customer",
+      "target_tables": [
+        "core.order",
+        "core.reservation",
+        "core.bulk_order",
+        "core.customer"
+      ],
+      "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.erased_at IS NULL AND s.email_verified_at IS NOT NULL AND current_user = 'munim_crosstenant'",
+      "seeded_in": "0015",
+      "implemented_by": "0015 core.customer_claim_verified_email_guests() (T-035)"
     }
   ]
 }

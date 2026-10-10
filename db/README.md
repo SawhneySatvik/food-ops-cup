@@ -15,12 +15,15 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (14 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (15 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
 skipped loudly on embedded PG), 0014 W1 fix cycle 1 (guard scope/customer/pricing rules, customer RLS, run scope,
-derivation source states, status transitions, riders #17–#62) — gates see 13 applied. Every migration from 0007 ends with
+derivation source states, status transitions, riders #17–#62), 0015 W2 fix Batch A (draft-only commands, settlement
+needs a committed run, outlet RLS on compliance/goal tables, W2 command rows, refund caps per role, W2 derivations,
+POS-export imports, order-line pricing freeze, loyalty policy, verified-email merge, model-role defaults) — gates see
+14 applied. Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
 grants, definer objects, intel_ro ownership).
@@ -132,6 +135,40 @@ of the command — the draft's command type for (2) — else MB008. `core.campai
 `SELECT command_type, allowed_roles, scope, target_tables FROM core.command_authority ORDER BY 1`. M-B command
 names not yet in `packages/contracts` are INFERENCE — module lanes adopt them or request a rename.
 
+Since 0015 (W2 fix, Batch A), `core.command_authority` carries three more columns:
+- **`draft_only`** (A1). The own-command branch (1) refuses a draft-only command with MB001 (`… is draft-only`), on
+  INSERT and UPDATE alike; branch (2) — its approved draft — is unaffected. Draft-only: `customers.campaign.create.v1`,
+  `imports.run.commit.v1`, `imports.format.approve.v1`, `finance.journal.adjust.v1`. `allowed_roles` of a draft-only
+  command lists who may *approve* its draft (`core.decision_named_person`).
+- **`role_caps`** (A5, W2-R3): `{role: max_amount_minor}`; a role absent from the map is uncapped. Seeded:
+  `orders.refund.record.v1` = staff 50000, manager 500000 (INFERENCE amounts; owner and judge uncapped). Read by
+  core-api's `evaluateAuthority`; the database does not enforce amounts. Keys must be roles the command allows
+  (`assert_catalog`).
+- **`outlet_column`** (A6): when set, branch (1) checks the row's (NEW and OLD) value of that column against
+  `app.outlet_ids` instead of `core.book_scope`. `inventory.transfer.receive.v1` = `to_outlet_id`: a transfer is
+  received under the destination outlet's scope (a source-only manager → MB001).
+
+0015 command rows (A4): `tenancy.onboard.v1` (owner, tenant, = `tenancy.provision.v1`'s tables), `tenancy.member.bind.v1`
+(every member role, outlet, `core.member`), `tenancy.member.role.set.v1` / `tenancy.member.deactivate.v1` (owner,
+tenant), `purchasing.grn.receive.v1`, `storefront.order.cancel.v1` / `.reschedule.v1` (customer, own_order),
+`orders.order.advance.v1` / `.accept.v1` / `.reject.v1`, `people.payroll_draft.status.v1` (owner). The core-api test
+shims that inserted these rows (storefront, purchasing) now collide with them — C1 removes the shims.
+
+**Journal re-post after a reversal (0015).** `journal_entry_one_per_source_rule` (0008) still allows one unreversed
+entry per (rule, source). A source reversed by `finance.reverse_supplier_invoice` (invoice disputed/void) or
+`finance.reverse_payroll` (payroll void) and later re-approved re-posts as **the reversal of the reversal**
+(`reverses_id` = the reversal entry, `posting_rule` = the original rule) — neither unique index blocks it; a plain
+second post (no `reverses_id`) is still 23505.
+
+**Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
+predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
+exactly when their asset is (`tenant_via_asset`). A future migration that re-issues every `tenant_outlet_isolation`
+policy in a loop (as 0014 did) must keep the `outlet_id IS NULL` clause on those five.
+
+**Imported orders (0015 A7).** An order inserted under an approved `imports.run.commit.v1` draft keeps the
+`business_date` it carries (the bill's date) and never takes a device invoice number; `ticket_no` is still assigned
+for that date.
+
 **Approval transaction (T-008).** `UPDATE core.draft SET status='executing', exec_txid=txid_current() WHERE …
 AND status='proposed'` → `INSERT core.decision` (as the approver: `app.role`, `app.member_id`) →
 `set_config('app.decision_id', …, true)` → the command's book writes → `UPDATE … status='executed'`, one
@@ -160,7 +197,18 @@ Replay indexes: `core.outbox (tenant_id, created_at, id)`, `core.draft (tenant_i
 **Cross-tenant lookups (munim_crosstenant, SECURITY DEFINER, EXECUTE `munim_core` only).**
 `core.tenant_for_storefront_key(key_hash text) → (tenant_id, channel_id)` for an unrevoked key of an active tenant
 (store only `sha256(key)` hex in `core.storefront_key`; a miss returns 0 rows — answer 404, gotcha 16).
-`core.memberships_for_sub(sub text) → (tenant_id, tenant_name, role)` for active memberships. Definer objects: 5.
+`core.memberships_for_sub(sub text) → (tenant_id, tenant_name, role)` for active memberships.
+`core.customer_claim_verified_email_guests() → (entity text, entity_id uuid, from_customer_id uuid)` (0015 A10, R41; not cross-tenant: it
+filters on `app.tenant_id`, but needs BYPASSRLS to see guest profiles a customer context cannot): callable only
+inside the customer's own `customers.account.link.v1` (`app.role = 'customer'`, else MB001). When the caller's profile
+is signed in, live, not a guest and email-verified, every live unmerged guest profile of the tenant with the same
+email (case-insensitive) hands over its orders, reservations and bulk orders and gets `merged_into` = caller; loyalty
+rows stay. Writes pass the guard through the rule `customers.merge_verified_email`, whose source state includes
+`current_user = 'munim_crosstenant'` (it admits nothing outside this function). Returns one row per changed book
+row, ordered by (entity, entity_id): each moved `core.order` / `core.reservation` / `core.bulk_order` with its previous
+customer, and each merged guest as `core.customer` (entity_id = from_customer_id = the guest). The caller must write
+one audit entry per row.
+Definer objects: 6 (5 functions + `platform.tenant_registry`).
 
 **Guest orders.** `core."order".guest_access_hash` = sha256 (32 bytes) of a random token returned once at placement.
 

@@ -199,11 +199,14 @@ describe("campaigns exist only through an approved draft (R15, R16)", () => {
     expect(approved).toBeNull();
   });
 
-  test("RED-PROOF: drop campaign_from_decision → the direct command creates a campaign", async () => {
+  test("RED-PROOF: both layers off (drop campaign_from_decision AND clear draft_only, 0015) → the direct command creates a campaign (dropping the trigger alone still refuses)", async () => {
     const x = await db.clone();
     try {
+      const direct = () => attempt(x, "munim_core", ownerCtx(A, { command_type: "customers.campaign.create.v1" }), campaignSql, [A.tenant, A.snapshot]);
       await x.admin("DROP TRIGGER campaign_from_decision ON core.campaign");
-      const e = await attempt(x, "munim_core", ownerCtx(A, { command_type: "customers.campaign.create.v1" }), campaignSql, [A.tenant, A.snapshot]);
+      expect((await direct())?.code).toBe("MB001"); // the guard's draft-only rule
+      await x.admin("UPDATE core.command_authority SET draft_only = false WHERE command_type = 'customers.campaign.create.v1'");
+      const e = await direct();
       console.log("RED-PROOF campaign:", e);
       expect(e).toBeNull();
     } finally {

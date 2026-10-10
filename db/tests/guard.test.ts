@@ -227,6 +227,20 @@ describe("branch 3 — allow-listed derivation of an existing book row", () => {
       ["finance.reconcile_order", "core.order", "core.reconciliation_break"],
       ["finance.reconcile_settlement", "core.settlement", "core.reconciliation_break"],
       ["orders.reprice", "core.order", "core.order"],
+      // 0015: W2-R6 stock reversal; transfer_in batch; reversal and advance posting rules; line repricing; R41 merge
+      ["inventory.reverse_order_consumption", "core.order", "core.stock_movement"],
+      ["inventory.transfer_in", "core.transfer", "core.batch"],
+      ["finance.reverse_supplier_invoice", "core.supplier_invoice", "core.journal_entry"],
+      ["finance.reverse_supplier_invoice", "core.supplier_invoice", "core.posting"],
+      ["finance.reverse_payroll", "core.payroll_draft", "core.journal_entry"],
+      ["finance.reverse_payroll", "core.payroll_draft", "core.posting"],
+      ["finance.post_advance", "core.advance", "core.journal_entry"],
+      ["finance.post_advance", "core.advance", "core.posting"],
+      ["orders.reprice", "core.order", "core.order_line"],
+      ["customers.merge_verified_email", "core.customer", "core.order"],
+      ["customers.merge_verified_email", "core.customer", "core.reservation"],
+      ["customers.merge_verified_email", "core.customer", "core.bulk_order"],
+      ["customers.merge_verified_email", "core.customer", "core.customer"],
     ];
     const got = r.rows.map((x) => [x.rule_id, x.source_table, x.target_table, x.s, x.t]).sort((a, b) => a.join().localeCompare(b.join()));
     expect(got).toEqual(rules.map(([a, b, c]) => [a, b, c, "munim:book", "munim:book"]).sort((a, b) => a.join().localeCompare(b.join())));

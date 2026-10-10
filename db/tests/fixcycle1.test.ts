@@ -349,12 +349,23 @@ describe("#22 — operational money tables tied to their path", () => {
     expect((await db.admin("SELECT count(*)::int n FROM core.market_signal WHERE tenant_id = $1", [A.tenant])).rows[0]!.n).toBe(1);
   });
 
+  // The world's run is committed since 0015 (its settlement posts only from a committed run): preview a fresh one.
+  const previewedRun = async (x: TestDb) => {
+    const id = uuidv7();
+    await x.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, async (c) => {
+      await c.query(`INSERT INTO core.import_run (tenant_id, id, document_id, kind, parser)
+        SELECT $1, $2, document_id, 'bank_statement', 'bank_csv_v1' FROM core.import_run WHERE tenant_id = $1 LIMIT 1`, [A.tenant, id]);
+      await c.query(`UPDATE core.import_run SET status = 'previewed', rows_ok = 0, rows_quarantined = 0, control_total_minor = 0, currency = 'INR' WHERE id = $1`, [id]);
+    });
+    return id;
+  };
+
   test("a previewed run: changing its control total → MB004; staging another row → MB004; a parsing run accepts rows", async () => {
     const svc = { tenant_id: A.tenant, outlet_ids: "*" as const };
-    const ctl = await attempt(db, "munim_svc", svc, `UPDATE core.import_run SET control_total_minor = 1 WHERE tenant_id = $1 AND status = 'previewed'`, [A.tenant]);
+    const previewed = await previewedRun(db);
+    const ctl = await attempt(db, "munim_svc", svc, `UPDATE core.import_run SET control_total_minor = 1 WHERE tenant_id = $1 AND id = $2`, [A.tenant, previewed]);
     const stage = (run: string) => attempt(db, "munim_svc", svc,
       `INSERT INTO core.import_staging (tenant_id, id, import_run_id, row_no, target_table, data) VALUES ($1, gen_random_uuid(), $2, 99, 'core.bank_line', '{}')`, [A.tenant, run]);
-    const previewed = (await db.admin("SELECT id FROM core.import_run WHERE tenant_id = $1 AND status = 'previewed'", [A.tenant])).rows[0]!.id;
     const late = await stage(previewed);
     const parsing = uuidv7();
     await db.withContext("munim_svc", svc, (c) => c.query(`INSERT INTO core.import_run (tenant_id, id, document_id, kind, parser)
@@ -369,7 +380,7 @@ describe("#22 — operational money tables tied to their path", () => {
     const x = await db.clone();
     try {
       await x.admin("DROP TRIGGER while_parsing ON core.import_staging");
-      const previewed = (await x.admin("SELECT id FROM core.import_run WHERE tenant_id = $1 AND status = 'previewed'", [A.tenant])).rows[0]!.id;
+      const previewed = await previewedRun(x);
       const e = await attempt(x, "munim_svc", { tenant_id: A.tenant, outlet_ids: "*" },
         `INSERT INTO core.import_staging (tenant_id, id, import_run_id, row_no, target_table, data) VALUES ($1, gen_random_uuid(), $2, 98, 'core.bank_line', '{}')`, [A.tenant, previewed]);
       console.log("RED-PROOF #22 staging:", e);

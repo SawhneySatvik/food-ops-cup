@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0014 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0015 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -17,6 +17,7 @@ export const MIGRATIONS = [
   "0011_customers_growth",
   "0012_compliance_goals_intel",
   "0014_w1_fix_cycle_1",
+  "0015_w2_fix",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -164,15 +165,15 @@ export const TABLES: Record<string, T> = {
   "core.review": book(),
   "core.bulk_order": book(),
   // 0012
-  "core.licence": book(),
-  "core.checklist": book(),
+  "core.licence": book(true), // outlet RLS since 0015 (A3; outlet_id NULL = tenant-wide)
+  "core.checklist": book(true),
   "core.checklist_run": book(true),
-  "core.asset": book(),
+  "core.asset": book(true),
   "core.temp_log": book(true),
-  "core.amc": book(),
-  "core.maintenance": book(),
-  "core.goal": book(),
-  "core.task": book(),
+  "core.amc": book(), // visible through its asset (0015 A3), tested separately
+  "core.maintenance": book(), // visible through its asset (0015 A3), tested separately
+  "core.goal": book(true),
+  "core.task": book(true),
   "core.market_signal": op(),
   "core.viability_case": book(), // book since 0014 (#22)
   "intel.entity": plain(true),
@@ -207,7 +208,7 @@ export const TENANT_TABLES = names.filter((n) => TABLES[n]!.tenant);
 export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
 
 /** Hand counts, so a mistake in the object above also shows up as a count mismatch. */
-export const EXPECTED_COUNTS = { all: 147, core: 118, book: 92, tenant: 133, outlet: 28 };
+export const EXPECTED_COUNTS = { all: 147, core: 118, book: 92, tenant: 133, outlet: 33 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -255,12 +256,13 @@ export const LEGAL_ORDER_TRANSITIONS = [
 
 /** SECURITY DEFINER / munim_crosstenant-owned objects (03-architecture §1.2). */
 export const CROSSTENANT_OBJECTS = [
-  "core.active_tenants", "core.memberships_for_sub", "core.outbox_claim", "core.tenant_for_storefront_key",
+  "core.active_tenants", "core.customer_claim_verified_email_guests", "core.memberships_for_sub", "core.outbox_claim",
+  "core.tenant_for_storefront_key",
   "platform.tenant_registry",
 ];
 
 /** Snapshot templates and their per-column numeric-source allow-list (02-schema §3, R40 C5). */
-export const TEMPLATES = ["inventory.below_reorder"];
+export const TEMPLATES = ["inventory.below_reorder", "platform.spend_by_tenant"];
 /** Allowed intel numeric sources, column-level (R40 C5): deterministic forecast points, simulated quote
  *  terms, spend, and ROW COUNTS of intel.answer / intel.outcome. Never finding.confidence_bp or any other
  *  intel-supplied value. Widened by hand in M-B (forecast intervals, quote terms used by D-1 templates). */

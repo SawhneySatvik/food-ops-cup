@@ -38,7 +38,18 @@ END)`,
   trace_via_run: `(${TENANT} AND (EXISTS ( SELECT 1
    FROM intel.run r
   WHERE ((r.tenant_id = trace_event.tenant_id) AND (r.id = trace_event.run_id)))))`,
+  // 0015 A3: compliance and goal tables — the outlet form plus tenant-wide rows (outlet_id NULL); AMC and
+  // maintenance through their asset.
+  outlet_or_wide: `(${TENANT} AND ((( SELECT current_setting('app.role'::text, true) AS current_setting) = ANY (ARRAY['customer'::text, 'guest'::text])) OR ${ALL_OUTLETS} OR (outlet_id IS NULL) OR ${inScope("outlet_id")}))`,
+  amc_via_asset: viaAsset("amc"),
+  maintenance_via_asset: viaAsset("maintenance"),
 };
+function viaAsset(t: string): string {
+  return `(${TENANT} AND (EXISTS ( SELECT 1
+   FROM core.asset a
+  WHERE ((a.tenant_id = ${t}.tenant_id) AND (a.id = ${t}.asset_id)))))`;
+}
+const OUTLET_OR_WIDE = ["core.licence", "core.checklist", "core.asset", "core.goal", "core.task"];
 
 // F4 (0014): the RESTRICTIVE customer_scope policy, (qual, with check) per class.
 const NC = `(( SELECT current_setting('app.role'::text, true) AS current_setting) IS DISTINCT FROM 'customer'::text)`;
@@ -91,6 +102,8 @@ function expectedForm(t: string): string {
   if (t === "core.loyalty_entry") return "customer_own_rows";
   if (t === "intel.run") return "run_scope";
   if (t === "intel.trace_event") return "trace_via_run";
+  if (OUTLET_OR_WIDE.includes(t)) return "outlet_or_wide";
+  if (t === "core.amc" || t === "core.maintenance") return `${t.slice(5)}_via_asset`;
   return OUTLET_TABLES.includes(t) ? "outlet" : "tenant";
 }
 /** Extra policies written on purpose (each pinned exactly in its own test). */

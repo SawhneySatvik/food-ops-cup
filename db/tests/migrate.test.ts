@@ -86,7 +86,7 @@ test("`-- requires: vector` is skipped LOUDLY and not recorded; later files stil
   expect(r.skipped).toEqual([...SKIPPED_HERE, { name: `${v(NEXT)}_embeddings2`, missing: ["vector"] }]);
   expect(loud[0]).toMatch(/SKIPPED 0013_embeddings — requires extension\(s\) vector/);
   expect(r.applied.at(-1)).toBe(`${v(NEXT + 1)}_after`);
-  const rec = await c.query("SELECT name FROM munim_meta.schema_migrations WHERE version >= $1 ORDER BY version", [MIGRATIONS.length]);
+  const rec = await c.query("SELECT name FROM munim_meta.schema_migrations WHERE version >= $1 ORDER BY version", [MIGRATION_FILES.length]);
   expect(rec.rows.map((x) => x.name)).toEqual([MIGRATIONS.at(-1), `${v(NEXT + 1)}_after`]);
 });
 

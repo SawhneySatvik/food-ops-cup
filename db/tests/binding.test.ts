@@ -66,8 +66,10 @@ describe("decision branch", () => {
     let origin: unknown;
     await approveDraft(db, A, "imports.run.commit.v1", async (q) => {
       const s = randomUUID();
-      await q(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency)
-               VALUES ($1, $2, $3, '2026-10-08', '2026-10-14', $4, 1000, 'INR')`, [A.tenant, s, A.channel, `P-${s}`]);
+      // From the world's committed import run (0015 A2: a settlement posts only from a committed run).
+      await q(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
+               VALUES ($1, $2, $3, '2026-10-08', '2026-10-14', $4, 1000, 'INR',
+                       (SELECT r.id FROM core.import_run r WHERE r.tenant_id = $1 AND r.status = 'committed'))`, [A.tenant, s, A.channel, `P-${s}`]);
       await q("SELECT set_config('app.posting_rule', 'finance.post_settlement', true), set_config('app.source_ref', $1, true)", [`core.settlement:${s}`]);
       const r = await q(`WITH je AS (INSERT INTO core.journal_entry (tenant_id, id, entry_date, source_type, source_id, posting_rule)
                                      VALUES ($1, gen_random_uuid(), '2026-10-14', 'core.settlement', $2, 'finance.post_settlement') RETURNING id, origin)
