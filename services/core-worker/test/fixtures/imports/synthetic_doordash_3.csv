@@ -1,0 +1,7 @@
+payout_id,start_date,end_date,payout_date,store_name,order_ref,order_date,transaction_type,subtotal_cents,commission_cents,marketing_cents,promotion_cents,withheld_cents,net_cents
+SYN-DD-PO4,2026-10-15,2026-10-21,2026-10-22,Outlet 1,SYN-DD-9020,2026-10-16,delivery,4000,1200,0,0,0,2800
+SYN-DD-PO4,2026-10-15,2026-10-21,2026-10-22,Outlet 1,SYN-DD-9021,2026-10-16,tip,500,0,0,0,0,500
+SYN-DD-PO4,2026-10-15,2026-10-21,2026-10-22,Outlet 1,SYN-DD-9022,2026-10-17,delivery,-1000,0,0,0,0,-1000
+SYN-DD-PO4,2026-10-15,2026-10-21,2026-10-22,Outlet 1,SYN-DD-9020,2026-10-16,delivery,4000,1200,0,0,0,2800
+SYN-DD-PO4,2026-10-15,2026-10-21,2026-10-22,Outlet 1,SYN-DD-9023,2026-10-18,delivery,1000,300,0,0,0,700
+TOTAL,,,,,,,,,,,,,3500

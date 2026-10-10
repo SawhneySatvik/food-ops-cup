@@ -1,0 +1,6 @@
+Date,Voucher Type,Voucher No,Ledger,Party,Amount,GST,Narration,Cost Centre
+15-10-2026,Payment,SYN-PV-030,Water,Synthetic Water Board,450.00,0,,Outlet 1
+15-10-2026,Payment,SYN-PV-030,Water,Synthetic Water Board,450.00,0,,Outlet 1
+31-11-2026,Payment,SYN-PV-032,Rent,Synthetic Landlord LLP,500.00,0,,Outlet 1
+16-10-2026,Payment,SYN-PV-033,Rent,Synthetic Landlord LLP,700.00,0,,Head Office
+16-10-2026,Payment,SYN-PV-031,Professional Fees,Synthetic CA,11800.00,1800.00,Audit,

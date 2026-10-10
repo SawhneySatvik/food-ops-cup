@@ -1,0 +1,5 @@
+Statement ID,Period Start,Period End,Payment Date,Store,Order ID,Date,Type,Sales (incl. GST),Service Fee,Marketing,Offers,Tax Withheld,Payout,Currency
+SYN-UE-ST01,01/10/2026,07/10/2026,09/10/2026,Outlet 1,SYN-UE-7001,02/10/2026,Order,42.50,12.75,0,0,0,29.75,AUD
+SYN-UE-ST01,01/10/2026,07/10/2026,09/10/2026,Outlet 1,SYN-UE-7002,03/10/2026,Order,18.00,5.40,0,2.00,0,10.60,AUD
+SYN-UE-ST01,01/10/2026,07/10/2026,09/10/2026,Outlet 1,,,Marketing,0,0,15.00,0,0,-15.00,AUD
+TOTAL,,,,,,,,,,,,,25.35,

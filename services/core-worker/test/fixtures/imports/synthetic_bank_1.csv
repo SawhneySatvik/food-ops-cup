@@ -1,0 +1,6 @@
+Txn Date,Reference,Narration,Mode,Payee VPA,Amount,Currency,Account,Outlet
+01-10-2026,SYN-BNK-0001,UPI collection,UPI,outlet1@okbank,1250.00,INR,SYN-ACC-01,Outlet 1
+01-10-2026,SYN-BNK-0002,Card settlement,POS,,"3,400.00",INR,SYN-ACC-01,Outlet 1
+02-10-2026,SYN-BNK-0003,Bank charges,CHG,,-59.00,INR,SYN-ACC-01,
+02-10-2026,SYN-BNK-0004,Rent transfer,NEFT,,-25000.00,INR,SYN-ACC-01,
+TOTAL,,,,,-20409.00,,,

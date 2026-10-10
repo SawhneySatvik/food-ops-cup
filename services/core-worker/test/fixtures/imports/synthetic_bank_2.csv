@@ -1,0 +1,4 @@
+Txn Date,Reference,Narration,Mode,Payee VPA,Amount,Currency,Account,Outlet
+03-10-2026,SYN-BNK-0010,UPI collection,UPI,outlet1@okbank,780.50,INR,SYN-ACC-01,Outlet 1
+03-10-2026,SYN-BNK-0011,UPI collection,UPI,,320.00,INR,SYN-ACC-01,Outlet 2
+04-10-2026,SYN-BNK-0012,Supplier payment,IMPS,,-4500.00,INR,SYN-ACC-01,

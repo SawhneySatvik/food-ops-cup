@@ -1,0 +1,4 @@
+on_date,kind,label,outlet_ref,value,unit,source
+2026-10-20,festival,festival.diwali,,,,synthetic_calendar.csv
+2026-10-12,weather,weather.rain_mm,Outlet 1,12.5,mm,synthetic_weather.csv
+2026-10-15,local_event,event.cricket_match,Outlet 2,,,synthetic_events.csv

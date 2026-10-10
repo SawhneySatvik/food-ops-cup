@@ -1,0 +1,6 @@
+on_date,kind,label,outlet_ref,value,unit,source
+2026-10-19,holiday,holiday.weekend,,,,synthetic_calendar.csv
+2026-10-19,competitor_price,price.rival_thali,Outlet 1,250,inr,synthetic_prices.csv
+2026-10-19,weather,weather.rain_mm,Outlet 8,1,mm,synthetic_weather.csv
+2026-10-32,weather,weather.rain_mm,Outlet 1,1,mm,synthetic_weather.csv
+2026-10-21,local_event,event.street_fair,Outlet 3,,,synthetic_events.csv

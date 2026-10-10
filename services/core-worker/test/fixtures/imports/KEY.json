@@ -1,0 +1,44 @@
+{
+  "_note": "SYNTHETIC DATA ONLY. Hand-written answer key for the T-030 import gates, worked out by hand from the CSV text (never from the parser). Row numbers count the header as row 1. Money in minor units of the tenant currency (IN: INR paise, AU: AUD cents). Aggregator files are Swiggy/Zomato/Uber Eats/DoorDash-SHAPED layouts invented for this build, not any operator's real export.",
+  "files": {
+    "synthetic_swiggy_1.csv":   { "country": "IN", "kind": "payout_statement", "parser": "swiggy_orders_v1", "rows_ok": 4, "control_total_minor": 138039, "staged_total_minor": 138039, "quarantine": {} },
+    "synthetic_swiggy_2.csv":   { "country": "IN", "kind": "payout_statement", "parser": "swiggy_orders_v1", "rows_ok": 5, "control_total_minor": null, "staged_total_minor": 164740, "quarantine": {} },
+    "synthetic_swiggy_3.csv":   { "country": "IN", "kind": "payout_statement", "parser": "swiggy_orders_v1", "rows_ok": 2, "control_total_minor": 175700, "staged_total_minor": 97500, "quarantine": { "3": "date_unreadable", "4": "net_mismatch" } },
+    "synthetic_swiggy_4.csv":   { "country": "IN", "kind": "payout_statement", "parser": "swiggy_orders_v1", "rows_ok": 2, "control_total_minor": 210600, "staged_total_minor": 210600, "quarantine": { "3": "line_kind_unknown", "4": "outlet_unknown", "5": "duplicate_row", "7": "amount_unreadable" } },
+
+    "synthetic_zomato_1.csv":   { "country": "IN", "kind": "payout_statement", "parser": "zomato_orders_v1", "rows_ok": 3, "control_total_minor": 36080, "staged_total_minor": 36080, "quarantine": {} },
+    "synthetic_zomato_2.csv":   { "country": "IN", "kind": "payout_statement", "parser": "zomato_orders_v1", "rows_ok": 4, "control_total_minor": null, "staged_total_minor": 91980, "quarantine": {} },
+    "synthetic_zomato_3.csv":   { "country": "IN", "kind": "payout_statement", "parser": "zomato_orders_v1", "rows_ok": 2, "control_total_minor": 64600, "staged_total_minor": 64600, "quarantine": { "3": "currency_differs", "4": "amount_negative" } },
+    "synthetic_zomato_4.csv":   { "country": "IN", "kind": "payout_statement", "parser": "zomato_orders_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": 17480, "quarantine": { "3": "field_missing", "4": "column_count", "5": "period_invalid" } },
+
+    "synthetic_ubereats_1.csv": { "country": "AU", "kind": "payout_statement", "parser": "ubereats_statement_v1", "rows_ok": 3, "control_total_minor": 2535, "staged_total_minor": 2535, "quarantine": {} },
+    "synthetic_ubereats_2.csv": { "country": "AU", "kind": "payout_statement", "parser": "ubereats_statement_v1", "rows_ok": 4, "control_total_minor": null, "staged_total_minor": 7860, "quarantine": {} },
+    "synthetic_ubereats_3.csv": { "country": "AU", "kind": "payout_statement", "parser": "ubereats_statement_v1", "rows_ok": 2, "control_total_minor": 4200, "staged_total_minor": 4200, "quarantine": { "3": "currency_differs", "4": "date_unreadable" } },
+    "synthetic_ubereats_4.csv": { "country": "AU", "kind": "payout_statement", "parser": "ubereats_statement_v1", "rows_ok": 2, "control_total_minor": 6650, "staged_total_minor": 6650, "quarantine": { "3": "amount_unreadable", "4": "net_mismatch" } },
+
+    "synthetic_doordash_1.csv": { "country": "AU", "kind": "payout_statement", "parser": "doordash_statement_v1", "rows_ok": 3, "control_total_minor": 4210, "staged_total_minor": 4210, "quarantine": {} },
+    "synthetic_doordash_2.csv": { "country": "AU", "kind": "payout_statement", "parser": "doordash_statement_v1", "rows_ok": 4, "control_total_minor": null, "staged_total_minor": 5150, "quarantine": {} },
+    "synthetic_doordash_3.csv": { "country": "AU", "kind": "payout_statement", "parser": "doordash_statement_v1", "rows_ok": 2, "control_total_minor": 3500, "staged_total_minor": 3500, "quarantine": { "3": "line_kind_unknown", "4": "amount_negative", "5": "duplicate_row" } },
+    "synthetic_doordash_4.csv": { "country": "AU", "kind": "payout_statement", "parser": "doordash_statement_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": 2380, "quarantine": { "3": "payout_header_differs", "4": "outlet_unknown" } },
+
+    "synthetic_bank_1.csv":     { "country": "IN", "kind": "bank_statement", "parser": "bank_statement_v1", "rows_ok": 4, "control_total_minor": -2040900, "staged_total_minor": -2040900, "quarantine": {} },
+    "synthetic_bank_2.csv":     { "country": "IN", "kind": "bank_statement", "parser": "bank_statement_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": -339950, "quarantine": {} },
+    "synthetic_bank_3.csv":     { "country": "IN", "kind": "bank_statement", "parser": "bank_statement_v1", "rows_ok": 2, "control_total_minor": 240000, "staged_total_minor": 240000, "quarantine": { "3": "currency_differs", "4": "amount_zero", "5": "vpa_invalid" } },
+    "synthetic_bank_4.csv":     { "country": "IN", "kind": "bank_statement", "parser": "bank_statement_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": 174000, "quarantine": { "3": "mode_unknown", "4": "duplicate_row", "5": "already_imported" } },
+
+    "synthetic_pos_1.csv":      { "country": "IN", "kind": "pos_export", "parser": "pos_export_v1", "rows_ok": 4, "control_total_minor": 183225, "staged_total_minor": 183225, "quarantine": {} },
+    "synthetic_pos_2.csv":      { "country": "IN", "kind": "pos_export", "parser": "pos_export_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": 95550, "quarantine": {} },
+    "synthetic_pos_3.csv":      { "country": "IN", "kind": "pos_export", "parser": "pos_export_v1", "rows_ok": 2, "control_total_minor": 36750, "staged_total_minor": 36750, "quarantine": { "3": "total_mismatch", "4": "field_missing", "5": "date_unreadable" } },
+    "synthetic_pos_4.csv":      { "country": "IN", "kind": "pos_export", "parser": "pos_export_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": 69930, "quarantine": { "3": "duplicate_row", "4": "amount_negative", "5": "outlet_unknown" } },
+
+    "synthetic_tally_1.csv":    { "country": "IN", "kind": "tally_export", "parser": "tally_export_v1", "rows_ok": 3, "control_total_minor": 5916000, "staged_total_minor": 5916000, "quarantine": {} },
+    "synthetic_tally_2.csv":    { "country": "IN", "kind": "tally_export", "parser": "tally_export_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": 195800, "quarantine": {} },
+    "synthetic_tally_3.csv":    { "country": "IN", "kind": "tally_export", "parser": "tally_export_v1", "rows_ok": 2, "control_total_minor": 354000, "staged_total_minor": 354000, "quarantine": { "3": "voucher_type_unsupported", "4": "tax_exceeds_amount", "5": "amount_not_positive" } },
+    "synthetic_tally_4.csv":    { "country": "IN", "kind": "tally_export", "parser": "tally_export_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": 1225000, "quarantine": { "3": "duplicate_row", "4": "date_unreadable", "5": "outlet_unknown" } },
+
+    "synthetic_market_1.csv":   { "country": "IN", "kind": "market_signal", "parser": "market_signal_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": null, "quarantine": {} },
+    "synthetic_market_2.csv":   { "country": "IN", "kind": "market_signal", "parser": "market_signal_v1", "rows_ok": 3, "control_total_minor": null, "staged_total_minor": null, "quarantine": {} },
+    "synthetic_market_3.csv":   { "country": "IN", "kind": "market_signal", "parser": "market_signal_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": null, "quarantine": { "3": "kind_unknown", "4": "label_invalid", "5": "unit_missing" } },
+    "synthetic_market_4.csv":   { "country": "IN", "kind": "market_signal", "parser": "market_signal_v1", "rows_ok": 2, "control_total_minor": null, "staged_total_minor": null, "quarantine": { "3": "kind_unsupported", "4": "outlet_unknown", "5": "date_unreadable" } }
+  }
+}

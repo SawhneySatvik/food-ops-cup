@@ -1,0 +1,5 @@
+Date,Voucher Type,Voucher No,Ledger,Party,Amount,GST,Narration,Cost Centre
+01-10-2026,Payment,SYN-PV-001,Rent,Synthetic Landlord LLP,45000.00,0,September rent,Outlet 1
+03-10-2026,Payment,SYN-PV-002,Electricity,Synthetic Power Co,8260.00,0,Bill Aug,Outlet 1
+05-10-2026,Payment,SYN-PV-003,Packaging,Synthetic Boxes Pvt Ltd,5900.00,900.00,Boxes,Outlet 2
+TOTAL,,,,,59160.00,,,

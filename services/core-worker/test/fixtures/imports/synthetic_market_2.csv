@@ -1,0 +1,4 @@
+on_date,kind,label,outlet_ref,value,unit,source
+2026-10-02,holiday,holiday.gandhi_jayanti,,,,synthetic_calendar.csv
+2026-10-13,weather,weather.max_temp_c,Outlet 1,33.25,celsius,synthetic_weather.csv
+2026-10-14,other,footfall.mall_index,Outlet 3,1.125,ratio,synthetic_mall.csv

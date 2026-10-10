@@ -1,0 +1,6 @@
+Payout Ref,Cycle Start,Cycle End,Paid On,Outlet,Order No,Order Date,Line Type,Order Value (Rs),Commission (Rs),Ads (Rs),Discount Share (Rs),GST Withheld (Rs),Net Payable (Rs)
+SYN-SWG-P001,01-10-2026,07-10-2026,10-10-2026,Outlet 1,SYN-SWG-1001,02-10-2026,Order,500.00,110.00,0,0,0,390.00
+SYN-SWG-P001,01-10-2026,07-10-2026,10-10-2026,Outlet 1,SYN-SWG-1002,03-10-2026,Order,"1,200.50",264.11,0,0,0,936.39
+SYN-SWG-P001,01-10-2026,07-10-2026,10-10-2026,Outlet 1,,,Ads,0,0,150.00,0,0,-150.00
+SYN-SWG-P001,01-10-2026,07-10-2026,10-10-2026,Outlet 1,SYN-SWG-1003,05-10-2026,Order,300.00,66.00,0,30.00,0,204.00
+TOTAL,,,,,,,,,,,,,1380.39

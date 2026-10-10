@@ -1,0 +1,6 @@
+Bill No,Bill Date,Outlet,Order Type,Payment Mode,Subtotal,Discount,Tax,Total
+SYN-B-0030,2026-10-07,Outlet 1,dine_in,cash,90.00,0,4.50,94.50
+SYN-B-0030,2026-10-07,Outlet 1,dine_in,cash,90.00,0,4.50,94.50
+SYN-B-0031,2026-10-07,Outlet 1,dine_in,cash,100.00,-10.00,5.00,115.00
+SYN-B-0032,2026-10-07,Outlet 7,dine_in,cash,100.00,0,5.00,105.00
+SYN-B-0033,2026-10-08,Outlet 3,delivery,upi,640.00,64.00,28.80,604.80

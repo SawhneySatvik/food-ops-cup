@@ -1,0 +1,7 @@
+Date,Voucher Type,Voucher No,Ledger,Party,Amount,GST,Narration,Cost Centre
+12-10-2026,Payment,SYN-PV-020,Advertising,Synthetic Flyers,2360.00,360.00,Flyers,Outlet 1
+12-10-2026,Receipt,SYN-PV-021,Sales,Synthetic Customer,5000.00,0,,
+13-10-2026,Payment,SYN-PV-022,Repairs,Synthetic Fixit,100.00,180.00,,Outlet 1
+13-10-2026,Payment,SYN-PV-023,Rent,Synthetic Landlord LLP,0.00,0,,Outlet 1
+14-10-2026,Payment,SYN-PV-024,Internet,Synthetic ISP,1180.00,180.00,,Outlet 2
+TOTAL,,,,,3540.00,,,

@@ -1,0 +1,4 @@
+Date,Voucher Type,Voucher No,Ledger,Party,Amount,GST,Narration,Cost Centre
+08-10-2026,Payment,SYN-PV-010,Repairs,Synthetic Fixit,1200.00,0,Tap fix,Outlet 2
+09-10-2026,Payment,SYN-PV-011,Bank Charges,Synthetic Bank,118.00,18.00,,
+10-10-2026,Payment,SYN-PV-012,Staff Welfare,Synthetic Sweets,640.00,0,Festival sweets,Outlet 1

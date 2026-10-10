@@ -1,0 +1,5 @@
+payout_id,start_date,end_date,payout_date,store_name,order_ref,order_date,transaction_type,subtotal_cents,commission_cents,marketing_cents,promotion_cents,withheld_cents,net_cents
+SYN-DD-PO5,2026-10-22,2026-10-28,2026-10-29,Outlet 1,SYN-DD-9030,2026-10-23,delivery,2500,750,0,0,0,1750
+SYN-DD-PO5,2026-10-22,2026-10-29,2026-10-29,Outlet 1,SYN-DD-9031,2026-10-23,delivery,1000,300,0,0,0,700
+SYN-DD-PO5,2026-10-22,2026-10-28,2026-10-29,Outlet Nine,SYN-DD-9032,2026-10-24,delivery,1000,300,0,0,0,700
+SYN-DD-PO5,2026-10-22,2026-10-28,2026-10-29,Outlet 1,SYN-DD-9033,2026-10-25,delivery,900,270,0,0,0,630

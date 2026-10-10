@@ -1,0 +1,5 @@
+settlement_id,period_from,period_to,settled_on,outlet_name,order_id,order_date,entry_type,bill_amount_paise,platform_fee_paise,ads_fee_paise,promo_paise,tax_deducted_paise,payout_paise,currency
+SYN-ZMT-S01,2026-10-01,2026-10-07,2026-10-09,Outlet 1,SYN-ZMT-5001,2026-10-02,order,45000,10800,0,0,0,34200,INR
+SYN-ZMT-S01,2026-10-01,2026-10-07,2026-10-09,Outlet 1,SYN-ZMT-5002,2026-10-03,order,38000,9120,0,2000,0,26880,INR
+SYN-ZMT-S01,2026-10-01,2026-10-07,2026-10-09,Outlet 1,,,ads,0,0,25000,0,0,-25000,INR
+TOTAL,,,,,,,,,,,,,36080,

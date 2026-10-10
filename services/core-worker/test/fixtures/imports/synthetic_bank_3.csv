@@ -1,0 +1,7 @@
+Txn Date,Reference,Narration,Mode,Payee VPA,Amount,Currency,Account,Outlet
+05-10-2026,SYN-BNK-0020,UPI collection,UPI,,1500.00,INR,SYN-ACC-01,Outlet 1
+05-10-2026,SYN-BNK-0021,Card settlement,POS,,200.00,USD,SYN-ACC-01,Outlet 1
+05-10-2026,SYN-BNK-0022,Reversal,UPI,,0.00,INR,SYN-ACC-01,Outlet 1
+06-10-2026,SYN-BNK-0023,Transfer,NEFT,someone@okbank,-100.00,INR,SYN-ACC-01,
+06-10-2026,SYN-BNK-0024,UPI collection,UPI,,900.00,INR,SYN-ACC-01,Outlet 2
+TOTAL,,,,,2400.00,,,
