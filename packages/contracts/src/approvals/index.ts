@@ -27,9 +27,15 @@ export const DraftsApproveV1 = z
   })
   .superRefine(checkDraftPayload("editable", "edited_payload"));
 
+/** Why a person turned a proposal (or a finding) down (ADR-014 §8, §14 C4). Additive: `reason` stays the required note.
+ *  The code is the only part intel may ever see; the note is untrusted text (R25). */
+export const REJECT_REASON_CODES = ["wrong_numbers", "not_needed", "already_done", "bad_timing", "other"] as const;
+export const RejectReasonCode = z.enum(REJECT_REASON_CODES);
+
 export const DraftsRejectV1 = z.strictObject({
   draft_id: Uuid7,
   reason: z.string().min(1).max(500),
+  reason_code: RejectReasonCode.optional(),
 });
 
 export const DraftStatus = z.enum(["proposed", "executing", "executed", "failed", "rejected", "stale"]);

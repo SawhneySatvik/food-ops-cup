@@ -34,6 +34,7 @@ export const MODULES = [
   "inbox",
   "runs",
   "traces",
+  "lineage",
 ] as const;
 export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal", "platform"] as const;
 

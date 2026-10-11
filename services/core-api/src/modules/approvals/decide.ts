@@ -259,6 +259,8 @@ export async function rejectDraft(deps: DecideDeps, m: Member, draftId: string, 
   const env = RejectEnvelope.safeParse(body);
   if (!env.success || env.data.payload.draft_id !== draftId) throw new ApiError("invalid_payload");
   const reason = env.data.payload.reason;
+  // No column holds the code yet (migrator request): it rides in the audit entry, which lineage reads.
+  const reasonCode = env.data.payload.reason_code;
   const out = await withContext(pools.core, contextOf(m), async (c) => {
     const draft = await readDraft(c, draftId);
     if (!(await authorized(c, m, "drafts.reject.v1", draft.outlet_ids)) || !(await roleAllowed(c, m, draft.command_type))) {
@@ -274,7 +276,7 @@ export async function rejectDraft(deps: DecideDeps, m: Member, draftId: string, 
         await q.query(
           `INSERT INTO core.decision (tenant_id, id, draft_id, verdict, final_payload, reason, decided_by) VALUES ($1, $2, $3, 'rejected', NULL, $4, $5)`,
           [m.tenant_id, decisionId, draftId, reason, m.member_id]);
-        return { entityId: draftId, audit: [{ entity: "core.draft", entityId: draftId, after: { status: "rejected", verdict: "rejected" } }] };
+        return { entityId: draftId, audit: [{ entity: "core.draft", entityId: draftId, after: { status: "rejected", verdict: "rejected", ...(reasonCode ? { reason_code: reasonCode } : {}) } }] };
       },
     };
     const ctx = { tx: <T>(fn: (q: Queryable) => Promise<T>) => fn(c), tenantId: m.tenant_id, actor: actorOf(m), decisionId };

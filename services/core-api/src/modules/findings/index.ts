@@ -1,12 +1,16 @@
 // Findings module (T-040): `GET /v1/findings?status=&cursor=&limit=` — findings in the caller's outlet scope (RLS:
 // outlet_ids overlap, 0012), newest first. Written only by intel through /internal/intel/v1/findings after core's
-// validator (R25); dismissing is T-084a. Mounted by modules/index.ts.
+// validator (R25). `POST /v1/findings/{id}:dismiss` (T-084a) is a person's own command with a reason code.
+// Mounted by modules/index.ts.
+import { CommandEnvelope } from "@munim/contracts";
 import { FindingStatus } from "@munim/contracts/intel";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember } from "../../auth/resolve.ts";
+import { executeCommand, replayHeaders } from "../../commit/index.ts";
 import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
+import { dismiss } from "./dismiss.ts";
 import { CURSOR_SQL, FINDING_COLUMNS, type FindingRow, findingViews, makeCursor, parseCursor, parseLimit } from "./read.ts";
 
 export { CURSOR_SQL, FINDING_COLUMNS, type FindingRow, findingViews, makeCursor, parseCursor, parseLimit } from "./read.ts";
@@ -16,6 +20,8 @@ function member(c: Context<AppEnv>) {
   if (p.kind !== "member") throw new ApiError("forbidden");
   return p;
 }
+
+const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 export const router = new Hono<AppEnv>().get("/v1/findings", requireMember, async (c) => {
   const m = member(c);
@@ -37,4 +43,16 @@ export const router = new Hono<AppEnv>().get("/v1/findings", requireMember, asyn
       next_cursor: r.rows.length > limit ? makeCursor(page.at(-1)!.cursor) : null,
     };
   }), 200);
-});
+})
+  .post(`/v1/findings/:action{${ID}:dismiss}`, requireMember, async (c) => {
+    const m = member(c);
+    const raw: unknown = await c.req.json().catch(() => undefined);
+    if (raw === undefined) throw new ApiError("bad_request");
+    const env = CommandEnvelope.safeParse(raw);
+    if (!env.success || env.data.payload.finding_id !== c.req.param("action")!.slice(0, -":dismiss".length)) throw new ApiError("invalid_payload");
+    const { pools, publish } = c.var.deps;
+    const out = await executeCommand(
+      { tx: (fn) => withContext(pools.core, contextOf(m), fn), tenantId: m.tenant_id, actor: { kind: "member", id: m.member_id, role: m.role }, ...(publish ? { publish } : {}) },
+      env.data, dismiss);
+    return c.body(out.body, 200, { "Content-Type": "application/json", ...replayHeaders(out) });
+  });

@@ -48,7 +48,7 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "drafts.decision-error": { error: { code: "stale_draft", message: "This proposal is out of date: the numbers it relied on have changed.", reason_code: "stale_draft" }, changes: [change] },
   "drafts.approve.v1": { draft_id: u(90), command_type: "purchasing.po.create.v1", edited_payload: editedPo, reason: "Half a crate is already on the way" },
-  "drafts.reject.v1": { draft_id: u(90), reason: "Supplier closed for the festival" },
+  "drafts.reject.v1": { draft_id: u(90), reason: "Supplier closed for the festival", reason_code: "bad_timing" },
   "proposal.purchasing.po.create.v1": proposalPo,
   "proposal.catalogue.price.set.v1": proposalPrice,
   "proposal.inventory.reorder_level.set.v1": proposalReorder,
