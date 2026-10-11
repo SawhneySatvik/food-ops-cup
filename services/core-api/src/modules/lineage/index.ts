@@ -9,7 +9,7 @@ import { contextOf, requireMember } from "../../auth/resolve.ts";
 import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
-import { auditOf, chainOf, touchedBy } from "./chain.ts";
+import { auditOf, chainOf, touchedBy, visibleIds } from "./chain.ts";
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const ROW = new RegExp(`^(core|intel)\\.([a-z][a-z0-9_]*):(${ID})$`);
@@ -28,21 +28,9 @@ export const router = new Hono<AppEnv>()
     const [, schema, table, id] = parsed as unknown as [string, string, string, string];
     return c.json(await withContext(c.var.deps.pools.core, contextOf(m), async (db) => {
       // The row must be visible to THIS member first: audit_log is tenant-wide, so without this check another
-      // outlet's history would leak. Identifiers are validated above and quoted; a table the role cannot read or
-      // with no uuid `id` column is the same 404 as a missing row.
-      const hasId = await db.query(
-        `SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass(format('%I.%I', $1::text, $2::text)) AND attname = 'id' AND atttypid = 'uuid'::regtype AND NOT attisdropped`,
-        [schema, table]);
-      if (hasId.rowCount !== 1) throw new ApiError("not_found");
-      await db.query("SAVEPOINT lineage_row");
-      let visible: boolean;
-      try {
-        visible = (await db.query(`SELECT 1 FROM "${schema}"."${table}" WHERE id = $1`, [id])).rowCount === 1;
-      } catch {
-        await db.query("ROLLBACK TO SAVEPOINT lineage_row");
-        visible = false;
-      }
-      if (!visible) throw new ApiError("not_found");
+      // outlet's history would leak. A table the role cannot read or with no uuid `id` column is the same 404 as a
+      // missing row.
+      if (!(await visibleIds(db, `${schema}.${table}`, [id])).has(id)) throw new ApiError("not_found");
       const audits = await auditOf(db, `${schema}.${table}`, id);
       if (audits.length === 0) throw new ApiError("not_found");
       const chains = [];

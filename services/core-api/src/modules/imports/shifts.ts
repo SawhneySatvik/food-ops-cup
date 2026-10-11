@@ -4,12 +4,15 @@
 // own figure from the committed tenders (float + cash tenders − cash refunds in the window), so a shift log commits
 // after the bills of its days. The file's "Cash Tenders" column is a control total only: compared with core's figure
 // at preview (mismatch → `tender_mismatch`) and never written. The figure is computed again at the approval; one that
-// moved since the preview refuses the approval rather than commit a number the approver did not see (as billsOf).
+// moved since the preview makes the draft stale (409 `stale_draft`, R-A 6) rather than commit a number the approver did
+// not see (as billsOf). Only history-imported orders count (R-A 10): a live QR / storefront order is device-less too and
+// may be paid in cash at the counter, and once its day has passed a history window could take it as drawer cash.
 // A shift lies inside one business date: both of its times are read on the row's Date (a time before the outlet's
 // cutoff belongs to the next calendar day, as for bills).
 import { uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
+import { lockOutlets } from "../../lib/locks.ts";
 import { dateRefusal, type HistoryCtx, instantOf, one } from "./history.ts";
 import type { RowOutcome } from "./rows.ts";
 
@@ -18,16 +21,19 @@ type Row = Record<string, Value>;
 
 interface Window { outlet_id: string; opened_at: string; closed_at: string }
 
-/** Net cash taken in each window at a device-less drawer: cash tenders − cash refunds. expectedCash's predicate with
- *  the shift's own bounds (it needs an existing shift row; these shifts do not exist yet). */
+/** Net cash taken in each window at a device-less drawer: cash tenders − cash refunds of history-imported orders (their
+ *  pricing snapshot names the import run). expectedCash's predicate with the shift's own bounds (it needs an existing
+ *  shift row; these shifts do not exist yet). */
 export async function cashIn(c: Queryable, windows: readonly Window[]): Promise<number[]> {
   if (windows.length === 0) return [];
   const r = await c.query<{ i: number; cash: string }>(
     `SELECT x.i,
             (SELECT coalesce(sum(t.amount_minor), 0) FROM core.tender t JOIN core."order" o ON o.tenant_id = t.tenant_id AND o.id = t.order_id
-              WHERE t.method = 'cash' AND o.outlet_id = x.outlet_id AND o.device_id IS NULL AND t.at >= x.opened_at AND t.at <= x.closed_at)
+              WHERE t.method = 'cash' AND o.outlet_id = x.outlet_id AND o.device_id IS NULL AND o.pricing_snapshot ? 'import_run_id'
+                AND t.at >= x.opened_at AND t.at <= x.closed_at)
           - (SELECT coalesce(sum(f.amount_minor), 0) FROM core.refund f JOIN core."order" o ON o.tenant_id = f.tenant_id AND o.id = f.order_id
-              WHERE f.method = 'cash' AND o.outlet_id = x.outlet_id AND o.device_id IS NULL AND f.at >= x.opened_at AND f.at <= x.closed_at) AS cash
+              WHERE f.method = 'cash' AND o.outlet_id = x.outlet_id AND o.device_id IS NULL AND o.pricing_snapshot ? 'import_run_id'
+                AND f.at >= x.opened_at AND f.at <= x.closed_at) AS cash
        FROM jsonb_to_recordset($1::jsonb) AS x (i int, outlet_id uuid, opened_at timestamptz, closed_at timestamptz)`,
     [JSON.stringify(windows.map((w, i) => ({ i, ...w })))]);
   const out: number[] = [];
@@ -46,7 +52,8 @@ export async function checkShifts(c: Queryable, rows: ReadonlyArray<{ line: numb
     const outletId = outletIdOf(v.outlet);
     const openedBy = one(h.members, s(v, "opened_by").toLowerCase());
     const closedBy = one(h.members, s(v, "closed_by").toLowerCase());
-    const money = ["float", "counted_cash", "cash_tenders"].map((k) => v[k] as number);
+    // Cash Tenders may be negative (cash refunded above cash taken in the window); the drawer's own figures may not.
+    const money = ["float", "counted_cash"].map((k) => v[k] as number);
     if (!outletId) { out[i] = no("outlet_unknown"); continue; }
     if (!openedBy || !closedBy) { out[i] = no("member_unknown"); continue; }
     if (money.some((x) => x < 0)) { out[i] = no("amount_negative"); continue; }
@@ -97,16 +104,19 @@ export interface StagedShift {
 
 /** Inserts the approved shifts as closed in one INSERT each row (the 0004 CHECK), under the approver's decision. */
 export async function writeShifts(c: Queryable, shifts: readonly StagedShift[], currency: string): Promise<void> {
+  await lockOutlets(c, "shift", shifts.map((x) => x.outlet_id));
   const now = await cashIn(c, shifts.map((x) => ({ outlet_id: x.outlet_id, opened_at: x.opened_at, closed_at: x.closed_at })));
   shifts.forEach((x, i) => {
-    if (x.float_minor + now[i]! !== x.expected_cash_minor || x.counted_cash_minor - x.expected_cash_minor !== x.variance_minor) throw new ApiError("invalid_payload");
+    if (x.counted_cash_minor - x.expected_cash_minor !== x.variance_minor) throw new ApiError("invalid_payload");
+    if (x.float_minor + now[i]! !== x.expected_cash_minor) throw new ApiError("stale_draft", "stale_draft");
   });
   // Another file approved since this one was previewed may hold the same drawer time: a tender would count in two shifts.
+  // That never clears on a retry, so the draft goes stale (R-A 6), as for a moved figure.
   const clash = await c.query(
     `SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS x (outlet_id uuid, opened_at timestamptz, closed_at timestamptz)
        JOIN core.shift s ON s.outlet_id = x.outlet_id AND s.device_id IS NULL AND s.opened_at <= x.closed_at AND x.opened_at <= coalesce(s.closed_at, 'infinity')
       LIMIT 1`, [JSON.stringify(shifts)]);
-  if (clash.rowCount) throw new ApiError("conflict");
+  if (clash.rowCount) throw new ApiError("stale_draft", "stale_draft");
   await c.query(
     `INSERT INTO core.shift (tenant_id, id, outlet_id, device_id, status, opened_by, opened_at, float_minor, currency, closed_by, closed_at,
                              counted_cash_minor, expected_cash_minor, variance_minor)

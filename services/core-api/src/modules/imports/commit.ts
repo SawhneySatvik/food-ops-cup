@@ -229,8 +229,8 @@ type BillRow = {
 };
 
 /** pos_bills_v2 staged lines → bills. Tax and totals are derived again here with the pack and item MRPs in force now
- *  (rule 9: never the file's, never the client's); a figure that moved since the preview the person approved refuses
- *  the approval rather than commit numbers they did not see. */
+ *  (rule 9: never the file's, never the client's); a figure that moved since the preview the person approved makes the
+ *  draft stale (R-A 6) rather than commit numbers they did not see. */
 async function billsOf(c: Queryable, staged: readonly StagedRow[], runId: string): Promise<Bill[]> {
   const pack = (await c.query<{ doc: CountryPack }>(
     `SELECT p.doc FROM core.tenant t JOIN platform.country_pack p ON p.code = t.country_code AND p.status = 'active'
@@ -250,8 +250,9 @@ async function billsOf(c: Queryable, staged: readonly StagedRow[], runId: string
     const priced = orderTax(pack, { channel_kind: h.channel_kind, lines: rows.map((r) => ({
       name: String(r.line_no), qty_milli: r.qty_milli, unit_price_minor: r.unit_price_minor, line_discount_minor: r.line_discount_minor, tax_class: r.tax_class,
       mrp_minor: mrp.get(r.item_id) ?? null })) });
-    if (!priced.ok || priced.tax.lines.some((t, i) => t.tax_minor !== rows[i]!.line_tax_minor || t.total_minor !== rows[i]!.line_total_minor)) {
-      throw new ApiError("invalid_payload");
+    if (!priced.ok) throw new ApiError("invalid_payload");
+    if (priced.tax.lines.some((t, i) => t.tax_minor !== rows[i]!.line_tax_minor || t.total_minor !== rows[i]!.line_total_minor)) {
+      throw new ApiError("stale_draft", "stale_draft");
     }
     const t = priced.tax;
     const discount = t.lines.reduce((a, l) => a + l.discount_minor, 0);

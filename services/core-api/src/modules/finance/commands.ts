@@ -76,6 +76,19 @@ export const disputeDraft: CommandHandler = {
     if (p.lines.some((l) => (l.settlement_line_id === null) === (l.order_id === null))) throw new ApiError("invalid_payload");
     // Lines are the claim's breakdown: when present they add up to the total (packs/finance.md §6 Σ row).
     if (p.lines.length && p.lines.reduce((a, l) => a + l.claimed_minor, 0) !== p.total_claimed_minor) throw new ApiError("invalid_payload");
+    // One claim per order or settlement line while a dispute holding it is open (R-B S1-C: a weekly re-draft of the same
+    // missing payout must not claim it twice). Serialised per tenant so two approvals cannot both pass the check. Inside an
+    // approval the held line never clears on a retry, so the draft goes stale; a person's own command gets 409.
+    const orders = p.lines.flatMap((l) => (l.order_id ? [l.order_id] : []));
+    const settled = p.lines.flatMap((l) => (l.settlement_line_id ? [l.settlement_line_id] : []));
+    if (new Set(orders).size !== orders.length || new Set(settled).size !== settled.length) throw new ApiError("invalid_payload");
+    if (p.lines.length) {
+      await c.query(`SELECT pg_advisory_xact_lock(hashtextextended('core.dispute_line:' || current_setting('app.tenant_id'), 0))`);
+      const held = await c.query(
+        `SELECT 1 FROM core.dispute_line l JOIN core.dispute d ON d.tenant_id = l.tenant_id AND d.id = l.dispute_id
+          WHERE d.status IN ('recorded', 'sent') AND (l.order_id = ANY ($1::uuid[]) OR l.settlement_line_id = ANY ($2::uuid[])) LIMIT 1`, [orders, settled]);
+      if (held.rowCount) throw (await decisionId(c)) ? new ApiError("stale_draft", "stale_draft") : new ApiError("conflict");
+    }
     await c.query(
       `INSERT INTO core.dispute (tenant_id, id, counterparty, channel_id, basis, total_claimed_minor, currency)
        VALUES (current_setting('app.tenant_id')::uuid, $1, 'channel', $2, $3, $4, $5)`,

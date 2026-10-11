@@ -2,7 +2,9 @@
 // Everything happens in ONE munim_core transaction under the approver's own SET LOCAL identity:
 //   proposed → executing (conditional, exactly one winner) → authority on the FINAL payload → based_on cells
 //   re-run under the approver's scope (changed → `stale`, commit that alone, 0 executions) → core.decision →
-//   app.decision_id → the module's handler via executeCommand (audit + outbox) → executed.
+//   app.decision_id → the module's handler via executeCommand (audit + outbox) → executed. A handler that finds core's
+//   own figures moved since the draft was made (an import preview, R-A 6) throws `stale_draft`: the decision and
+//   everything after it roll back, and the draft goes `stale` exactly as above (never `proposed` again).
 import { commandEnvelopeOf, draftable, parseRef, snapRef } from "@munim/contracts";
 import { DraftsApproveV1, DraftsRejectV1 } from "@munim/contracts/approvals";
 import { evaluateAuthority, type AuthorityRow } from "@munim/core-domain/authority";
@@ -220,6 +222,7 @@ export async function approveDraft(deps: DecideDeps, m: Member, draftId: string,
     }
 
     const decisionId = uuidv7();
+    await c.query("SAVEPOINT draft_decide");
     await c.query(
       `INSERT INTO core.decision (tenant_id, id, draft_id, verdict, final_payload, reason, decided_by) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [m.tenant_id, decisionId, draftId, verdict, final, p.reason, m.member_id]);
@@ -237,6 +240,12 @@ export async function approveDraft(deps: DecideDeps, m: Member, draftId: string,
       // No `publish` here: it would fire before this OUTER transaction commits (afterCommit publishes).
       done = await executeCommand({ ...base, decisionId }, command, wrapped);
     } catch (e) {
+      if (e instanceof ApiError && e.code === "stale_draft") {
+        await c.query("ROLLBACK TO SAVEPOINT draft_decide");
+        await c.query(`UPDATE core.draft SET status = 'stale' WHERE id = $1`, [draftId]);
+        await audit(c, m, draftId, { status: "stale", changes: [] }, null);
+        return { stale: [] };
+      }
       if (!permanent(e)) throw e;
       await c.query("ROLLBACK TO SAVEPOINT draft_exec");
       // failure_reason (0014): the refusing SQLSTATE as a code, e.g. sqlstate_23p01 — never exception text.

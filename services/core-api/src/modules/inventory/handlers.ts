@@ -9,6 +9,7 @@ import {
 import { mulDiv } from "@munim/core-domain/money";
 import { type AuditEntry, type CommandHandler, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
+import { lockOutlets } from "../../lib/locks.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { isExpired } from "./fefo.ts";
 import {
@@ -118,6 +119,9 @@ export const countSubmit: CommandHandler = {
   type: "inventory.count.submit.v1",
   async run(c, command) {
     const p = InventoryCountSubmitV1.parse(command.payload);
+    // The outlet's count lock, shared with history count approvals (R-A 3): a back-dated count approved meanwhile waits,
+    // then sees this count as later than its own and goes stale.
+    await lockOutlets(c, "stock_count", [p.outlet_id]);
     const keys = p.lines.map((l) => `${l.ingredient_id}|${l.batch_id}`);
     if (new Set(keys).size !== keys.length) throw bad();
     const lines = [];

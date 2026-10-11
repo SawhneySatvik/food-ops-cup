@@ -3,10 +3,9 @@
 //   (1) a price row changed by an approved draft → the full chain, every hop equal to the planted id
 //   (2)(3) planted rejected / stale / failed drafts → reason(+code) / changes / sqlstate
 //   (3) /v1/draftables length = `proposal.` lines in MANIFEST.d (counted from the files, not the registry)
-//   (4) another outlet's row (and draft) → 404, the owning outlet's manager → 200
+//   (4) another outlet's row (and draft) → 404, the owning outlet's manager → 200; a draft's touched rows are filtered per
+//       row (R-A 7: an outlet-0 manager never gets the id of an outlet-1 row the same decision touched)
 //   dismiss: owner 200, replay → same bytes + 1 audit entry, different request on the same key → 409.
-// findings.dismiss.v1 needs its core.command_authority row (migrator request): this file inserts it as a fixture
-// stand-in; once the migration carries it the insert is a no-op (ON CONFLICT DO NOTHING).
 // Synthetic data only.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -102,7 +101,6 @@ beforeAll(async () => {
     `SELECT i.id AS item_id, 25000::bigint AS suggested_minor FROM core.item i WHERE i.id = :item_id::uuid`,
     JSON.stringify([{ name: "item_id", type: "uuid" }, { name: "suggested_minor", type: "integer", numeric_source: "core.price.amount_minor" }]),
   ]);
-  await db.admin(`INSERT INTO core.command_authority (command_type, allowed_roles, scope, target_tables) VALUES ('findings.dismiss.v1', ARRAY['owner','manager','judge'], 'outlet', '{}') ON CONFLICT DO NOTHING`);
   // The planted run → snapshot → finding that the approved draft cites.
   await db.withContext("munim_svc", svc(), async (c) => {
     await c.query(`INSERT INTO intel.run (tenant_id, id, trigger, actor, outlet_scope, expires_at) VALUES ($1, $2, 'event', 'watcher:catalogue', $3, now() + interval '1 hour')`, [T.tenant, T.run, [T.outlets[0]]]);
@@ -251,6 +249,20 @@ describe("(4) another outlet's row → 404; the owning outlet → 200", () => {
     const mine = RowLineageResponse.parse(await (await lineageOf("mgr1", `core.item:${T.item}`)).json());
     expect(mine.chains[0]!.decision).toMatchObject({ decision_id: decisionId });
     expect(mine.chains[0]!.draft).toMatchObject({ draft_id: planted.approved });
+  });
+  it("touched rows are filtered per row (R-A 7): outlet-0 manager gets the outlet-0 price but not an outlet-1 price the decision touched; the owner gets both", async () => {
+    const decisionId = (await one<{ id: string }>(`SELECT id FROM core.decision WHERE draft_id = $1`, [planted.approved])).id;
+    const price1 = uuidv7();
+    await db.withContext("munim_core", own("catalogue.price.set.v1"), (c) =>
+      c.query(`INSERT INTO core.price (tenant_id, id, item_id, variant_id, outlet_id, channel_kind, amount_minor, currency, tax_class, valid_from, valid_to)
+               VALUES ($1, $2, $3, NULL, $4, 'counter', 20000, 'INR', 'restaurant_5', '2020-01-01', NULL)`, [T.tenant, price1, T.item, T.outlets[1]]));
+    await db.admin(`INSERT INTO core.audit_log (tenant_id, actor, action, entity, entity_id, decision_id, after, seq, prev_hash, hash, created_at)
+                    VALUES ($1, '{"kind":"member","id":"x","role":"owner"}', 'test.touch', 'core.price', $2, $3, '{}', 0, '', '', now())`, [T.tenant, price1, decisionId]);
+    const ids = async (who: Who) => DraftLineageResponse.parse(await (await call("GET", `/v1/drafts/${planted.approved}/lineage`, who)).json()).touched.map((t) => t.id);
+    const mine = await ids("mgr1");
+    expect([mine.includes(T.price0), mine.includes(price1)]).toEqual([true, false]);
+    const all = await ids("owner");
+    expect([all.includes(T.price0), all.includes(price1)]).toEqual([true, true]);
   });
   it("malformed row param → 400; unknown row, unknown table, a table with no id → 404", async () => {
     for (const bad of ["", "core.price", "core.price:x", "core.price;drop:" + uuidv7(), "public.price:" + uuidv7()]) expect((await lineageOf("owner", bad)).status).toBe(400);

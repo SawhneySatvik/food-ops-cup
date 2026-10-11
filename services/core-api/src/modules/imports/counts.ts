@@ -3,12 +3,18 @@
 // derivation group per count (the movement is core's, never a command of the approver's). `expected_qty_milli` is core's
 // on-hand at `counted_at` (Σ movements with at ≤ counted_at), not the file's. An ingredient counted again later in the
 // same file starts from the earlier count's adjustment: counts are taken in (counted_at, count no) order and each is
-// held to the figure the previous one leaves, at the preview and again at the approval (one that moved refuses it).
+// held to the figure the previous one leaves, at the preview and again at the approval (one that moved makes the draft
+// stale, 409 `stale_draft`, R-A 6). A count dated before a submitted count (or a count adjustment) of the same outlet,
+// ingredient and batch is refused (`later_count_exists`, R-A 3): its adjustment would land under the later count and
+// shift today's stock, which that later count already fixed. At the approval the same rule, like the same count already
+// in the books, makes the draft stale too (it never clears on a retry); approvals and live counts at one outlet are
+// serialised before these checks (R-A 2).
 // A batch-tracked ingredient is counted per batch (the "Batch" column, a batch code at that outlet; expected is that
 // batch's own stock, as countSubmit's); an untracked one has no batch. Quantities are in the base unit.
 import { uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
+import { lockOutlets } from "../../lib/locks.ts";
 import { dateRefusal, type HistoryCtx, instantOf, one } from "./history.ts";
 import type { RowOutcome } from "./rows.ts";
 import { type Group, writeDerived } from "./write.ts";
@@ -28,6 +34,20 @@ async function onHandAt(c: Queryable, outletId: string, lines: ReadonlyArray<{ i
   const out: number[] = [];
   for (const row of r.rows) out[row.k] = Number(row.q);
   return out;
+}
+
+/** The lines (by index) with a submitted count line or a count adjustment of the same outlet, ingredient and batch AFTER `at`. */
+async function countedLater(c: Queryable, outletId: string, lines: ReadonlyArray<{ ingredient_id: string; batch_id: string | null }>, at: string): Promise<Set<number>> {
+  const r = await c.query<{ k: number }>(
+    `SELECT x.k FROM jsonb_to_recordset($1::jsonb) AS x (k int, ingredient_id uuid, batch_id uuid)
+      WHERE EXISTS (SELECT 1 FROM core.stock_count sc JOIN core.stock_count_line l ON l.tenant_id = sc.tenant_id AND l.stock_count_id = sc.id
+                     WHERE sc.outlet_id = $2 AND sc.status = 'submitted' AND sc.counted_at > $3::timestamptz
+                       AND l.ingredient_id = x.ingredient_id AND l.batch_id IS NOT DISTINCT FROM x.batch_id)
+         OR EXISTS (SELECT 1 FROM core.stock_movement m
+                     WHERE m.outlet_id = $2 AND m.kind = 'count_adjust' AND m.at > $3::timestamptz
+                       AND m.ingredient_id = x.ingredient_id AND m.batch_id IS NOT DISTINCT FROM x.batch_id)`,
+    [JSON.stringify(lines.map((l, k) => ({ k, ...l }))), outletId, at]);
+  return new Set(r.rows.map((x) => x.k));
 }
 
 interface Line { line: number; v: Row; ingredient_id?: string; batch_id?: string | null; base_unit?: string; out?: RowOutcome }
@@ -80,6 +100,8 @@ export async function checkCounts(c: Queryable, rows: ReadonlyArray<{ line: numb
       else { r.ingredient_id = ing!.id; r.batch_id = batch ?? null; r.base_unit = ing!.base_unit; seen.add(`${ing!.id}|${batch ?? ""}`); }
     }
     if (bad.size) { fail(bad); continue; }
+    const later = await countedLater(c, outletId!, lines.map((l) => ({ ingredient_id: l.ingredient_id!, batch_id: l.batch_id! })), at!);
+    if (later.size) { fail(new Map(lines.flatMap((l, j) => (later.has(j) ? [[l, "later_count_exists"] as const] : [])))); continue; }
     good.push({ no: countNo, lines, outletId: outletId!, countedBy: countedBy!, at: at!, date });
   }
 
@@ -110,18 +132,23 @@ export async function writeCounts(c: Queryable, staged: readonly StagedCountLine
   const counts = new Map<string, StagedCountLine[]>();
   for (const l of staged) counts.set(l.count_no, [...(counts.get(l.count_no) ?? []), l]);
   const ordered = [...counts.values()].sort((a, b) => Date.parse(a[0]!.at) - Date.parse(b[0]!.at) || (a[0]!.count_no < b[0]!.count_no ? -1 : 1));
+  await lockOutlets(c, "stock_count", staged.map((l) => l.outlet_id));
   let lines = 0, adjustments = 0;
   for (const ls of ordered) {
     const head = ls[0]!;
-    // Another file approved since the preview may hold this very count (same outlet and instant): already imported.
-    if ((await c.query(`SELECT 1 FROM core.stock_count WHERE outlet_id = $1 AND counted_at = $2::timestamptz`, [head.outlet_id, head.at])).rowCount) throw new ApiError("conflict");
+    // Another file approved since the preview may hold this very count (same outlet and instant): already imported; or a
+    // later count of one of its ingredients (R-A 3).
+    if ((await c.query(`SELECT 1 FROM core.stock_count WHERE outlet_id = $1 AND counted_at = $2::timestamptz`, [head.outlet_id, head.at])).rowCount
+        || (await countedLater(c, head.outlet_id, ls, head.at)).size) throw new ApiError("stale_draft", "stale_draft");
     const onHand = await onHandAt(c, head.outlet_id, ls, head.at);
-    // The figure the approver saw in the preview must still be core's, or nothing is written.
-    if (ls.some((l, j) => onHand[j]! !== l.expected_qty_milli)) throw new ApiError("invalid_payload");
+    // The figure the approver saw in the preview must still be core's, or nothing is written: the draft is stale.
+    if (ls.some((l, j) => onHand[j]! !== l.expected_qty_milli)) throw new ApiError("stale_draft", "stale_draft");
     const countId = uuidv7();
+    // 0024's UNIQUE (tenant, outlet, counted_at) is the same rule as the check above, held by the database.
     await c.query(
       `INSERT INTO core.stock_count (tenant_id, id, outlet_id, counted_by, counted_at, status)
-       VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'submitted')`, [countId, head.outlet_id, head.counted_by, head.at]);
+       VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'submitted')`, [countId, head.outlet_id, head.counted_by, head.at])
+      .catch((e: { code?: string }) => { throw e.code === "23505" ? new ApiError("stale_draft", "stale_draft") : e; });
     await c.query(
       `INSERT INTO core.stock_count_line (tenant_id, id, stock_count_id, ingredient_id, batch_id, expected_qty_milli, counted_qty_milli, unit)
        SELECT current_setting('app.tenant_id')::uuid, x.id, $1, x.ingredient_id, x.batch_id, x.expected_qty_milli, x.counted_qty_milli, x.unit

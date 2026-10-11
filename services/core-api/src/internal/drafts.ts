@@ -6,6 +6,8 @@
 //      `draftables`, or one of its `workflow_draftables` (DECISIONS 11 Oct, W3.2: emitted by deterministic intel code,
 //      never a model tool; contracts DraftsRequest lets such a draft cite no snapshot cell when every numeric leaf is a
 //      document span or a quote row) — else 422.
+//      Campaign and coupon drafts are no specialist's draftable (R-B S1-B / S1-D ruling, 11 Oct: an approved campaign must
+//      never reach customers outside the finding; coupon.set waits for pack §6's executable tightening), so check 0 refuses them.
 //  0b. A payroll draft outside the pack's `payroll_scope` → 422 `payroll_out_of_scope` (W3.2; nothing stored).
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
 //      every ref and every based_on cell resolves for this run → else `abstained` + reason, nothing stored.
@@ -18,8 +20,10 @@
 //      digits: a code is an identifier, not a number shown as a fact). Beside it, by an explicit list (IDENTIFIER_LEAVES)
 //      because the schema is also the member route's and stays free: a supplier invoice's `invoice_no` (DECISIONS 11 Oct,
 //      W3.2) — the number printed on the supplier's page, an identifier a person matches, not a quantity; its
-//      `lines[].description` stays prose and is checked. imports.* draftables are excepted as a whole: no specialist may
-//      propose them (step 0), so intel never reaches this check with one.
+//      `lines[].description` stays prose and is checked. An identifier leaf is excepted only in its own shape (R-A 4:
+//      letters, digits and / . _ -, no spaces, ≤ 40 characters); anything else is `number_grammar`, so prose cannot ride
+//      in it. imports.* draftables are excepted as a whole: no specialist may propose them (step 0), so intel never
+//      reaches this check with one.
 //   3. Fingerprint (below). An OPEN draft with it → that draft's id, 0 new rows. A draft a person REJECTED with it
 //      within 30 days → `abstained` + `recently_rejected` (the verdict only, never the reason text).
 //   4. Insert, with `expected` copied from each based_on cell (approval re-checks them; changed → stale).
@@ -52,7 +56,8 @@ type Cells = Map<string, { template_id: string; template_version: number; params
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PAYROLL = new Set(["people.payroll_draft.create.v1"]);
-/** Free-string leaves that are identifiers, not prose (step 2b): excepted from the number grammar by name. */
+/** Free-string leaves that are identifiers, not prose (step 2b): excepted from the number grammar by name, in this shape only. */
+const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9/._-]{0,39}$/;
 const IDENTIFIER_LEAVES: Record<string, readonly string[]> = { "purchasing.invoice.record.v1": ["invoice_no"] };
 const REJECTION_WINDOW = "30 days";
 
@@ -146,6 +151,7 @@ function stringsAt(v: unknown, keys: readonly string[]): string[] {
   return Array.isArray(x) ? x.flatMap((e) => stringsAt(e, rest)) : [];
 }
 const proseIn = (commandType: string, payload: unknown) => [...proseLeafPaths(commandType)].flatMap((p) => stringsAt(payload, p.split(".")));
+const identifiersIn = (commandType: string, payload: unknown) => (IDENTIFIER_LEAVES[commandType] ?? []).flatMap((p) => stringsAt(payload, p.split(".")));
 
 const DRAFT_COLS = `id, source, command_type, command_payload, outlet_ids, finding_id, evidence, based_on`;
 
@@ -177,7 +183,8 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   const resolver = dbResolver(c, run.scope);
   const verdict = await validateDraft({ payload: req.payload, based_on: req.based_on }, resolver);
   if (!verdict.ok) return answer({ draft_id: req.draft_id, status: "abstained", reason_code: verdict.reason_code });
-  if (proseIn(req.command_type, req.payload).some((t) => !checkGrammar(t).ok)) return answer({ draft_id: req.draft_id, status: "abstained", reason_code: "number_grammar" });
+  if (proseIn(req.command_type, req.payload).some((t) => !checkGrammar(t).ok)
+      || identifiersIn(req.command_type, req.payload).some((t) => !IDENTIFIER.test(t))) return answer({ draft_id: req.draft_id, status: "abstained", reason_code: "number_grammar" });
   for (const e of req.evidence) {
     if ((await resolver.resolve(evidenceRef(e))).status !== "ok") return answer({ draft_id: req.draft_id, status: "abstained", reason_code: "unresolved_ref" });
   }

@@ -2,7 +2,10 @@
 //   • the fixture month's P&L (finance.pnl, run as the template W3 installs) = the hand-computed answer key,
 //     by outlet, brand and channel; GST check and GST summary = their keys;
 //   • reconciliation: an ad fee the terms never allowed → one unapproved_deduction break; dispute route moves it
-//     to disputed (replay → same bytes); disputing it again → 409 with no new dispute;
+//     to disputed (replay → same bytes); disputing it again → 409 with no new dispute; a line naming an order or a
+//     settlement line already in an open dispute → 409, a repeated line in one claim → 422, another order → 201, and
+//     once its dispute is withdrawn the order may be claimed again (R-B S1-C: a weekly re-draft never claims twice); as an
+//     approved draft the held line makes the draft stale (409 stale_draft), never a 409 that a retry meets again;
 //   • channel terms: owner 201, overlap 409, staff 403; expense into a closed period 409 period_closed, open 201;
 //   • journal adjust: no route (404); handler without a decision refused, 0 rows; approved draft → 1 entry under
 //     the decision; an unbalanced edit → 422, 0 entries, draft still proposed;
@@ -196,6 +199,61 @@ describe("reconciliation breaks and disputes", () => {
     const again = await call("POST", "/v1/finance/disputes", "owner", envelope("finance.dispute.draft.v1", { ...payload, dispute_id: uuidv7() }));
     expect([again.status, (await again.json()).error.code]).toEqual([409, "conflict"]);
     expect(await count(db, `SELECT count(*) n FROM core.dispute WHERE tenant_id = $1`, [fx.tenant])).toBe(1);
+  });
+
+  it("R-B S1-C: an order or settlement line already in an open dispute → 409, 0 rows; a repeat inside one claim → 422; others → 201", async () => {
+    const disputes = () => count(db, `SELECT count(*) n FROM core.dispute WHERE tenant_id = $1`, [fx.tenant]);
+    const sl = (await db.admin<{ id: string }>(`SELECT id FROM core.settlement_line WHERE settlement_id = $1 AND line_no = 2`, [ids.s1])).rows[0]!.id;
+    const claim = (lines: Array<{ order_id?: string; settlement_line_id?: string; claimed_minor: number }>) => {
+      const dispute_id = uuidv7();
+      return { dispute_id, body: envelope("finance.dispute.draft.v1", { dispute_id, channel_id: fx.agg, basis: "short_payout", break_ids: [], currency: "INR",
+        lines: lines.map((l) => ({ order_id: l.order_id ?? null, settlement_line_id: l.settlement_line_id ?? null, claimed_minor: l.claimed_minor })),
+        total_claimed_minor: lines.reduce((a, l) => a + l.claimed_minor, 0) }) };
+    };
+    const post = async (b: { body: unknown }) => { const r = await call("POST", "/v1/finance/disputes", "owner", b.body); return [r.status, r.status === 201 ? null : (await r.json()).error.code]; };
+    const n0 = await disputes();
+    const first = claim([{ order_id: ids.o2, claimed_minor: 1000 }]);
+    expect(await post(first)).toEqual([201, null]);
+    expect(await post(claim([{ order_id: ids.o2, claimed_minor: 1000 }]))).toEqual([409, "conflict"]);
+    expect(await post(claim([{ order_id: ids.o3, claimed_minor: 500 }, { order_id: ids.o2, claimed_minor: 500 }]))).toEqual([409, "conflict"]);
+    expect(await post(claim([{ settlement_line_id: sl, claimed_minor: 3000 }]))).toEqual([201, null]);
+    expect(await post(claim([{ settlement_line_id: sl, claimed_minor: 3000 }]))).toEqual([409, "conflict"]);
+    expect(await post(claim([{ order_id: ids.o3, claimed_minor: 500 }, { order_id: ids.o3, claimed_minor: 500 }]))).toEqual([422, "invalid_payload"]);
+    expect(await disputes()).toBe(n0 + 2);
+    // A withdrawn dispute no longer holds its order (open = recorded | sent).
+    await db.admin(`SET session_replication_role = replica; UPDATE core.dispute SET status = 'withdrawn' WHERE id = '${first.dispute_id}'; SET session_replication_role = origin`);
+    expect(await post(claim([{ order_id: ids.o2, claimed_minor: 1000 }]))).toEqual([201, null]);
+    expect(await disputes()).toBe(n0 + 3);
+  });
+
+  it("R-B S1-C: two dispute drafts naming one order → the first approval 200, the second stale (409 stale_draft, draft stale), 0 rows", async () => {
+    const disputes = () => count(db, `SELECT count(*) n FROM core.dispute WHERE tenant_id = $1`, [fx.tenant]);
+    // The proposal cites amounts the owner then types (R26): the claim is the owner's, the order line is the draft's.
+    const ref = snapRef(uuidv7(), 0, "claimed_minor");
+    const body = (claimed: unknown) => ({ dispute_id: uuidv7(), channel_id: fx.agg, basis: "missing_payout", break_ids: [], currency: "INR",
+      lines: [{ order_id: ids.o3, settlement_line_id: null, claimed_minor: claimed }], total_claimed_minor: claimed });
+    const drafted = new Map<string, Record<string, unknown>>();
+    const draft = async () => {
+      const id = uuidv7();
+      const payload = body(ref);
+      drafted.set(id, payload);
+      await db.withContext("munim_svc", { tenant_id: fx.tenant, outlet_ids: "*" }, (c) =>
+        c.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload) VALUES ($1, $2, '{}', 'intel:finance', $3, $4)`,
+          [fx.tenant, id, "finance.dispute.draft.v1", payload]));
+      return id;
+    };
+    const typed = { value: 700, typed_by: fx.owner };
+    const approve = (id: string) => call("POST", `/v1/drafts/${id}:approve`, "owner", { command_id: uuidv7(), idempotency_key: `approve-${uuidv7()}`,
+      type: "drafts.approve.v1", payload: { draft_id: id, command_type: "finance.dispute.draft.v1", reason: "Owner typed the claim",
+        edited_payload: { ...drafted.get(id)!, lines: [{ order_id: ids.o3, settlement_line_id: null, claimed_minor: typed }], total_claimed_minor: typed } } });
+    const [a, b] = [await draft(), await draft()];
+    const n0 = await disputes();
+    const ra = await approve(a);
+    expect([ra.status, ra.status === 200 ? null : await ra.json()]).toEqual([200, null]);
+    const res = await approve(b);
+    const st = (await db.admin<{ status: string }>(`SELECT status FROM core.draft WHERE id = $1`, [b])).rows[0]!.status;
+    expect([res.status, (await res.json()).error.code, st]).toEqual([409, "stale_draft", "stale"]);
+    expect(await disputes()).toBe(n0 + 1);
   });
 });
 

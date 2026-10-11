@@ -8,6 +8,15 @@
 //   4. an owner's own imports.run.commit.v1 cannot write a shift, a count or a count line (MB001);
 //   5. a future date → date_not_past, a closed period → period_closed (at preview and between preview and approval);
 //   6. the commit is idempotent: the same key replays, a new key is refused, 0 rows added.
+// W3.2 review fix cycle 1 (last describe):
+//   R-A 2  two approvals racing (a lock barrier holds both inside their transactions): the first commits, the second goes
+//          stale (409 `stale_draft`, draft `stale`, 0 rows) — a clash never clears on a retry, so it is no 409 loop;
+//   R-A 3  a count dated before a submitted count of the same outlet + ingredient (+ batch) → `later_count_exists` at the
+//          preview (its siblings `count_rejected`), and stale at the approval when the later count landed after the
+//          preview — including a live count submitted while the approval runs (the same outlet lock);
+//   R-A 6  core's figure moved between the preview and the approval (an imported bill, an earlier count, a bill's tax) → 409 `stale_draft`,
+//          the draft `stale` (not `proposed`), 0 rows; a retry → 409 `stale_draft` again;
+//   R-A 10 a live device-less cash order (a QR / storefront order) on a past day is not a history drawer's cash.
 // Red-proofs: services/core-api/test/redproof-t093.sh (MUNIM_T093_PLANT, test-side only). Synthetic data only.
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -69,6 +78,7 @@ const RUN: Record<string, { run: string; draft: string }> = {};
 const shiftsOf = () => count(`SELECT count(*) AS n FROM core.shift WHERE tenant_id = $1 AND device_id IS NULL`, [w.tenant]);
 const countsOf = () => count(`SELECT count(*) AS n FROM core.stock_count WHERE tenant_id = $1 AND origin ->> 'kind' = 'decision'`, [w.tenant]);
 const tenders = () => count(`SELECT count(*) AS n FROM core.tender WHERE tenant_id = $1`, [w.tenant]);
+const draftStatus = async (draft: string) => (await rows<{ status: string }>(`SELECT status FROM core.draft WHERE id = $1`, [draft]))[0]!.status;
 
 beforeAll(async () => {
   db = await openDb();
@@ -258,7 +268,7 @@ describe("two files previewed before either is approved", () => {
   const SH = "Shift No,Date,Outlet,Opened At,Closed At,Opened By,Closed By,Float,Counted Cash,Cash Tenders";
   const CH = "Count No,Date,Time,Outlet,Counted By,Ingredient,Counted Qty,Unit,Batch";
   const put = async (name: string, text: string) => { await writeFile(join(FIXTURES, name), text); };
-  it("overlapping shift windows: the first commits, the second is refused (409 conflict) and writes 0 shifts", async () => {
+  it("overlapping shift windows: the first commits, the second goes stale (409 stale_draft, draft stale) and writes 0 shifts", async () => {
     await put("t93_ov_a.csv", `${SH}\nT93-OA,2026-10-09,Outlet 2,10:00,18:00,Owner,Owner,100.00,100.00,0.00\n`);
     await put("t93_ov_b.csv", `${SH}\nT93-OB,2026-10-09,Outlet 2,15:00,20:00,Owner,Owner,100.00,100.00,0.00\n`);
     const a = await preview("shift_log", "t93_ov_a.csv", "shift_log_v1");
@@ -268,7 +278,7 @@ describe("two files previewed before either is approved", () => {
     expect((await approve(a.run.draft_id!)).status).toBe(200);
     expect(await shiftsOf()).toBe(before + 1);
     const res = await approve(b.run.draft_id!);
-    expect([res.status, (await res.json()).error?.code]).toEqual([409, "conflict"]);
+    expect([res.status, (await res.json()).error?.code, await draftStatus(b.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
     expect(await shiftsOf()).toBe(before + 1);
   });
   it("non-overlapping windows previewed together both commit", async () => {
@@ -280,7 +290,7 @@ describe("two files previewed before either is approved", () => {
     expect([(await approve(c.run.draft_id!)).status, (await approve(d.run.draft_id!)).status]).toEqual([200, 200]);
     expect(await shiftsOf()).toBe(before + 2);
   });
-  it("the same count (outlet and instant) in two files: the first commits, the second is refused and writes 0 counts or movements", async () => {
+  it("the same count (outlet and instant) in two files: the first commits, the second goes stale and writes 0 counts or movements", async () => {
     await put("t93_cnt_e.csv", `${CH}\nT93-CE,2026-10-09,11:00,Outlet 3,Owner,Oil,10,ml,\n`);
     await put("t93_cnt_f.csv", `${CH}\nT93-CF,2026-10-09,11:00,Outlet 3,Owner,Oil,20,ml,\n`);
     const e = await preview("stock_count", "t93_cnt_e.csv", "stock_count_v1");
@@ -289,7 +299,7 @@ describe("two files previewed before either is approved", () => {
     const before = [await countsOf(), await count(`SELECT count(*) AS n FROM core.stock_movement WHERE tenant_id = $1 AND kind = 'count_adjust'`, [w.tenant])];
     expect((await approve(e.run.draft_id!)).status).toBe(200);
     const res = await approve(f.run.draft_id!);
-    expect([res.status, (await res.json()).error?.code]).toEqual([409, "conflict"]);
+    expect([res.status, (await res.json()).error?.code, await draftStatus(f.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
     expect([await countsOf(), await count(`SELECT count(*) AS n FROM core.stock_movement WHERE tenant_id = $1 AND kind = 'count_adjust'`, [w.tenant])]).toEqual([before[0]! + 1, before[1]! + 1]);
   });
 });
@@ -327,3 +337,187 @@ describe("refusals", () => {
     expect([await shiftsOf(), await countsOf()]).toEqual(before);
   });
 });
+
+describe("W3.2 review fixes: races, back-dated counts, drift, live device-less cash", () => {
+  const SH = "Shift No,Date,Outlet,Opened At,Closed At,Opened By,Closed By,Float,Counted Cash,Cash Tenders";
+  const CH = "Count No,Date,Time,Outlet,Counted By,Ingredient,Counted Qty,Unit,Batch";
+  const BH = "Bill No,Bill Date,Bill Time,Outlet,Channel,Brand,Order Type,Customer Phone,Bill Status,Item Code,Variant Code,Qty,Unit Price,Tax Class,Line Discount,Line Total,Void Reason,Cash,Card,UPI,Refund,Refund Mode,Refund Reason,Refund Date";
+  const put = async (name: string, text: string) => { await writeFile(join(FIXTURES, name), text); };
+  const adjusts = () => count(`SELECT count(*) AS n FROM core.stock_movement WHERE tenant_id = $1 AND kind = 'count_adjust'`, [w.tenant]);
+  const status = async (draft: string) => (await rows<{ status: string }>(`SELECT status FROM core.draft WHERE id = $1`, [draft]))[0]!.status;
+  // Only this database's waits: the cluster is shared with other test files' clones.
+  const ungranted = () => count(`SELECT count(*) AS n FROM pg_locks WHERE NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`);
+  /** Holds `table` in SHARE mode (reads pass, INSERTs wait), starts each approval in turn once the previous one waits, then
+   *  lets go: without a per-outlet lock taken BEFORE the re-checks, both approvals pass their checks and both commit. */
+  async function race(table: string, steps: Array<() => Promise<Res>>): Promise<Res[]> {
+    const barrier = await db.connect("admin");
+    await barrier.query("BEGIN");
+    await barrier.query(`LOCK TABLE ${table} IN SHARE MODE`);
+    const pending: Array<Promise<Res>> = [];
+    try {
+      for (const [i, step] of steps.entries()) {
+        pending.push(step());
+        for (let k = 0; (await ungranted()) < i + 1; k++) {
+          if (k > 400) throw new Error(`race: approval ${i + 1} never blocked`);
+          await new Promise((r) => setTimeout(r, 25));
+        }
+      }
+    } finally {
+      await barrier.query("COMMIT");
+      await barrier.end();
+    }
+    return Promise.all(pending);
+  }
+
+  it("R-A 10: a live device-less cash tender and refund on a past day are not drawer cash (Cash Tenders 0.00 → staged); 500.00 → tender_mismatch", async () => {
+    // A storefront-style order at outlet 2 (device NULL, live pricing — no import run) paid 500.00 cash at 12:00 on 6 Oct and
+    // refunded 100.00 cash at 13:00: either leg counted would make core's cash +500.00 or −100.00, not 0.00.
+    const order = uuidv7(), tender = uuidv7();
+    await db.admin(`SET session_replication_role = replica;
+      INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot, business_date, ticket_no, origin)
+        VALUES ('${w.tenant}', '${order}', '${w.outlets[1]}', '${w.channel}', 'takeaway', 'completed', 47619, 2381, 50000, 'INR', '{}', '2026-10-06', 9301, '{}');
+      INSERT INTO core.tender (tenant_id, id, outlet_id, order_id, method, amount_minor, currency, recorded_by, at, origin)
+        VALUES ('${w.tenant}', '${tender}', '${w.outlets[1]}', '${order}', 'cash', 50000, 'INR', '${w.owner}', '2026-10-06T12:00:00+05:30', '{}');
+      INSERT INTO core.refund (tenant_id, id, outlet_id, order_id, tender_id, method, amount_minor, currency, reason_code, note, actor, at, origin)
+        VALUES ('${w.tenant}', '${uuidv7()}', '${w.outlets[1]}', '${order}', '${tender}', 'cash', 10000, 'INR', 'wrong_item', 'Synthetic refund', '${w.owner}',
+                '2026-10-06T13:00:00+05:30', '{}');
+      SET session_replication_role = origin`);
+    await put("t93_w32_live0.csv", `${SH}\nT93-L0,2026-10-06,Outlet 2,10:00,18:00,Owner,Owner,100.00,100.00,0.00\n`);
+    await put("t93_w32_live5.csv", `${SH}\nT93-L5,2026-10-06,Outlet 2,10:00,18:00,Owner,Owner,100.00,600.00,500.00\n`);
+    const zero = await preview("shift_log", "t93_w32_live0.csv", "shift_log_v1");
+    const five = await preview("shift_log", "t93_w32_live5.csv", "shift_log_v1");
+    expect([zero.run.rows_ok, zero.quarantined]).toEqual([1, {}]);
+    expect([five.run.rows_ok, five.quarantined]).toEqual([0, { "2": "tender_mismatch" }]);
+  });
+
+  it("R-A 3: a count before a later submitted count of the same ingredient → later_count_exists (sibling count_rejected); after it → staged", async () => {
+    // Books: outlet 1 Flour and Oil were counted at 3 Oct 20:00 and 6 Oct 18:30, Paneer batch T93-PB at 6 Oct 18:30.
+    await put("t93_w32_back.csv", `${CH}\nT93-K1,2026-10-05,12:00,Outlet 1,Owner,Flour,9000,g,\nT93-K1,2026-10-05,12:00,Outlet 1,Owner,Salt,100,g,\n`
+      + `T93-K2,2026-10-04,12:00,Outlet 1,Owner,Paneer,500,g,T93-PB\nT93-K3,2026-10-07,12:00,Outlet 1,Owner,Flour,9700,g,\n`);
+    await db.withContext("munim_core", ctx("inventory.ingredient.upsert.v1"), (c) =>
+      c.query(`INSERT INTO core.ingredient (tenant_id, id, name, base_unit, tracked_by_batch) VALUES ($1, $2, 'Salt', 'g', false)`, [w.tenant, uuidv7()]));
+    const p = await preview("stock_count", "t93_w32_back.csv", "stock_count_v1");
+    expect(p.quarantined).toEqual({ "2": "later_count_exists", "3": "count_rejected", "4": "later_count_exists" });
+    expect(p.staged.map((s) => [s.data.count_no, s.data.counted_qty_milli])).toEqual([["T93-K3", 9_700_000]]);
+  });
+
+  it("R-A 3: a later count approved after this one's preview → this approval goes stale (409 stale_draft), 0 counts; the later one committed", async () => {
+    await put("t93_w32_late_a.csv", `${CH}\nT93-KA,2026-10-08,09:00,Outlet 1,Owner,Oil,4800,ml,\n`);
+    await put("t93_w32_late_b.csv", `${CH}\nT93-KB,2026-10-08,15:00,Outlet 1,Owner,Oil,4700,ml,\n`);
+    const a = await preview("stock_count", "t93_w32_late_a.csv", "stock_count_v1");
+    const b = await preview("stock_count", "t93_w32_late_b.csv", "stock_count_v1");
+    expect([a.run.rows_ok, b.run.rows_ok]).toEqual([1, 1]);
+    const before = await countsOf();
+    expect((await approve(b.run.draft_id!)).status).toBe(200);
+    const res = await approve(a.run.draft_id!);
+    expect([res.status, (await res.json()).error?.code, await status(a.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
+    expect(await countsOf()).toBe(before + 1);
+  });
+
+  it("R-A 2: two overlapping shift files approved at once → the first 200, the second stale (409 stale_draft); 1 shift written", async () => {
+    await put("t93_w32_race_p.csv", `${SH}\nT93-RP,2026-10-08,Outlet 1,10:00,14:00,Owner,Owner,100.00,100.00,0.00\n`);
+    await put("t93_w32_race_q.csv", `${SH}\nT93-RQ,2026-10-08,Outlet 1,13:00,18:00,Owner,Owner,100.00,100.00,0.00\n`);
+    const p = await preview("shift_log", "t93_w32_race_p.csv", "shift_log_v1");
+    const q = await preview("shift_log", "t93_w32_race_q.csv", "shift_log_v1");
+    expect([p.run.rows_ok, q.run.rows_ok]).toEqual([1, 1]);
+    const before = await shiftsOf();
+    const [rp, rq] = await race("core.shift", [() => approve(p.run.draft_id!), () => approve(q.run.draft_id!)]);
+    expect([rp!.status, rq!.status, (await rq!.json()).error?.code, await status(q.run.draft_id!)]).toEqual([200, 409, "stale_draft", "stale"]);
+    expect(await shiftsOf()).toBe(before + 1);
+  });
+
+  it("R-A 2: two count files of one ingredient approved at once, the earlier-dated second → 200 then stale (409 stale_draft); 1 count written", async () => {
+    await put("t93_w32_race_r.csv", `${CH}\nT93-RR,2026-10-09,15:00,Outlet 1,Owner,Flour,9600,g,\n`);
+    await put("t93_w32_race_s.csv", `${CH}\nT93-RS,2026-10-09,10:00,Outlet 1,Owner,Flour,9650,g,\n`);
+    const r = await preview("stock_count", "t93_w32_race_r.csv", "stock_count_v1");
+    const s = await preview("stock_count", "t93_w32_race_s.csv", "stock_count_v1");
+    expect([r.run.rows_ok, s.run.rows_ok]).toEqual([1, 1]);
+    const before = await countsOf();
+    const [rr, rs] = await race("core.stock_count", [() => approve(r.run.draft_id!), () => approve(s.run.draft_id!)]);
+    expect([rr!.status, rs!.status, (await rs!.json()).error?.code, await status(s.run.draft_id!)]).toEqual([200, 409, "stale_draft", "stale"]);
+    expect(await countsOf()).toBe(before + 1);
+  });
+
+  it("R-A 3: a live count submitted while a back-dated count's approval runs → the live count commits, the approval goes stale; 0 history counts", async () => {
+    await put("t93_w32_race_live.csv", `${CH}\nT93-RL,2026-10-09,12:00,Outlet 2,Owner,Flour,0,g,\n`);
+    const h = await preview("stock_count", "t93_w32_race_live.csv", "stock_count_v1");
+    expect(h.run.rows_ok).toBe(1);
+    const flour = (await rows<{ id: string }>(`SELECT id FROM core.ingredient WHERE tenant_id = $1 AND name = 'Flour'`, [w.tenant]))[0]!.id;
+    const live = () => call("POST", "/v1/inventory/counts", { command_id: uuidv7(), idempotency_key: `t93-live-${uuidv7()}`, type: "inventory.count.submit.v1",
+      payload: { count_id: uuidv7(), outlet_id: w.outlets[1], lines: [{ line_id: uuidv7(), ingredient_id: flour, batch_id: null, counted_qty_milli: 0, unit: "g" }] } });
+    const before = await countsOf();
+    const [rl, rh] = await race("core.stock_count", [live, () => approve(h.run.draft_id!)]);
+    expect([rl!.status, rh!.status, (await rh!.json()).error?.code, await status(h.run.draft_id!)]).toEqual([200, 409, "stale_draft", "stale"]);
+    expect(await countsOf()).toBe(before);
+  });
+
+  it("a negative Cash Tenders (a cash refund above the window's cash takings) is staged and commits; a negative float or counted cash → amount_negative", async () => {
+    // A history-imported order at outlet 2 paid 336.00 cash on 3 Oct and refunded 100.00 cash at 13:00 on 5 Oct: core's
+    // cash in the 5 Oct 10:00–18:00 window is −100.00, so expected = 200.00 − 100.00 = 100.00.
+    const order = uuidv7(), tender = uuidv7();
+    await db.admin(`SET session_replication_role = replica;
+      INSERT INTO core."order" (tenant_id, id, outlet_id, channel_id, kind, status, subtotal_minor, tax_minor, total_minor, currency, pricing_snapshot, business_date, ticket_no, origin)
+        VALUES ('${w.tenant}', '${order}', '${w.outlets[1]}', '${w.channel}', 'takeaway', 'completed', 32000, 1600, 33600, 'INR',
+                '{"import_run_id": "${uuidv7()}"}', '2026-10-03', 9302, '{}');
+      INSERT INTO core.tender (tenant_id, id, outlet_id, order_id, method, amount_minor, currency, recorded_by, at, origin)
+        VALUES ('${w.tenant}', '${tender}', '${w.outlets[1]}', '${order}', 'cash', 33600, 'INR', '${w.owner}', '2026-10-03T12:00:00+05:30', '{}');
+      INSERT INTO core.refund (tenant_id, id, outlet_id, order_id, tender_id, method, amount_minor, currency, reason_code, note, actor, at, origin)
+        VALUES ('${w.tenant}', '${uuidv7()}', '${w.outlets[1]}', '${order}', '${tender}', 'cash', 10000, 'INR', 'wrong_item', 'Synthetic refund', '${w.owner}',
+                '2026-10-05T13:00:00+05:30', '{}');
+      SET session_replication_role = origin`);
+    await put("t93_w32_neg_bad.csv", `${SH}\nT93-NF,2026-10-05,Outlet 2,10:00,18:00,Owner,Owner,-200.00,100.00,-100.00\n` +
+      `T93-NC,2026-10-05,Outlet 2,10:00,18:00,Owner,Owner,200.00,-1.00,-100.00\nT93-NE,2026-10-05,Outlet 2,10:00,18:00,Owner,Owner,50.00,0.00,-100.00\n`);
+    const bad = await preview("shift_log", "t93_w32_neg_bad.csv", "shift_log_v1");
+    expect([bad.run.rows_ok, bad.quarantined]).toEqual([0, { "2": "amount_negative", "3": "amount_negative", "4": "expected_negative" }]);
+    await put("t93_w32_neg.csv", `${SH}\nT93-N1,2026-10-05,Outlet 2,10:00,18:00,Owner,Owner,200.00,100.00,-100.00\n`);
+    const p = await preview("shift_log", "t93_w32_neg.csv", "shift_log_v1");
+    expect([p.run.rows_ok, p.quarantined]).toEqual([1, {}]);
+    expect((await approve(p.run.draft_id!)).status).toBe(200);
+    expect(await rows(`SELECT float_minor::int AS f, counted_cash_minor::int AS c, expected_cash_minor::int AS e, variance_minor::int AS v
+                         FROM core.shift WHERE tenant_id = $1 AND outlet_id = $2 AND device_id IS NULL AND opened_at = '2026-10-05T10:00:00+05:30'`,
+      [w.tenant, w.outlets[1]])).toEqual([{ f: 20000, c: 10000, e: 10000, v: 0 }]);
+  });
+
+  it("R-A 6: an imported cash bill lands in a previewed shift's window → 409 stale_draft, draft stale, 0 shifts; retry → 409 stale_draft", async () => {
+    await put("t93_w32_drift_s.csv", `${SH}\nT93-DS,2026-10-07,Outlet 2,10:00,18:00,Owner,Owner,100.00,100.00,0.00\n`);
+    await put("t93_w32_drift_b.csv", `${BH}\nT93-D1,2026-10-07,12:00,Outlet 2,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,\n`);
+    const sh = await preview("shift_log", "t93_w32_drift_s.csv", "shift_log_v1");
+    expect(sh.run.rows_ok).toBe(1);
+    const bills = await preview("pos_bills", "t93_w32_drift_b.csv", "pos_bills_v2");
+    expect((await approve(bills.run.draft_id!)).status).toBe(200);
+    const before = await shiftsOf();
+    const res = await approve(sh.run.draft_id!);
+    expect([res.status, (await res.json()).error?.code, await status(sh.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
+    const again = await approve(sh.run.draft_id!);
+    expect([again.status, (await again.json()).error?.code]).toEqual([409, "stale_draft"]);
+    expect(await shiftsOf()).toBe(before);
+  });
+
+  it("R-A 6: a staged bill whose tax is no longer core's re-derivation → 409 stale_draft, draft stale, 0 orders", async () => {
+    await put("t93_w32_drift_t.csv", `${BH}\nT93-D2,2026-10-08,14:00,Outlet 2,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,\n`);
+    const p = await preview("pos_bills", "t93_w32_drift_t.csv", "pos_bills_v2");
+    expect(p.run.rows_ok).toBe(1);
+    // The preview's figure and core's now differ by one paisa (as a pack or MRP change since the preview would make them).
+    await db.admin(`UPDATE core.import_staging SET data = jsonb_set(data, '{line_tax_minor}', to_jsonb((data ->> 'line_tax_minor')::int + 1)) WHERE import_run_id = $1`,
+      [p.run.import_run_id]);
+    const res = await approve(p.run.draft_id!);
+    expect([res.status, (await res.json()).error?.code, await status(p.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
+    expect(await count(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1 AND external_ref = 'T93-D2'`, [w.tenant])).toBe(0);
+  });
+
+  it("R-A 6: an earlier count approved after a later one's preview moves its expected → 409 stale_draft, draft stale, 0 counts", async () => {
+    // Outlet 2 Oil: 250,000 on hand since the 5 Oct count. F at 9 Oct 12:00 is previewed against 250,000; E at 8 Oct (counted 300)
+    // adjusts +50,000 before F's instant, so F's figure is no longer core's.
+    await put("t93_w32_drift_f.csv", `${CH}\nT93-DF,2026-10-09,12:00,Outlet 2,Owner,Oil,200,ml,\n`);
+    await put("t93_w32_drift_e.csv", `${CH}\nT93-DE,2026-10-08,12:00,Outlet 2,Owner,Oil,300,ml,\n`);
+    const f = await preview("stock_count", "t93_w32_drift_f.csv", "stock_count_v1");
+    const e = await preview("stock_count", "t93_w32_drift_e.csv", "stock_count_v1");
+    expect([f.staged[0]!.data.expected_qty_milli, e.staged[0]!.data.expected_qty_milli]).toEqual([250_000, 250_000]);
+    expect((await approve(e.run.draft_id!)).status).toBe(200);
+    const before = [await countsOf(), await adjusts()];
+    const res = await approve(f.run.draft_id!);
+    expect([res.status, (await res.json()).error?.code, await status(f.run.draft_id!)]).toEqual([409, "stale_draft", "stale"]);
+    expect([await countsOf(), await adjusts()]).toEqual(before);
+  });
+});
+

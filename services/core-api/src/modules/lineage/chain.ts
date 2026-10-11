@@ -107,10 +107,37 @@ export async function chainOf(c: Queryable, m: Member, audit: AuditRow | null, d
   };
 }
 
+const TABLE = /^(core|intel)\.([a-z][a-z0-9_]*)$/;
+
+/** Which of `ids` in `table` ('<schema>.<table>') the caller's own RLS shows. audit_log is tenant-wide, so a row's
+ *  visibility is asked of its own table. A table the role cannot read, or with no uuid `id` column, shows none. */
+export async function visibleIds(c: Queryable, table: string, ids: readonly string[]): Promise<Set<string>> {
+  const t = TABLE.exec(table);
+  if (!t) return new Set();
+  const [, schema, name] = t as unknown as [string, string, string];
+  const hasId = await c.query(
+    `SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass(format('%I.%I', $1::text, $2::text)) AND attname = 'id' AND atttypid = 'uuid'::regtype AND NOT attisdropped`,
+    [schema, name]);
+  if (hasId.rowCount !== 1) return new Set();
+  await c.query("SAVEPOINT lineage_row");
+  try {
+    return new Set((await c.query<{ id: string }>(`SELECT id::text AS id FROM "${schema}"."${name}" WHERE id = ANY ($1::uuid[])`, [ids])).rows.map((r) => r.id));
+  } catch {
+    await c.query("ROLLBACK TO SAVEPOINT lineage_row");
+    return new Set();
+  }
+}
+
+/** The rows a decision touched, each only if the caller's RLS shows it (R-A 7: never another outlet's row id). */
 export async function touchedBy(c: Queryable, decisionId: string) {
   const r = await c.query<AuditRow>(
     `SELECT ${AUDIT_COLS} FROM core.audit_log WHERE decision_id = $1 AND entity <> 'core.draft' ORDER BY seq`, [decisionId]);
-  return r.rows.map((a) => ({ table: a.entity, id: a.entity_id, action: a.action, seq: Number(a.seq) }));
+  const shown = new Map<string, Set<string>>();
+  for (const table of new Set(r.rows.map((a) => a.entity))) {
+    shown.set(table, await visibleIds(c, table, r.rows.filter((a) => a.entity === table).map((a) => a.entity_id)));
+  }
+  return r.rows.filter((a) => shown.get(a.entity)!.has(a.entity_id))
+    .map((a) => ({ table: a.entity, id: a.entity_id, action: a.action, seq: Number(a.seq) }));
 }
 
 export async function auditOf(c: Queryable, entity: string, id: string): Promise<AuditRow[]> {
