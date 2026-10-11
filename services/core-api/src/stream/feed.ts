@@ -18,14 +18,15 @@
 //   t.<run id>=<seq>                     intel.trace_event, seq within a run
 // Drafts, findings and investigations have no commit-ordered column: updated_at is a transaction-START time, so their reads
 // look back LOOKBACK behind the cursor and skip rows this feed has already sent; the cursor only moves
-// forward, and an event that does not move it is sent without an `id:` line. KNOWN LIMIT (i/f only): a
-// late draft/finding change that commits while the client is disconnected, behind its Last-Event-ID, or a
-// transaction open longer than LOOKBACK, is not delivered. (i/f/v)
+// forward, and an event that does not move it is sent without an `id:` line. KNOWN LIMIT (i/f/v): a late
+// draft/finding/investigation change that commits while the client is disconnected, behind its Last-Event-ID, or a
+// transaction open longer than LOOKBACK, is not delivered.
 import type pg from "pg";
 import { contextOf, type Principal } from "../auth/resolve.ts";
 import { type AppContext, withContext } from "../lib/db.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { Deps } from "../lib/types.ts";
+import { statusVisible } from "../modules/investigations/redact.ts";
 import type { Channel, Hub, Listener } from "./hub.ts";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -406,7 +407,7 @@ export class Feed implements Listener {
       const rows = await this.read(async (db) => {
         const common = [floor, page.ts, page.id, upTo?.ts ?? null, upTo?.id ?? null];
         if (part === "v") {
-          return (await db.query<Row & { status: string; mode: string; stop_reason: string | null; playbook_id: string; outlet_scope: string[] }>(
+          const rows = (await db.query<Row & { status: string; mode: string; stop_reason: string | null; playbook_id: string; outlet_scope: string[] }>(
             `SELECT id, status, mode, stop_reason, playbook_id, outlet_scope::text[] AS outlet_scope, ${tsSql("updated_at")} AS ts
                FROM core.investigation
               WHERE updated_at > $1::timestamptz - interval '${LOOKBACK_S} seconds'
@@ -415,6 +416,10 @@ export class Feed implements Listener {
               ORDER BY updated_at, id LIMIT ${PAGE}`,
             common,
           )).rows;
+          // R-D: the status (and the stop reason, which can name the verdict) is `restricted` / null unless this
+          // subscriber may open every template the playbook judges on.
+          const visible = await statusVisible(db, this.ctx.role ?? "", rows.map((x) => x.playbook_id));
+          return rows.map((x) => (visible.has(x.playbook_id) ? x : { ...x, status: "restricted", stop_reason: null }));
         }
         if (part === "f") {
           return (await db.query<Row & { status: string; pack: string; type: string; severity: string; outlet_ids: string[] }>(

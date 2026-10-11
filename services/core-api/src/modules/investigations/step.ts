@@ -11,6 +11,9 @@
 //   5. insert the step with its explicit number (0020: gapless, member = the signed-in member) and update the row;
 //      a step clears any earlier Plan stop reason (0020: NULL while it runs) and wakes `inbox:<tenant>` at commit.
 // Narration happens after commit (index.ts): the transaction never waits on intel.
+// An Auto step (T-089b, auto.ts) is this same path on munim_svc under core-worker: `m` is the creator as their membership
+// stands now, the snapshots are minted by the step's `auto_step` run (R40 C4 via F11's standing grant) after the same
+// role check a member mint gets, and the step row names the grant and the run (0020 step_rules).
 import {
   bindParams, type Cell, evaluable, type ItemStatus, judge, nextStatus, type Playbook, type PlaybookItem, PLAYBOOKS, residualWithin,
   type Snap, templateSentence,
@@ -18,7 +21,7 @@ import {
 import { snapRef } from "@munim/contracts";
 import { ApiError } from "../../lib/errors.ts";
 import type { OutletScope, Queryable } from "../../runtoken/index.ts";
-import type { Member } from "../approvals/index.ts";
+import { type Member, TEMPLATE_RANK } from "../approvals/index.ts";
 import { mintSnapshot } from "../evidence/index.ts";
 
 export interface ChecklistEntry {
@@ -80,8 +83,12 @@ export async function notifyInbox(q: Queryable, tenantId: string, id: string): P
 const refsOf = (cells: readonly Cell[]) => cells.map((c) => snapRef(c.snapshot_id, c.row, c.column));
 const idsOf = (snaps: ReadonlyArray<Snap | null>) => snaps.flatMap((s) => (s ? [s.snapshot_id] : []));
 
-/** `trigger`: `member` (Step mode, a `:continue`) or `plan` (T-089a: the approving member's request runs the steps). */
-export async function runStep(q: Queryable, m: Member, id: string, stepNo: number, trigger: "member" | "plan" = "member"): Promise<StepResult> {
+/** The run and grant behind an Auto step (auto.ts). */
+export interface AutoStep { run_id: string; grant_id: string }
+
+/** `trigger`: `member` (Step mode, a `:continue`), `plan` (T-089a: the approving member's request runs the steps) or
+ *  `auto` (T-089b: core-worker under the creator's standing grant, with `auto` set). */
+export async function runStep(q: Queryable, m: Member, id: string, stepNo: number, trigger: "member" | "plan" | "auto" = "member", auto?: AutoStep): Promise<StepResult> {
   const r = await q.query<InvestigationRow>(`SELECT ${INVESTIGATION_COLS} FROM core.investigation i WHERE i.id = $1 FOR UPDATE`, [id]);
   const inv = r.rows[0];
   if (!inv) throw new ApiError("not_found");
@@ -100,12 +107,17 @@ export async function runStep(q: Queryable, m: Member, id: string, stepNo: numbe
   if (stepNo !== inv.steps_done + 1) throw new ApiError("sequence_gap");
 
   await q.query(`SELECT set_config('app.outlet_ids', $1, true)`, [scope[0] === "*" ? "{*}" : `{${scope.join(",")}}`]);
-  const minter = { kind: "member" as const, member_id: m.member_id, role: m.role, scope };
+  const minter = auto ? { kind: "run" as const, run_id: auto.run_id, scope } : { kind: "member" as const, member_id: m.member_id, role: m.role, scope };
   const minted = new Map<string, Snap | null>();
   async function mint(templateId: string, params: Record<string, unknown>): Promise<Snap | null> {
     const key = `${templateId} ${JSON.stringify(params)}`;
     if (!minted.has(key)) {
       try {
+        // A run mint has no role check of its own (mint.ts): an Auto step reads no template above its creator's current role.
+        if (auto) {
+          const t = await q.query<{ min_role: string }>(`SELECT min_role FROM evidence.snapshot_template WHERE id = $1 ORDER BY version DESC LIMIT 1`, [templateId]);
+          if ((TEMPLATE_RANK[m.role] ?? 0) < (TEMPLATE_RANK[t.rows[0]?.min_role ?? ""] ?? 99)) throw new ApiError("not_found");
+        }
         const s = await mintSnapshot(q, m.tenant_id, minter, templateId, params);
         minted.set(key, { snapshot_id: s.snapshot_id, rows: s.rows as Snap["rows"] });
       } catch (e) {
@@ -161,10 +173,19 @@ export async function runStep(q: Queryable, m: Member, id: string, stepNo: numbe
         snapshot_ids: next.snapshot_ids, refs: next.refs });
       if (j.cells.length > 0) narrate.push({ item, status: j.status, cells: j.cells });
     }
-    if (flipped) status = stepNo >= pb.max_steps ? "exhausted" : "open";
+    // A flip reopens: the status is computed again over the re-judged items (a gate flip → waiting, or cannot_verify at
+    // max steps; R-D), and never `done` in this step.
+    if (flipped) {
+      const again = nextStatus(pb, statuses, residual.ok, stepNo);
+      status = again === "done" ? (stepNo >= pb.max_steps ? "exhausted" : "open") : again;
+    }
   }
 
-  await q.query(
+  if (auto) {
+    await q.query(
+      `INSERT INTO core.investigation_step (tenant_id, investigation_id, step_no, member_id, triggered_by, item_updates, grant_id, run_id)
+       VALUES ($1, $2, $3, $4, 'auto', $5, $6, $7)`, [m.tenant_id, id, stepNo, m.member_id, JSON.stringify(updates), auto.grant_id, auto.run_id]);
+  } else await q.query(
     `INSERT INTO core.investigation_step (tenant_id, investigation_id, step_no, member_id, triggered_by, item_updates)
      VALUES ($1, $2, $3, $4, $6, $5)`, [m.tenant_id, id, stepNo, m.member_id, JSON.stringify(updates), trigger]);
   await q.query(`UPDATE core.investigation SET status = $2, checklist = $3, steps_done = $4 WHERE id = $1`,

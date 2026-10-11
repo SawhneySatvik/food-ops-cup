@@ -152,7 +152,7 @@ describe("B3: composition and the AccountMissing refusal", () => {
       await without.close();
     }
     const w = composeWorker({ svcUrl: url("munim_svc"), keys, intelUrl: "http://127.0.0.1:9", serviceSecret: "s".repeat(64), log: () => {} });
-    expect(w.worker.cron.jobNames).toEqual(["outbox-sweep", "fanout-watch", "fanout-brief", "nightly", "imports-parse"]);
+    expect(w.worker.cron.jobNames).toEqual(["outbox-sweep", "fanout-watch", "fanout-brief", "nightly", "imports-parse", "investigations-auto-imports", "investigations-auto-daily"]);
     await w.close();
   });
 });

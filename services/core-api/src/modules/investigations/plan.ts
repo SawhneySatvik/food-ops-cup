@@ -1,7 +1,10 @@
 // Investigation Plan mode (ledger R45 F10; BOARD T-089a). The creator sees a preview — the playbook's checklist items,
 // the specialists involved and the estimated AI cost — approves it once, and the steps then run without further clicks.
-//   - The estimate is an `intel.investigation_cost_estimate` snapshot minted for the creator when the plan is opened
-//     (in that transaction, so the template sees the new checklist). The preview cites its cells; no number is typed.
+//   - The estimate is an `intel.investigation_cost_estimate` snapshot (v2, 0025) minted for the creator when the plan is
+//     opened (in that transaction, so the template sees the new checklist and step count). v2 prices per STEP, not per
+//     item (one step judges every evaluable item in one call): estimate_minor = per_step_minor (the playbook's average
+//     spend per run-linked step, zero-spend steps included) × remaining_steps (max_steps − steps done, capped by the
+//     checklist items not yet frozen). The preview cites its cells; no number is typed.
 //   - `:approve-plan` is the member's own act on an operational row: `plan_approved_by` is stamped once, by the
 //     signed-in member (0020 investigation_rules), after the role ceiling is checked in the same transaction (T-090).
 //     A repeat by the same member is a replay: the current view, no further steps (`:continue` is what resumes).
@@ -12,8 +15,12 @@
 //   - Before each step core re-reads the member's CURRENT membership (the request's principal is stale by then): access
 //     to the investigation's outlets gone → cancelled, stop_reason `scope` (review M7, F10); and the month's AI budget
 //     (T-090 effectiveCap): none set or none left → stop_reason `budget` before the step, so no further model call.
+//     The role's ceiling is re-checked too (R-D): lowered below `plan`, or the member demoted to such a role → the run
+//     stops with stop_reason `scope` (0020's CHECK has no ceiling value) before the step.
 //   - After each step: an abstained narration → `abstain`; `waiting` → `waiting`; any terminal status ends the run.
 //     Investigations create no drafts and nothing links one in v1 (ADR-014 §7.2), so `draft` is never recorded here.
+//   - `mode: "auto"` (T-089b) approves the same plan as Auto: the mode and the creator's standing grant are written in the
+//     approving transaction (auto.ts approveAuto), and the in-request steps run exactly as Plan's.
 import { outletScopeOf } from "@munim/core-domain/authority";
 import { type Playbook } from "@munim/core-domain/investigations";
 import { contextOf, type MemberRole } from "../../auth/resolve.ts";
@@ -21,9 +28,10 @@ import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { Deps } from "../../lib/types.ts";
 import type { OutletScope, Queryable } from "../../runtoken/index.ts";
-import { assertModeAllowed, effectiveCap } from "../ai_policy/index.ts";
+import { assertModeAllowed, ceilingFor, effectiveCap } from "../ai_policy/index.ts";
 import { loadSnapshots, type Member } from "../approvals/index.ts";
 import { mintSnapshot } from "../evidence/index.ts";
+import { approveAuto } from "./auto.ts";
 import { notifyInbox } from "./step.ts";
 
 export const ESTIMATE_TEMPLATE = "intel.investigation_cost_estimate";
@@ -40,15 +48,18 @@ const covers = (viewer: "*" | readonly string[], scope: readonly string[]) =>
 const svc = <T>(deps: Deps, tenantId: string, fn: (q: Queryable) => Promise<T>) =>
   withContext(deps.pools.svc, { tenant_id: tenantId, outlet_ids: "*", role: "service" }, fn);
 
-/** Mints the plan's cost estimate for its creator, in the transaction that opened the plan. A template above the
- *  creator's role is simply not minted: the preview then reads "cannot verify". */
-export async function mintEstimate(q: Queryable, m: Member, id: string): Promise<void> {
-  const scope = (m.outlet_ids === "*" ? ["*"] : m.outlet_ids) as OutletScope;
+/** Mints the plan's cost estimate for its creator, in the transaction that opened the plan, under the investigation's
+ *  outlet scope (R-D; a subset of the creator's, which RLS just proved covers it), then restores the transaction's scope.
+ *  A template above the creator's role is simply not minted: the preview then reads "cannot verify". */
+export async function mintEstimate(q: Queryable, m: Member, id: string, scope: OutletScope): Promise<void> {
+  const prior = (await q.query<{ s: string | null }>(`SELECT current_setting('app.outlet_ids', true) AS s`)).rows[0]!.s;
+  await q.query(`SELECT set_config('app.outlet_ids', $1, true)`, [scope[0] === "*" ? "{*}" : `{${scope.join(",")}}`]);
   try {
     await mintSnapshot(q, m.tenant_id, { kind: "member", member_id: m.member_id, role: m.role, scope }, ESTIMATE_TEMPLATE, { investigation_id: id });
   } catch (e) {
     if (!(e instanceof ApiError && e.code === "not_found")) throw e;
   }
+  await q.query(`SELECT set_config('app.outlet_ids', $1, true)`, [prior ?? ""]);
 }
 
 export interface PlanRow { id: string; mode: string; created_by: string; plan_approved_by: string | null; plan_approved_at: Date | null }
@@ -91,7 +102,7 @@ async function currentMember(deps: Deps, m: Member): Promise<Member | null> {
 
 /** Approves the plan (once) and, unless this is a replay, runs its steps inside the caller's request. Returns the
  *  member as they stand after the run (null when their access is gone) for the response's view. */
-export async function approvePlan(deps: Deps, m: Member, id: string, step: StepFn): Promise<{ replayed: boolean; member: Member | null }> {
+export async function approvePlan(deps: Deps, m: Member, id: string, step: StepFn, mode: "plan" | "auto" = "plan"): Promise<{ replayed: boolean; member: Member | null }> {
   const replayed = await withContext(deps.pools.core, contextOf(m), async (q) => {
     const r = await q.query<{ created_by: string; mode: string; status: string; plan_approved_by: string | null }>(
       `SELECT created_by, mode, status, plan_approved_by FROM core.investigation WHERE id = $1 FOR UPDATE`, [id]);
@@ -99,6 +110,7 @@ export async function approvePlan(deps: Deps, m: Member, id: string, step: StepF
     if (!inv) throw new ApiError("not_found");
     if (inv.created_by !== m.member_id) throw new ApiError("forbidden");
     await assertModeAllowed(q, m, "plan");
+    if (mode === "auto") return approveAuto(q, m, id, inv);
     if (inv.plan_approved_by !== null) return true;
     if (inv.mode !== "plan" || (inv.status !== "open" && inv.status !== "waiting")) throw new ApiError("illegal_transition");
     await q.query(`UPDATE core.investigation SET plan_approved_by = $2, stop_reason = NULL WHERE id = $1`, [id, m.member_id]);
@@ -125,6 +137,7 @@ async function runPlan(deps: Deps, approver: Member, id: string, step: StepFn): 
       });
       return m;
     }
+    if ((await svc(deps, approver.tenant_id, (q) => ceilingFor(q, m!.role))) === "step") return stop(deps, m, id, "scope");
     const cap = await svc(deps, approver.tenant_id, (q) => effectiveCap(q));
     if (!cap || cap.left_minor <= 0) return stop(deps, m, id, "budget");
     try {

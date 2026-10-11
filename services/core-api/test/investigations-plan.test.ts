@@ -223,11 +223,11 @@ describe("T-089a create: the mode is checked against the role's ceiling", () => 
     expect(await count(`SELECT count(*) n FROM core.investigation WHERE id = $1`, [id])).toBe(0);
     expect((await create(A, A.staffSub, "step")).status).toBe(201);
   });
-  it("auto: a manager → 403 (above plan); the owner (ceiling auto) → 422 until T-089b, 0 rows; plan → 201 with a preview", async () => {
+  it("auto: a manager → 403 (above plan); the owner (ceiling auto) → 201, a plan to approve as Auto (T-089b); plan → 201 with a preview", async () => {
     expect((await create(A, A.managerSub, "auto")).status).toBe(403);
     const id = uuidv7();
-    expect((await create(A, A.ownerSub, "auto", {}, id)).status).toBe(422);
-    expect(await count(`SELECT count(*) n FROM core.investigation WHERE id = $1`, [id])).toBe(0);
+    expect((await create(A, A.ownerSub, "auto", {}, id)).status).toBe(201);
+    expect(await count(`SELECT count(*) n FROM core.investigation WHERE id = $1 AND mode = 'plan' AND plan_approved_by IS NULL`, [id])).toBe(1);
     const p = await create(A, A.ownerSub, "plan");
     const v = InvestigationView.parse(await p.json());
     expect([p.status, v.mode, v.plan?.approved_by, v.steps_done]).toEqual([201, "plan", null, 0]);

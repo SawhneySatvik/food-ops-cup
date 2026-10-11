@@ -30,6 +30,8 @@ export interface MintInput {
   trigger: RunTrigger;
   /** "watcher:<pack>" | "brief" | a member id (04-agent-framework §1). */
   actor: string;
+  /** auto_step only (0020 run_grant_iff_auto_step): the standing grant the run acts under. Not a token claim. */
+  grantId?: string;
 }
 export type VerifyResult =
   | { ok: true; claims: RunTokenClaims }
@@ -97,9 +99,9 @@ export async function mintRunTokenIn(c: Queryable, deps: RunTokenKeys & { now?: 
     exp: iat + ttlSeconds(input.trigger),
   });
   await c.query(
-    `INSERT INTO intel.run (tenant_id, id, trigger, actor, outlet_scope, issued_at, expires_at)
-     VALUES ($1, $2, $3, $4, $5, to_timestamp($6), to_timestamp($7))`,
-    [claims.tenant_id, claims.run_id, claims.trigger, claims.actor, claims.outlet_scope, claims.iat, claims.exp],
+    `INSERT INTO intel.run (tenant_id, id, trigger, actor, outlet_scope, issued_at, expires_at, grant_id)
+     VALUES ($1, $2, $3, $4, $5, to_timestamp($6), to_timestamp($7), $8)`,
+    [claims.tenant_id, claims.run_id, claims.trigger, claims.actor, claims.outlet_scope, claims.iat, claims.exp, input.grantId ?? null],
   );
   return { token: signJwt(claims, deps.privateKey), claims };
 }

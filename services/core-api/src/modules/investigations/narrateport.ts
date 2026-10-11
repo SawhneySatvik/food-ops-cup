@@ -16,7 +16,8 @@ export interface HttpNarratePortOptions {
 }
 
 export function createHttpNarratePort(o: HttpNarratePortOptions): NarratePort {
-  const endpoint = new URL("investigate:narrate", o.url.endsWith("/") ? o.url : `${o.url}/`).toString();
+  // "./": a bare "investigate:narrate" parses as an absolute URL whose scheme is `investigate:` (R-D, review W3 close).
+  const endpoint = new URL("./investigate:narrate", o.url.endsWith("/") ? o.url : `${o.url}/`).toString();
   const doFetch = o.fetch ?? fetch;
   const timeoutMs = o.timeoutMs ?? NARRATE_TIMEOUT_MS;
   return async (runToken, body) => {

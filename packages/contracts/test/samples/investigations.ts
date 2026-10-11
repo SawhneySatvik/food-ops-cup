@@ -25,7 +25,7 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "v1.investigation.continue.request": { step_no: 2 },
   "v1.investigation.cancel.request": {},
-  "v1.investigation.approve-plan.request": {},
+  "v1.investigation.approve-plan.request": { mode: "auto" },
   "v1.investigations.response": { items: [item], next_cursor: null },
   "v1.investigation": {
     investigation_id: u(130), playbook_id: "margin_fall", params: { period_month: "2026-09-01", compare_month: "2026-08-01" }, outlet_scope: ["*"],

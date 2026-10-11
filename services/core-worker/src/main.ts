@@ -10,6 +10,8 @@
 //   Intel      intelHttp → intel's base URL with the service secret.
 //   Imports    importParseJob (T-030) on the same munim_svc pool, reading uploads from the blob store core-api
 //              writes (both entries build it from config.runDir).
+//   Auto       autoImportJob / autoDailyJob (T-089b) on the same pool: Auto investigation steps under their standing
+//              grant, narrated through intel's /investigate:narrate with the step's auto_step run token.
 import { join, resolve } from "node:path";
 import type pg from "pg";
 import { createLogger, loadRepoConfig } from "../../../packages/config/src/index.ts";
@@ -18,12 +20,14 @@ import { createHttpPublisher } from "../../core-api/src/dev-root.ts";
 import { loadContracts } from "../../core-api/src/lib/contracts.ts";
 import { createPool } from "../../core-api/src/lib/db.ts";
 import { blobs as defaultBlobs, type BlobStore, localBlobStore } from "../../core-api/src/modules/imports/index.ts";
+import { createHttpNarratePort } from "../../core-api/src/modules/investigations/index.ts";
 import { endRun, loadRunTokenKeys, mintRunToken, type RunTokenKeys, type SvcTx } from "../../core-api/src/runtoken/index.ts";
 import { ensureDevRunTokenKeys } from "../../core-api/src/runtoken/keys.ts";
 import { svcTxOf } from "../../core-api/src/server.ts";
 import { jsonLog, PoisonRowError, type Clock, type Log, type OutboxRow, type Publisher, type RunTokenMinter } from "./ports.ts";
 import { intelHttp } from "./fanout.ts";
 import { importParseJob } from "./imports/index.ts";
+import { autoDailyJob, autoImportJob } from "./investigations/index.ts";
 import { runUntilSignal } from "./process.ts";
 import { Worker } from "./worker.ts";
 
@@ -81,6 +85,8 @@ export function composeWorker(w: WorkerWiring): { worker: Worker; pool: pg.Pool;
     ...(w.clock ? { clock: w.clock } : {}),
   });
   worker.cron.add(importParseJob({ pool, blobs: w.blobs ?? defaultBlobs(), log }));
+  const auto = { pool, keys, narrate: createHttpNarratePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }), log };
+  worker.cron.add(autoImportJob(auto)).add(autoDailyJob(auto));
   return { worker, pool, close: () => pool.end() };
 }
 

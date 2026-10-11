@@ -6,13 +6,17 @@
 //   GET  /v1/investigations/{id}               → the investigation with its steps (and its plan preview in Plan mode)
 //   POST /v1/investigations/{id}:continue      {step_no} → 200 (runs exactly that step)
 //   POST /v1/investigations/{id}:cancel        {} → 200 (cancelled; any later :continue → 409)
-//   POST /v1/investigations/{id}:approve-plan  {} → 200 after the approved steps ran, inside this request (≤ max_steps)
+//   POST /v1/investigations/{id}:approve-plan  {mode?} → 200 after the approved steps ran, inside this request (≤ max_steps)
 // Mode (F10): the creator picks it within their role's ceiling (core.ai_policy, T-090; above it → 403
-// `mode_above_ceiling`). `auto` is T-089b's: refused at create until then. A Plan-mode investigation shows a preview —
+// `mode_above_ceiling`). A Plan-mode investigation shows a preview —
 // its checklist items, the specialists involved and the estimated AI cost as a snapshot ref of
 // `intel.investigation_cost_estimate`, labelled "estimate (computed)" — and runs once its creator approves it. The steps
 // stop at `waiting`, an abstained narration, the budget or a scope change (`stop_reason`); a member's `:continue`
 // resumes at `steps_done + 1`. Progress streams on `inbox:<tenant>` as `inbox.investigation` events (ids and status).
+// Auto (T-089b; F10, F11 O-1) is Plan approved with `{mode: "auto"}`: the approval also gives the creator's standing
+// grant, and core-worker then resumes the investigation (steps `triggered_by: "auto"`) when an approved import can
+// complete what it waits on, and daily — re-checking the creator's current scope (else cancelled), the role ceiling
+// and the month's AI budget before every step. `mode: "auto"` at create opens the plan (shown as `plan` until approved).
 // Idempotency without a command log (0020's rows are operational): the client names the investigation id and the
 // step it means. The same id / step again by the same member is a replay (`X-Munim-Replayed: true`, the current
 // view); another body under that id → 409 `idempotency_conflict`; a step number that is not the next → 409
@@ -30,6 +34,11 @@ export const PlaybookId = z.enum(["margin_fall"]);
 export const ItemStatus = z.enum(["pending", "supported", "refuted", "cannot_verify"]);
 export const InvestigationStatus = z.enum(["open", "waiting", "done", "no_driver_found", "cannot_verify", "cancelled", "exhausted"]);
 export const InvestigationMode = z.enum(["step", "plan", "auto"]);
+/** As shown to a viewer (R-D "redact per viewer"): an item whose template is above the viewer's role, or whose verdict
+ *  snapshots do not open for them, is `restricted` (no verdict, refs or narration); the investigation's own status is
+ *  `restricted` unless the viewer may open every template its playbook judges on. */
+export const ShownItemStatus = z.enum([...ItemStatus.options, "restricted"]);
+export const ShownInvestigationStatus = z.enum([...InvestigationStatus.options, "restricted"]);
 /** Why a Plan (or Auto) run stopped; null while it runs, or when it ended in a terminal status. `draft` is reserved:
  *  investigations create no drafts and no draft linking exists in v1 (ADR-014 §7.2), so nothing records it yet. */
 export const StopReason = z.enum(["draft", "abstain", "budget", "scope", "waiting"]);
@@ -48,7 +57,7 @@ export const CreateInvestigationRequest = z.strictObject({
   params: MarginFallParams,
   /** Omitted → the creator's whole outlet scope. Must lie inside it (else 404). */
   outlet_scope: OutletScope.optional(),
-  /** Omitted → `step`. Above the creator's role ceiling → 403 `mode_above_ceiling`; `auto` is refused until T-089b. */
+  /** Omitted → `step`. Above the creator's role ceiling → 403 `mode_above_ceiling`. `auto` opens a plan to approve as Auto. */
   mode: InvestigationMode.optional(),
 });
 
@@ -57,9 +66,12 @@ export const ContinueInvestigationRequest = z.strictObject({
   step_no: z.int().min(1).max(10),
 });
 
-/** `:cancel` and `:approve-plan` carry no fields: the investigation id is the key, and both are set once. */
+/** `:cancel` carries no fields and `:approve-plan` only the mode: the investigation id is the key, and both are set once. */
 export const CancelInvestigationRequest = z.strictObject({});
-export const ApprovePlanRequest = z.strictObject({});
+export const ApprovePlanRequest = z.strictObject({
+  /** Omitted → `plan`. `auto` needs the role's ceiling at `auto` (403) and an unapproved plan (an approved Plan → 409). */
+  mode: z.enum(["plan", "auto"]).optional(),
+});
 
 /** "{Specialist}" on an item or a narrated segment, composed by core from the playbook (intel never sends it). */
 export const ItemSignature = z.strictObject({
@@ -73,7 +85,7 @@ export const ChecklistItemView = z.strictObject({
   label_key: z.string().min(1),
   specialist: SpecialistId,
   signature: ItemSignature,
-  status: ItemStatus,
+  status: ShownItemStatus,
   /** A supported item is frozen; only the final re-mint before `done` judges it again. */
   frozen: z.boolean(),
   /** The snapshots its last verdict was judged on. */
@@ -85,8 +97,8 @@ export const ChecklistItemView = z.strictObject({
 export const ItemUpdate = z.strictObject({
   item_id: Slug,
   specialist: SpecialistId,
-  from: ItemStatus,
-  to: ItemStatus,
+  from: ShownItemStatus,
+  to: ShownItemStatus,
   frozen: z.boolean(),
   /** A frozen item whose verdict flipped at the final re-mint (ADR-014 §7.4). */
   reopened: z.boolean(),
@@ -112,15 +124,17 @@ export const StepView = z.strictObject({
   narration: StepNarration.nullable(),
 });
 
-/** The estimated AI cost of a plan: cells of an `intel.investigation_cost_estimate` snapshot minted for the creator
- *  when the plan was opened (never a typed number; values in the view's `resolved_refs`). `cannot_verify` (refs null)
- *  when the template has no row — no narrated step of this playbook has recorded spend yet — or is above the
+/** The estimated AI cost of a plan: cells of an `intel.investigation_cost_estimate` snapshot (v2, 0025) minted for the
+ *  creator when the plan was opened (never a typed number; values in the view's `resolved_refs`). `cannot_verify` (refs
+ *  null) when the template has no row — no run-linked step of this playbook has recorded spend yet — or is above the
  *  creator's role. */
 export const PlanEstimate = z.strictObject({
   label: z.literal("estimate (computed)"),
   status: z.enum(["computed", "cannot_verify"]),
   snapshot_id: Uuid7.nullable(),
-  /** `estimate_minor`: per-step spend history × the checklist items not yet frozen. */
+  /** `estimate_minor` = `per_step_minor` × `remaining_steps`: the average spend of a run-linked step of this playbook
+   *  (steps with no spend count as 0) × the expected remaining steps (max_steps − steps done, capped by the checklist
+   *  items not yet frozen; 0 once the investigation is terminal). One step judges every evaluable item in one call. */
   estimate_ref: SnapCellRef.nullable(),
   currency_ref: SnapCellRef.nullable(),
 });
@@ -142,7 +156,7 @@ export const InvestigationItem = z.strictObject({
   params: MarginFallParams,
   outlet_scope: OutletScope,
   mode: InvestigationMode,
-  status: InvestigationStatus,
+  status: ShownInvestigationStatus,
   stop_reason: StopReason.nullable(),
   created_by: Uuid7,
   steps_done: z.int().min(0),
@@ -239,7 +253,7 @@ export const ROUTES: readonly Route[] = [
   },
   {
     surface: "public", method: "post", path: "/v1/investigations/{id}:approve-plan", operationId: "approveInvestigationPlan",
-    summary: "Approve a Plan-mode investigation (its creator, within the role's ceiling) and run its steps inside this request until a stop",
+    summary: "Approve a Plan-mode investigation (its creator, within the role's ceiling), as Plan or Auto, and run its steps inside this request until a stop",
     auth: "member", request: "v1.investigation.approve-plan.request", response: "v1.investigation", status: 200, pathParams: ID, conflict: true,
   },
 ];
