@@ -1,0 +1,33 @@
+{
+  "_about": "T-082a gate 1: hand-labelled questions. `cap` is copied by hand from ADR-014 §3.4 / §6.1 (orchestrator ≤ 24k, branch ≤ 16k input tokens per call), never from the code. `skills` are the skills the Manager (or the branch) has loaded; `reads` is how many read results (one synthetic 50-row page of each skill template in turn) sit in the history; `thread`, `investigation` and `hints` say which run blocks are present; `propose` marks a draft_request (proposal tools bound, one skill). Rows marked heavy are over the cap without compaction (§6.2).",
+  "questions": [
+    {"id": "q01", "kind": "orchestrator", "cap": 24000, "skills": ["finance"], "reads": 2, "thread": false, "investigation": false, "hints": 3,
+     "question": "Why was last week's Swiggy payout short at Indiranagar?"},
+    {"id": "q02", "kind": "orchestrator", "cap": 24000, "skills": ["catalogue", "kitchen"], "reads": 4, "thread": false, "investigation": false, "hints": 10,
+     "question": "Which dishes lost margin this month, and is the kitchen over-prepping them?"},
+    {"id": "q03", "kind": "orchestrator", "cap": 24000, "skills": ["inventory_purchasing"], "reads": 9, "thread": false, "investigation": false, "hints": 5,
+     "question": "Is any supplier creeping its prices on paneer or oil since August?", "heavy": true},
+    {"id": "q04", "kind": "orchestrator", "cap": 24000, "skills": ["people", "finance"], "reads": 12, "thread": true, "investigation": true, "hints": 10,
+     "question": "Why did margin fall this month, and how much of it is overtime?", "heavy": true},
+    {"id": "q05", "kind": "orchestrator", "cap": 24000, "skills": ["customers"], "reads": 1, "thread": true, "investigation": false, "hints": 0,
+     "question": "@Customers which regulars stopped ordering in the last six weeks?"},
+    {"id": "q06", "kind": "orchestrator", "cap": 24000, "skills": ["compliance", "market"], "reads": 3, "thread": false, "investigation": false, "hints": 4,
+     "question": "Which licences expire before Diwali, and is there an event week we should staff for?"},
+    {"id": "q07", "kind": "orchestrator", "cap": 24000, "skills": [], "reads": 0, "thread": true, "investigation": false, "hints": 10,
+     "question": "What should I look at first this morning?"},
+    {"id": "q08", "kind": "orchestrator", "cap": 24000, "skills": ["kitchen"], "reads": 6, "thread": true, "investigation": true, "hints": 2,
+     "question": "@Kitchen why are Friday dinner tickets slower than last month?"},
+    {"id": "q09", "kind": "branch", "cap": 16000, "skills": ["finance"], "reads": 7, "thread": false, "investigation": true, "hints": 0,
+     "question": "Branch brief: finance view of the margin drop this month, settlement and tender gaps only.", "heavy": true},
+    {"id": "q10", "kind": "branch", "cap": 16000, "skills": ["kitchen"], "reads": 2, "thread": false, "investigation": false, "hints": 0,
+     "question": "Branch brief: kitchen view of overprep for the top dishes this week."},
+    {"id": "q11", "kind": "branch", "cap": 16000, "skills": ["inventory_purchasing"], "reads": 6, "thread": false, "investigation": true, "hints": 0,
+     "question": "Branch brief: purchasing view of ingredient cost drift behind the margin drop.", "heavy": true},
+    {"id": "q12", "kind": "branch", "cap": 16000, "skills": ["people"], "reads": 3, "thread": false, "investigation": false, "hints": 0,
+     "question": "Branch brief: labour hours against demand for the weekend slots."},
+    {"id": "q13", "kind": "orchestrator", "cap": 24000, "skills": ["inventory_purchasing"], "propose": true, "reads": 8, "thread": true, "investigation": false, "hints": 10,
+     "question": "Draft a purchase order for next week's oil and paneer from the cheapest simulated supplier.", "heavy": true},
+    {"id": "q14", "kind": "orchestrator", "cap": 24000, "skills": ["finance"], "propose": true, "reads": 3, "thread": false, "investigation": true, "hints": 3,
+     "question": "Draft a dispute for the short Swiggy payout at Indiranagar."}
+  ]
+}
