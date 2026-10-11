@@ -132,6 +132,14 @@ class HandleTable:
             return self.ref(handle)[len(SNAP_OPEN) : -len(SNAP_CLOSE)].removeprefix("cite:").split(DOT)[0]
         return f"snap:{self.snapshot_id(handle)}"
 
+    def has_cell(self, snapshot_id: str, row: int, column: str) -> bool | None:
+        """Whether a snapshot minted in this run has that row and column; None when this run did not mint it."""
+        h = self._snapshot_handle.get(snapshot_id)
+        if h is None:
+            return None
+        snap = self.snapshot(h)
+        return 0 <= row < len(snap["rows"]) and column in {c["name"] for c in snap["columns"]}
+
     def literal_id(self, handle: str) -> str:
         """The uuid a cell handle holds (the model never types an id)."""
         snap, row, col, typ = self._cell(handle)

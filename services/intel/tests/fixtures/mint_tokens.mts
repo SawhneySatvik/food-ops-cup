@@ -22,7 +22,7 @@ function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope:
     tenant_id: tenant,
     outlet_scope: outletScope,
     trigger,
-    actor: trigger === "ask" || trigger === "ingest" ? uuidv7() : trigger === "brief" ? "brief" : "watcher:smoke",
+    actor: trigger === "ask" || trigger === "ingest" || trigger === "auto_step" ? uuidv7() : trigger === "brief" ? "brief" : "watcher:smoke",
     iat,
     exp: iat + ttlSeconds(trigger),
   });
@@ -32,6 +32,8 @@ const valid = claims(tenantA, "event", ["*"]);
 const ask = claims(tenantA, "ask", [outlet]);
 const brief = claims(tenantA, "brief", ["*"]);
 const ingest = claims(tenantA, "ingest", [outlet]);
+// Auto mode's worker narrates each investigation step under an auto_step run (T-089b).
+const autoStep = claims(tenantA, "auto_step", [outlet]);
 const expired = claims(tenantA, "event", ["*"], nowS - 3 * 3600);
 const validToken = signJwt(valid, core.privateKey);
 const [h, , s] = validToken.split(".") as [string, string, string];
@@ -44,12 +46,13 @@ console.log(JSON.stringify({
   tenant_a: tenantA,
   tenant_b: tenantB,
   outlet,
-  claims: { valid, ask, brief, ingest },
+  claims: { valid, ask, brief, ingest, auto_step: autoStep },
   tokens: {
     valid: validToken,
     ask: signJwt(ask, core.privateKey),
     brief: signJwt(brief, core.privateKey),
     ingest: signJwt(ingest, core.privateKey),
+    auto_step: signJwt(autoStep, core.privateKey),
     expired: signJwt(expired, core.privateKey),
     other_key: signJwt(valid, other.privateKey),
     tampered_to_b: `${h}.${toB}.${s}`,

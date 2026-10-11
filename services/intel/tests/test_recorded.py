@@ -56,6 +56,7 @@ def test_placeholders_in_a_fixture_come_back_as_this_requests_ids(tmp_path: Path
     assert asyncio.run(first_text()) == f"run {RUN_B}"
 
 
+@pytest.mark.fixture_miss_expected
 def test_a_missing_fixture_fails_the_run_naming_its_key(cfg: Config, tmp_path: Path) -> None:
     ctx = RunContext(RUN_A, "01920000-0000-7000-8000-000000000002", ("*",), "ask", "brief", 2_000_000_000, "t.t.t")
     agent = LlmAgent(name="nofixture", model=RecordedLlm(model="recorded/router", fixtures_dir=tmp_path), instruction="x")

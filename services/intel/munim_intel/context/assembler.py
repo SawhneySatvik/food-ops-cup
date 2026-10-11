@@ -52,11 +52,11 @@ CALL_CAPS: dict[RunKind, int] = {"orchestrator": 24_000, "branch": 16_000}
 #: §6.1 shared-prefix rule: constant names; the pack rides in the trace actor label, never here.
 AGENT_NAME: dict[RunKind, str] = {"orchestrator": "munim", "branch": "munim_branch"}
 #: §6.1 block budgets (tokens) for the blocks built here.
-BLOCK_CAPS = {"5": 600, "6": 1_500, "6b": 1_500, "7": 1_000}
+BLOCK_CAPS = {"5": 600, "6": 1_500, "7": 1_000}
 #: §6.2: compaction starts at 70 % of the per-call cap.
 COMPACT_AT = 0.7
-#: §6.1 block 6: the last 2 untainted step summaries; block 6b: the last ≤ 3 turns; block 7: ≤ 10 findings.
-STEP_SUMMARIES, THREAD_TURNS, HINTS = 2, 3, 10
+#: §6.1 block 6: the last 2 untainted step summaries; block 7: ≤ 10 findings.
+STEP_SUMMARIES, HINTS = 2, 10
 #: Tool results at most this long stay whole when compacting (load_skill's, an error, a small graph result).
 SMALL_RESULT_CHARS = 400
 
@@ -165,17 +165,15 @@ def investigation_block(inv: Investigation | None, handles: HandleTable) -> str:
 
 
 def thread_block(thread: ThreadsBlock | None) -> str:
-    """Block 6b: the rolling cited summary (refs of earlier untainted answers' segments) and the last ≤ 3 turns by id.
-    No answer is re-read (§6.4 rule 4) and no older turn is named: a summary segment carries its refs only, so a turn
-    older than the last three contributes nothing but what it cited. Over the cap, the oldest segments go first."""
-    if thread is None:
+    """Block 6b: that this ask follows earlier turns — no turn id and no ref (R-E 3). ADR-014 §5.7: the model never
+    types or reads a UUID, and an earlier turn's ref could not be cited in this run anyway (submit_answer takes handles
+    minted in the run); no answer is re-read (§6.4 rule 4). The first turn of a thread has no block."""
+    if thread is None or not (thread.last_turn_ids or thread.summary_refs):
         return ""
-    turns = [str(t.root) for t in thread.last_turn_ids][-THREAD_TURNS:]
-    head = "Thread so far (earlier answers are not shown; only what they cited):"
-    tail = f"- last turns: {', '.join(turns)}" if turns else "- no earlier turns"
-    lines = [f"- earlier answer cited: {' '.join(r.root for r in s.refs)}" for s in thread.summary_refs]
-    kept = _fit(head, [*lines, tail], BLOCK_CAPS["6b"], keep="last")
-    return kept if kept.endswith(tail) else "\n".join([head, tail])
+    return (
+        "Thread so far: this question follows earlier turns of the conversation. Earlier answers are not shown and their "
+        "evidence is not carried over: read it again with your tools to cite it."
+    )
 
 
 def hints_block(hints: Sequence[FindingHint], handles: HandleTable) -> str:

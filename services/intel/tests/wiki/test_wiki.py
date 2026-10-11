@@ -78,6 +78,9 @@ async def test_a_planted_uncited_sentence_is_dropped() -> None:
         "They are reliable ⟨snap:" + SNAP + "·0·margin_minor⟩.",  # a real-looking cell this page does not hold
         'They say "cheap" {C1}.',  # a typed quotation
         "They cost 100% less {C1}.",
+        "They are seven times cheaper {C1}.",  # R-E 1-A: a number word (core's grammar)
+        "They spend {K1}k a month.",  # R-E 1-A: a magnitude suffix after the expanded ref
+        f"They are reliable ⟨cite:claim:{vid(0xC1)}⟩.",  # a ref the page holds, but typed by the model, not a handle
     ],
 )
 @aio
@@ -188,6 +191,8 @@ async def test_recorded_prose_is_cited_and_untrusted_text_reaches_neither_the_mo
     assert CANARY not in json.dumps(sink.pages, ensure_ascii=False).split('"title"')[0]  # not in any body
     assert [p["title"] for p in sink.pages] == [e.name]  # plain letters: shown (titles are not grammar-checked by core)
     assert P.title(dataclasses.replace(e, name="Shop 7 <b>")) == "Supplier"  # anything else: the kind alone
+    assert P.title(dataclasses.replace(e, name="Seven Spice Traders")) == "Supplier"  # a number word fails the grammar
+    assert P.title(dataclasses.replace(e, name="Spice Traders")) == "Spice Traders"  # paired accept
 
 
 @aio
@@ -202,6 +207,7 @@ async def test_out_of_budget_means_template_only_and_no_model_call(tmp_path: Pat
     assert r.stored == 1 and texts(sink, vid(1))[1].startswith("The records hold a claim")
 
 
+@pytest.mark.fixture_miss_expected
 @aio
 async def test_a_model_that_fails_degrades_to_the_template_page(tmp_path: Path) -> None:
     ctx, cfg, state = harness(tmp_path)

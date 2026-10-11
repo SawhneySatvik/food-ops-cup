@@ -37,9 +37,10 @@ from google.genai.errors import ClientError
 
 from munim_intel.config import Config
 from munim_intel.decide.port import DecisionQuestion, DecisionResult, DecisionState, egress_payload, finish
-from munim_intel.llm import ModelRoleSource, llm_for_role
+from munim_intel.llm import ModelRoleSource, llm_for_role, provider_of
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.spend import Usage, estimate_input_tokens
 
 CODES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -157,9 +158,12 @@ class LlmMimic:
         codes = codes_for(q)
         calls = 1
         last, rejected = await self._call(req)
+        usage = [_usage(req, last)]
         if rejected and q.use_unscored:
             calls = 2
-            last, _ = await self._call(build_request(self._llm, q, state, logprobs=False))
+            retry = build_request(self._llm, q, state, logprobs=False)
+            last, _ = await self._call(retry)
+            usage.append(_usage(retry, last))
         ms = int((time.monotonic() - started) * 1000)
         tokens = (last.usage_metadata.prompt_token_count or 0) if last is not None and last.usage_metadata else 0
 
@@ -175,6 +179,8 @@ class LlmMimic:
                 error=error,
                 unscorable=unscorable,
                 model_calls=calls,
+                call_usage=tuple(usage),
+                provider=provider_of(self._llm),
             )
 
         if rejected and not q.use_unscored:
@@ -187,6 +193,14 @@ class LlmMimic:
             return done(None, None)
         probs = probabilities(last, code, list(codes))
         return done(codes[code], None if probs is None else {codes[k]: v for k, v in probs.items()})
+
+
+def _usage(req: LlmRequest, resp: LlmResponse | None) -> Usage:
+    """One call's spend row: the provider's count, or the request-size estimate when it reported none (or failed)."""
+    u = resp.usage_metadata if resp is not None else None
+    if u is None or u.prompt_token_count is None:
+        return Usage(estimate_input_tokens(req), 0, estimated=True)
+    return Usage(u.prompt_token_count, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0))
 
 
 async def router_decision_model(cfg: Config, roles: ModelRoleSource) -> LlmMimic:

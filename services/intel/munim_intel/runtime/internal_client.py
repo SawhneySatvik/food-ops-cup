@@ -36,6 +36,7 @@ from munim_intel.contracts_gen.models import (
     InternalGraphQueryResponse,
     InternalQuotesBatchRequest,
     InternalSnapshotsRequest,
+    InternalSpendRequest,
     InternalTracesBatchRequest,
     InternalTracesBatchResponse,
     InternalWatchClaimRequest,
@@ -154,6 +155,11 @@ class InternalClient:
 
     async def write_wiki(self, req: InternalWikiBatchRequest) -> InternalWikiBatchResponse:
         return await self._post("wiki:batch", req, InternalWikiBatchResponse)
+
+    async def write_spend(self, req: InternalSpendRequest) -> InternalBatchResponse:
+        """Model spend, one row per provider call (trace/spend.py). core stamps `at` and always records it, past the cap
+        too; the currency must be the month's budget currency."""
+        return await self._post("spend", req, InternalBatchResponse)
 
     async def graph_query(self, template: str, args: dict[str, str | int]) -> list[dict[str, str | int | None]]:
         """One core-owned graph template under the run's tenant (core binds it from the token; never an argument).

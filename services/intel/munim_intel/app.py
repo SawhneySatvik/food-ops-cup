@@ -10,7 +10,8 @@
               intel the document's text, so nothing is read or written here (W4)
 /ask          core's AskPort (T-088a; T-082b): one Manager ask under an `ask` run token → {answer_id, tainted}; the answer
               is stored through core's internal API under core's answer id, before this returns
-/investigate:narrate  core's NarratePort (T-083): one investigation step's narration under an `ask` run token → {answer_id,
+/investigate:narrate  core's NarratePort (T-083): one investigation step's narration under an `ask` run token (Step and Plan
+              mode) or an `auto_step` one (Auto mode's worker, T-089b) → {answer_id,
               tainted, source}; at most one L1 call with no tools; the answer is stored under core's answer id first
 /smoke        one trivial recorded ADK run through the echo tool: RunContext end to end
 
@@ -39,7 +40,7 @@ from munim_intel.config import Config, ConfigError
 from munim_intel.contracts_gen.models import Cloudevent, InvestigationsNarrateRequest, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
 from munim_intel.investigate import narrate_step
-from munim_intel.llm import llm_for_role
+from munim_intel.llm import llm_for_role, provider_of
 from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
@@ -48,6 +49,7 @@ from munim_intel.runtime.runner import RunFailed
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.smoke import smoke_run
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.spend import Meter, SpendBuffer
 from munim_intel.watch import sweep
 from munim_intel.watch.frame import Frame, FrameSource, core_frame_source
 from munim_intel.watch.pipeline import Report
@@ -144,16 +146,19 @@ def create_app(
         for event, ctx in runs:
 
             async def one(
-                client: InternalClient, frame: Frame, llm: BaseLlm | None, e: Cloudevent = event, c: RunContext = ctx
+                client: InternalClient, frame: Frame, llm: BaseLlm | None, meter: Meter | None, e: Cloudevent = event, c: RunContext = ctx
             ) -> Report | None:
-                return await handle_event(e, c, client, frame, cfg, llm=llm)
+                return await handle_event(e, c, client, frame, cfg, llm=llm, meter=meter)
 
             await watch(ctx, one)
         log.info("intel: /events handled %s", [e.id.root for e in batch])
         return JSONResponse({"accepted": len(batch)}, status_code=202)
 
-    async def watch(ctx: RunContext, work: Callable[[InternalClient, Frame, BaseLlm | None], Awaitable[Report | None]]) -> dict[str, Any]:
-        """One watcher run: its Frame (or nothing, fail closed), the narrate model when the Frame allows it, the work."""
+    async def watch(
+        ctx: RunContext, work: Callable[[InternalClient, Frame, BaseLlm | None, Meter | None], Awaitable[Report | None]]
+    ) -> dict[str, Any]:
+        """One watcher run: its Frame (or nothing, fail closed), the narrate model when the Frame allows it and the meter
+        its calls are charged to, the work."""
         frame = await frame_of(ctx)
         if frame is None:
             log.info("intel: run %s frame_unavailable", ctx.run_id)
@@ -167,7 +172,10 @@ def create_app(
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
                     # Rule 11: AI surfaces degrade to the template, never to an error.
                     log.warning("intel: run %s narrates by template: %s", ctx.run_id, type(e).__name__)
-            report = await work(client, frame, llm)
+            meter = None
+            if llm is not None:
+                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model)
+            report = await work(client, frame, llm, meter)
         except (CoreError, httpx.HTTPError) as e:
             log.error("intel: watch run %s failed: %s", ctx.run_id, type(e).__name__)
             return {"status": "failed"}
@@ -179,8 +187,8 @@ def create_app(
     async def watch_sweep(request: Request) -> Response:
         ctx = run_context(request)
 
-        async def run(client: InternalClient, frame: Frame, llm: BaseLlm | None) -> Report:
-            return await sweep(ctx, client, frame, cfg, llm=llm)
+        async def run(client: InternalClient, frame: Frame, llm: BaseLlm | None, meter: Meter | None) -> Report:
+            return await sweep(ctx, client, frame, cfg, llm=llm, meter=meter)
 
         out = await watch(ctx, run)
         return JSONResponse({"run_id": ctx.run_id, **out}, status_code=202)
@@ -213,8 +221,11 @@ def create_app(
                 )
                 for i in (await client.brief_items()).items
             ]
-            # One model call for the whole brief; run_agent flushes the traces before it returns.
-            state = RunState(traces=TraceBuffer(client.write_traces), budget=Budget(max_model_calls=1, max_tool_calls=0))
+            # One model call for the whole brief; run_agent flushes the traces and the call's spend row before it returns.
+            meter = None
+            if llm is not None and frame is not None:
+                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model)
+            state = RunState(traces=TraceBuffer(client.write_traces), budget=Budget(max_model_calls=1, max_tool_calls=0), meter=meter)
             report = await compile_brief(items, CoreAnswerSink(client), ctx=ctx, llm=llm, cfg=cfg, state=state)
         except (CoreError, httpx.HTTPError) as e:
             log.error("intel: brief run %s failed: %s", ctx.run_id, type(e).__name__)
@@ -247,8 +258,8 @@ def create_app(
             return _error(503, "unavailable")
         client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
         try:
-            out = await answer_ask(ctx, req, frame, client, cfg, await models_of(client))
-        except (CoreError, httpx.HTTPError, ProviderUnavailable) as e:
+            out = await answer_ask(ctx, req, frame, client, cfg, models_of)
+        except (CoreError, httpx.HTTPError) as e:
             # Nothing usable was stored: core answers its member 503 and writes no turn.
             log.error("intel: ask run %s failed: %s", ctx.run_id, type(e).__name__)
             return _error(502, "internal")
@@ -259,8 +270,8 @@ def create_app(
     @app.post("/investigate:narrate")
     async def investigate_narrate(request: Request) -> Response:
         ctx = run_context(request)
-        # Only an ask token (core mints one per step, actor = the member) buys a narration.
-        if ctx.trigger != "ask":
+        # Only an ask token (core mints one per step, actor = the member) or Auto mode's auto_step token buys a narration.
+        if ctx.trigger not in ("ask", "auto_step"):
             return _error(401, "unauthenticated")
         try:
             req = InvestigationsNarrateRequest.model_validate(await json_body(request))

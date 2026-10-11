@@ -6,11 +6,15 @@ No signature text ever leaves intel: core composes "{Specialist} · via Manager"
 
   1. `@Kitchen` (any specialist off for every outlet kind in scope) → abstain not_applicable, no model call;
   2. AI off or the month's budget spent (run-frame `narration` ≠ model, the typed kill switch) → abstain model_blocked,
-     no model call (rule 11: degrade, never error);
+     no model call (rule 11: degrade, never error). The models are resolved only after these two exits (R-E 2-A): a role
+     that cannot be built (no key, a retired id, model roles unreadable) is model_blocked too, never a 502;
   3. route.intent → path (paths.py); `certification_request` → abstain not_a_certificate, no model call;
   4. otherwise one Manager LlmAgent (`munim`) over the T-082a assembler and PackToolset, ending in submit_answer.
 Every exit stores an answer: a run that ends without a submission (budget fallback, the assembler's cap, a provider
 error) stores an abstention, `missing_ref` — the generic "cannot verify" (§5.3).
+
+Spend (W3 close ruling): one buffer per ask, in the month's budget currency; the route.intent calls (DecisionResult
+`call_usage`), the Manager's and every branch's calls are rows in it, posted before the answer is stored.
 
 Taint: a tainted thread starts the run tainted through the Assembler (T-082a, the one carry into RunState); the
 response returns RunState.tainted. An early exit runs nothing and returns the thread's own taint.
@@ -41,16 +45,18 @@ from munim_intel.decide.mimic import router_decision_model
 from munim_intel.decide.port import Band, DecisionModel, DecisionState, EgressRefused, answer_or_fallback
 from munim_intel.decide.questions import ROUTE_INTENT
 from munim_intel.fanout.tool import Branches, FanOutTool, orchestrator_budget
-from munim_intel.llm import llm_for_role
+from munim_intel.llm import llm_for_role, provider_of
+from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused
 from munim_intel.manager.paths import FAN_OUT, PATHS, Binding, bind, not_applicable
 from munim_intel.runtime.context import RunContext
-from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER, InternalClient
+from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
 from munim_intel.runtime.state import RunState
 from munim_intel.skills.loader import PackToolset
 from munim_intel.tools.answer import SubmitAnswerTool
 from munim_intel.tools.handles import HandleTable
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.spend import Meter, SpendBuffer, spend_currency
 
 log = logging.getLogger("munim_intel.manager")
 
@@ -98,14 +104,20 @@ def outlet_kinds(frame: InternalRunFrameResponse) -> tuple[str, ...]:
     return tuple(sorted({o.kind for o in frame.outlets}))
 
 
-async def route(ctx: RunContext, question: str, frame: InternalRunFrameResponse, decide: DecisionModel) -> tuple[str, Band]:
+async def route(
+    ctx: RunContext, question: str, frame: InternalRunFrameResponse, decide: DecisionModel, spend: SpendBuffer | None = None
+) -> tuple[str, Band]:
     """(intent, band). Abstained or below threshold → `explain` (§4.3); so is a question the egress check refuses to
-    send (e.g. a pasted id: no UUID leaves the process) — nothing is sent, the caller's fallback runs."""
+    send (e.g. a pasted id: no UUID leaves the process) — nothing is sent, the caller's fallback runs. Each provider call
+    the decision cost is a `router` row in `spend`."""
     state: DecisionState = {"question": question, "outlet_kinds": outlet_kinds(frame), "country": frame.pack.code}
     try:
         [result] = await decide.decide(ctx, state, [ROUTE_INTENT])
     except EgressRefused:
         return "explain", "low"
+    if spend is not None:
+        for usage in result.call_usage:
+            spend.add("router", result.provider, result.model_id, usage)
     return answer_or_fallback(ROUTE_INTENT, result) or "explain", result.band
 
 
@@ -126,12 +138,13 @@ def prepare(
     client: InternalClient,
     b: Binding,
     branches: Branches | None = None,
+    meter: Meter | None = None,
 ) -> Prepared:
     """The Manager's context for one ask: one RunState and HandleTable, submit_answer as the one base tool, the
     addressed skill loaded in code (no load_skill), propose tools only as the binding says. On the unaddressed
     `investigate` path, given `branches`, `fan_out` joins as a base tool (F5) and the run takes §3.4's fan-out
     orchestrator caps; an addressed investigate stays with the named specialist, single agent."""
-    state = RunState(traces=TraceBuffer(client.write_traces))
+    state = RunState(traces=TraceBuffer(client.write_traces), meter=meter)
     handles = HandleTable(state.handles)
     toolset: PackToolset
     submit = SubmitAnswerTool(req.answer_id.root, handles, lambda: [c for s in toolset.skills for c in s.refusal_codes])
@@ -164,10 +177,12 @@ async def answer_ask(
     frame: InternalRunFrameResponse,
     client: InternalClient,
     cfg: Config,
-    models: Models,
+    models: Models | ModelsFactory,
 ) -> ThreadsIntelAskResponse:
+    """`models`: the models, or the factory that builds them — called only once the ask needs a model (R-E 2-A)."""
     actor = f"specialist:{req.addressed_to}" if req.addressed_to else "manager"
     thread_tainted = req.thread is not None and req.thread.tainted
+    spend = SpendBuffer(client.write_spend, spend_currency(frame))
 
     async def early(code: str, labels: dict[str, str | list[str]]) -> ThreadsIntelAskResponse:
         traces = TraceBuffer(client.write_traces)
@@ -175,19 +190,28 @@ async def answer_ask(
             await traces.append("route", actor, labels)
         await traces.append("abstain", actor, {"reason": code})
         await traces.flush()
+        await spend.flush()
         return await _store(client, req, abstained(req, code), thread_tainted)
 
     if not_applicable(req.addressed_to, frozenset(outlet_kinds(frame))):
         return await early("not_applicable", {})
     if frame.narration != "model":
         return await early("model_blocked", {})
-    intent, band = await route(ctx, req.question, frame, models.decide)
+    if not isinstance(models, Models):
+        try:
+            models = await models(client)
+        except (ProviderUnavailable, RetiredModelRefused, CoreError, httpx.HTTPError) as e:
+            # Rule 11: a model that cannot be built is AI unavailable for this ask — an abstention, never a 502.
+            log.warning("intel: ask run %s has no model: %s", ctx.run_id, type(e).__name__)
+            return await early("model_blocked", {})
+    intent, band = await route(ctx, req.question, frame, models.decide, spend)
     b = bind(PATHS[intent], req.addressed_to)
     labels: dict[str, str | list[str]] = {"intent": intent, "band": band, "path": b.path.name}
     if b.abstain is not None:
         return await early(b.abstain, labels)
 
-    p = prepare(ctx, req, frame, client, b, Branches(models.reason, cfg))
+    meter = Meter(spend, "reason", provider_of(models.reason), models.reason.model)
+    p = prepare(ctx, req, frame, client, b, Branches(models.reason, cfg), meter)
     await p.state.traces.append("route", actor, labels)
     if b.skill is not None:
         await p.state.traces.append("skill_load", actor, {"skill": b.skill, "by": "addressed"})
@@ -204,4 +228,5 @@ async def answer_ask(
         # Rule 11: the ask degrades to "cannot verify"; the failure's class name only, never its text.
         log.warning("intel: ask run %s failed: %s", ctx.run_id, e.kind)
     envelope = p.submit.envelope or abstained(req, NO_ANSWER)
+    await spend.flush()
     return await _store(client, req, envelope, p.state.tainted)

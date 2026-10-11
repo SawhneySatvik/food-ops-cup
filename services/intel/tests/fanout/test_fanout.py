@@ -5,7 +5,7 @@ test_fanout_e2e.py.
 Expected values never come from the code under test:
   (1) labels.json is hand-written (its `_about` says how); the replies are synthetic, so this proves plumbing;
   (2) "parallel" = every branch started before any branch ended, read from the stored trace order (seq);
-  (3) the 16k per-call cap is ADR-014 §6.1's; the markers are the member's question and the thread's turn ids, which
+  (3) the 16k per-call cap is ADR-014 §6.1's; the markers are the member's question and the thread block's text, which
       only the Manager's context holds (positive control: the Manager's own request does hold them);
   (4) each branch's expected tools are `report` plus that skill's own read tools (skills/<pack>/skill.py);
   (5) the injection is planted in a test-only `search` (no skill binds search yet);
@@ -32,7 +32,6 @@ from fanout_kit import (
     INJECTION,
     QUESTIONS,
     RUNAWAY,
-    THREAD_TURNS,
     FakeCore,
     Q,
     Run,
@@ -51,6 +50,8 @@ from munim_intel.skills import load_skill
 from munim_intel.tools.handles import HandleTable
 from munim_intel.trace.buffer import TraceBuffer
 
+#: Block 6b's opening words (context/assembler.py thread_block): only the Manager's context of an ask in a thread has them.
+THREAD_MARK = "Thread so far: this question follows earlier turns"
 LABELS: dict[str, Any] = {k: v for k, v in json.loads((HERE / "labels.json").read_text("utf8")).items() if not k.startswith("_")}
 CANONICAL = re.compile(r"⟨snap:([0-9a-f-]{36})·(\d+)·([a-z_][a-z0-9_]*)⟩")
 
@@ -74,6 +75,9 @@ def classify(r: Run) -> dict[str, Any]:
     env = r.envelope
     return {
         "intent": route.get("intent"),
+        # R-E 2-C: the band too, so a route fixture that went missing (the router abstains → explain, band low) cannot
+        # pass for a recorded `explain`.
+        "band": route.get("band"),
         "path": route.get("path"),
         "branches": sorted({e["actor"].removeprefix("branch:") for e in r.core.traces if e["actor"].startswith("branch:")}),
         "outcome": f"abstained:{env['reason_code']}" if env["abstained"] else "answered",
@@ -124,6 +128,22 @@ def test_the_merged_answer_cites_cells_the_branches_minted() -> None:
     assert cited == set(r.core.snapshots)
 
 
+def test_every_model_call_of_a_fan_out_ask_is_one_spend_row() -> None:
+    """W3 close ruling (R-E 1-C, money): the DecisionModel's call, the Manager's and every branch's are each one spend
+    row, posted before the answer. By hand from the kit's script for this question: route.intent 1 call; the Manager 2
+    (fan_out, then the merge); each of its 3 branches 2 (its read, then report) = 9."""
+    r = replay("Why was this week bad?")
+    assert sorted(e["role"] for e in r.core.spend) == ["reason"] * 8 + ["router"]
+    assert len({e["id"] for e in r.core.spend}) == 9 and all(e["currency"] == "INR" and e["amount_minor"] >= 1 for e in r.core.spend)
+    # No usage in a recorded reply: each row's input is the request-size estimate, never zero.
+    assert all(e["input_tokens"] > 0 for e in r.core.spend)
+
+
+def test_paired_a_certification_ask_posts_only_its_route_call() -> None:
+    r = replay("Certify that our books for September are correct")
+    assert [e["role"] for e in r.core.spend] == ["router"], "the route.intent call only: certification needs no Manager"
+
+
 # -- gate 2: ≥ 3 parallel branches in the trace -----------------------------------------------------------------------
 
 
@@ -165,12 +185,12 @@ def test_each_branch_first_request_holds_no_orchestrator_event_and_fits_16k(q: Q
         assert lead.startswith("Run frame:") and "\n\n" not in lead, "block 5 only"
         assert brief == q.brief
         text = json.dumps(s.request, ensure_ascii=False)
-        assert q.question not in text and not any(t in text for t in THREAD_TURNS)
+        assert q.question not in text and THREAD_MARK not in text
         assert s.tokens <= BRANCH["per_call"]
     manager = next(s for s in r.seen if s.agent == "munim" and s.step == 0)
     assert q.question in json.dumps(manager.request, ensure_ascii=False), "positive control: the Manager's context holds it"
     if q.in_thread:
-        assert all(t in json.dumps(manager.request) for t in THREAD_TURNS)
+        assert THREAD_MARK in json.dumps(manager.request, ensure_ascii=False)
 
 
 # -- gate 4: branch tool lists hold 0 propose_* -------------------------------------------------------------------------
@@ -312,6 +332,34 @@ def test_a_second_fan_out_in_the_run_is_refused() -> None:
     assert r.prepared is not None and r.prepared.fan_out is not None
     again = asyncio.run(r.prepared.fan_out.run_async(args={"specialists": ["finance"], "question": "again"}, tool_context=None))  # type: ignore[arg-type]
     assert again == {"error": "fan_out already ran in this run; merge its reports into submit_answer."}
+
+
+def test_a_branch_that_raises_cancels_its_siblings_before_the_error_leaves(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R-E 3: a branch that raises (rather than failing into its report) ends the fan-out, and the siblings still running
+    are cancelled before fan_out returns — not left spending model calls behind a failed run. The error that leaves is
+    the branch's own. Paired: a fan-out whose branches all finish returns their reports (gate 1)."""
+    cancelled: list[str] = []
+
+    async def branch(self: FanOutTool, pack: str, question: str) -> dict[str, Any]:
+        if pack == "finance":
+            await asyncio.sleep(0)
+            raise RuntimeError("a branch broke")
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            cancelled.append(pack)
+            raise
+        return {}
+
+    monkeypatch.setattr(FanOutTool, "_branch", branch)
+    tool = fan_out_tool()
+
+    async def go() -> list[str]:
+        with pytest.raises(RuntimeError, match="a branch broke"):
+            await tool.run_async(args={"specialists": ["finance", "kitchen", "people"], "question": "brief"}, tool_context=None)  # type: ignore[arg-type]
+        return sorted(cancelled)  # read before asyncio.run's own shutdown cancels anything left
+
+    assert asyncio.run(go()) == ["kitchen", "people"]
 
 
 def test_kitchen_on_a_shop_only_scope_answers_not_applicable_without_a_model_call() -> None:

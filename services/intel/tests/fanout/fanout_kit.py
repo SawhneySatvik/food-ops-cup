@@ -133,6 +133,8 @@ class FakeCore:
         self.answers: list[dict[str, Any]] = []
         self.drafts: list[dict[str, Any]] = []
         self.traces: list[dict[str, Any]] = []
+        #: Spend rows intel posted (one per provider call; W3 close ruling).
+        self.spend: list[dict[str, Any]] = []
         self.bodies: list[str] = []
 
     def client(self) -> InternalClient:
@@ -182,6 +184,9 @@ class FakeCore:
         if path == "traces:batch":
             self.traces += body["events"]
             return httpx.Response(201, json={"inserted": len(body["events"]), "last_seq": len(self.traces)})
+        if path == "spend":
+            self.spend += body["entries"]
+            return httpx.Response(201, json={"inserted": len(body["entries"]), "existing": 0})
         return httpx.Response(404, json={"error": {"code": "not_found", "message": "not_found", "reason_code": None}})
 
 

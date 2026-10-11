@@ -115,6 +115,7 @@ class Core:
         self.run_frame = run_frame
         self.answers: list[dict[str, Any]] = []
         self.traces: list[dict[str, Any]] = []
+        self.spend: list[dict[str, Any]] = []
         self.transport = httpx.MockTransport(self.handle)
 
     def client(self) -> InternalClient:
@@ -134,6 +135,9 @@ class Core:
         if path == "traces:batch":
             self.traces += body["events"]
             return httpx.Response(201, json={"inserted": len(body["events"]), "last_seq": len(self.traces)})
+        if path == "spend":
+            self.spend += body["entries"]
+            return httpx.Response(201, json={"inserted": len(body["entries"]), "existing": 0})
         return httpx.Response(404)
 
 
@@ -187,6 +191,8 @@ def test_one_call_no_tools_handles_not_values_and_untainted() -> None:
     assert answer["question"] == QUESTION and answer["envelope"]["abstained"] is False
     assert [seg["refs"] for seg in answer["envelope"]["segments"]] == [[f"snap:{S1}"], [f"snap:{S1}"], [f"snap:{S2}"]]
     assert {e["actor"] for e in core.traces} == {"specialist:finance"}
+    # W3 close ruling (money): the one call is one spend row, `narrate`, in the frame's currency.
+    assert [(e["role"], e["currency"]) for e in core.spend] == [("narrate", "INR")] and core.spend[0]["amount_minor"] >= 1
 
 
 @pytest.mark.parametrize(
@@ -198,6 +204,9 @@ def test_one_call_no_tools_handles_not_values_and_untainted() -> None:
         ("labour: Labour is not the cause {C9}.", "an unknown handle"),
         ("labour: Labour is not the cause.", "no handle"),
         ("labour: Labour is not the cause {C4} {S1.r0.x}.", "a stray brace"),
+        ("labour: Labour moved by {C4}k.", "a magnitude suffix on the expanded ref"),
+        (f"labour: Labour is not the cause {ref(S1, 7, 'share_bp')} {{C4}}.", "a ref the model typed itself"),
+        ("labour: Labour is not the cause ⟨snap:CANARYXQZ⟩ {C4}.", "a malformed ref the model typed"),
     ],
 )
 def test_an_unusable_line_is_core_template_for_that_item_only(line: str, why: str) -> None:
@@ -210,6 +219,53 @@ def test_an_unusable_line_is_core_template_for_that_item_only(line: str, why: st
     assert s["supplier_price"] != TEMPLATES["supplier_price"] and out.source == "model"
 
 
+def test_a_line_the_contract_refuses_is_template_and_no_model_text_reaches_a_log(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, cfg: Config, minted: dict[str, Any]
+) -> None:
+    """R-E 1-B: a model line that passes the line checks but not the contract (here: the bracket and grammar checks are
+    planted away, so a typed bogus ref reaches the envelope) is that item's template; the route answers 200, not 500, and
+    no log line carries the model's text (pydantic's ValidationError echoes its input)."""
+    import munim_intel.investigate as inv
+
+    monkeypatch.setattr(inv, "typed_bracket", lambda _: False)
+    monkeypatch.setattr(inv, "check_grammar", lambda _: None)
+    core = Core(frame("model"))
+
+    async def model_of(_: object) -> BaseLlm:
+        return Scripted(reply="supplier_price: Fine {C1}.\nlabour: Labour moved ⟨snap:CANARYXQZ⟩ {C4}.", requests=[])
+
+    client = TestClient(create_app(cfg, core_transport=core.transport, narrate_llm=model_of), raise_server_exceptions=False)
+    headers = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['ask']}"}
+    with caplog.at_level("DEBUG"):
+        r = client.post("/investigate:narrate", json=request().model_dump(mode="json"), headers=headers)
+    assert r.status_code == 200 and r.json()["source"] == "model"
+    s = segments(core)
+    assert s["labour"] == TEMPLATES["labour"] and s["supplier_price"] == f"Fine {ref(S1, 3, 'delta_minor')}."
+    assert "CANARYXQZ" not in caplog.text and "CANARYXQZ" not in r.text
+
+
+def test_an_auto_step_token_buys_a_narration_and_its_call_is_charged_and_an_event_token_does_not(
+    cfg: Config, minted: dict[str, Any]
+) -> None:
+    """Auto mode (T-089b): the worker narrates each step under an `auto_step` run, so the route takes that token as it
+    takes an ask one, and the call is one `narrate` spend row as under an ask (W3 close ruling). Paired: an event token
+    is the uniform 401 and nothing is written."""
+    core = Core(frame("model"))
+
+    async def model_of(_: object) -> BaseLlm:
+        return Scripted(reply="supplier_price: Supplier prices pushed the margin down {C1}.", requests=[])
+
+    client = TestClient(create_app(cfg, core_transport=core.transport, narrate_llm=model_of))
+    body = request().model_dump(mode="json")
+    event = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['valid']}"}
+    refused = client.post("/investigate:narrate", json=body, headers=event)
+    assert refused.status_code == 401 and core.answers == [] and core.spend == []
+    auto = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['auto_step']}"}
+    r = client.post("/investigate:narrate", json=body, headers=auto)
+    assert r.status_code == 200 and r.json() == {"answer_id": vid(50), "tainted": False, "source": "model"}
+    assert len(core.answers) == 1 and [(e["role"], e["currency"]) for e in core.spend] == [("narrate", "INR")]
+
+
 @pytest.mark.parametrize(("narration", "fail"), [("template", False), (None, False), ("model", True)])
 def test_ai_off_no_frame_or_a_failed_run_is_all_template(narration: str | None, fail: bool) -> None:
     llm = Scripted(reply="supplier_price: Fine {C1}.", fail=fail, requests=[])
@@ -218,6 +274,7 @@ def test_ai_off_no_frame_or_a_failed_run_is_all_template(narration: str | None, 
     assert segments(core) == TEMPLATES
     assert out.source == "template" and out.tainted is False
     assert len(llm.requests) == (1 if fail else 0)
+    assert len(core.spend) == (1 if fail else 0), "a failed call is still charged; no call, no row"
 
 
 def test_the_route_takes_ask_tokens_only_and_refuses_bad_bodies(cfg: Config, minted: dict[str, Any]) -> None:

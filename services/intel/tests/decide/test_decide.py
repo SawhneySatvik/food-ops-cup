@@ -34,6 +34,7 @@ from munim_intel.llm.providers import build_live_llm
 from munim_intel.manager.ask import route
 from munim_intel.manager.paths import DRAFT, PATHS, bind
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.spend import SpendBuffer
 
 from .make_fixtures import PLANTED_LOW, PLANTED_MAP_NO_LOGPROBS, PLANTED_NO_LOGPROBS, PLANTED_OUT_OF_ENUM, POS_BILLS_HEADERS
 
@@ -169,6 +170,7 @@ def test_probabilities_sum_to_10000_on_every_recorded_result() -> None:
         assert r.band in ("medium", "high")
 
 
+@pytest.mark.fixture_miss_expected
 def test_adapter_error_is_an_abstain_without_model_text() -> None:
     r = ask(ROUTE_INTENT, route_state("a question with no recorded fixture"))
     assert (r.abstained, r.reason, r.answer) == (True, "adapter_error", None)
@@ -454,6 +456,23 @@ def test_a_rejected_logprobs_request_is_retried_once_and_routes_draft_request_un
     assert PATHS[intent] is DRAFT
     assert bind(PATHS[intent], None).abstain == "specialist_needed"
     assert bind(PATHS[intent], "inventory_purchasing").propose is True
+
+
+def test_both_calls_of_a_rejected_then_retried_route_are_spend_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """W3 close ruling (R-E 1-C, money): the DecisionModel's calls are charged too, each one — by hand, the logprobs request
+    the provider rejected (400) and its retry = 2 `router` rows = DecisionResult.model_calls. The rejected call reported no
+    usage, so it is charged on the request-size estimate; the retry on the provider's 247 prompt tokens."""
+    seen = gemini_rejecting_logprobs(monkeypatch, "D")
+    spend = SpendBuffer(_no_sink, "INR")
+    intent, band = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, live_router(), spend))
+    rows = spend.entries
+    assert (intent, band, len(seen)) == ("draft_request", "unscored", 2)
+    assert [(r["role"], r["provider"], r["model_id"]) for r in rows] == [("router", "gemini", "gemini-3.5-flash-lite")] * 2
+    assert rows[0]["input_tokens"] > 0 and rows[1]["input_tokens"] == 247 and all(r["amount_minor"] >= 1 for r in rows)
+
+
+async def _no_sink(_: object) -> None:
+    return None
 
 
 def test_map_columns_with_logprobs_rejected_abstains_without_a_retry(monkeypatch: pytest.MonkeyPatch) -> None:

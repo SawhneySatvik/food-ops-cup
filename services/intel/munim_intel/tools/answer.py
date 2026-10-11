@@ -2,9 +2,10 @@
 the F3 cap tight: inventory_purchasing with its propose tools is 19, so a draft run has room for one base tool).
 
   segments   short prose; every number is a cell handle in braces ({S1.r0.net_minor}). Each segment is rendered
-             through the run's HandleTable, fail closed (context/expand.py): an unresolved or forged handle, a segment
-             citing nothing, or a number typed outside a handle is refused with the segment index and the rule — one
-             retry, then the answer is an abstention with that rule's code (§5.3).
+             through the run's HandleTable, fail closed (context/expand.py): a ref delimiter the model typed itself, an
+             unresolved handle, a segment citing nothing, or anything core's number grammar refuses (tools/grammar.py:
+             digits, number words, a magnitude suffix after a ref, a quotation) is refused with the segment index and the
+             rule — one retry, then the answer is an abstention with that rule's code (§5.3).
   abstain    one reason code instead: the loaded skills' refusal codes plus missing_ref and insufficient_history.
 
 `refs` are built here from the expanded canonical refs, never from the model's input. The first submission wins and
@@ -24,8 +25,8 @@ from google.genai import types
 
 from munim_intel.context.expand import CANNOT_VERIFY, expand
 from munim_intel.contracts_gen.models import AnswerEnvelope
-from munim_intel.negotiate.grammar import violation
 from munim_intel.tools.args import problems
+from munim_intel.tools.grammar import check_grammar, reason_code, typed_bracket
 from munim_intel.tools.handles import DOT, SNAP_CLOSE, SNAP_OPEN, HandleTable
 
 #: ADR-014 §5.1: every skill may abstain with these, beside its own refusal codes.
@@ -35,8 +36,6 @@ MAX_SEGMENTS = 6
 #: contracts `Segment.text` max.
 TEXT_CHARS = 2000
 _CANONICAL = re.compile(rf"{SNAP_OPEN}[^{SNAP_CLOSE}]*{SNAP_CLOSE}")
-#: A private-use stand-in for a ref while the prose is checked: not a letter, digit or symbol, so it bounds words.
-_REF_MARK = ""
 
 
 def ref_id(token: str) -> str:
@@ -96,16 +95,18 @@ class SubmitAnswerTool(BaseTool):
         return f"invalid arguments for submit_answer: {'; '.join(found)}."[:300] if found else None
 
     def _segment(self, i: int, text: str) -> tuple[dict[str, Any] | None, str | None, str | None]:
-        """(segment, problem for the model, reason code if it stands)."""
+        """(segment, problem for the model, reason code if it stands). Problems name the rule, never the text."""
+        if typed_bracket(text):
+            return None, f"segment {i}: never type a ref; cite only handles in braces, e.g. {{S1.r0.<column>}}.", "unresolved_ref"
         out = expand(text, self._handles)
         if out == CANNOT_VERIFY:
             return None, f"segment {i}: a handle did not resolve; cite only handles returned in this run.", "unresolved_ref"
         refs = list(dict.fromkeys(ref_id(t) for t in _CANONICAL.findall(out)))
         if not refs:
             return None, f"segment {i}: it cites no cell; every segment cites a handle in braces.", "missing_ref"
-        rule = violation(_CANONICAL.sub(_REF_MARK, out))
-        if rule is not None:
-            return None, f"segment {i}: {rule}; write every number as a cell handle in braces, never typed.", "number_grammar"
+        v = check_grammar(out)
+        if v is not None:
+            return None, f"segment {i}: {v.rule}; write every number as a cell handle in braces, never typed.", reason_code(v)
         if len(out) > TEXT_CHARS:
             return None, f"segment {i}: too long; split it.", "missing_ref"
         return {"text": out, "refs": refs}, None, None

@@ -99,6 +99,7 @@ def test_every_hook_on_the_plugin_is_spelt_as_adk_calls_it() -> None:
     assert sorted(hooks - set(CALLBACKS_14)) == [] and sorted(set(CALLBACKS_14) - hooks) == []
 
 
+@pytest.mark.fixture_miss_expected
 def test_each_of_the_14_callbacks_fires_on_the_scripted_run_plus_3_planted_error_runs(cfg: Config, tmp_path: Path) -> None:
     fired: Counter[str] = Counter()
     clean = new_state(Core())
@@ -122,6 +123,7 @@ def test_each_of_the_14_callbacks_fires_on_the_scripted_run_plus_3_planted_error
 # -- (2) a failed run still flushes ---------------------------------------------------------------------------------
 
 
+@pytest.mark.fixture_miss_expected
 def test_a_model_error_is_flushed_by_on_run_error_alone(tmp_path: Path) -> None:
     """A bare Runner (no run_agent `finally`): only on_run_error_callback can have flushed these rows."""
     core = Core()
@@ -169,6 +171,7 @@ def test_a_cancelled_run_is_flushed_by_the_runners_finally(cfg: Config) -> None:
     assert before == 0 and len(core.rows) >= 1 and state.traces.unsent == 0
 
 
+@pytest.mark.fixture_miss_expected
 def test_a_model_error_through_run_agent_fails_the_run_and_its_traces_are_in_core(cfg: Config, tmp_path: Path) -> None:
     core = Core()
     with pytest.raises(RunFailed) as failed:
@@ -388,6 +391,7 @@ def test_an_unknown_actor_label_is_refused(cfg: Config) -> None:
 # -- no prose in any payload ----------------------------------------------------------------------------------------
 
 
+@pytest.mark.fixture_miss_expected
 def test_no_payload_of_any_scripted_run_carries_planted_text(cfg: Config, tmp_path: Path) -> None:
     rows: list[Events] = []
     for name, model in (

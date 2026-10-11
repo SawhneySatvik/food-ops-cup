@@ -1,9 +1,10 @@
 """Page inputs, template sentences, the drop rule and the input fingerprint (04 §4: cite-or-abstain, no free digits).
 
 Core abstains a whole page when any one sentence fails its validator, so the drop rule runs here, per sentence, before
-posting: a sentence stays only if every `⟨…⟩` token in it is one this page minted, there is at least one, and nothing
-outside the tokens is a digit, a brace or a quotation mark. Core's grammar stays the real judge (number words, magnitude
-suffixes); this is the cheap guard that keeps one bad sentence from costing the page. `refs[]` is computed from the text.
+posting: a sentence stays only if every `⟨…⟩` token in it is one this page minted, there is at least one, nothing outside
+the tokens is a digit, a brace or a quotation mark, and it passes core's number grammar (tools/grammar.py: number words,
+magnitude suffixes after a ref, R-E 1-A) — so one bad sentence costs only itself. `refs[]` is computed from the text.
+A title is shown text too: it passes the same grammar or falls back to the kind.
 The prose never contains untrusted text: claims and neighbours are cited by id and rendered by the ref, never quoted.
 """
 
@@ -13,6 +14,8 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+
+from munim_intel.tools.grammar import check_grammar
 
 KINDS = ("supplier", "ingredient", "item", "outlet")
 #: intel.entity.kind CHECK; a neighbour's kind outside it reads as "record" (the value is a graph row, not code).
@@ -105,7 +108,7 @@ def keep(sentence: str, allowed: set[str]) -> list[str] | None:
     rest = _TOKEN.sub(" ", sentence)
     if any(ch.isnumeric() or ch.isdigit() or ch in "{}⟨⟩%#₹$" or ch in _QUOTES for ch in rest):
         return None
-    if len(sentence) > 2000:
+    if len(sentence) > 2000 or check_grammar(sentence) is not None:
         return None
     ids: list[str] = []
     for t in tokens:
@@ -153,5 +156,6 @@ _SAFE_TITLE = re.compile(r"^[A-Za-z][A-Za-z '&.-]{0,79}$")
 
 
 def title(e: EntityIn) -> str:
-    """Core does not validate titles. The entity's name is shown only when it is plain letters; else the kind alone."""
-    return e.name if _SAFE_TITLE.match(e.name) else e.kind.capitalize()
+    """Core does not validate titles. The entity's name is shown only when it is plain letters with no number word (the
+    grammar); else the kind alone."""
+    return e.name if _SAFE_TITLE.match(e.name) and check_grammar(e.name) is None else e.kind.capitalize()

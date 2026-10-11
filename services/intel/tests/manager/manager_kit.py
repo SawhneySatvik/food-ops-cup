@@ -150,6 +150,8 @@ class FakeCore:
         self.drafts: list[dict[str, Any]] = []
         self.answers: list[dict[str, Any]] = []
         self.traces: list[dict[str, Any]] = []
+        #: Spend rows intel posted (one per provider call; W3 close ruling).
+        self.spend: list[dict[str, Any]] = []
         self.bodies: list[str] = []
         self.transport = httpx.MockTransport(self.handle)
 
@@ -197,6 +199,9 @@ class FakeCore:
         if path == "traces:batch":
             self.traces += body["events"]
             return httpx.Response(201, json={"inserted": len(body["events"]), "last_seq": len(self.traces)})
+        if path == "spend":
+            self.spend += body["entries"]
+            return httpx.Response(201, json={"inserted": len(body["entries"]), "existing": 0})
         return httpx.Response(404, json={"error": {"code": "not_found", "message": "not_found", "reason_code": None}})
 
 
@@ -273,6 +278,8 @@ ROUTE: list[tuple[str, str, str, float]] = [
     ("@Finance draft a dispute for the short delivery payout", "restaurant", "D", 0.90),
     ("@Compliance can you certify we are audit-ready?", "restaurant", "E", 0.82),
     ("@Kitchen why are tickets slow on Fridays?", "mixed", "B", 0.84),
+    # The endpoint test's question, padded as a member may type it (the question is never trimmed).
+    ("  @Finance what did each channel make this month?", "restaurant", "A", 0.88),
 ]
 #: Route codes whose unaddressed asks never reach the Manager's model: certification_request (not_a_certificate) and
 #: draft_request (specialist_needed).
@@ -281,6 +288,9 @@ UNSURE = "PLANTED: the router is unsure"
 LOOKUP_FINANCE = "@Finance what did each channel make this month?"
 DISPUTE = "@Finance draft a dispute for the short delivery payout"
 KITCHEN = "@Kitchen why are tickets slow on Fridays?"
+PADDED = "  @Finance what did each channel make this month?"
+#: A pasted id: the egress check refuses to send it to the router, so the ask takes the explain fallback (no route fixture).
+EGRESS = f"Why was order {vid(60)} refunded?"
 
 
 def call(name: str, args: dict[str, Any]) -> LlmResponse:
@@ -304,6 +314,8 @@ DISPUTE_ARGS = {
 SCRIPTS: dict[str, list[LlmResponse]] = {
     **{q: ABSTAIN for q, _, code, _ in ROUTE if code not in MODEL_FREE and not q.startswith("@")},
     KITCHEN: ABSTAIN,
+    PADDED: ABSTAIN,
+    EGRESS: ABSTAIN,
     LOOKUP_FINANCE: [
         call("read_finance_pnl", {"group_by": "channel", "period_month": "2026-10-01", "page": 0}),
         call("submit_answer", {"segments": [{"text": "Net for {S1.r0.key} this month was {S1.r0.net_minor}."}], "abstain": None}),
@@ -316,11 +328,13 @@ SCRIPTS: dict[str, list[LlmResponse]] = {
 }
 #: Each scripted ask: (question, addressed_to, thread taint or None for no thread, scope).
 RUNS: list[tuple[str, str | None, bool | None, str]] = [
-    *[(q, None, None, "restaurant") for q, _, code, _ in ROUTE if code not in MODEL_FREE and not q.startswith("@")],
+    *[(q, None, None, "restaurant") for q, _, code, _ in ROUTE if code not in MODEL_FREE and not q.lstrip().startswith("@")],
     (LOOKUP_FINANCE, "finance", None, "restaurant"),
     (DISPUTE, "finance", False, "restaurant"),
     (DISPUTE, "finance", True, "restaurant"),
     (KITCHEN, "kitchen", None, "mixed"),
+    (PADDED, "finance", None, "restaurant"),
+    (EGRESS, None, None, "restaurant"),
 ]
 
 

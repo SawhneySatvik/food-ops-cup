@@ -44,6 +44,12 @@ class Frame:
     outlets: tuple[OutletFrame, ...]
     narration: Narration
     payroll_scope: PayrollScope
+    #: The month's AI budget currency (run-frame `budget.currency`): core takes spend rows only in it. None: no budget.
+    budget_currency: str | None = None
+
+    @property
+    def spend_currency(self) -> str:
+        return self.budget_currency or self.currency
 
     def in_scope(self, ctx: RunContext) -> tuple[OutletFrame, ...]:
         if ctx.outlet_scope == ("*",):
@@ -96,6 +102,7 @@ def frame_from_run_frame(body: Mapping[str, Any]) -> Frame:
         outlets=tuple(_outlet(o, body["licence_kinds"]) for o in body["outlets"]),
         narration=narration,
         payroll_scope=_payroll_scope(body["payroll_scope"]),
+        budget_currency=body["budget"]["currency"] if body.get("budget") else None,
     )
 
 

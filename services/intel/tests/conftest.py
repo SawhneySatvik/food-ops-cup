@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from munim_intel.config import Config, load_config
+from munim_intel.llm.recorded import RecordedFixtureMissing
 
 INTEL = Path(__file__).resolve().parents[1]
 REPO = INTEL.parents[1]
@@ -53,6 +54,33 @@ def no_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(builtins, "open", guarded)
     monkeypatch.setattr(io, "open", guarded)
+
+
+_MISSES_BEFORE = pytest.StashKey[int]()
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item: pytest.Item) -> Iterator[None]:
+    # Read before any fixture of this test is set up — module- and session-scoped ones included, which pytest builds in
+    # the first requesting test's setup, before function-scoped autouse fixtures could look.
+    item.stash[_MISSES_BEFORE] = RecordedFixtureMissing.raised
+    yield
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Iterator[None]:
+    """A recorded-fixture miss fails the test (R-E 2-C), even when the code under test swallowed it (the DecisionModel
+    abstains on any error; run_agent wraps it in RunFailed and its callers degrade to a template). Misses are counted
+    from the test's setup (its higher-scoped fixtures included) to its teardown. A test that misses on purpose — the
+    degrade path is what it proves — says so with `@pytest.mark.fixture_miss_expected`."""
+    outcome = yield
+    if call.when != "teardown":
+        return
+    report = outcome.get_result()  # type: ignore[attr-defined]
+    missed = RecordedFixtureMissing.raised - item.stash.get(_MISSES_BEFORE, RecordedFixtureMissing.raised)
+    if missed and item.get_closest_marker("fixture_miss_expected") is None and report.passed:
+        report.outcome = "failed"
+        report.longrepr = f"{missed} recorded fixture miss(es) in a test not marked fixture_miss_expected"
 
 
 @pytest.fixture(scope="session")

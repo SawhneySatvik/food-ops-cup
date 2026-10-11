@@ -7,9 +7,12 @@ the ranked items. Each item arrives as the finding's stored, core-validated text
 Template wording always exists: the stored text, a draft clause, and the specialist's signature. It has no digit of its
 own. Model wording is at most ONE call (L1, no tools) for the whole brief: it sees item handles ({I1}), the specialist's
 desk, the severity word and the kind of finding — never a value, a name or a key — and writes one line per item. Code
-expands the handle into the impact cell's canonical ref and keeps a line only if it cites its own item's refs and holds no
-digit, so a typed number never reaches core (whose validator then refuses a brief anyway). Budget out, AI off, a failed
-call or an unusable line leaves the item on its template (rule 11). The brief is posted as one answer (`answers`).
+expands the handle into the impact cell's canonical ref and keeps a line only if it is the first line naming its item,
+the model typed no ref delimiter itself, it cites only its own item's refs, and it passes core's number grammar
+(tools/grammar.py: digits, number words, magnitude suffixes after a ref, quotations), so a typed number never reaches
+core. Budget out, AI off, a failed call or an unusable line leaves the item on its template (rule 11). The brief is
+posted as one answer (`answers`). Should core still abstain a brief that carries model lines, the template-only brief is
+posted once more under its own answer id (R-E 1-A): an abstained brief is never the day's last word.
 """
 
 from __future__ import annotations
@@ -25,12 +28,12 @@ from google.adk.models import BaseLlm
 from munim_intel.config import Config
 from munim_intel.contracts_gen.models import InternalAnswersRequest, InternalAnswersResponse
 from munim_intel.mapping import uuid7_ms
-from munim_intel.narrate import refs_of
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
 from munim_intel.runtime.state import RunState
 from munim_intel.tools.generated import uuid7
+from munim_intel.tools.grammar import ANY_REF, check_grammar, ref_ids, typed_bracket
 
 QUESTION = "What needs me today?"
 TOP = 5
@@ -46,7 +49,6 @@ DESK = {
 }
 SEVERITY_WORD = {"low": "low", "medium": "medium", "high": "high", "critical": "critical"}
 
-_TOKEN = re.compile(r"⟨[^⟩]*⟩")
 _HANDLE = re.compile(r"\{(I\d+)\}")
 _QUOTES = "\"'`“”‘’«»"
 
@@ -82,7 +84,8 @@ class Report:
     template_items: int = 0
     dropped: int = 0  # model lines dropped
     posted: bool = False
-    abstained: bool = False  # core refused the brief; nothing is shown
+    abstained: bool = False  # core refused the brief (and its template-only re-post); nothing is shown
+    reposted: bool = False  # core abstained the brief with model lines; the template-only brief was posted under a new id
 
 
 class AnswerSink(Protocol):
@@ -98,16 +101,17 @@ class CoreAnswerSink:
 
 
 def clean(text: str, allowed: set[str]) -> bool:
-    """The drop rule: at least one ref token, every token one of this item's, and no digit or quote outside a token."""
-    tokens = _TOKEN.findall(text)
-    if not tokens or any(t not in allowed for t in tokens):
+    """The drop rule: at least one ref token, every token one of this item's, core's number grammar, and no brace, stray
+    bracket, currency sign or quote outside a token."""
+    tokens = ANY_REF.findall(text)
+    if not tokens or any(t not in allowed for t in tokens) or len(text) > 1800:
         return False
-    rest = _TOKEN.sub(" ", text)
-    return not any(ch.isnumeric() or ch.isdigit() or ch in "{}⟨⟩%#₹$" or ch in _QUOTES for ch in rest) and len(text) <= 1800
+    rest = ANY_REF.sub(" ", text)
+    return not any(ch.isnumeric() or ch.isdigit() or ch in "{}⟨⟩%#₹$" or ch in _QUOTES for ch in rest) and check_grammar(text) is None
 
 
 def _allowed(item: BriefItem) -> set[str]:
-    out = {t for text in item.texts for t in _TOKEN.findall(text)}
+    out = {t for text in item.texts for t in ANY_REF.findall(text)}
     if item.impact_ref:
         out.add(item.impact_ref)
     return out
@@ -157,11 +161,15 @@ async def model_lines(
     text = "".join(p.text for e in events if e.is_final_response() and e.content for p in e.content.parts or [] if p.text and not p.thought)
     by_handle = dict(handled)
     out: dict[int, str] = {}
+    seen: set[str] = set()
     for line in (ln.strip() for ln in text.splitlines()):
         if not line:
             continue
         hs = _HANDLE.findall(line)
-        if len(hs) != 1 or hs[0] not in by_handle or index[hs[0]] in out:
+        # Only the first line naming an item may stand for it: a refused line is not retried by a later one.
+        first = len(hs) == 1 and hs[0] not in seen
+        seen.update(hs)
+        if not first or hs[0] not in by_handle or typed_bracket(line):
             report.dropped += 1
             continue
         it = by_handle[hs[0]]
@@ -188,6 +196,20 @@ async def compile_brief(
     lines: dict[int, str] = {}
     if llm is not None and cfg is not None and state is not None:
         lines = await model_lines(top, llm=llm, ctx=ctx, cfg=cfg, state=state, report=report)
+    segments = _segments(top, lines, report)
+    if not segments:
+        return report
+    resp = await sink.post(_request(f"brief:{ctx.run_id}", ctx, segments))
+    if resp.abstained and report.model_items:
+        # Core refused a brief carrying model lines: post the template-only brief once, under its own deterministic id (a
+        # retried /brief replays both posts as stored). No model text is re-used.
+        report.model_items, report.template_items, report.reposted = 0, 0, True
+        resp = await sink.post(_request(f"brief:{ctx.run_id}:template", ctx, _segments(top, {}, report)))
+    report.posted, report.abstained = not resp.abstained, resp.abstained
+    return report
+
+
+def _segments(top: Sequence[BriefItem], lines: dict[int, str], report: Report) -> list[dict[str, object]]:
     segments: list[dict[str, object]] = []
     for n, item in enumerate(top):
         model = lines.get(n)
@@ -201,20 +223,14 @@ async def compile_brief(
         else:
             report.template_items += 1
         text = body + _signature(item)
-        segments.append({"text": text, "refs": refs_of(text)})
-    if not segments:
-        return report
-    req = InternalAnswersRequest.model_validate(
+        segments.append({"text": text, "refs": ref_ids(text)})
+    return segments
+
+
+def _request(seed: str, ctx: RunContext, segments: list[dict[str, object]]) -> InternalAnswersRequest:
+    return InternalAnswersRequest.model_validate(
         {
             "question": QUESTION,
-            "envelope": {
-                "answer_id": uuid7(uuid7_ms(ctx.run_id), f"brief:{ctx.run_id}"),
-                "segments": segments,
-                "abstained": False,
-                "reason_code": None,
-            },
+            "envelope": {"answer_id": uuid7(uuid7_ms(ctx.run_id), seed), "segments": segments, "abstained": False, "reason_code": None},
         }
     )
-    resp = await sink.post(req)
-    report.posted, report.abstained = not resp.abstained, resp.abstained
-    return report

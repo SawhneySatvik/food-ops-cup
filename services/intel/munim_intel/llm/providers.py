@@ -3,16 +3,25 @@
 
 Never hand ADK a model *string*: its registry resolves `openai/...` to LiteLlm (banned) and `Gemini()` defaults
 to a gemini-2.5 id. Always an explicit BaseLlm instance with its model id set, checked before and after build.
+
+Every live call has a per-role timeout (W3 close ruling; `Config.model_timeouts_s`): the classes below are ADK's own,
+subclassed, so `isinstance(llm, OpenAILlm)` (the DecisionModel's request shape) and `llm.model` hold. Past the timeout
+the call raises TimeoutError, which fails like any provider error: the run's RunFailed (ask → abstention, narration →
+template) or the DecisionModel's `adapter_error`.
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 from google.adk.integrations.openai import OpenAILlm
 from google.adk.models import BaseLlm
 from google.adk.models.google_llm import Gemini
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 
 from munim_intel.config import Config, ProviderKeyName
 from munim_intel.contracts_gen.models import PlatformModelRoleRow
@@ -45,6 +54,29 @@ PROVIDERS: dict[str, Provider] = {
 }
 
 
+async def bounded(responses: AsyncGenerator[LlmResponse, None], seconds: float) -> list[LlmResponse]:
+    """Every response of one call, or TimeoutError once `seconds` pass. The whole call is awaited inside the deadline
+    and only then handed on, so the deadline never spans the caller's own work between responses."""
+    async with asyncio.timeout(seconds):
+        return [r async for r in responses]
+
+
+class TimedGemini(Gemini):
+    timeout_s: float = 60.0
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
+            yield r
+
+
+class TimedOpenAILlm(OpenAILlm):
+    timeout_s: float = 60.0
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
+            yield r
+
+
 def refuse_retired(model_id: str) -> None:
     if _RETIRED.search(model_id):
         raise RetiredModelRefused(model_id)
@@ -60,10 +92,11 @@ def build_live_llm(row: PlatformModelRoleRow, cfg: Config) -> BaseLlm:
     key = cfg.provider_key(provider.key_name)
     if key is None:
         raise ProviderUnavailable(f"{row.provider}: {provider.key_name} is not set — skipped")
+    timeout_s = cfg.model_timeouts_s[row.role]
     llm: BaseLlm
     if row.provider == "gemini":
-        llm = Gemini(model=row.model_id, client_kwargs={"api_key": key})
+        llm = TimedGemini(model=row.model_id, client_kwargs={"api_key": key}, timeout_s=timeout_s)
     else:
-        llm = OpenAILlm(model=row.model_id, api_key=key, base_url=provider.base_url)
+        llm = TimedOpenAILlm(model=row.model_id, api_key=key, base_url=provider.base_url, timeout_s=timeout_s)
     refuse_retired(llm.model)
     return llm

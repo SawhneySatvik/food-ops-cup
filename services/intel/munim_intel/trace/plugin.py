@@ -7,8 +7,14 @@ misspelt hook (never called by ADK) shows up as 0.
 What reaches a trace: kinds, actors, agent and registered tool names, outcomes, exception class names. Never the
 member's message, model text, tool arguments or results, or an exception's message (rule 8; ADR-014 §6.4 rule 5).
 
-Not here yet: the §5.3 model retry ladder (cheaper role, then template), the grammar pre-check, handle expansion
-and spend posting — on_model_error only traces and lets the error propagate.
+Spend (W3 close ruling, trace/spend.py): every provider call of the context is one row in the run's spend buffer —
+after_model_callback with the provider's usage (or a request-size estimate when none is reported), on_model_error_callback
+with the estimate (a failed or timed-out call may still be billed). A response a callback made up (the budget fallback,
+the assembler's cap) never reaches the provider and is not charged: ADK skips after_model for it. The buffer flushes with
+the traces (after_run, on_run_error, and run_agent's `finally`).
+
+Not here yet: the §5.3 model retry ladder (cheaper role, then template) — on_model_error traces, charges and lets the
+error propagate.
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from munim_intel.runtime.state import ACTOR, RunState, check_actor
 from munim_intel.trace.buffer import Payload
+from munim_intel.trace.spend import Usage, estimate_input_tokens
 
 #: Tools whose results carry untrusted text into the context (ADR-014 §6.4 rule 2).
 UNTRUSTED_READS = frozenset({"search", "wiki_read"})
@@ -92,6 +99,8 @@ class MunimPlugin(BasePlugin):
         self._calls: dict[str, str] = {}
         #: Calls this plugin answered in before_tool. ADK still runs after_tool on them; their result is already traced.
         self._answered: set[str] = set()
+        #: The current model call's input estimate (a context's calls are sequential), for a call that reports no usage.
+        self._estimate = 0
 
     def _fire(self, callback: str) -> None:
         self.state.fired[callback] += 1
@@ -132,15 +141,20 @@ class MunimPlugin(BasePlugin):
         self._fire("on_event_callback")
         event.custom_metadata = {**(event.custom_metadata or {}), "munim_actor": self._actor()}
 
+    async def _flush(self) -> None:
+        await self.state.traces.flush()
+        if self.state.meter is not None:
+            await self.state.meter.buffer.flush()
+
     async def after_run_callback(self, *, invocation_context: InvocationContext) -> None:
         self._fire("after_run_callback")
-        await self.state.traces.flush()
+        await self._flush()
 
     async def on_run_error_callback(self, *, invocation_context: InvocationContext, error: Exception) -> None:
         # after_run_callback is skipped when the run errors (runners.py, `run_error is None`): flush here too.
         self._fire("on_run_error_callback")
         await self._trace("error", {"where": "run", "error": type(error).__name__})
-        await self.state.traces.flush()
+        await self._flush()
 
     # -- agent --------------------------------------------------------------------------------------------------
 
@@ -166,6 +180,7 @@ class MunimPlugin(BasePlugin):
             await self._trace("abstain", {"reason": "ai_budget_cap"})
             return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=BUDGET_FALLBACK)]))
         budget.model_calls += 1
+        self._estimate = estimate_input_tokens(llm_request)
         return None
 
     async def after_model_callback(self, *, callback_context: CallbackContext, llm_response: LlmResponse) -> None:
@@ -174,10 +189,19 @@ class MunimPlugin(BasePlugin):
         if usage is not None:
             self.state.budget.input_tokens += usage.prompt_token_count or 0
             self.state.budget.output_tokens += usage.candidates_token_count or 0
+        if self.state.meter is not None and not llm_response.partial:
+            if usage is not None and usage.prompt_token_count is not None:
+                # Thinking tokens are billed as output.
+                out = (usage.candidates_token_count or 0) + (usage.thoughts_token_count or 0)
+                self.state.meter.record(Usage(usage.prompt_token_count, out))
+            else:
+                self.state.meter.record(Usage(self._estimate, 0, estimated=True))
 
     async def on_model_error_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest, error: Exception) -> None:
         self._fire("on_model_error_callback")
         await self._trace("error", {"where": "model", "error": type(error).__name__})
+        if self.state.meter is not None:
+            self.state.meter.record(Usage(self._estimate, 0, estimated=True))
 
     # -- tool ---------------------------------------------------------------------------------------------------
 

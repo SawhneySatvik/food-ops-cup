@@ -25,9 +25,11 @@ from conftest import SECRET
 from manager_kit import (
     CTX,
     DISPUTE,
+    EGRESS,
     KITCHEN,
     LLM_FIXTURES,
     LOOKUP_FINANCE,
+    PADDED,
     ROUTE,
     SPECIALIST_NEEDED,
     TS,
@@ -45,6 +47,7 @@ from munim_intel.app import create_app
 from munim_intel.config import Config
 from munim_intel.contracts_gen.models import ThreadsIntelAskRequest
 from munim_intel.decide.questions import ROUTE_INTENT
+from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused
 from munim_intel.manager.ask import Models, answer_ask, prepare
 from munim_intel.manager.paths import PATHS, bind
 from munim_intel.runtime.state import PACKS
@@ -102,7 +105,7 @@ def test_route_intent_options_are_the_six_of_adr_4_3() -> None:
     assert ROUTE_INTENT.options == HAND_INTENTS and set(PATHS) == set(HAND_INTENTS)
 
 
-@pytest.mark.parametrize("question,code", [(q, c) for q, _, c, _ in ROUTE if not q.startswith("@")], ids=lambda x: str(x)[:24])
+@pytest.mark.parametrize("question,code", [(q, c) for q, _, c, _ in ROUTE if not q.lstrip().startswith("@")], ids=lambda x: str(x)[:24])
 def test_each_route_intent_takes_the_hand_path(question: str, code: str) -> None:
     intent = "explain" if question == UNSURE else HAND_INTENTS["ABCDEF".index(code)]
     out, core = run(question)
@@ -116,7 +119,7 @@ def test_each_route_intent_takes_the_hand_path(question: str, code: str) -> None
 
 def test_a_question_the_egress_check_refuses_falls_back_to_explain_and_sends_nothing() -> None:
     """A pasted id in the question: no UUID may leave the process (§4.3), so the router is not called at all."""
-    out, core = run(f"Why was order {vid(60)} refunded?")
+    out, core = run(EGRESS)
     assert route_labels(core) == {"intent": "explain", "band": "low", "path": "answer"}
     assert Counted.CALLS["recorded/router"] == 0 and len(core.answers) == 1
 
@@ -268,6 +271,7 @@ def test_paired_an_untainted_thread_accepts_the_proposal() -> None:
 # -- every exit stores one answer under core's id; the endpoint ------------------------------------------------------
 
 
+@pytest.mark.fixture_miss_expected
 def test_a_run_that_ends_without_submit_answer_stores_an_abstention() -> None:
     """A provider failure (here: no fixture for the step) degrades to "cannot verify" (rule 11), never an error."""
     out, core = run("A question nobody recorded an answer for", reason=Counted(model="recorded/reason", fixtures_dir=LLM_FIXTURES / "none"))
@@ -299,7 +303,7 @@ def _factory(m: Models) -> Any:
 def test_the_ask_endpoint_answers_answer_id_and_taint_only(cfg: Config, minted: dict[str, Any]) -> None:
     core = FakeCore()
     reset()
-    question = "  @Finance what did each channel make this month?"
+    question = PADDED  # recorded (R-E 2-C: it once ran on a missing route fixture, unseen)
     body = {"answer_id": vid(81), "question": question, "addressed_to": "finance", "thread": None}
     headers = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['ask']}"}
     r = app_client(cfg, core).post("/ask", json=body, headers=headers)
@@ -309,6 +313,31 @@ def test_the_ask_endpoint_answers_answer_id_and_taint_only(cfg: Config, minted: 
     sent = "\n".join([*core.bodies, r.text])
     for text in ("via Manager", "signature", "Finance ·"):
         assert text not in sent, f"intel sent signature text: {text!r}"
+
+
+@pytest.mark.parametrize("narration", ["template", "model"])
+@pytest.mark.parametrize("error", [ProviderUnavailable("gemini: GEMINI_API_KEY is not set"), RetiredModelRefused("gemini-2.5-x")])
+def test_a_model_that_cannot_be_built_is_a_model_blocked_abstention_not_a_502(
+    cfg: Config, minted: dict[str, Any], narration: str, error: Exception
+) -> None:
+    """R-E 2-A: the models are built after the AI-off exit, and a role that cannot be built is AI unavailable — a stored
+    model_blocked abstention, 200 — on AI off and on AI on alike. Paired accept: the endpoint test above answers."""
+    built: list[str] = []
+
+    async def unbuildable(_: object) -> Models:
+        built.append("called")
+        raise error
+
+    core = FakeCore(frame(narration=narration))
+    client = TestClient(create_app(cfg, core_transport=core.transport, ask_models=unbuildable))
+    body = {"answer_id": vid(81), "question": LOOKUP_FINANCE, "addressed_to": "finance", "thread": None}
+    headers = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['ask']}"}
+    r = client.post("/ask", json=body, headers=headers)
+    assert r.status_code == 200 and r.json() == {"answer_id": vid(81), "tainted": False}
+    [answer] = core.answers
+    assert answer["envelope"]["abstained"] is True and answer["envelope"]["reason_code"] == "model_blocked"
+    assert built == ([] if narration == "template" else ["called"]), "AI off never builds a model"
+    assert core.spend == []
 
 
 def test_the_ask_endpoint_refuses_other_tokens_and_bad_bodies(cfg: Config, minted: dict[str, Any]) -> None:
@@ -387,6 +416,9 @@ def test_submit_answer_builds_refs_from_the_expansion_and_ends_the_run() -> None
         ("Net was {S1.r0.net_minor}, up 12 on last month.", "number_grammar"),  # a typed digit
         ("Net was {S1.r0.net_minor}, up twelve on last month.", "number_grammar"),  # a number word
         ("Net went up this month.", "missing_ref"),  # cites nothing
+        ("Net was {S1.r0.net_minor}k this month.", "number_grammar"),  # R-E 2-B: a magnitude suffix on the expanded ref
+        ("Net was {S1.r0.net_minor} ⟩ this month.", "unresolved_ref"),  # R-E 2-B: a ref delimiter typed by the model
+        ("Net was {S1.r0.net_minor} or ⟨snap:bogus⟩.", "unresolved_ref"),  # a malformed ref typed by the model
     ],
 )
 def test_submit_answer_refuses_once_then_abstains_with_the_rule(text: str, code: str) -> None:
@@ -396,6 +428,15 @@ def test_submit_answer_refuses_once_then_abstains_with_the_rule(text: str, code:
     second, ended = submit(tool, [text])
     assert second == {"status": "abstained", "reason_code": code} and ended
     assert tool.envelope is not None and tool.envelope.abstained and tool.envelope.segments == []
+
+
+def test_submit_answer_refuses_a_typed_canonical_ref_even_of_a_minted_cell_and_accepts_its_handle() -> None:
+    """R-E 2-B: the model never types a ref, not even an exact copy of one this run minted; the handle is the way."""
+    tool, snap = submit_tool()
+    first, _ = submit(tool, [f"Net was ⟨snap:{snap}·0·net_minor⟩."])
+    assert "error" in first and snap not in first["error"]
+    ok, ended = submit(tool, ["Net was {S1.r0.net_minor}."])
+    assert ok == {"status": "submitted"} and ended
 
 
 def test_submit_answer_abstains_only_with_the_loaded_skills_codes_and_the_always_codes() -> None:

@@ -8,7 +8,8 @@ Model narration is one L1 call with no tools, only for findings at `high` or abo
 The model sees the finding type, its severity and the cell *handles* it may cite (`{S1.r0.unapproved_minor}`) — never
 a cell value — and writes prose only. Handles are expanded by the run's HandleTable; whatever the model typed that is
 not a handle stays as typed, so a free digit reaches core's validator, which refuses the narration (`number_grammar`).
-intel never re-implements the grammar. A refused narration leaves the template finding in place.
+No pre-check here (tools/grammar.py is core's grammar, used where a refusal would cost more than the line): a refused
+narration leaves the template finding in place.
 """
 
 from __future__ import annotations

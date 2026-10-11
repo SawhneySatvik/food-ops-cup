@@ -19,6 +19,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.spend import Meter
 
 #: Ledger R45 F8 — the eight specialists, one per pack (hand list; the registry is packages/contracts/src/intel/specialists.ts).
 PACKS = ("catalogue", "kitchen", "inventory_purchasing", "finance", "people", "customers", "compliance", "market")
@@ -37,7 +38,7 @@ def check_actor(label: str) -> str:
 @dataclass
 class Budget:
     """Per-run model and tool caps. Defaults are ADR-014 §3.4 "ask, single agent" (provisional; re-based by T-059).
-    The caps come from core's run-frame once T-040b lands; spend is recorded here until the `spend` route exists."""
+    These are the run's own caps; the month's money is core's (`RunState.meter` posts each call's spend)."""
 
     max_model_calls: int = 8
     max_input_tokens: int = 100_000
@@ -67,3 +68,6 @@ class RunState:
     invalid_args: Counter[str] = field(default_factory=Counter)
     #: Plugin callback name -> times fired. The fired-callback gate reads it: a misspelt hook stays at 0.
     fired: Counter[str] = field(default_factory=Counter)
+    #: Where this context's model calls are charged (W3 close ruling): one row per provider call, posted with the traces.
+    #: None only where no provider is ever called (template paths) or in offline tests that do not measure spend.
+    meter: Meter | None = None

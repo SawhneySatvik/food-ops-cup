@@ -30,8 +30,13 @@ _PLACEHOLDER = re.compile(r"⟦uuid:(\d+)⟧")
 
 
 class RecordedFixtureMissing(Exception):
+    #: Misses raised in this process, counted when raised: callers that degrade on any error (the DecisionModel, run_agent)
+    #: swallow the exception itself, so the test guard (tests/conftest.py) reads this count instead (R-E 2-C).
+    raised: ClassVar[int] = 0
+
     def __init__(self, key: str, projection: str) -> None:
         super().__init__(f"no recorded fixture {key}.json")
+        RecordedFixtureMissing.raised += 1
         self.key = key
         #: The canonical request (placeholders in), for whoever authors the fixture. Not in the message.
         self.projection = projection

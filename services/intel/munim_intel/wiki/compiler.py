@@ -16,6 +16,7 @@ from typing import Any, Protocol
 from munim_intel.contracts_gen.models import InternalWikiBatchRequest, InternalWikiBatchResponse
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.tools.generated import uuid7
+from munim_intel.tools.grammar import typed_bracket
 from munim_intel.wiki import pages as P
 from munim_intel.wiki.prose import Narrator, expand, split_sentences
 
@@ -78,9 +79,11 @@ async def _body(e: P.EntityIn, narrator: Narrator | None, report: Report) -> tup
     if narrator is None:
         return template, False
     table = P.handles(e)
-    raw = [expand(s, table) for s in split_sentences(await narrator.prose(e))]
+    said = split_sentences(await narrator.prose(e))
+    # A ref the model typed itself (⟨…⟩) is never kept, even one this page minted: refs come only from its handles.
+    raw = [expand(s, table) for s in said if not typed_bracket(s)]
     model, dropped = P.segments(raw, allowed)
-    report.dropped += dropped
+    report.dropped += dropped + len(said) - len(raw)
     if not model:
         return template, False
     cited = {r for s in model for r in s["refs"]}  # type: ignore[attr-defined]

@@ -8,9 +8,11 @@ item, in order — and returns {answer_id, tainted, source}. core composes the s
 The model call (L1, `narrate` role, at most one per step, NO tools): the model sees the playbook id, each item's id and
 verdict, and per cell a handle (C1, C2, …) with its column name — never a value, a uuid or a name — and writes one line
 per item. A line is used only when it cites at least one of THAT item's handles and nothing else in braces, and the
-prose outside the refs passes the number grammar; any other item keeps core's template sentence (cite-or-abstain:
-every segment cites; nothing typed is a number). AI off or the month's budget spent (run-frame `narration` ≠ model), no
-model available, or a failed run → every item keeps its template (rule 11: degrade to template, never to an error).
+prose passes core's number grammar (tools/grammar.py, core's own rules) and the model typed no ref delimiter itself; any
+other item keeps core's template sentence (cite-or-abstain: every segment cites; nothing typed is a number). A segment the
+contract still refuses is that item's template too, and nothing of the model's text reaches a log (R-E 1-B). AI off or
+the month's budget spent (run-frame `narration` ≠ model), no model available, or a failed run → every item keeps its
+template (rule 11: degrade to template, never to an error).
 
 Only core's cells reach the model, so the run is never tainted (`tainted` is RunState's flag, returned as is).
 """
@@ -19,9 +21,11 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
+from pydantic import ValidationError
 
 from munim_intel.config import Config
 from munim_intel.contracts_gen.models import (
@@ -30,14 +34,17 @@ from munim_intel.contracts_gen.models import (
     InternalRunFrameResponse,
     InvestigationsNarrateRequest,
     InvestigationsNarrateResponse,
+    Segment,
 )
-from munim_intel.negotiate.grammar import violation
+from munim_intel.llm import provider_of
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
 from munim_intel.runtime.state import RunState
 from munim_intel.tools.answer import ref_id
+from munim_intel.tools.grammar import ANY_REF, check_grammar, ref_ids, typed_bracket
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.spend import Meter, SpendBuffer, spend_currency
 
 log = logging.getLogger("munim_intel.investigate")
 
@@ -52,9 +59,6 @@ INSTRUCTION = (
 
 _LINE = re.compile(r"^\s*[-*]?\s*([a-z][a-z0-9_.]*)\s*:\s*(.+?)\s*$")
 _HANDLE = re.compile(r"\{(C[1-9][0-9]*)\}")
-_CANONICAL = re.compile(r"⟨[^⟩]*⟩")
-#: A private-use stand-in for a ref while the prose is checked (as tools/answer.py): it bounds words.
-_REF_MARK = ""
 
 
 def handles(req: InvestigationsNarrateRequest) -> list[dict[str, str]]:
@@ -81,12 +85,23 @@ def message(req: InvestigationsNarrateRequest, tables: list[dict[str, str]]) -> 
 def sentence(text: str, table: dict[str, str]) -> str | None:
     """The model's line for one item with its handles expanded, or None when it may not stand."""
     cited = _HANDLE.findall(text)
-    if not cited or any(h not in table for h in cited):
+    if not cited or any(h not in table for h in cited) or typed_bracket(text):
         return None
     out = _HANDLE.sub(lambda m: table[m.group(1)], text)
     if "{" in out or "}" in out or len(out) > 2000:
         return None
-    return out if violation(_CANONICAL.sub(_REF_MARK, out)) is None else None
+    return out if check_grammar(out) is None else None
+
+
+def _segment(text: str) -> dict[str, Any] | None:
+    """The segment as the contract takes it, or None. Every ref-shaped token becomes a RefId, so a malformed one fails the
+    contract here rather than at core. A ValidationError's text echoes its input, so it is dropped here, unlogged."""
+    seg = {"text": text, "refs": list(dict.fromkeys(ref_id(t) for t in ANY_REF.findall(text)))}
+    try:
+        Segment.model_validate(seg)
+    except ValidationError:
+        return None
+    return seg
 
 
 def segments(req: InvestigationsNarrateRequest, tables: list[dict[str, str]], reply: str) -> tuple[list[dict[str, object]], bool]:
@@ -100,9 +115,9 @@ def segments(req: InvestigationsNarrateRequest, tables: list[dict[str, str]], re
     used = False
     for item, table in zip(req.items, tables, strict=True):
         text = sentence(lines[item.item_id], table) if item.item_id in lines else None
-        used = used or text is not None
-        text = text or item.template
-        out.append({"text": text, "refs": list(dict.fromkeys(ref_id(t) for t in _CANONICAL.findall(text)))})
+        seg = _segment(text) if text is not None else None
+        used = used or seg is not None
+        out.append(seg or {"text": item.template, "refs": ref_ids(item.template)})
     return out, used
 
 
@@ -132,6 +147,8 @@ async def narrate_step(
     tables = handles(req)
     reply = ""
     if llm is not None and frame is not None and frame.narration == "model":
+        # The one call is charged to the month's budget (W3 close ruling); run_agent posts the row with the traces.
+        state.meter = Meter(SpendBuffer(client.write_spend, spend_currency(frame)), "narrate", provider_of(llm), llm.model)
         reply = await model_reply(ctx, req, tables, llm, cfg, state)
     else:
         await state.traces.append("abstain", f"specialist:{req.owner}", {"reason": "model_blocked"})

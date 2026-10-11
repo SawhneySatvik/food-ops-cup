@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.spend import Usage
 
 Kind = Literal["choice", "score", "predicate"]
 KINDS: tuple[Kind, ...] = ("choice", "score", "predicate")
@@ -93,6 +94,11 @@ class DecisionResult:
     latency_ms: int
     #: Provider calls this result cost: 2 when a request with logprobs was rejected and retried without (budget).
     model_calls: int = 1
+    #: Each provider call's usage, in call order (one spend row each; W3 close ruling). The DecisionModel runs before any
+    #: RunState exists, so the caller posts these.
+    call_usage: tuple[Usage, ...] = ()
+    #: The provider the spend rows name (`gemini` for a recorded replay).
+    provider: str = "gemini"
 
 
 class DecisionModel(Protocol):
@@ -155,6 +161,8 @@ def finish(
     error: bool = False,
     unscorable: bool = False,
     model_calls: int = 1,
+    call_usage: tuple[Usage, ...] = (),
+    provider: str = "gemini",
 ) -> DecisionResult:
     """Re-validate an adapter's raw output (§4.2): the answer must be an option and the probabilities a full
     distribution over the options; anything else is `decision_invalid`. No probabilities → band `unscored` when the
@@ -174,6 +182,8 @@ def finish(
             input_tokens=input_tokens,
             latency_ms=latency_ms,
             model_calls=model_calls,
+            call_usage=call_usage,
+            provider=provider,
         )
 
     if error:

@@ -7,6 +7,9 @@
 //   {"op":"ask","world","persona","question","thread_id"?}  → {"status","body"}  (core-api's /v1/ask as that member)
 //   {"op":"http","method","path","headers","body"}          → {"status","body"}  (core-api's app, in-process)
 //   {"op":"sql","q","params"}                               → rows, as the cluster superuser (gate reads only)
+//   {"op":"budget"}                                         → core's own effectiveCap for AS_OF's month (T-090; the
+//                                                             `intel.ai_budget_left` template the run-frame reads), or null
+//   {"op":"frame"}                                          → core's own run-frame for an all-outlet run at the pinned clock
 //   {"op":"intel_reply","id","status","body"}               → (no answer; resolves the pending AskPort call)
 //   {"op":"stop"}
 // AI is on for the world's tenant (intel.enabled + a month budget, as an operator sets them) and core's clock is pinned
@@ -25,7 +28,9 @@ import { localBlobStore } from "../../../../services/core-api/src/modules/import
 import { configureThreads } from "../../../../services/core-api/src/modules/threads/index.ts";
 import { composeCoreApi, serveApi } from "../../../../services/core-api/src/server.ts";
 import { configureInternal } from "../../../../services/core-api/src/internal/index.ts";
-import { createPool } from "../../../../services/core-api/src/lib/db.ts";
+import { createPool, withContext } from "../../../../services/core-api/src/lib/db.ts";
+import { effectiveCap } from "../../../../services/core-api/src/modules/ai_policy/index.ts";
+import { runFrame } from "../../../../services/core-api/src/internal/frame.ts";
 import { parsePendingImports } from "../../../../services/core-worker/src/imports/index.ts";
 import { startIntelStub } from "../../../../scripts/dev/intel-stub.ts";
 import { personaIdentity } from "../../../../tools/worldgen/src/api.ts";
@@ -99,6 +104,13 @@ async function main() {
         return { status: res.status, body: await res.text() };
       }
       if (m.op === "sql") return (await db.admin(m.q as string, (m.params as unknown[]) ?? [])).rows;
+      if (m.op === "budget") {
+        return withContext(svcPool, { tenant_id: tenant, outlet_ids: "*", role: "service" }, (q) => effectiveCap(q, AS_OF.slice(0, 7)));
+      }
+      if (m.op === "frame") {
+        const run = { tenantId: tenant, runId: "01920000-0000-7000-8000-00000000f4a3", scope: ["*"] as ["*"], actor: "manager", trigger: "ask" as const };
+        return withContext(svcPool, { tenant_id: tenant, outlet_ids: "*", role: "service" }, (q) => runFrame(q, run, new Date(`${AS_OF}T06:30:00Z`)));
+      }
       throw new Error(`unknown op ${m.op}`);
     };
 

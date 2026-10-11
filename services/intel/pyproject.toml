@@ -29,6 +29,7 @@ packages = ["munim_intel"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-p no:cacheprovider"
+markers = ["fixture_miss_expected: the test proves a degrade path by missing a recorded fixture on purpose (tests/conftest.py)"]
 
 # ruff + mypy (`make lint` / `make typecheck`) cover the areas listed here. An area joins when its lane makes it
 # pass; contracts_gen is generated and never checked.
@@ -52,9 +53,10 @@ include = [
   "tests/watch/test_watch.py", "tests/watch/test_watch_e2e.py", "tests/watch/stack.py", "tests/watch/make_fixtures.py",
   "tests/watch/test_hooks.py", "tests/watch/test_frame_source.py", "tests/packs/**/*.py",
   "tests/decide/*.py", "tests/tools/*.py", "tests/trace/trace_harness.py", "tests/trace/trace_record.py", "tests/trace/test_trace_plugin.py",
-  "tests/trace/test_trace_core_roundtrip.py",
+  "tests/trace/test_trace_core_roundtrip.py", "tests/trace/test_spend.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
   "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
+  "tests/test_fixture_guard.py",
   "tests/fixtures/smoke_once.py", "tests/live/*.py",
 ]
 
@@ -84,9 +86,10 @@ files = [
   "tests/watch/test_watch.py", "tests/watch/test_watch_e2e.py", "tests/watch/stack.py", "tests/watch/make_fixtures.py",
   "tests/watch/test_hooks.py", "tests/watch/test_frame_source.py", "tests/packs",
   "tests/decide", "tests/tools", "tests/trace/trace_harness.py", "tests/trace/trace_record.py", "tests/trace/test_trace_plugin.py",
-  "tests/trace/test_trace_core_roundtrip.py",
+  "tests/trace/test_trace_core_roundtrip.py", "tests/trace/test_spend.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
   "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
+  "tests/test_fixture_guard.py",
   "tests/fixtures/smoke_once.py", "tests/live",
 ]
 mypy_path = "tests"

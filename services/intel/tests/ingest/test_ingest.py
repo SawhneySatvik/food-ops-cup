@@ -227,6 +227,7 @@ def test_injection_fixtures_execute_no_tool_and_taint_the_run(run: Run) -> None:
     assert run.state.budget.tool_calls == 0
 
 
+@pytest.mark.fixture_miss_expected
 def test_any_extraction_taints_the_run_even_when_it_fails(no_fixture_misses: list[str]) -> None:
     """Taint is set before the call: a clean document taints, and so does a call that never returns (missing fixture,
     which the pipeline records as a refused source, `model_error:RecordedFixtureMissing`)."""

@@ -64,6 +64,7 @@ from munim_intel.runtime.state import Budget, RunState
 from munim_intel.tools.generated import run_start_ms, uuid7
 from munim_intel.tools.handles import HandleTable
 from munim_intel.trace.buffer import TraceBuffer, TraceLabelError
+from munim_intel.trace.spend import Meter
 from munim_intel.watch.frame import Frame
 
 log = logging.getLogger("munim_intel.watch")
@@ -109,7 +110,9 @@ class Report:
 
 
 class WatchRun:
-    def __init__(self, ctx: RunContext, core: Core, frame: Frame, cfg: Config, *, llm: BaseLlm | None = None) -> None:
+    def __init__(
+        self, ctx: RunContext, core: Core, frame: Frame, cfg: Config, *, llm: BaseLlm | None = None, meter: Meter | None = None
+    ) -> None:
         self.ctx = ctx
         self.core = core
         self.frame = frame
@@ -119,6 +122,8 @@ class WatchRun:
         self.state = RunState(
             traces=TraceBuffer(core.write_traces),
             budget=Budget(max_model_calls=MAX_NARRATIONS, max_input_tokens=MAX_NARRATIONS * 8_000, max_tool_calls=0),
+            # Where the narrations' model calls are charged (W3 close ruling); the caller builds it with the model.
+            meter=meter,
         )
         self.handles = HandleTable(self.state.handles)
         self.report = Report()

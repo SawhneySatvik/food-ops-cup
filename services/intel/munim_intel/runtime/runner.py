@@ -2,8 +2,8 @@
 nothing persisted (no DatabaseSessionService — gotcha 25, R25). Errors leave as RunFailed with redacted text
 and no exception chain, so a provider error quoting a key cannot leak through a cause or a traceback.
 
-With a RunState (T-042) the Runner carries a MunimPlugin over it, and the run's traces are flushed in `finally`
-as well: on_run_error_callback sees `Exception` only, so a cancelled run would otherwise lose them. A fan-out branch
+With a RunState (T-042) the Runner carries a MunimPlugin over it, and the run's traces and spend rows are flushed in
+`finally` as well: on_run_error_callback sees `Exception` only, so a cancelled run would otherwise lose them. A fan-out branch
 Runner (T-053) passes its own RunState — its own budget and taint flag over the run's shared HandleTable and TraceBuffer —
 and its own actor label (`branch:<pack>`); its taint reaches the Manager through `BranchReport.tainted`.
 """
@@ -52,10 +52,12 @@ async def run_agent(
     finally:
         await runner.close()
         if state is not None:
-            try:
-                await state.traces.flush()
-            except Exception as e:  # noqa: BLE001 — a run that already failed keeps its own failure
-                failure = failure or RunFailed(type(e).__name__, cfg.redact(str(e)))
+            # Each flush is tried even when the other fails: spend that core never sees is a cap that never moves.
+            for flush in [state.traces.flush, *([state.meter.buffer.flush] if state.meter is not None else [])]:
+                try:
+                    await flush()
+                except Exception as e:  # noqa: BLE001 — a run that already failed keeps its own failure
+                    failure = failure or RunFailed(type(e).__name__, cfg.redact(str(e)))
         ACTOR.reset(actor_token)
     if failure is not None:
         raise failure

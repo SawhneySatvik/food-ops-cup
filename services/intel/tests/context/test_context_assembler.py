@@ -269,7 +269,8 @@ def test_a_branch_gets_block_5_and_no_orchestrator_material() -> None:
         req = request_with_evidence(a, QUESTION, 1)
         assert a.assemble(req)
         texts[name] = whole(req)
-    marks = ("STEPFOURPROSE", "Thread so far", TURNS[5], CITED[0], "Open findings", "finance.short_payout")
+    # The thread block carries no id since R-E 3 (its text is the marker); the absence of ids is gate 6's.
+    marks = ("STEPFOURPROSE", "Thread so far", "Open findings", "finance.short_payout")
     assert "Indiranagar Kitchen" in texts["branch"] and "Indiranagar Kitchen" in texts["manager"]
     assert all(m not in texts["branch"] for m in marks)
     assert all(m in texts["manager"] for m in marks)
@@ -475,6 +476,29 @@ def test_unexpanded_or_forged_handles_render_cannot_verify() -> None:
     assert expand(f"Short by {vouched}.", table, refs=(vouched,)) == f"Short by {vouched}."
 
 
+def test_a_typed_ref_is_checked_for_its_row_and_column_not_only_its_id() -> None:
+    """R-E 2-B: a typed canonical ref of a snapshot this run minted must name a row and a column that snapshot has; a
+    malformed token never passes; a vouched canonical ref counts only as the exact token. Paired accepts in each case."""
+    table = HandleTable()
+    snap = synthetic_snapshot("finance.settlement_vs_orders", 0, rows=2)
+    sid = snap["snapshot_id"]
+    table.add_snapshot(snap)
+    assert expand(f"Short by ⟨snap:{sid}·1·short_minor⟩.", table) == f"Short by ⟨snap:{sid}·1·short_minor⟩.", "a real cell"
+    for planted in (
+        f"Short by ⟨snap:{sid}·2·short_minor⟩.",  # past its rows (r0, r1)
+        f"Short by ⟨snap:{sid}·0·no_such_column⟩.",  # no such column
+        "Short by ⟨snap:bogus⟩.",  # not a ref at all
+        "Short by ⟨⟩.",
+    ):
+        assert expand(planted, table) == CANNOT_VERIFY, planted
+    other = _id(701)
+    vouched = f"⟨snap:{other}·0·short_minor⟩"
+    assert expand(f"Short by {vouched}.", table, refs=(vouched,)) == f"Short by {vouched}."
+    assert expand(f"Short by ⟨snap:{other}·5·short_minor⟩.", table, refs=(vouched,)) == CANNOT_VERIFY, "not the vouched token"
+    assert expand(f"Short by ⟨snap:{other}·5·short_minor⟩.", table, refs=(f"snap:{other}",)) != CANNOT_VERIFY, "a vouched RefId"
+    assert expand(f"Short by ⟨snap:{sid}·9·short_minor⟩.", table, refs=(f"snap:{sid}",)) == CANNOT_VERIFY, "minted: checked"
+
+
 def test_a_planted_handle_in_a_step_summary_renders_cannot_verify_in_context() -> None:
     a = kit(CTX_A, FRAME_A, skills=("finance",), investigation=investigation(planted=" {S9.r0.short_minor}"))
     req = request_with_evidence(a, QUESTION, 0)
@@ -553,21 +577,23 @@ def test_a_tainted_step_summary_contributes_zero_bytes_and_untainted_ones_are_pr
     assert "STEPONEPROSE" not in text, "only the last two untainted summaries"
 
 
-# -- gate 6: the thread excerpt holds the last three turns and nothing of older ones ---------------------------------
+# -- gate 6: the thread excerpt says the ask follows earlier turns, with no id of any of them (R-E 3, §5.7) -----------
 
 
-def test_thread_excerpt_holds_the_last_three_turns_and_zero_bytes_of_older_ones() -> None:
+def test_thread_excerpt_marks_a_follow_up_and_carries_no_turn_answer_or_ref_id() -> None:
     a = kit(CTX_A, FRAME_A, skills=("finance",), thread=thread())
     req = request_with_evidence(a, QUESTION, 1)
     assert a.assemble(req)
     text = whole(req)
-    for t in TURNS[3:6]:
-        assert text.count(t) == 1, "each of the last three turns is present"
-    for old in (*TURNS[:3], *ANSWERS):
-        assert text.count(old) == 0, "an older turn (or any answer) contributes no bytes"
-    for n in (1, 3, 4, 5):
-        assert text.count(CITED[n - 1]) == 1, "the rolling summary's refs are present"
+    assert text.count("Thread so far: this question follows earlier turns") == 1, "the follow-up is marked"
+    for planted in (*TURNS, *ANSWERS, *CITED, _id(99)):
+        assert text.count(planted) == 0, "no turn, answer, cited snapshot or thread id reaches the model"
     assert not a.state.tainted
+    # Paired: a first turn (a thread with nothing before it) has no block at all.
+    first = ThreadsBlock.model_validate({"thread_id": _id(99), "summary_refs": [], "last_turn_ids": [], "tainted": False})
+    b = kit(CTX_A, FRAME_A, skills=("finance",), thread=first)
+    req = request_with_evidence(b, QUESTION, 1)
+    assert b.assemble(req) and "Thread so far" not in whole(req)
 
 
 def test_a_tainted_thread_starts_the_run_tainted() -> None:

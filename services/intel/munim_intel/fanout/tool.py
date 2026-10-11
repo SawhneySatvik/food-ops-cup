@@ -200,11 +200,23 @@ class FanOutTool(BaseTool):
         if tokens(question) > BRIEF_TOKENS:
             return {"error": "The brief is too long; ask in a sentence or two."}
         packs = list(dict.fromkeys(args["specialists"]))
-        return {"reports": list(await asyncio.gather(*(self._branch(p, question) for p in packs)))}
+        tasks = [asyncio.ensure_future(self._branch(p, question)) for p in packs]
+        try:
+            return {"reports": list(await asyncio.gather(*tasks))}
+        except BaseException:
+            # A branch that raised (rather than failing into its report) ends the fan-out: its siblings are cancelled, not
+            # left spending model calls behind a run that has already failed (R-E 3). Their run_agent `finally` still
+            # flushes what they traced and spent; the original error is what leaves.
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
 
     async def _branch(self, pack: str, question: str) -> dict[str, Any]:
         actor = f"branch:{pack}"
-        state = RunState(traces=self._state.traces, budget=branch_budget(), tainted=self._state.tainted, handles=self._state.handles)
+        # The run's TraceBuffer, HandleTable and spend Meter; the branch's own budget and taint flag.
+        run = self._state
+        state = RunState(traces=run.traces, budget=branch_budget(), tainted=run.tainted, handles=run.handles, meter=run.meter)
         branch = Branch(pack, state)
         self.branches.append(branch)
         if not_applicable(pack, self._kinds):

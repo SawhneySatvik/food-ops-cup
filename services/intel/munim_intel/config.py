@@ -24,6 +24,9 @@ ProviderKeyName = Literal["GEMINI_API_KEY", "NVIDIA_API_KEY", "OPENROUTER_API_KE
 ModelMode = Literal["recorded", "live"]
 
 DEFAULT_INTEL_URL = "http://127.0.0.1:8081"
+#: Per-role ceiling on one live provider call, in seconds (W3 close ruling). A call past it fails like any provider error
+#: (the ask abstains, a narration keeps its template). Override with MUNIM_MODEL_TIMEOUT_<ROLE>_S (not a secret).
+DEFAULT_MODEL_TIMEOUTS_S = {"router": 20.0, "narrate": 30.0, "reason": 60.0, "vision": 90.0, "extract": 30.0, "embed": 15.0}
 PUBLIC_KEY_FILE = "run-token-ed25519.pub.pem"
 
 
@@ -59,6 +62,18 @@ class Config:
         # Not a secret, so never read from `.env`.
         sim = (env.get("SUPPLIERS_SIM_PUBLIC_URL") or "").strip()
         self.suppliers_sim_public_url = sim or f"http://127.0.0.1:{(env.get('SUPPLIERS_SIM_PORT') or '8090').strip()}"
+        # Live call timeouts per role; not secrets, so never read from `.env`.
+        self.model_timeouts_s: dict[str, float] = {}
+        for role, default in DEFAULT_MODEL_TIMEOUTS_S.items():
+            name = f"MUNIM_MODEL_TIMEOUT_{role.upper()}_S"
+            raw = (env.get(name) or "").strip()
+            try:
+                seconds = float(raw) if raw else default
+            except ValueError:
+                raise ConfigError(f"{name} must be a number of seconds") from None
+            if not 0 < seconds <= 600:
+                raise ConfigError(f"{name} must be in (0, 600] seconds")
+            self.model_timeouts_s[role] = seconds
 
     def _register(self, label: str, value: str) -> None:
         if len(value) >= 4 and (label, value) not in self._secrets:

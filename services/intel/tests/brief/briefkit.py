@@ -31,7 +31,7 @@ ROWS = (
     ("people", "high", "people.advance_unrecovered", "Staff advances are still outstanding, {ref} in all."),
     ("finance", "medium", "finance.tender_gap", "Card and cash takings do not match the till, a gap of {ref}."),
     ("finance", "medium", "finance.missing_payout", "Delivery payouts have not arrived, {ref} is unpaid."),
-    ("inventory_purchasing", "medium", "purchasing.near_duplicate_invoice", "Two near-identical invoices were booked, {ref} twice."),
+    ("inventory_purchasing", "medium", "purchasing.near_duplicate_invoice", "A near-identical invoice was booked again, {ref} each time."),
 )
 
 

@@ -193,9 +193,11 @@ async def run_matrix(cfg: Config, caller: Caller = live_call) -> Outcome:
         try:
             out.cells[(provider, role)] = await caller(provider, role, mid, cfg)
         except ProviderUnavailable as e:
-            out.cells[(provider, role)] = Cell("skipped", err(e))
+            # Raised while building the model, before any request: no call was made.
+            out.cells[(provider, role)] = Cell("skipped", err(e), calls=0)
         except Exception as e:  # noqa: BLE001 - any provider failure is reported by class + code only
-            out.cells[(provider, role)] = Cell("failed", err(e), None)
+            # The call (or the router's call and its retry) may have been made and billed: counted at its planned worst.
+            out.cells[(provider, role)] = Cell("failed", err(e), None, calls=worst_calls(provider, role))
         out.made += out.cells[(provider, role)].calls
     return out
 
