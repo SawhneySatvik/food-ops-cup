@@ -210,10 +210,15 @@ describe("R1-m5 — reconcile_settlement / reconcile_bank need a committed run",
   test("a settlement and a bank line with no run → MB001; from the committed run → accepted", async () => {
     const run = (await one<{ id: string }>(`SELECT id FROM core.import_run WHERE tenant_id = $1 AND status = 'committed'`, [A.tenant])).id;
     const s0 = uuidv7(); const s1 = uuidv7(); const b0 = uuidv7(); const b1 = uuidv7();
+    const lines = new Map([[s0, uuidv7()], [s1, uuidv7()]]);
     await approveDraft(db, A, "imports.run.commit.v1", async (q) => {
-      for (const [s, r] of [[s0, null], [s1, run]] as const)
+      for (const [s, r] of [[s0, null], [s1, run]] as const) {
         await q(`INSERT INTO core.settlement (tenant_id, id, channel_id, period_from, period_to, external_ref, net_minor, currency, import_run_id)
                  VALUES ($1, $2, $3, '2026-10-08', '2026-10-14', $4, 700, 'INR', $5)`, [A.tenant, s, A.channel, `P-${s}`, r]);
+        // 0022: a settlement's break hangs on one of its own lines.
+        await q(`INSERT INTO core.settlement_line (tenant_id, id, settlement_id, line_no, line_kind, ad_fee_minor, net_minor, currency)
+                 VALUES ($1, $2, $3, 1, 'ad_fee', 700, -700, 'INR')`, [A.tenant, lines.get(s), s]);
+      }
       for (const [b, r] of [[b0, null], [b1, run]] as const)
         await q(`INSERT INTO core.bank_line (tenant_id, id, outlet_id, account_ref, value_date, amount_minor, currency, method, external_ref, import_run_id)
                  VALUES ($1, $2, $3, 'BANK-1', '2026-10-09', 700, 'INR', 'neft', $4, $5)`, [A.tenant, b, A.outlets[0], `UTR-${b}`, r]);
@@ -221,8 +226,8 @@ describe("R1-m5 — reconcile_settlement / reconcile_bank need a committed run",
     const brk = (rl: string, src: string, col: string, id: string) => attempt(db, "munim_core", rule(rl, src),
       `INSERT INTO core.reconciliation_break (tenant_id, id, kind, channel_id, ${col}, amount_minor, currency) VALUES ($1, gen_random_uuid(), 'other', $2, $3, 1, 'INR')`,
       [A.tenant, A.channel, id]);
-    const sNo = await brk("finance.reconcile_settlement", `core.settlement:${s0}`, "outlet_id", A.outlets[0]);
-    const sOk = await brk("finance.reconcile_settlement", `core.settlement:${s1}`, "outlet_id", A.outlets[0]);
+    const sNo = await brk("finance.reconcile_settlement", `core.settlement:${s0}`, "settlement_line_id", lines.get(s0)!);
+    const sOk = await brk("finance.reconcile_settlement", `core.settlement:${s1}`, "settlement_line_id", lines.get(s1)!);
     const bNo = await brk("finance.reconcile_bank", `core.bank_line:${b0}`, "bank_line_id", b0);
     const bOk = await brk("finance.reconcile_bank", `core.bank_line:${b1}`, "bank_line_id", b1);
     console.log(`R1-m5 reconcile: settlement no run → ${sNo?.code}, run → ${sOk ? sOk.code : "accepted"}; bank no run → ${bNo?.code}, run → ${bOk ? bOk.code : "accepted"}`);

@@ -445,7 +445,7 @@ describe("prep lists", () => {
       lines: [{ ingredient_id: T.ingredient, qty_milli: ref(snap, 0), unit: "g" }, { ingredient_id: T.ing2, qty_milli: ref(snap, 1), unit: "kg" }],
     };
     await db.withContext("munim_svc", { tenant_id: T.tenant, outlet_ids: "*", role: "service" }, (c) =>
-      c.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload, based_on) VALUES ($1, $2, $3, 'intel:forecast', 'kitchen.prep_list.create.v1', $4, $5)`,
+      c.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload, based_on) VALUES ($1, $2, $3, 'intel:kitchen', 'kitchen.prep_list.create.v1', $4, $5)`,
         [T.tenant, id, [OUT()], payload, JSON.stringify([ref(snap, 0), ref(snap, 1)])]));
     return { id, list };
   }

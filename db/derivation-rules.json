@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-written list of every core.derivation_rule row (W1 fix #55). db/tests/rules.test.ts asserts the database equals this file; core-domain's parity test may read it instead of parsing migration SQL. One entry per (rule_id, source_table); target_tables lists each seeded target. implemented_by = the ticket that owns the deterministic code.",
+  "_note": "Hand-written list of every core.derivation_rule row (W1 fix #55). db/tests/rules.test.ts asserts the database equals this file; core-domain's parity test may read it instead of parsing migration SQL. One entry per (rule_id, source_table); target_tables lists each seeded target. implemented_by = the ticket that owns the deterministic code. Since 0022 (M-C1d, R45 F11) each entry also lists `bindings`: per target table, the SQL predicate over the source row s, the written row n and (UPDATE) its old version o that the guard's derivation branch requires; tests/mc1d.test.ts fails when an entry has none.",
   "rules": [
     {
       "rule_id": "inventory.consume_order",
@@ -8,6 +8,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.status IN ('placed', 'accepted', 'preparing', 'ready', 'completed')",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'sale_consumption' AND n.ref_type = 'core.order' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id"
+      },
       "seeded_in": "0005",
       "implemented_by": "T-003 (core-domain inventory/rules.ts)"
     },
@@ -18,6 +21,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.status IN ('placed', 'accepted', 'preparing', 'ready', 'completed')",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'sale_consumption' AND n.ref_type = 'core.order' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id"
+      },
       "seeded_in": "0005",
       "implemented_by": "T-003 (core-domain inventory/rules.ts)"
     },
@@ -29,6 +35,10 @@
         "core.posting"
       ],
       "source_state": "s.status = 'completed'",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.order' AND n.source_id = s.id AND n.posting_rule = 'finance.post_order' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.order' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.order' AND je.source_id = s.id AND je.posting_rule = 'finance.post_order')"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -40,6 +50,10 @@
         "core.posting"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.tender' AND n.source_id = s.id AND n.posting_rule = 'finance.post_tender' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.tender' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.tender' AND je.source_id = s.id AND je.posting_rule = 'finance.post_tender')"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -51,6 +65,10 @@
         "core.posting"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.goods_received' AND n.source_id = s.id AND n.posting_rule = 'finance.post_grn' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.goods_received' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.goods_received' AND je.source_id = s.id AND je.posting_rule = 'finance.post_grn')"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -62,6 +80,10 @@
         "core.posting"
       ],
       "source_state": "s.status = 'approved'",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.supplier_invoice' AND n.source_id = s.id AND n.posting_rule = 'finance.post_supplier_invoice' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.supplier_invoice' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.supplier_invoice' AND je.source_id = s.id AND je.posting_rule = 'finance.post_supplier_invoice')"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -73,6 +95,10 @@
         "core.posting"
       ],
       "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.settlement' AND n.source_id = s.id AND n.posting_rule = 'finance.post_settlement' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.settlement' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.settlement' AND je.source_id = s.id AND je.posting_rule = 'finance.post_settlement')"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-026"
     },
@@ -83,6 +109,9 @@
         "core.payable"
       ],
       "source_state": "s.status = 'approved'",
+      "bindings": {
+        "core.payable": "n.source_type = 'core.supplier_invoice' AND n.source_id = s.id AND n.supplier_id = s.supplier_id"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-025"
     },
@@ -93,6 +122,9 @@
         "core.stock_movement"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'receipt' AND n.ref_type = 'core.goods_received' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND EXISTS (SELECT 1 FROM core.grn_line l WHERE l.tenant_id = s.tenant_id AND l.goods_received_id = s.id AND l.ingredient_id = n.ingredient_id AND l.batch_id IS NOT DISTINCT FROM n.batch_id)"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -103,6 +135,9 @@
         "core.stock_movement"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'waste' AND n.ref_type = 'core.waste_log' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND n.ingredient_id = s.ingredient_id AND n.batch_id IS NOT DISTINCT FROM s.batch_id"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -113,6 +148,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.status IN ('sent', 'received')",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'transfer_out' AND n.ref_type = 'core.transfer' AND n.ref_id = s.id AND n.outlet_id = s.from_outlet_id AND EXISTS (SELECT 1 FROM core.transfer_line l WHERE l.tenant_id = s.tenant_id AND l.transfer_id = s.id AND l.ingredient_id = n.ingredient_id AND l.batch_id IS NOT DISTINCT FROM n.batch_id)"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -124,6 +162,10 @@
         "core.batch"
       ],
       "source_state": "s.status = 'received'",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'transfer_in' AND n.ref_type = 'core.transfer' AND n.ref_id = s.id AND n.outlet_id = s.to_outlet_id AND EXISTS (SELECT 1 FROM core.transfer_line l WHERE l.tenant_id = s.tenant_id AND l.transfer_id = s.id AND l.ingredient_id = n.ingredient_id)",
+        "core.batch": "n.outlet_id = s.to_outlet_id AND EXISTS (SELECT 1 FROM core.transfer_line l WHERE l.tenant_id = s.tenant_id AND l.transfer_id = s.id AND l.ingredient_id = n.ingredient_id)"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -134,6 +176,9 @@
         "core.stock_movement"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'supplier_return' AND n.ref_type = 'core.supplier_return' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND EXISTS (SELECT 1 FROM core.supplier_return_line l WHERE l.tenant_id = s.tenant_id AND l.supplier_return_id = s.id AND l.ingredient_id = n.ingredient_id AND l.batch_id IS NOT DISTINCT FROM n.batch_id)"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -144,6 +189,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.restock",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'sale_return' AND n.ref_type = 'core.sale_return' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND EXISTS (SELECT 1 FROM core.order_line l JOIN core.item i ON i.tenant_id = l.tenant_id AND i.id = l.item_id WHERE l.tenant_id = s.tenant_id AND l.id = s.order_line_id AND i.stock_ingredient_id = n.ingredient_id)"
+      },
       "seeded_in": "0008",
       "implemented_by": "T-024"
     },
@@ -154,6 +202,9 @@
         "core.loyalty_entry"
       ],
       "source_state": "s.status = 'completed'",
+      "bindings": {
+        "core.loyalty_entry": "n.kind = 'earn' AND n.order_id = s.id AND n.customer_id = s.customer_id AND n.refund_id IS NULL"
+      },
       "seeded_in": "0011",
       "implemented_by": "T-028"
     },
@@ -164,6 +215,9 @@
         "core.loyalty_entry"
       ],
       "source_state": "s.status IN ('cancelled', 'rejected')",
+      "bindings": {
+        "core.loyalty_entry": "n.kind = 'reverse' AND n.order_id = s.id AND n.refund_id IS NULL"
+      },
       "seeded_in": "0011",
       "implemented_by": "T-028"
     },
@@ -174,6 +228,9 @@
         "core.loyalty_entry"
       ],
       "source_state": "EXISTS (SELECT 1 FROM core.\"order\" o WHERE o.tenant_id = s.tenant_id AND o.id = s.order_id AND o.status = 'completed')",
+      "bindings": {
+        "core.loyalty_entry": "n.kind = 'reverse' AND n.refund_id = s.id AND n.order_id = s.order_id"
+      },
       "seeded_in": "0016",
       "implemented_by": "T-028 (f-2, R2-S2-4)"
     },
@@ -185,6 +242,10 @@
         "core.posting"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.refund' AND n.source_id = s.id AND n.posting_rule = 'finance.post_refund' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.refund' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.refund' AND je.source_id = s.id AND je.posting_rule = 'finance.post_refund')"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -196,6 +257,10 @@
         "core.posting"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.expense' AND n.source_id = s.id AND n.posting_rule = 'finance.post_expense' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.expense' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.expense' AND je.source_id = s.id AND je.posting_rule = 'finance.post_expense')"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -207,6 +272,10 @@
         "core.posting"
       ],
       "source_state": "s.status IN ('approved', 'paid_externally')",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.payroll_draft' AND n.source_id = s.id AND n.posting_rule = 'finance.post_payroll' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.payroll_draft' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.payroll_draft' AND je.source_id = s.id AND je.posting_rule = 'finance.post_payroll')"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -219,6 +288,11 @@
         "core.coupon_use"
       ],
       "source_state": "s.status IN ('placed', 'accepted')",
+      "bindings": {
+        "core.order": "n.id = s.id AND o.id = s.id",
+        "core.order_line": "n.order_id = s.id AND o.order_id = s.id",
+        "core.coupon_use": "n.order_id = s.id AND o.order_id = s.id"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-022 / T-003 (pricing); core.coupon_use discount_minor of the source order only since 0017 (R2-S3-7)"
     },
@@ -229,6 +303,9 @@
         "core.reconciliation_break"
       ],
       "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
+      "bindings": {
+        "core.reconciliation_break": "n.channel_id = s.channel_id AND n.outlet_id IS NOT DISTINCT FROM s.outlet_id AND EXISTS (SELECT 1 FROM core.settlement_line l WHERE l.tenant_id = s.tenant_id AND l.settlement_id = s.id AND l.id = n.settlement_line_id)"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -239,6 +316,9 @@
         "core.reconciliation_break"
       ],
       "source_state": "s.import_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM core.import_run r WHERE r.tenant_id = s.tenant_id AND r.id = s.import_run_id AND r.status = 'committed')",
+      "bindings": {
+        "core.reconciliation_break": "n.bank_line_id = s.id"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -249,6 +329,9 @@
         "core.reconciliation_break"
       ],
       "source_state": "s.status = 'completed'",
+      "bindings": {
+        "core.reconciliation_break": "n.order_id = s.id"
+      },
       "seeded_in": "0014",
       "implemented_by": "T-026"
     },
@@ -259,6 +342,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.status IN ('cancelled', 'rejected')",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'sale_return' AND n.ref_type = 'core.order' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND EXISTS (SELECT 1 FROM core.stock_movement c WHERE c.tenant_id = s.tenant_id AND c.ref_type = 'core.order' AND c.ref_id = s.id AND c.kind = 'sale_consumption' AND c.ingredient_id = n.ingredient_id AND c.batch_id IS NOT DISTINCT FROM n.batch_id)"
+      },
       "seeded_in": "0015",
       "implemented_by": "T-022 / T-024 (W2-R6)"
     },
@@ -270,6 +356,10 @@
         "core.posting"
       ],
       "source_state": "s.status IN ('disputed', 'void')",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.supplier_invoice' AND n.source_id = s.id AND n.posting_rule = 'finance.reverse_supplier_invoice' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.supplier_invoice' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.supplier_invoice' AND je.source_id = s.id AND je.posting_rule = 'finance.reverse_supplier_invoice')"
+      },
       "seeded_in": "0015",
       "implemented_by": "T-026"
     },
@@ -281,6 +371,10 @@
         "core.posting"
       ],
       "source_state": "s.status = 'void'",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.payroll_draft' AND n.source_id = s.id AND n.posting_rule = 'finance.reverse_payroll' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.payroll_draft' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.payroll_draft' AND je.source_id = s.id AND je.posting_rule = 'finance.reverse_payroll')"
+      },
       "seeded_in": "0015",
       "implemented_by": "T-026"
     },
@@ -292,6 +386,10 @@
         "core.posting"
       ],
       "source_state": "true",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.advance' AND n.source_id = s.id AND n.posting_rule = 'finance.post_advance' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.advance' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.advance' AND je.source_id = s.id AND je.posting_rule = 'finance.post_advance')"
+      },
       "seeded_in": "0015",
       "implemented_by": "T-026"
     },
@@ -306,6 +404,13 @@
         "core.coupon_use"
       ],
       "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.erased_at IS NULL AND s.email_verified_at IS NOT NULL AND current_user = 'munim_crosstenant'",
+      "bindings": {
+        "core.order": "n.customer_id = s.id",
+        "core.reservation": "n.customer_id = s.id",
+        "core.bulk_order": "n.customer_id = s.id",
+        "core.customer": "n.merged_into = s.id AND n.id <> s.id",
+        "core.coupon_use": "n.customer_id = s.id"
+      },
       "seeded_in": "0015",
       "implemented_by": "0015 core.customer_claim_verified_email_guests() (T-035)"
     },
@@ -317,6 +422,10 @@
         "core.posting"
       ],
       "source_state": "s.status = 'completed' AND EXISTS (SELECT 1 FROM core.loyalty_entry l WHERE l.tenant_id = s.tenant_id AND l.order_id = s.id AND l.kind = 'redeem' AND NOT EXISTS (SELECT 1 FROM core.loyalty_entry r WHERE r.tenant_id = l.tenant_id AND r.reverses_id = l.id))",
+      "bindings": {
+        "core.journal_entry": "n.source_type = 'core.order' AND n.source_id = s.id AND n.posting_rule = 'finance.post_loyalty_redemption' AND (n.reverses_id IS NULL OR EXISTS (SELECT 1 FROM core.journal_entry r WHERE r.tenant_id = s.tenant_id AND r.id = n.reverses_id AND r.source_type = 'core.order' AND r.source_id = s.id))",
+        "core.posting": "EXISTS (SELECT 1 FROM core.journal_entry je WHERE je.tenant_id = s.tenant_id AND je.id = n.journal_entry_id AND je.source_type = 'core.order' AND je.source_id = s.id AND je.posting_rule = 'finance.post_loyalty_redemption')"
+      },
       "seeded_in": "0016",
       "implemented_by": "T-026 (f-2, R2-S1-4)"
     },
@@ -327,6 +436,9 @@
         "core.customer"
       ],
       "source_state": "s.erased_at IS NOT NULL AND current_user = 'munim_crosstenant'",
+      "bindings": {
+        "core.customer": "n.merged_into = s.id AND o.merged_into = s.id"
+      },
       "seeded_in": "0016",
       "implemented_by": "0016 core.customer_erase_merged_guests(uuid) (f-3, R1-M1)"
     },
@@ -339,6 +451,11 @@
         "core.customer"
       ],
       "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.idp_sub IS NOT NULL AND s.erased_at IS NULL AND s.merged_into IS NULL AND current_user = 'munim_crosstenant'",
+      "bindings": {
+        "core.order": "n.customer_id = s.id",
+        "core.coupon_use": "n.customer_id = s.id",
+        "core.customer": "n.merged_into = s.id AND n.id <> s.id"
+      },
       "seeded_in": "0017",
       "implemented_by": "0017 core.customer_claim_guest_token() (m-5, R41)"
     },
@@ -349,6 +466,9 @@
         "core.stock_movement"
       ],
       "source_state": "s.status = 'submitted'",
+      "bindings": {
+        "core.stock_movement": "n.kind = 'count_adjust' AND n.ref_type = 'core.stock_count' AND n.ref_id = s.id AND n.outlet_id = s.outlet_id AND EXISTS (SELECT 1 FROM core.stock_count_line l WHERE l.tenant_id = s.tenant_id AND l.stock_count_id = s.id AND l.ingredient_id = n.ingredient_id AND l.batch_id IS NOT DISTINCT FROM n.batch_id)"
+      },
       "seeded_in": "0021",
       "implemented_by": "T-093 core imports (stock_count_v1 commit, write_derived group); live counts may adopt it (inventory)"
     }

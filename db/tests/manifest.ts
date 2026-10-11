@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0021 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0022 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -24,6 +24,7 @@ export const MIGRATIONS = [
   "0019_mc1a_templates_outlet_rls",
   "0020_mc23_threads_policy_investigations",
   "0021_mc1bc_pack_templates_history_kinds",
+  "0022_mc1d_guard_binding_f8_asof",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -304,6 +305,11 @@ export const TEMPLATES = [
   "people.advances_open", "people.attendance_coverage", "people.labour_pct", "people.labour_vs_demand", "people.overtime_drift",
   "people.payroll_lines",
   "purchasing.deal_inputs", "purchasing.invoice_duplicates", "purchasing.invoice_vs_po", "purchasing.price_creep", "purchasing.quote_compare",
+  // 0022 (M-C1d): two non-pack templates, and version 2 (a nullable as_of) of the fourteen that read "today".
+  "finance.gst_summary", "inventory.count_variance", "inventory.counts", "market.goals", "purchasing.invoices", "catalogue.dish_margin@2",
+  "catalogue.cost_drift@2", "catalogue.recipe_current@2", "compliance.energy_per_order@2", "forecast.slot_profile@2",
+  "inventory.dead_stock@2", "inventory.expiry_risk@2", "inventory.shortfall@2", "market.competitor_gap@2", "market.goal_baseline@2",
+  "market.goal_progress@2", "market.signal_uplift@2", "market.upcoming@2", "people.advances_open@2", "purchasing.deal_inputs@2",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read

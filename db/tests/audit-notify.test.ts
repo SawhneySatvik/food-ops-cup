@@ -139,7 +139,7 @@ describe("NOTIFY", () => {
       const id = randomUUID();
       await db.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, (t) =>
         t.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload)
-                 VALUES ($1, $2, '{}', 'intel:inventory', 'inventory.reorder_level.set.v1', '{}')`, [A.tenant, id]));
+                 VALUES ($1, $2, '{}', 'intel:inventory_purchasing', 'inventory.reorder_level.set.v1', '{}')`, [A.tenant, id]));
       await db.withContext("munim_core", ownerCtx(A), (t) =>
         t.query(`UPDATE core.draft SET status = 'stale' WHERE tenant_id = $1 AND id = $2`, [A.tenant, id]));
       await settle();

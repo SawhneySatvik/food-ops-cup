@@ -308,6 +308,10 @@ describe("A5 — refund caps per role", () => {
 describe("A6 — derivations", () => {
   test("W2-R6: stock goes back for a cancelled order (inventory.reverse_order_consumption); a placed order → MB001", async () => {
     const order = await placeOrder(A.outlets[0]);
+    // 0022: a reversal gives back what the order consumed, so the order consumes first.
+    expect(await attempt(db, "munim_core", rule("inventory.consume_order", `core.order:${order}`),
+      `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, qty_milli, unit, kind, ref_type, ref_id)
+       VALUES ($1, gen_random_uuid(), $2, $3, -150000, 'g', 'sale_consumption', 'core.order', $4)`, [A.tenant, A.outlets[0], A.ingredient, order])).toBeNull();
     const back = () => attempt(db, "munim_core", rule("inventory.reverse_order_consumption", `core.order:${order}`),
       `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, qty_milli, unit, kind, ref_type, ref_id)
        VALUES ($1, gen_random_uuid(), $2, $3, 150000, 'g', 'sale_return', 'core.order', $4)`, [A.tenant, A.outlets[0], A.ingredient, order]);

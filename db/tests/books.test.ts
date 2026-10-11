@@ -174,7 +174,7 @@ describe("snapshots", () => {
         JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace s ON s.oid = c.relnamespace
        WHERE s.nspname = 'core' AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped`)).rows.map((r) => r.col));
     const tables = new Set([...cols].map((c) => c.split(".").slice(0, 2).join(".")));
-    const t = await x.admin("SELECT id, columns FROM evidence.snapshot_template ORDER BY id");
+    const t = await x.admin("SELECT CASE version WHEN 1 THEN id ELSE id || '@' || version END AS id, columns FROM evidence.snapshot_template ORDER BY id, version");
     const failures: string[] = [];
     let elements = 0;
     for (const row of t.rows) {
@@ -189,7 +189,7 @@ describe("snapshots", () => {
         }
       }
     }
-    return { templates: t.rows.map((r) => r.id), failures, elements };
+    return { templates: t.rows.map((r) => r.id as string).sort(), failures, elements };
   }
 
   test("template numeric sources: every numeric column names an allowed source column", async () => {
@@ -205,7 +205,7 @@ describe("snapshots", () => {
     const x = await db.clone();
     try {
       await x.admin(`UPDATE evidence.snapshot_template SET columns = jsonb_set(columns, '{2,numeric_source}',
-                       '["core.order_line.qty_milli", "intel.finding.confidence_bp"]') WHERE id = 'catalogue.dish_margin'`);
+                       '["core.order_line.qty_milli", "intel.finding.confidence_bp"]') WHERE id = 'catalogue.dish_margin' AND version = 1`);
       const r = await templateSourceFailures(x);
       console.log("RED-PROOF template sources (list element):", r.failures);
       expect(r.failures).toEqual(["catalogue.dish_margin.units_sold: numeric_source 'intel.finding.confidence_bp' not allowed"]);

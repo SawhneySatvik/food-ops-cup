@@ -230,7 +230,9 @@ describe("M-C3 (6) intel.agent_track_record", () => {
     console.log("track record finance:", JSON.stringify(fin), "kitchen rows:", kit.length, "all rows:", all.length);
     expect(fin).toEqual([{ specialist: "finance", proposed: "6", approved: "3", edited: "0", rejected: "2", stale: "1", abstained: "1" }]);
     expect(kit).toEqual([]);
-    expect(all).toEqual(fin); // the world's own drafts are 'intel:inventory' — not an F8 id
+    // The world's own two drafts are 'intel:inventory_purchasing' (0022 F8 CHECK): both proposed, the second rejected
+    // (world.ts step 4), none approved, edited or stale, no abstain traces.
+    expect(all).toEqual([...fin, { specialist: "inventory_purchasing", proposed: "2", approved: "0", edited: "0", rejected: "1", stale: "0", abstained: "0" }]);
   });
 });
 

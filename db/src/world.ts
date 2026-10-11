@@ -429,9 +429,13 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await q(`INSERT INTO intel.run (tenant_id, id, trigger, actor, outlet_scope, expires_at) VALUES ($1, $2, 'watch_sweep', 'watcher:inventory', '{*}', now() + interval '2 hours')`, [T, w.run]);
     await q(`INSERT INTO evidence.snapshot (tenant_id, id, template_id, template_version, run_id, outlet_scope, rows, row_count, sha256)
              VALUES ($1, $2, 'inventory.below_reorder', 1, $3, '{*}', '[]', 0, repeat('0', 64))`, [T, w.snapshot, w.run]);
+    // F8 (0022): the Inventory & Purchasing specialist's drafts; a payload the proposal schema accepts (numbers as refs),
+    // since a specialist desk lists them.
     for (const [k, d] of w.drafts.entries()) {
+      const ref = (col: string) => `\u27e8snap:${w.snapshot}\u00b70\u00b7${col}\u27e9`;
       await q(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, run_id, command_type, command_payload)
-               VALUES ($1, $2, $3, 'intel:inventory', $4, 'inventory.reorder_level.set.v1', '{}')`, [T, d, [w.outlets[k]], w.run]);
+               VALUES ($1, $2, $3, 'intel:inventory_purchasing', $4, 'inventory.reorder_level.set.v1', $5)`,
+        [T, d, [w.outlets[k]], w.run, { outlet_id: w.outlets[k], ingredient_id: w.ingredient, min_qty_milli: ref("min_qty_milli"), par_qty_milli: ref("par_qty_milli") }]);
     }
     // Imports (0009): a parsed run with one staged and one quarantined row.
     await q(`INSERT INTO core.import_run (tenant_id, id, document_id, kind, parser) VALUES ($1, $2, $3, 'payout_statement', 'swiggy_orders_v1')`,
@@ -463,8 +467,10 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
                VALUES ($1, $2, $3, $4, $5, '2026-10-10', 'seasonal_naive', 12000, 9000, 15000, $6)`, [T, u(), fr, w.outlets[k], w.item, w.snapshot]);
     }
     await q(`INSERT INTO intel.finding (tenant_id, id, run_id, outlet_ids, pack, type, severity, impact_snapshot_id, impact_row, impact_column, confidence_bp, envelope, dedupe_key)
-             VALUES ($1, $2, $3, $4, 'inventory', 'inventory.shortfall', 'high', $5, 0, 'on_hand_milli', 8000, '{"segments": []}', $6)`,
-      [T, w.finding, w.run, [w.outlets[0]], w.snapshot, `inventory.shortfall:${w.outlets[0]}`]);
+             VALUES ($1, $2, $3, $4, 'inventory_purchasing', 'inventory.shortfall', 'high', $5, 0, 'on_hand_milli', 8000, $7, $6)`,
+      [T, w.finding, w.run, [w.outlets[0]], w.snapshot, `inventory.shortfall:${w.outlets[0]}`,
+       // An abstained envelope the findings contract accepts (a specialist desk lists the finding since 0022's F8 relabel).
+       { finding_id: w.finding, segments: [], impact_ref: null, abstained: true, reason_code: "count_missing" }]);
     await q(`INSERT INTO intel.answer (tenant_id, id, run_id, question, asked_by, envelope, abstained, reason_code) VALUES ($1, $2, $3, 'Why was this week bad?', $4, '{"segments": []}', true, 'settlements_missing')`,
       [T, u(), w.run, w.owner]);
     const ev = u();

@@ -81,7 +81,7 @@ export async function startEnv(country: "IN" | "AU" = "IN"): Promise<Env> {
     async draft(command_type, payload, basedOn, outlets) {
       const id = uuidv7();
       await db.withContext("munim_svc", svc, (c) =>
-        c.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload, based_on) VALUES ($1, $2, $3, 'intel:compliance_assets', $4, $5, $6)`,
+        c.query(`INSERT INTO core.draft (tenant_id, id, outlet_ids, source, command_type, command_payload, based_on) VALUES ($1, $2, $3, 'intel:compliance', $4, $5, $6)`,
           [w.tenant, id, outlets, command_type, payload, JSON.stringify(basedOn)]));
       return id;
     },
