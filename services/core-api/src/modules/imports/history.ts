@@ -28,7 +28,9 @@ export interface HistoryCtx {
   variants: Map<string, string[]>;
   /** E.164 phone → live, unmerged customer ids. */
   customers: Map<string, string[]>;
-  ingredients: Map<string, Array<{ id: string; base_unit: string }>>;
+  ingredients: Map<string, Array<{ id: string; base_unit: string; tracked: boolean }>>;
+  /** Active members by lower-cased name (shift and count files name people; core resolves them). */
+  members: Map<string, string[]>;
   closed: Array<{ month: string; outlet_id: string | null }>;
   /** `<channel id>␟<external_ref>` already in the books (an import of the same bill twice). */
   existing: Set<string>;
@@ -44,7 +46,7 @@ export async function loadHistoryCtx(c: Queryable, refs: readonly string[]): Pro
       WHERE t.tenant_id = current_setting('app.tenant_id')::uuid ORDER BY p.version DESC LIMIT 1`)).rows[0]!.doc;
   const h: HistoryCtx = {
     pack, outlets: new Map(), channels: new Map(), brands: new Map(), items: new Map(), variants: new Map(), customers: new Map(),
-    ingredients: new Map(), closed: [], existing: new Set(),
+    ingredients: new Map(), members: new Map(), closed: [], existing: new Set(),
   };
   const now = (await c.query<{ now: Date }>(`SELECT now() AS now`)).rows[0]!.now;
   for (const o of (await c.query<{ id: string; tz: string; cutoff: string }>(
@@ -68,9 +70,11 @@ export async function loadHistoryCtx(c: Queryable, refs: readonly string[]): Pro
   }
   for (const cu of (await c.query<{ id: string; phone: string }>(
     `SELECT id, phone FROM core.customer WHERE phone IS NOT NULL AND erased_at IS NULL AND merged_into IS NULL`)).rows) add(h.customers, cu.phone, cu.id);
-  for (const g of (await c.query<{ id: string; name: string; base_unit: string }>(`SELECT id, name, base_unit FROM core.ingredient`)).rows) {
-    add(h.ingredients, g.name.trim().toLowerCase(), { id: g.id, base_unit: g.base_unit });
+  for (const g of (await c.query<{ id: string; name: string; base_unit: string; tracked_by_batch: boolean }>(
+    `SELECT id, name, base_unit, tracked_by_batch FROM core.ingredient`)).rows) {
+    add(h.ingredients, g.name.trim().toLowerCase(), { id: g.id, base_unit: g.base_unit, tracked: g.tracked_by_batch });
   }
+  for (const m of (await c.query<{ id: string; name: string }>(`SELECT id, name FROM core.member WHERE active`)).rows) add(h.members, m.name.trim().toLowerCase(), m.id);
   h.closed = (await c.query<{ month: string; outlet_id: string | null }>(
     `SELECT period_month::text AS month, outlet_id FROM core.period_close`)).rows;
   if (refs.length) {
@@ -108,7 +112,7 @@ export function instantOf(h: HistoryCtx, outletId: string, date: string, time: s
   return businessDate(at, o.tz, o.cutoff) === date ? at.toISOString() : null;
 }
 
-const one = <V>(m: Map<string, V[]>, k: string | null): V | undefined => {
+export const one = <V>(m: Map<string, V[]>, k: string | null): V | undefined => {
   if (k === null) return undefined;
   const hit = m.get(k);
   return hit?.length === 1 ? hit[0] : undefined;

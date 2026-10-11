@@ -246,6 +246,8 @@ export class RowChecker {
       }
       case "pos_bills":
       case "waste_log":
+      case "shift_log":
+      case "stock_count":
         throw new Error("imports: history kinds are checked by history.ts");
     }
   }

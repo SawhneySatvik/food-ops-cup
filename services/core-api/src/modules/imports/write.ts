@@ -139,7 +139,7 @@ async function billViaSeams(c: Queryable, b: Bill, w: Who): Promise<void> {
 
 // ---- the batched path -------------------------------------------------------------------------------------------
 
-type Group = { rule: string; source_ref: string; journal_entry?: unknown[]; posting?: unknown[]; stock_movement?: unknown[] };
+export type Group = { rule: string; source_ref: string; journal_entry?: unknown[]; posting?: unknown[]; stock_movement?: unknown[] };
 type BatchStock = Parameters<typeof fefoPick>[0][number];
 
 /** What the derivations read, once per commit (the seams read it per row). */
@@ -266,7 +266,7 @@ function derived(ctx: Ctx, b: Bill, ids: Ids, currency: string): Group[] {
   return [...groups.filter((g): g is Group => g !== null), ...(b.lines.length ? consumption(ctx, b, ids.order, ids.lines) : [])];
 }
 
-async function writeDerived(c: Queryable, groups: readonly Group[]): Promise<void> {
+export async function writeDerived(c: Queryable, groups: readonly Group[]): Promise<void> {
   if (groups.length === 0) return;
   await c.query(`SELECT core.write_derived($1::jsonb)`, [JSON.stringify(groups)]);
   // finance's checkBalancedNow: the deferred balance checks fire here, so an imbalance surfaces at the call site.

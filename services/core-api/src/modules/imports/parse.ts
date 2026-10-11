@@ -10,7 +10,9 @@ import type { Queryable } from "../../runtoken/index.ts";
 import type { BlobStore } from "./blob.ts";
 import { CsvError, readCsv } from "./csv.ts";
 import { builtInByParser, CONTROL_FIELD, headerSignature, type MappingEntry } from "./formats.ts";
+import { checkCounts } from "./counts.ts";
 import { checkBills, checkWaste, loadHistoryCtx } from "./history.ts";
+import { checkShifts } from "./shifts.ts";
 import { columnIndex, outletOf, readFields, readMoney, RowChecker, type RowContext, type RowOutcome, type Staged } from "./rows.ts";
 
 export type ParseOutcome = "previewed" | "failed" | "skipped";
@@ -109,7 +111,7 @@ export async function parseRun(c: Queryable, blobs: BlobStore, runId: string): P
   }
 
   // Dated rows (POS exports and history): outlet business dates, closed periods, channels and bills already imported.
-  if (run.kind === "pos_export" || run.kind === "pos_bills" || run.kind === "waste_log") {
+  if (run.kind === "pos_export" || run.kind === "pos_bills" || run.kind === "waste_log" || run.kind === "shift_log" || run.kind === "stock_count") {
     ctx.history = await loadHistoryCtx(c, [...new Set(read.flatMap(({ f }) => (f.ok && f.v.bill_no != null ? [String(f.v.bill_no).trim()] : [])))]);
   }
   const outletId = (name: unknown) => outletOf(ctx, (name ?? null) as string | null)?.id ?? undefined;
@@ -121,6 +123,16 @@ export async function parseRun(c: Queryable, blobs: BlobStore, runId: string): P
     const readable = read.flatMap(({ r, f }) => (f.ok && !unreadableBills.has(String(f.v.bill_no).trim()) ? [{ line: r.line, v: f.v }] : []));
     const judged = new Map(checkBills(readable, outletId, ctx.history!).map((o, i) => [readable[i]!.line, o] as const));
     outcomes = read.map(({ r, f }) => (!f.ok ? f : judged.get(r.line) ?? { ok: false, reason: "bill_rejected" }));
+  } else if (run.kind === "shift_log") {
+    const readable = read.flatMap(({ r, f }) => (f.ok ? [{ line: r.line, v: f.v }] : []));
+    const judged = new Map((await checkShifts(c, readable, outletId, ctx.history!)).map((o, i) => [readable[i]!.line, o] as const));
+    outcomes = read.map(({ r, f }) => (!f.ok ? f : judged.get(r.line)!));
+  } else if (run.kind === "stock_count") {
+    // A count is judged whole; a row that cannot even be read rejects its count.
+    const unreadable = new Set(read.flatMap(({ r, f }) => (f.ok ? [] : [(r.cells[cols.get("count_no")!] ?? "").trim()])));
+    const readable = read.flatMap(({ r, f }) => (f.ok && !unreadable.has(String(f.v.count_no).trim()) ? [{ line: r.line, v: f.v }] : []));
+    const judged = new Map((await checkCounts(c, readable, outletId, ctx.history!)).map((o, i) => [readable[i]!.line, o] as const));
+    outcomes = read.map(({ r, f }) => (!f.ok ? f : judged.get(r.line) ?? { ok: false, reason: "count_rejected" }));
   } else {
     outcomes = read.map(({ f }) => (!f.ok ? f : run.kind === "waste_log" ? checkWaste(f.v, outletId, ctx.history!) : checker.build(f.v)));
   }

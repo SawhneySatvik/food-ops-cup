@@ -1,0 +1,8 @@
+Shift No,Date,Outlet,Opened At,Closed At,Opened By,Closed By,Float,Counted Cash,Cash Tenders
+T93-S1,2026-10-01,Outlet 1,10:00,23:00,Owner,Owner,2000.00,3000.00,1008.00
+T93-S2,2026-10-02,Outlet 1,10:00,23:00,Owner,Staff,2000.00,2236.00,236.00
+T93-S3,2026-10-03,Outlet 1,10:00,23:00,Staff,Staff,2000.00,3108.00,1008.00
+T93-S4,2026-10-04,Outlet 1,10:00,23:00,Owner,Owner,1500.00,1800.00,336.00
+T93-S5,2026-10-05,Outlet 1,10:00,23:00,Owner,Owner,1500.00,2172.00,672.00
+T93-S6,2026-10-06,Outlet 1,18:00,02:00,Owner,Staff,1000.00,1386.00,336.00
+T93-S7,2026-10-07,Outlet 1,10:00,23:00,Owner,Owner,1000.00,1335.00,336.00

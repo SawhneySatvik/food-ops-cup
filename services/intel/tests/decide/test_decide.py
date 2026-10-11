@@ -381,7 +381,7 @@ def _zod_enum(path: str, name: str) -> set[str]:
 
 def test_registry_answers_are_finite_typed_choices_never_numbers_prose_severities_or_verdicts() -> None:
     kinds = set(_zod_enum("packages/contracts/src/imports/index.ts", "ImportKind"))
-    assert len(QUESTIONS) == 1 + len(kinds) == 8
+    assert len(QUESTIONS) == 1 + len(kinds) == 10  # 9 import kinds (T-093 added shift_log, stock_count) + map.columns
     assert {q.variant for q in QUESTIONS if q.key == "map.columns"} == kinds
     forbidden = (
         _zod_enum("packages/contracts/src/internal/index.ts", "Severity")
@@ -410,7 +410,7 @@ def test_import_fields_match_core() -> None:
     parsed: dict[str, tuple[str, ...]] = {}
     for kind, body in re.findall(r"\n  (\w+): \{(.*?)\n  \},", block, re.S):
         parsed[kind] = tuple(re.findall(r"(\w+): (?:[tmdn]\(|\{)", body))
-    assert len(parsed) == 7
+    assert len(parsed) == 9  # 7 + shift_log + stock_count (T-093)
     assert parsed == IMPORT_FIELDS
     for kind, fields in IMPORT_FIELDS.items():
         assert MAP_COLUMNS[kind].options == (*fields, "ignore")

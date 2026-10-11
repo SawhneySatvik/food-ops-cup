@@ -9,8 +9,10 @@ import { CurrencyCode, IsoDateTime, MinorAmount, Uuid7 } from "../shared/primiti
 import type { Route } from "../shared/routes.ts";
 
 /** The file kinds this module parses (core.import_run.kind, a subset of core.document.kind). `pos_bills` and
- *  `waste_log` are dated history (R44b, 0018): bills with lines, tenders, refunds and voids; waste entries. */
-export const ImportKind = z.enum(["payout_statement", "bank_statement", "pos_export", "tally_export", "market_signal", "pos_bills", "waste_log"]);
+ *  `waste_log` are dated history (R44b, 0018): bills with lines, tenders, refunds and voids; waste entries.
+ *  `shift_log` and `stock_count` are dated history too (T-093, 0021): closed drawer sessions; counted stock with its adjustments. */
+export const ImportKind = z.enum(["payout_statement", "bank_statement", "pos_export", "tally_export", "market_signal", "pos_bills", "waste_log",
+  "shift_log", "stock_count"]);
 export type ImportKind = z.infer<typeof ImportKind>;
 
 export const Sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);

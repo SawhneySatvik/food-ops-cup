@@ -17,6 +17,8 @@ import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { type BankLineInput, postFor, recordBankLines, recordSettlement, type SettlementInput } from "../finance/index.ts";
 import { builtInBySignature, checkMapping, headerSignature, type MappingEntry } from "./formats.ts";
+import { type StagedCountLine, writeCounts } from "./counts.ts";
+import { type StagedShift, writeShifts } from "./shifts.ts";
 import { type Bill, type Waste, writeBills, writeWaste, type WriteMode } from "./write.ts";
 
 interface Decision {
@@ -168,6 +170,20 @@ export async function commitRun(c: Queryable, cmd: Parameters<CommandHandler["ru
       });
       await writeWaste(c, rows, { by, currency }, mode);
       written.waste = rows.length;
+      break;
+    }
+    case "shift_log": {
+      await refuseClosed(c, staged.map((s) => ({ outlet_id: String(s.data.outlet_id), date: String(s.data.shift_date) })));
+      await writeShifts(c, staged.map((s) => s.data as unknown as StagedShift), currency);
+      written.shifts = staged.length;
+      break;
+    }
+    case "stock_count": {
+      await refuseClosed(c, staged.map((s) => ({ outlet_id: String(s.data.outlet_id), date: String(s.data.count_date) })));
+      const w = await writeCounts(c, staged.map((s) => s.data as unknown as StagedCountLine));
+      written.stock_counts = w.counts;
+      written.stock_count_lines = w.lines;
+      written.count_adjustments = w.adjustments;
       break;
     }
     case "market_signal": {

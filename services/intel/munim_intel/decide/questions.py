@@ -86,6 +86,19 @@ IMPORT_FIELDS: dict[str, tuple[str, ...]] = {
         "currency",
     ),
     "waste_log": ("waste_date", "waste_time", "outlet", "ingredient", "qty", "unit", "reason", "note"),
+    "shift_log": (
+        "shift_no",
+        "shift_date",
+        "outlet",
+        "opened_at",
+        "closed_at",
+        "opened_by",
+        "closed_by",
+        "float",
+        "counted_cash",
+        "cash_tenders",
+    ),
+    "stock_count": ("count_no", "count_date", "count_time", "outlet", "counted_by", "ingredient", "qty", "unit", "batch"),
 }
 
 

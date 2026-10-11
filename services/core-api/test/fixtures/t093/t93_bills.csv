@@ -1,0 +1,11 @@
+Bill No,Bill Date,Bill Time,Outlet,Channel,Brand,Order Type,Customer Phone,Bill Status,Item Code,Variant Code,Qty,Unit Price,Tax Class,Line Discount,Line Total,Void Reason,Cash,Card,UPI,Refund,Refund Mode,Refund Reason,Refund Date
+T93-B01,2026-10-01,12:30,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,
+T93-B02,2026-10-01,19:45,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,2,320.00,restaurant_5,0,672.00,,672.00,0,0,,,,
+T93-B03,2026-10-02,13:00,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,100.00,cash,late_delivery,
+T93-B04,2026-10-03,13:10,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,3,320.00,restaurant_5,0,1008.00,,1008.00,0,0,,,,
+T93-B05,2026-10-03,14:00,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,0,336.00,0,,,,
+T93-B06,2026-10-04,20:00,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,
+T93-B07,2026-10-05,12:15,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,2,320.00,restaurant_5,0,672.00,,672.00,0,0,,,,
+T93-B08,2026-10-06,21:30,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,
+T93-B09,2026-10-07,13:00,Outlet 1,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,
+T93-B10,2026-10-02,13:30,Outlet 2,counter,,dine_in,,,menu.paneer_tikka,,1,320.00,restaurant_5,0,336.00,,336.00,0,0,,,,

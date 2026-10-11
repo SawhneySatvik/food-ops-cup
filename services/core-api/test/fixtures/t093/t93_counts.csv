@@ -1,0 +1,7 @@
+Count No,Date,Time,Outlet,Counted By,Ingredient,Counted Qty,Unit,Batch
+T93-C1,2026-10-03,20:00,Outlet 1,Staff,Flour,8000,g,
+T93-C1,2026-10-03,20:00,Outlet 1,Staff,Oil,5000,ml,
+T93-C2,2026-10-05,18:00,Outlet 2,Owner,Oil,250,ml,
+T93-C3,2026-10-06,18:30,Outlet 1,Owner,Flour,9700,g,
+T93-C3,2026-10-06,18:30,Outlet 1,Owner,Oil,4900,ml,
+T93-C3,2026-10-06,18:30,Outlet 1,Owner,Paneer,700,g,T93-PB

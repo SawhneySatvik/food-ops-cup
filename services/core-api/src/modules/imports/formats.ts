@@ -46,12 +46,21 @@ export const FIELDS: Record<ImportKind, Record<string, Field>> = {
   waste_log: {
     waste_date: d(true), waste_time: t(), outlet: t(true), ingredient: t(true), qty: n(true), unit: t(true), reason: t(true), note: t(),
   },
+  // T-093: one row per closed drawer session. `cash_tenders` is the file's net cash taken in the shift: a control only.
+  shift_log: {
+    shift_no: t(true), shift_date: d(true), outlet: t(true), opened_at: t(true), closed_at: t(true), opened_by: t(true), closed_by: t(true),
+    float: m(true), counted_cash: m(true), cash_tenders: m(true),
+  },
+  // T-093: one row per counted ingredient; the count's own columns repeat on each of its rows and must agree.
+  stock_count: {
+    count_no: t(true), count_date: d(true), count_time: t(), outlet: t(true), counted_by: t(true), ingredient: t(true), qty: n(true), unit: t(true), batch: t(),
+  },
 };
 
 /** The field whose TOTAL row is the file's printed control total (none for market signals). */
 export const CONTROL_FIELD: Record<ImportKind, string | null> = {
   payout_statement: "net", bank_statement: "amount", tally_export: "amount", pos_export: "total", market_signal: null,
-  pos_bills: "line_total", waste_log: null,
+  pos_bills: "line_total", waste_log: null, shift_log: null, stock_count: null,
 };
 
 /** Units a column may be declared in. Money: the currency's major or minor unit (named or generic). */
@@ -170,6 +179,16 @@ const wasteMap = map([
   ["Date", "waste_date", "date_ymd"], ["Time", "waste_time"], ["Outlet", "outlet"], ["Ingredient", "ingredient"], ["Qty", "qty", "decimal"],
   ["Unit", "unit"], ["Reason", "reason"], ["Note", "note"],
 ]);
+// T-093 layouts. Money in the currency's major unit; times are the outlet's wall clock (HH:MM) on the business date.
+const shiftMap = map([
+  ["Shift No", "shift_no"], ["Date", "shift_date", "date_ymd"], ["Outlet", "outlet"], ["Opened At", "opened_at"], ["Closed At", "closed_at"],
+  ["Opened By", "opened_by"], ["Closed By", "closed_by"], ["Float", "float", "major"], ["Counted Cash", "counted_cash", "major"],
+  ["Cash Tenders", "cash_tenders", "major"],
+]);
+const countMap = map([
+  ["Count No", "count_no"], ["Date", "count_date", "date_ymd"], ["Time", "count_time"], ["Outlet", "outlet"], ["Counted By", "counted_by"],
+  ["Ingredient", "ingredient"], ["Counted Qty", "qty", "decimal"], ["Unit", "unit"], ["Batch", "batch"],
+]);
 const marketMap = map([
   ["on_date", "on_date", "date_ymd"], ["kind", "kind"], ["label", "label"], ["outlet_ref", "outlet"], ["value", "value", "decimal"],
   ["unit", "unit"], ["source", "source"],
@@ -199,6 +218,8 @@ export const BUILT_INS: readonly BuiltIn[] = [
   { parser: "market_signal_v1", kind: "market_signal", countries: null, header: headerOf(marketMap), mapping: marketMap, fixed: {}, labels: {} },
   { parser: "pos_bills_v2", kind: "pos_bills", countries: null, header: headerOf(posBillsMap), mapping: posBillsMap, fixed: {}, labels: {} },
   { parser: "waste_log_v1", kind: "waste_log", countries: null, header: headerOf(wasteMap), mapping: wasteMap, fixed: {}, labels: {} },
+  { parser: "shift_log_v1", kind: "shift_log", countries: null, header: headerOf(shiftMap), mapping: shiftMap, fixed: {}, labels: {} },
+  { parser: "stock_count_v1", kind: "stock_count", countries: null, header: headerOf(countMap), mapping: countMap, fixed: {}, labels: {} },
 ];
 
 export const builtInBySignature = (sig: string): BuiltIn | undefined => BUILT_INS.find((b) => headerSignature(b.header) === sig);
