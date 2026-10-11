@@ -69,6 +69,14 @@ export function bridgeSpec(): TemplateSpec & { components: string[]; sumRow: str
   return { id, params, columns, source: "ADR-014 §7.3", components, sumRow: ticks(sumLine)[0]! };
 }
 
+/** The template version a pack §3 row describes, where it is not version 1: finance.md §3 carries the 0023 (M-C1e)
+ *  version-2 columns and gst_check's `outlet_id?`. Hand-kept; other packs' §3 rows describe version 1 (their later
+ *  versions' extra columns are hand lists in tests/mc1d.test.ts and tests/mc1e.test.ts). */
+export const SPEC_VERSION: Record<string, number> = {
+  "finance.settlement_vs_orders": 2, "finance.missing_payouts": 2, "finance.tender_vs_bank": 2, "finance.gst_check": 2,
+};
+export const specVersion = (id: string) => SPEC_VERSION[id] ?? 1;
+
 /** Every M-C1a template: catalogue §3 + finance §3 + the bridge. */
 export function mc1aTemplates(): TemplateSpec[] {
   return [...packTemplates("catalogue"), ...packTemplates("finance"), bridgeSpec()];

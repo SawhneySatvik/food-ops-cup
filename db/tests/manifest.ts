@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0022 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0023 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -25,6 +25,7 @@ export const MIGRATIONS = [
   "0020_mc23_threads_policy_investigations",
   "0021_mc1bc_pack_templates_history_kinds",
   "0022_mc1d_guard_binding_f8_asof",
+  "0023_mc1e_template_versions",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -310,6 +311,10 @@ export const TEMPLATES = [
   "catalogue.cost_drift@2", "catalogue.recipe_current@2", "compliance.energy_per_order@2", "forecast.slot_profile@2",
   "inventory.dead_stock@2", "inventory.expiry_risk@2", "inventory.shortfall@2", "market.competitor_gap@2", "market.goal_baseline@2",
   "market.goal_progress@2", "market.signal_uplift@2", "market.upcoming@2", "people.advances_open@2", "purchasing.deal_inputs@2",
+  // 0023 (M-C1e): version 2 of nine templates the pack lanes asked for (Σ rows first, requested columns, an outlet filter).
+  "finance.settlement_vs_orders@2", "finance.missing_payouts@2", "finance.tender_vs_bank@2", "finance.gst_check@2",
+  "customers.coupon_current@2", "compliance.licence_calendar@2", "compliance.log_coverage@2", "people.overtime_drift@2",
+  "kitchen.ticket_times@2",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read

@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (22 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (23 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -33,7 +33,8 @@ fourteen catalogue/finance templates), 0020 M-C23 (specialist threads, the AI po
 standing grant behind Auto and the `auto_step` run trigger, three intel templates), 0021 M-C1bc + T-093 (the remaining packs'
 44 templates; the `shift_log` / `stock_count` history kinds, what an approved import writes for them, `inventory.count_adjust`),
 0022 M-C1d (the guard binds every derived row to its source record, F8 draft sources, `as_of` template versions,
-`finance.gst_summary`, `inventory.count_variance`) — gates see 21 applied.
+`finance.gst_summary`, `inventory.count_variance`), 0023 M-C1e (version 2 of nine templates the pack lanes asked for: Σ rows
+first, requested columns, gst_check's outlet filter; the `findings.dismiss.v1` command row) — gates see 22 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -315,7 +316,8 @@ second post (no `reverses_id`) is still 23505.
   `settlement_vs_orders` and `missing_payouts` add an `outlet_id` param the pack table does not list. `finance.pnl` and
   `finance.gst_check` are core-api's FINANCE_TEMPLATES SQL with the role codes resolved; `finance.gst_summary` (non-pack)
   arrives with 0022. `finance.tender_vs_bank` and `finance.close_status` narrow `core.outlet` (tenant-visible) to the
-  minter's outlets themselves. Σ rows (`settlement_vs_orders`, `missing_payouts`) are the last row, ids null.
+  minter's outlets themselves. Σ rows (`settlement_vs_orders`, `missing_payouts`) are the last row, ids null — in version 1;
+  since 0023 their version 2 (the one core-api mints) puts one Σ row per settlement / channel FIRST (M-C1e below).
 - **`finance.margin_bridge`** (`period_month`, `compare_month`): rows `revenue_volume, revenue_price, deal_discount,
   cogs_supplier_price, cogs_volume_mix, waste, channel_fees, labour, other, unexplained`, then the Σ row `margin_delta_minor`;
   columns `component, prior_minor, current_minor, delta_minor, share_bp`. Each row is a component's level in each month, so
@@ -521,6 +523,46 @@ restrictive `customer_scope` / `guest_scope` (deny) policies; `intel_ro` cannot 
   `inventory.below_reorder` v2 stays a decision for the orchestrator (0021).
 - **Gates:** `tests/mc1d.test.ts`; `node db/tests/templates-worlds.ts` (the time-bound plants RG-M1, RG-M1b, ST-I4 now run v2
   at `as_of` = the gate profile's date, never skipped, and hold with the wall clock moved 400 days); `db/tests/redproof-0022.sh`.
+
+**M-C1e (0023) — shapes other lanes code against.** Version 2 of nine templates (core-api mints the latest, so every new
+snapshot of these is v2 — **callers below must change**). The formula notes are 0023's header; in short:
+- **`finance.settlement_vs_orders` v2** — v1's columns + `settlement_id`, `channel_id`. One Σ row per settlement FIRST
+  (`settlement_line_id` NULL), summing only the lines that count under pack §4 (short ≥ max(`line_short_minor_gte`,
+  ⌈expected × `line_short_bp_gte` ÷ 10,000⌉), the active pack's `detectors.finance.short_payout` — core-api reconcileSettlement's
+  rule), every Σ column over those same lines; zeros when none counts. Expected net starts from the matched order's total
+  (pack §2, reconcileSettlement), the statement's gross for an unmatched line. Then the lines (as v1).
+- **`finance.missing_payouts` v2** — + `channel_id`. One Σ row per channel FIRST (`order_id` NULL), `days_unsettled` = the
+  oldest order's; no row for a channel with nothing unsettled (v1 always printed a zero Σ row).
+- **`finance.tender_vs_bank` v2** — + `week_start`, `gap_days`. One Σ row per ISO week FIRST (`business_on` NULL) over its gap
+  days (the statement has a credit on or after the day up to `:to`, and gap ≥ the pack's `detectors.finance.tender_gap`
+  `gap_minor_gte`); `outlet_median_voids` on a Σ row = the per-day median × `gap_days` (so "voids ≥ 2 × median" compares
+  like with like); `shift_member_id` only when every gap day's member is the same. Day rows as v1.
+- **`finance.gst_check` v2** — params + `outlet_id` (nullable, required as every named param): narrows orders and entries.
+- **`customers.coupon_current` v2** — + `code`, `kind`, `valid_from`, `valid_to` (timestamptz), `outlet_ids` (**text**: a JSON
+  array of uuids as jsonb prints it, `["a", "b"]`; `[]` = every outlet), `active`, `requires_customer`.
+- **`compliance.licence_calendar` v2** — + `status` (`in_force` | `expired` | `missing`), `manager_member_id`. Expired = none in
+  force, and the kind's latest non-superseded licence had started and ran out (active, `valid_to` < as_of) or is `lapsed`:
+  the row names it, `days_left` = `valid_to` − as_of capped at 0. **`missing` is now true only for status `missing`.**
+- **`compliance.log_coverage` v2** — + `manager_member_id` (of `:outlet_id`, else the checklist's own outlet; the temperature
+  row: of `:outlet_id`; else NULL).
+- **Manager rule** — an active member with an active `manager` membership listing the outlet; several → the fewest listed
+  outlets, then the lowest member id; none → NULL. Only in-scope outlets. (Worldgen: only restaurant_group's South has one.)
+- **`people.overtime_drift` v2** — one Σ row per staff member FIRST (`iso_week` NULL), Σ of their week rows (cost = Σ of the
+  rounded weekly costs). Week rows as v1.
+- **`kitchen.ticket_times` v2** — one row per station and item over the whole window FIRST (`slot_start` NULL; its own
+  p50/p80), then v1's per-slot rows.
+- **`findings.dismiss.v1`** — command authority row (owner, manager, judge; outlet; `target_tables` `{}` like
+  `drafts.approve.v1`): it writes only `intel.finding.status` (munim_core's 0012 column grant) and opens no book table.
+- **Callers to update (breaking):** `finance.gst_mismatch` (must send `outlet_id`, else mint refuses `invalid_payload`);
+  `finance.short_payout` / `missing_payout` / `tender_gap` detectors and the finance skill (Σ rows are first and per
+  settlement / channel / week; read them by their NULL id column); `compliance.licence_expiring` (an expired licence is no
+  longer `missing`: it fires on `days_left` ≤ 30, negative once run out); `people.overtime_drift` and
+  `kitchen.prep_time_gap` (filter the NULL `iso_week` / `slot_start` rows — the Σ / whole-window rows now come first and
+  carry the same ids); intel pack tests that install `requested_templates_v2.sql` now find the migrator's v2.
+- **Gates:** `tests/mc1e.test.ts` (columns, roles, params, Σ first, scope, v1 inside v2, hand values, D1);
+  `node db/tests/templates-worlds.ts` (now four worlds: RG-F3, CK-F3, AU-F3, RG-F4 + F7, RG-F5, RG-P1, AU-P1, RG-A5, ST-A5,
+  AU-A5 on v2); `tests/templates.test.ts` + `template-spec.ts` (`SPEC_VERSION`: finance.md §3 describes the finance v2s);
+  `db/tests/redproof-0023.sh`. Other red-proof scripts plant `0024_redproof_plant.sql` now.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
