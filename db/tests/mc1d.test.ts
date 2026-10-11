@@ -558,8 +558,9 @@ const NEW_LISTS = ["inventory.counts", "market.goals", "purchasing.invoices"];
 /** 0023 (M-C1e) adds version 2 of these nine (gated in tests/mc1e.test.ts); 0022's version 2s are the rest. Hand-kept. */
 const MC1E_V2 = ["finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.gst_check", "customers.coupon_current",
   "compliance.licence_calendar", "compliance.log_coverage", "people.overtime_drift", "kitchen.ticket_times"];
-/** Later version 2s with their own gates: 0025 intel.investigation_cost_estimate (tests/w3close.test.ts). */
-const LATER_V2 = ["intel.investigation_cost_estimate"];
+/** Later version 2s with their own gates: 0025 intel.investigation_cost_estimate (tests/w3close.test.ts), 0026
+ *  people.labour_vs_demand (tests/w3decisions.test.ts). */
+const LATER_V2 = ["intel.investigation_cost_estimate", "people.labour_vs_demand"];
 
 describe("A1 / A2 — version 2 of the templates", () => {
   let fx: McFixture;

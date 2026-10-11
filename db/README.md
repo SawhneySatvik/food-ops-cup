@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (25 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (26 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -37,7 +37,9 @@ standing grant behind Auto and the `auto_step` run trigger, three intel template
 first, requested columns, gst_check's outlet filter; the `findings.dismiss.v1` command row), 0024 W3.2 review fixes (one
 stock count per outlet per instant, A2A endpoints only on simulated suppliers, quote spans into the supplier's reply,
 the `ingest` run trigger, `finance.settlement_vs_orders` v3), 0025 W3 close (`intel.investigation_cost_estimate` v2 per
-remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`) — gates see 24 applied.
+remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`), 0026 W3 founder decisions (R47: per-role AI
+prices on `platform.model_role`, negotiation bounds on `core.business_policy`, `people.labour_vs_demand` v2 at the extra staff's
+rate, `purchasing.deal_inputs` v3 with shop SKU margins) — gates see 25 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -647,6 +649,74 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
   `core.business_policy`), unchanged.
 - **Gates:** `tests/w3close.test.ts` (hand values beside the fixture rows; each refusal paired with an accept);
   `db/tests/redproof-0025.sh`. Red-proof scripts plant `0026_redproof_plant.sql` now; `grants.test.ts` plants `0026_planted.sql`.
+
+**W3 founder decisions (0026, ledger R47) — shapes other lanes code against.** The formula notes are 0026's header; in short:
+- **D1 — per-role AI prices.** `platform.model_role` + `input_price_per_mtok_minor`, `output_price_per_mtok_minor`
+  (`bigint`, whole minor units of `price_currency` per 1,000,000 tokens — the shape rider-core validates; a sub-minor list
+  price such as US$0.075 = 7.5 cents cannot be stored and is rounded UP by the operator; a fractional value sent as a
+  parameter is refused 22P02, never rounded) and `price_currency` (`char(3)`). All three NULL or all three set (CHECK
+  `model_role_price_all_or_none`); prices ≥ 0 (`model_role_price_nonnegative`: **0 = free**, R47 D8); currency `^[A-Z]{3}$`.
+  **NULL = not priced: intel refuses a live call on such a role** (R47 D1); recorded mode needs no price. The six 0015 rows
+  are NULL — no price is invented. Writes: `munim_platform` only (UPDATE on the three columns; INSERT table-level), i.e. only
+  through core's approved config draft (R24); `munim_core` / `munim_svc` read them (table-level SELECT; the internal
+  model-roles read runs as `munim_svc`); `munim_intel_ro` reads nothing. **No trigger:** an approved draft applies exactly as
+  signed; clearing the price when a draft changes the model and omits the price group is core's `apply()` (orchestrator
+  ruling) — the database never rewrites a price (post-condition: `touch_updated_at` is the table's only trigger).
+  **Callers (core, contracts, intel — none of this is in `db/**`):** `platform/validate.ts` `model_role` patch must accept
+  the three keys (all or none; a non-negative decimal string or number with ≤ 6 decimals; currency `^[A-Z]{3}$`);
+  `drafts.ts` `apply()` must write them (and `currentOf()` must return them, so the platform audit's before/after carries the
+  price); `platform/read.ts` `modelRoles` lists columns explicitly, so the internal read exposes nothing until core adds them
+  — and intel's `PlatformModelRoleRow` is `extra='forbid'`, so core's response, contracts and the regenerated Pydantic must
+  change in one commit or every live model resolve fails. bigint comes back from `pg` as a string. How a USD price becomes
+  spend in an INR/AUD budget is not decided here (founder, money).
+- **D7 — negotiation bounds.** `core.business_policy` + `negotiation_target_bp` and `negotiation_walkaway_bp`, basis points
+  of the reference (last) price, each nullable and CHECK 1..20000; CHECK `business_policy_negotiation_order_check` target ≤
+  walk-away when both are set. A pair with one bound unset is judged on the effective pair (the other's default) by core —
+  the database cannot see a default that lives in code. **NULL = unset → code applies R47's 9500 / 11000** (no column DEFAULT: it would stamp an unapproved 95/110 on
+  every policy row). Written only as a new policy version by the owner's own `tenancy.policy.set.v1` (0007 row: owner, judge;
+  tenant; `core.business_policy` — asserted from the live row); no UPDATE grant. **Callers:** core's `policySetHandler` carries
+  the previous version's columns over by an explicit list — it must add both bounds (to the payload, the carry-over and the
+  audit `after`), or the next labour/margin change silently resets them to NULL (= the defaults). intel's
+  `negotiate/policy.py` holds the 9500 / 11000 defaults today; it needs the owner's values from core (run-frame or a snapshot
+  — a core decision) and must say "default" when they are NULL.
+- **D6 — `people.labour_vs_demand` v2** (core-api mints it from now on). Per outlet everywhere (v1 summed outlets when
+  `outlet_id` was NULL and judged them on one merged norm); `excess_min` = attended − orders × norm (≥ 0); `excess_cost_minor` =
+  those minutes filled from the slot's attending staff **cheapest hourly rate first** (staff_id breaks ties), each person at
+  most their own minutes in the slot, × their rate ÷ 60, rounded once (v1: × everyone's minute-weighted rate). Cheapest-first
+  is a lower bound — it never overstates a "₹ found" figure. One Σ row per (outlet, weekday, slot) FIRST (`business_on` NULL,
+  `weekday` `mon`..`sun`), each cell = Σ of the day cells below it; then day rows by outlet, day, slot. Columns: v1's eight,
+  then `outlet_id`, `weekday`, `excess_min`; params and `min_role` v1's; the norm is v1's (rolling 8-week median of the same
+  outlet, weekday and slot). **Callers:** `people.overstaffed_slot` skips the Σ rows already (no `business_on`), but its impact
+  changes: RG-P2's latest qualifying day reads 16,000 (the helpers' 8,000/h × 120 min), not 18,000 (blended 9,000/h) —
+  `tests/packs/people/test_people_e2e.py` asserts 18,000 and must change (INFERENCE: not run here), and its
+  `test_rg_p2_is_judged_against_its_planted_demand_norm` calls `date.fromisoformat(r["business_on"])` on every row, which
+  raises on the Σ rows (NULL). Any consumer that sums a column over all rows double-counts unless it filters
+  `business_on IS NOT NULL` (people.md §8 "labour cost (30 d) ← labour_vs_demand"). The pack doc (people.md §3) describes v1's columns
+  (`template-spec.ts` SPEC_VERSION stays 1).
+  **RG-P2 vs its key.** The key's 3,600 minutes / 480,000 counts every planted helper minute. The template reads 3,060 / 408,000
+  on the gate world: three of the 30 slot-days also carry a baseline history bill (8 Sep 16:00, 30 Sep 15:00, 7 Oct 17:00: 2
+  orders × 120 = 240 needed → 0), and in the fifth week the rolling norm has absorbed four helper days (median 180 → 60 instead
+  of 120 on three slot-days). Every excess minute is priced at the key's own rate (480,000 × 60 ÷ 3,600 = 8,000/h). The
+  template stays as written (orchestrator ruling); the 408,000 vs 480,000 gap is recorded as a worldgen/key issue (the
+  key's "orders flat" is false on three slot-days, and the rolling norm absorbs the plant), and the m0026 world check
+  asserts the template's own hand value, 3,060 / 408,000.
+- **D3 — `purchasing.deal_inputs` v3** (core-api mints it). v2 + recipe-less shop SKUs: an item `kind = 'sku'` whose
+  `stock_ingredient_id` is the quoted ingredient and that has no recipe (fuse's rule) sells one base unit of it, so its margin =
+  (selling price − the quote's unit price converted to the base unit) × 10000 ÷ selling price, with selling price = the
+  **lowest current `core.price`** (no variant) at the quote's run outlets in the minter's scope, valid on each outlet's today
+  (`as_of`-anchored), net of tax when the pack's prices are inclusive (amount × 10000 ÷ (10000 + the class's `rate_bp`)).
+  `margin_at_quote_bp` = the lowest over v2's dishes and these SKUs (an unpriced SKU or a unit that does not convert drops out,
+  like v2's unsold dishes). New last column **`margin_rule_applies`** (boolean): true when a dish's current recipe uses the
+  ingredient or a recipe-less SKU stocks it; **false for packaging** (no item sells it; the margin is then NULL). Params and
+  `min_role` v2's; `margin_at_quote_bp` also names `core.price.amount_minor`. **Callers:** `negotiate/review.py` must skip the
+  margin rule when `margin_rule_applies` is false (today a NULL margin is `cannot_verify cost_price_missing`); a true flag with a
+  NULL margin stays cannot-verify. Packaging's `need_qty_milli` is still 0 (fuse has no consumption path for it), so the overlap
+  rule still abstains — D3's "judged on need" has no source yet. inventory-purchasing.md §3 describes v1's columns.
+- **Gates:** `tests/w3decisions.test.ts` (hand values beside the fixture rows; each refusal paired with an accept; both new
+  versions' output columns = their declared columns); `node db/tests/templates-worlds.ts` (m0026: RG-P2's Σ rows, total and
+  per-row rate against the hand derivation above, with the two-bill slot-days counted from `core.order` directly; the store's
+  atta 1,115 / sugar 1,458 / carry bag NULL-and-false); `db/tests/redproof-0026.sh`. Red-proof scripts plant
+  `0027_redproof_plant.sql` now; `grants.test.ts` plants `0027_planted.sql`.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
