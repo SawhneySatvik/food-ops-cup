@@ -607,9 +607,9 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
   Σ row; a missing pack threshold takes core's default (`line_short_minor_gte` ?? 1, `line_short_bp_gte` ?? 0). Σ rows are
   v2's set (one per settlement with ≥ 1 order line, first; zeros when none counts — also when every line is unmatched).
   Columns, params and `min_role` = v2's. core-api mints v3 from now on. **Callers:** `finance.short_payout` (and the finance
-  skill) see no unmatched lines any more; on today's worldgen worlds the F3 plants (RG-F3 ZM-C-SHORT, CK-F3 SW-K-SHORT,
-  AU-F3 DD-SHORT) are statements whose order lines match no order (0/20, 0/12, 0/15 matched), so v3 — like core, which opens
-  no `short_payout` break for them — reads 0 there until worldgen re-plants F3 on real aggregator orders. Note: with
+  skill) see no unmatched lines any more. The worldgen F3 plants (RG-F3 ZM-C-SHORT, CK-F3 SW-K-SHORT, AU-F3 DD-SHORT) are
+  re-planted (wg-2) on real aggregator bills of the dated history (20/20, 12/12, 15/15 lines matched), so core's breaks and
+  v3 both read the keys (60,000, 57,600, 3,000). Note: with
   `greatest()` skipping a NULL and `short > 0` already implying ≥ 1, each coalesce alone changes nothing; both together are
   what stop a pack without line thresholds from counting nothing.
 - **Hosted apply.** Run the two pre-check counts first (the migration refuses otherwise):
@@ -618,7 +618,7 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
   built non-concurrently (the runner wraps each file in one transaction): it locks `core.stock_count` writes for the build.
 - **Gates:** `tests/w32fix.test.ts` (each refusal paired with an accept; hand values beside the fixture rows); `node
   db/tests/templates-worlds.ts` (v3 Σ = core's `short_payout` breaks per settlement on every world with a settlement; the F3
-  keys printed as INFO, blocked as above); `db/tests/redproof-0024.sh`. The manifest's FK count is 366.
+  statement fully matched with core's breaks = v3 Σ = the key); `db/tests/redproof-0024.sh`. The manifest's FK count is 366.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

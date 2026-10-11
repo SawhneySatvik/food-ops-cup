@@ -489,8 +489,8 @@ describe("G2 — the two named gaps with their real source states, and the MB008
     });
     const rule = { tenant_id: T, outlet_ids: "*" as const, posting_rule: "inventory.count_adjust", source_ref: `core.stock_count:${countId}` };
     const mv = (outlet: string, ing: string) => [`INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, qty_milli, unit, kind, ref_type, ref_id)
-      VALUES ($1, gen_random_uuid(), $2, $3, -100, 'g', 'count_adjust', 'core.stock_count', $4) RETURNING origin`, [T, outlet, ing, countId]] as const;
-    const ok = await db.withContext("munim_core", rule, (c) => c.query(...mv(o0, w.ingredient))).then((r) => r.rows[0].origin, (e) => e.code);
+      VALUES ($1, gen_random_uuid(), $2, $3, -100, 'g', 'count_adjust', 'core.stock_count', $4) RETURNING origin`, [T, outlet, ing, countId]] as [string, unknown[]];
+    const ok = await db.withContext("munim_core", rule, (c) => c.query<{ origin: unknown }>(...mv(o0, w.ingredient))).then((r) => r.rows[0]?.origin, (e) => e.code);
     const wrongOutlet = await attempt(db, "munim_core", rule, ...mv(o1, w.ingredient));
     const wrongIng = await attempt(db, "munim_core", rule, ...mv(o0, ing2));
     // An approved import binds no movement (0021 H2): an unbound one falls through to the decision's MB008.
@@ -511,7 +511,7 @@ describe("G2 — the two named gaps with their real source states, and the MB008
       `UPDATE core.supplier_invoice SET status = 'approved' WHERE tenant_id = $1 AND id = $2`, [T, inv.id])).toBeNull();
     const rule = { tenant_id: T, outlet_ids: "*" as const, posting_rule: "purchasing.payable_from_invoice", source_ref: `core.supplier_invoice:${inv.id}` };
     const pay = (src: string) => [`INSERT INTO core.payable (tenant_id, id, supplier_id, source_type, source_id, due_on, amount_minor, currency)
-      VALUES ($1, gen_random_uuid(), $2, 'core.supplier_invoice', $3, current_date, 100, $4)`, [T, inv.supplier_id, src, w.currency]] as const;
+      VALUES ($1, gen_random_uuid(), $2, 'core.supplier_invoice', $3, current_date, 100, $4)`, [T, inv.supplier_id, src, w.currency]] as [string, unknown[]];
     const other = randomUUID();
     const [ok, bad] = [await attempt(db, "munim_core", rule, ...pay(inv.id)), await attempt(db, "munim_core", rule, ...pay(other))];
     console.log(`payable_from_invoice (real state): own invoice → ${ok?.code ?? "accepted"}; another invoice → ${bad?.code}`);
