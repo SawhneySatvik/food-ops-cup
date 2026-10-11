@@ -558,6 +558,8 @@ const NEW_LISTS = ["inventory.counts", "market.goals", "purchasing.invoices"];
 /** 0023 (M-C1e) adds version 2 of these nine (gated in tests/mc1e.test.ts); 0022's version 2s are the rest. Hand-kept. */
 const MC1E_V2 = ["finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.gst_check", "customers.coupon_current",
   "compliance.licence_calendar", "compliance.log_coverage", "people.overtime_drift", "kitchen.ticket_times"];
+/** Later version 2s with their own gates: 0025 intel.investigation_cost_estimate (tests/w3close.test.ts). */
+const LATER_V2 = ["intel.investigation_cost_estimate"];
 
 describe("A1 / A2 — version 2 of the templates", () => {
   let fx: McFixture;
@@ -608,7 +610,7 @@ describe("A1 / A2 — version 2 of the templates", () => {
     const live = (await F.admin<{ id: string; req: string[]; p: string[] }>(`SELECT t2.id, ARRAY(SELECT jsonb_array_elements_text(t2.params_schema -> 'required') ORDER BY 1) req,
         ARRAY(SELECT jsonb_array_elements_text(t1.params_schema -> 'required') ORDER BY 1) p
       FROM evidence.snapshot_template t2 JOIN evidence.snapshot_template t1 ON t1.id = t2.id AND t1.version = 1
-     WHERE t2.version = 2 AND NOT t2.id = ANY ($1) ORDER BY 1`, [MC1E_V2])).rows;
+     WHERE t2.version = 2 AND NOT t2.id = ANY ($1) ORDER BY 1`, [[...MC1E_V2, ...LATER_V2]])).rows;
     console.log(`A1: ${live.length} version-2 templates`);
     expect(live.map((r) => r.id)).toEqual([...AS_OF_TEMPLATES, "catalogue.dish_margin"].sort());
     for (const r of live) expect(r.req).toEqual(r.id === "catalogue.dish_margin" ? r.p : [...r.p, "as_of"].sort());

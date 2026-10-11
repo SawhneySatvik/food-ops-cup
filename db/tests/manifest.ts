@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0024 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0025 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -27,6 +27,7 @@ export const MIGRATIONS = [
   "0022_mc1d_guard_binding_f8_asof",
   "0023_mc1e_template_versions",
   "0024_w32_review_fixes",
+  "0025_w3_close",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -319,6 +320,8 @@ export const TEMPLATES = [
   "kitchen.ticket_times@2",
   // 0024 (R-A F5): settlement_vs_orders v3, core-api reconcileSettlement's lines (matched orders only) and default thresholds.
   "finance.settlement_vs_orders@3",
+  // 0025 (R-D 4): investigation_cost_estimate v2, per remaining step (one step judges every evaluable item in one call).
+  "intel.investigation_cost_estimate@2",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read

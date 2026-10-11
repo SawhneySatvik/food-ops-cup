@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (24 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (25 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -36,7 +36,8 @@ standing grant behind Auto and the `auto_step` run trigger, three intel template
 `finance.gst_summary`, `inventory.count_variance`), 0023 M-C1e (version 2 of nine templates the pack lanes asked for: Σ rows
 first, requested columns, gst_check's outlet filter; the `findings.dismiss.v1` command row), 0024 W3.2 review fixes (one
 stock count per outlet per instant, A2A endpoints only on simulated suppliers, quote spans into the supplier's reply,
-the `ingest` run trigger, `finance.settlement_vs_orders` v3) — gates see 23 applied.
+the `ingest` run trigger, `finance.settlement_vs_orders` v3), 0025 W3 close (`intel.investigation_cost_estimate` v2 per
+remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`) — gates see 24 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -249,7 +250,7 @@ second post (no `reverses_id`) is still 23505.
   `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
   write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
   'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
-- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0025` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0026` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
   non-zero naming that item's tests (the plant is removed after each run).
 
 **History imports (0018, R44 b, c) — shapes other lanes code against.**
@@ -279,7 +280,7 @@ second post (no `reverses_id`) is still 23505.
   (409 `period_closed`, nothing written) when a month closed after the preview.
 - **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
   run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
-- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0025` per item (renumbered as later files landed) and requires
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0026` per item (renumbered as later files landed) and requires
   `tests/history.test.ts` to exit non-zero naming that item's tests. `redproof-0017.sh` likewise.
 
 **M-C1a (0019) — shapes other lanes code against.**
@@ -619,6 +620,33 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
 - **Gates:** `tests/w32fix.test.ts` (each refusal paired with an accept; hand values beside the fixture rows); `node
   db/tests/templates-worlds.ts` (v3 Σ = core's `short_payout` breaks per settlement on every world with a settlement; the F3
   statement fully matched with core's breaks = v3 Σ = the key); `db/tests/redproof-0024.sh`. The manifest's FK count is 366.
+
+**W3 close (0025) — shapes other lanes code against.** The formula notes are 0025's header; in short:
+- **`intel.investigation_cost_estimate` v2 (review R-D 4)** — core-api mints v2 from now on. Cost unit = the **step** (one step
+  judges every evaluable item in one L1 call), not the item.
+  - `per_step_minor` = round(Σ spend of the runs linked to steps of same-playbook investigations ÷ the number of those
+    linked steps), half away from zero, per spend currency. Linked = `run_id IS NOT NULL`. The denominator counts every
+    linked step whatever its spend (a step with no spend, or spend only in another currency, is 0 in the numerator and 1 in
+    the denominator); v1 counted only steps with spend in that currency.
+  - `remaining_steps` (new column, after `remaining_items`) = open / waiting: `max(0, least(max_steps − steps_done, items not
+    frozen))`; a terminal status: 0. The not-frozen cap is an INFERENCE (a step that freezes nothing new usually ends the
+    run: core-domain `nextStatus`).
+  - `estimate_minor` = `per_step_minor × remaining_steps` (was × `remaining_items`). Columns otherwise v1's; params and
+    `min_role` v1's. 0 rows without a linked step, **and** when linked steps exist but none recorded spend (no currency to
+    state it in → "cannot verify", as without history). v1 is unchanged.
+  - **Callers:** core-api reads only `estimate_minor` / `currency`. A fixture whose history has a linked step with no spend
+    now reads a lower per-step figure; one whose `max_steps − steps_done` is below the unfrozen count reads fewer steps.
+- **`core.investigation` NOTIFY (b-89a).** Trigger `notify_inbox` AFTER INSERT OR UPDATE → `core.notify_ids('munim_inbox')`,
+  payload `'<tenant_id>:<id>'`. core-worker's `munim_svc` UPDATEs (Auto steps) now wake inbox streams with no code. core-api's
+  explicit `notifyInbox` sends the identical payload in the same transaction; Postgres delivers it once (kept or deleted at
+  core's choice).
+- **`munim_platform` reads `intel.intel_spend.id` (b-92)** — page a tenant's spend rows by `(at, id)`. Still never `run_id`,
+  `role`, `provider`, `model_id` or tokens, and never `SELECT *`. Not granted: `core.ai_budget_cap` (a tenant book; the A5
+  screen does not show it; it would need USAGE on `core` and an operator RLS path) — asserted absent.
+- **No business-policy command row.** The business-policy command uses 0007's `tenancy.policy.set.v1` (owner, judge; tenant;
+  `core.business_policy`), unchanged.
+- **Gates:** `tests/w3close.test.ts` (hand values beside the fixture rows; each refusal paired with an accept);
+  `db/tests/redproof-0025.sh`. Red-proof scripts plant `0026_redproof_plant.sql` now; `grants.test.ts` plants `0026_planted.sql`.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible
