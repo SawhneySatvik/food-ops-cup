@@ -1,0 +1,34 @@
+{
+ "request": {
+  "model": "recorded/narrate",
+  "system": "You write the morning brief for the owner of a restaurant or shop: one short plain-English line per item, in the order given, on its own line. Each line must cite its item by writing that item's handle in braces, exactly as given, once. A line without its handle is discarded. Never write a digit, a number word, a percent sign, a currency amount, a date, a name or a quotation yourself. Do not give advice. Reply with the lines only.\n\nYou are an agent. Your internal name is \"brief\".",
+  "contents": [
+   {
+    "role": "user",
+    "parts": [
+     {
+      "text": "Items, most important first:\n- {I1}: Customers desk, severity high, kind regulars lapsing\n- {I2}: People desk, severity high, kind advance unrecovered\n- {I3}: Finance desk, severity medium, kind tender gap, a draft is waiting\n- {I4}: Finance desk, severity medium, kind missing payout\n- {I5}: Inventory and purchasing desk, severity medium, kind near duplicate invoice"
+     }
+    ]
+   }
+  ],
+  "tools": [],
+  "output": [
+   null,
+   null,
+   null
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "Lapsed regulars are the biggest money at risk today {I1}.\nMoney lent to staff is still waiting to be recovered {I2}.\nThe takings do not add up against the till {I3}.\nPayouts that should have arrived are missing {I4}.\nThe same supplier bill looks booked twice {I5}."
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

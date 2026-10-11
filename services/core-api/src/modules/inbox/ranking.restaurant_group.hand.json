@@ -1,0 +1,271 @@
+{
+ "_note": "Hand data (T-054, 11 Oct 2026). Synthetic. Expected inbox ranking for restaurant_group after one sweep. Inputs: impact_minor from tools/worldgen/answer-key/restaurant_group.json; eligible = detector-map.json detector non-null and no `expect: no_finding` (so RG-C3/F9/G7/X1/S1 [no §4 detector], RG-C5/G5 [abstain cases], RG-MF1 [investigation], RG-C6/F8 [traps] are out). Severity = packages/contracts/packs/IN.json severity_ladder applied to impact_minor (>= 5,000,000 critical, >= 1,000,000 high, >= 200,000 medium, else low); ASSUMPTION: the ladder's monthly impact equals the key's impact. confidence_bp = 10000 for every row; ASSUMPTION: no coverage cell lowers it. age_days = 0 (one sweep). score = impact x confidence_bp x urgency_bp, urgency_bp = severity weight (low 10000, medium 15000, high 20000, critical 30000) + 500 x age_days. Only tie: RG-K7 and RG-C2 (ranks 16-17, outside the top 5; broken by older, then id). A null-impact row (RG-A5) scores 0 and sorts last.",
+ "top5": [
+  "RG-G4",
+  "RG-P3",
+  "RG-F5",
+  "RG-F7",
+  "RG-I3"
+ ],
+ "rows": [
+  {
+   "id": "RG-G4",
+   "pack": "customers",
+   "detector": "customers.regulars_lapsing",
+   "impact_minor": 3225600,
+   "severity": "high",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 645120000000000,
+   "arithmetic": "3225600 x 10000 x 20000"
+  },
+  {
+   "id": "RG-P3",
+   "pack": "people",
+   "detector": "people.advance_unrecovered",
+   "impact_minor": 1500000,
+   "severity": "high",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 300000000000000,
+   "arithmetic": "1500000 x 10000 x 20000"
+  },
+  {
+   "id": "RG-F5",
+   "pack": "finance",
+   "detector": "finance.tender_gap",
+   "impact_minor": 939000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 140850000000000,
+   "arithmetic": "939000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-F7",
+   "pack": "finance",
+   "detector": "finance.missing_payout",
+   "impact_minor": 722400,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 108360000000000,
+   "arithmetic": "722400 x 10000 x 15000"
+  },
+  {
+   "id": "RG-I3",
+   "pack": "inventory_purchasing",
+   "detector": "purchasing.near_duplicate_invoice",
+   "impact_minor": 520000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 78000000000000,
+   "arithmetic": "520000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-K2",
+   "pack": "kitchen",
+   "detector": "kitchen.remakes",
+   "impact_minor": 491400,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 73710000000000,
+   "arithmetic": "491400 x 10000 x 15000"
+  },
+  {
+   "id": "RG-P2",
+   "pack": "people",
+   "detector": "people.overstaffed_slot",
+   "impact_minor": 480000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 72000000000000,
+   "arithmetic": "480000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-A1",
+   "pack": "compliance",
+   "detector": "compliance.temp_excursion",
+   "impact_minor": 448000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 67200000000000,
+   "arithmetic": "448000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-M1",
+   "pack": "market",
+   "detector": "market.event_ahead",
+   "impact_minor": 383630,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 57544500000000,
+   "arithmetic": "383630 x 10000 x 15000"
+  },
+  {
+   "id": "RG-I1",
+   "pack": "inventory_purchasing",
+   "detector": "purchasing.price_creep",
+   "impact_minor": 336000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 50400000000000,
+   "arithmetic": "336000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-F2",
+   "pack": "finance",
+   "detector": "finance.unapproved_ad_fee",
+   "impact_minor": 320000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 48000000000000,
+   "arithmetic": "320000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-M1b",
+   "pack": "market",
+   "detector": "market.event_ahead",
+   "impact_minor": 263968,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 39595200000000,
+   "arithmetic": "263968 x 10000 x 15000"
+  },
+  {
+   "id": "RG-C1b",
+   "pack": "catalogue",
+   "detector": "catalogue.cost_drift",
+   "impact_minor": 263894,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 39584100000000,
+   "arithmetic": "263894 x 10000 x 15000"
+  },
+  {
+   "id": "RG-P1",
+   "pack": "people",
+   "detector": "people.overtime_drift",
+   "impact_minor": 243000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 36450000000000,
+   "arithmetic": "243000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-C1",
+   "pack": "catalogue",
+   "detector": "catalogue.cost_drift",
+   "impact_minor": 224041,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 33606150000000,
+   "arithmetic": "224041 x 10000 x 15000"
+  },
+  {
+   "id": "RG-K7",
+   "pack": "kitchen",
+   "detector": "kitchen.overprep",
+   "impact_minor": 216000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 32400000000000,
+   "arithmetic": "216000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-C2",
+   "pack": "catalogue",
+   "detector": "catalogue.recipe_waste_gap",
+   "impact_minor": 216000,
+   "severity": "medium",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 32400000000000,
+   "arithmetic": "216000 x 10000 x 15000"
+  },
+  {
+   "id": "RG-K3",
+   "pack": "kitchen",
+   "detector": "kitchen.overprep",
+   "impact_minor": 180000,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 18000000000000,
+   "arithmetic": "180000 x 10000 x 10000"
+  },
+  {
+   "id": "RG-F4",
+   "pack": "finance",
+   "detector": "finance.missing_payout",
+   "impact_minor": 176400,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 17640000000000,
+   "arithmetic": "176400 x 10000 x 10000"
+  },
+  {
+   "id": "RG-I2",
+   "pack": "inventory_purchasing",
+   "detector": "purchasing.overbilled",
+   "impact_minor": 72000,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 7200000000000,
+   "arithmetic": "72000 x 10000 x 10000"
+  },
+  {
+   "id": "RG-G1",
+   "pack": "customers",
+   "detector": "customers.coupon_cap_evasion",
+   "impact_minor": 64800,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 6480000000000,
+   "arithmetic": "64800 x 10000 x 10000"
+  },
+  {
+   "id": "RG-F3",
+   "pack": "finance",
+   "detector": "finance.short_payout",
+   "impact_minor": 60000,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 6000000000000,
+   "arithmetic": "60000 x 10000 x 10000"
+  },
+  {
+   "id": "RG-F1",
+   "pack": "finance",
+   "detector": "finance.unapproved_ad_fee",
+   "impact_minor": 55000,
+   "severity": "low",
+   "confidence_bp": 10000,
+   "age_days": 0,
+   "score": 5500000000000,
+   "arithmetic": "55000 x 10000 x 10000"
+  },
+  {
+   "id": "RG-A5",
+   "pack": "compliance",
+   "detector": "compliance.licence_expiring",
+   "impact_minor": null
+  }
+ ]
+}
