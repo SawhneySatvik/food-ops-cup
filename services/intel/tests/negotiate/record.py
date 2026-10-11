@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import kit  # noqa: E402
 from kit import FIXTURES, CountingLlm, response_json  # noqa: E402
+
+E2E_FIXTURES = FIXTURES.parent / "e2e"
 from munim_intel.llm.recorded import request_key  # noqa: E402
 
 NOTES = {
@@ -89,14 +91,33 @@ class AuthorLlm(CountingLlm):
         if not (self.fixtures_dir / f"{key}.json").is_file():
             projection = json.loads(canonical)
             body = json.dumps({"request": projection, "responses": [AUTHORS[self.model](projection)]}, ensure_ascii=False, indent=1)
-            for d in {self.fixtures_dir, FIXTURES}:
+            # A planted copy's new fixture also belongs to the committed set; the e2e's fixtures are its own.
+            for d in {self.fixtures_dir} if self.fixtures_dir == E2E_FIXTURES else {self.fixtures_dir, FIXTURES}:
                 (d / f"{key}.json").write_text(body + "\n", "utf8")
             print(f"authored {self.model} {key}")
         async for r in super().generate_content_async(llm_request, stream):
             yield r
 
 
+def e2e() -> None:
+    """`python tests/negotiate/record.py e2e`: the real-core negotiation (test_negotiate_e2e) with the authoring extractor."""
+    import asyncio
+
+    import test_negotiate_e2e as te
+
+    E2E_FIXTURES.mkdir(parents=True, exist_ok=True)
+    s = te.Stack(7, [te.WORLD])
+    try:
+        out, _, _ = asyncio.run(te.scenario(s, te.seed(s), AuthorLlm(model="recorded/extract", fixtures_dir=E2E_FIXTURES)))
+        print(f"e2e: draft {out.draft.status if out.draft else None}, dropped {[leg.dropped for leg in out.legs]}")
+    finally:
+        s.stop()
+
+
 def main() -> None:
+    if sys.argv[1:] == ["e2e"]:
+        e2e()
+        return
     import test_negotiate_chooser as tc
     import test_negotiate_rules as tr
 
@@ -104,10 +125,19 @@ def main() -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
     names = [(m, n) for m in (tr, tc) for n in sorted(dir(m)) if n.startswith("test_gate")]
     tests = [getattr(m, n) for m, n in names if "tmp_path" in getattr(m, n).__code__.co_varnames]
-    for t in tests:
-        with tempfile.TemporaryDirectory() as d:
-            t(Path(d))
-            print(f"ok {t.__name__}")
+    # Two passes: a gate that plants a copy of the fixtures may run before the gate that authors what it copies, so the
+    # first pass only authors (its failures are expected) and the second must be green.
+    for strict in (False, True):
+        for t in tests:
+            with tempfile.TemporaryDirectory() as d:
+                try:
+                    t(Path(d))
+                except AssertionError:
+                    if strict:
+                        raise
+                    print(f"authoring pass: {t.__name__} not green yet")
+                    continue
+                print(f"ok {t.__name__}")
 
 
 if __name__ == "__main__":

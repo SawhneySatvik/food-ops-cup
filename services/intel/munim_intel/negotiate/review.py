@@ -5,12 +5,15 @@ Five rules, each `pass | fail(code, refs) | cannot_verify(code, refs)`; a quote 
 
   1 budget    quote_total_minor > budget_left_minor             → fail budget_exceeded; no budget → cannot_verify budget_missing
   2 margin    margin_at_quote_bp < margin_floor_bp              → fail margin_below_floor
-  3 minimum   quote_compare.min_order_qty_milli > use_in_shelf_life_qty_milli → fail moq_exceeds_need
+  3 minimum   quote_compare.min_order_qty_milli > use_in_shelf_life_qty_milli, or > the quote's own qty_milli (the
+              PO's quantity: an order below the supplier's minimum)  → fail moq_exceeds_need
   4 overlap   open_commit_qty_milli ≥ need_qty_milli            → fail open_commitment_overlap
   5 payment   quote_payment_days < min_payment_days             → fail payment_terms_worse
 
 A NULL margin is `cannot_verify cost_price_missing` (no priced dish uses the item); a NULL floor or minimum payment term
-(no business policy row) is `cannot_verify missing_ref` — the pack names no code for a missing policy (reported).
+(no business policy row) is `cannot_verify missing_ref` — the pack names no code for a missing policy (reported). A need
+of 0 (no forecast use of the item at the run's outlets — packaging used by no recipe, or no forecast) is `cannot_verify
+missing_ref` for the overlap rule: "open commitments cover a need of nothing" is not evidence of overlap (R-C F7).
 
 The best passing quote (lowest unit price, then supplier id) becomes ONE `purchasing.po.create.v1` draft emitted here, by
 code — never through `propose_*`, so the run's taint does not stop it and no model chose a number in it: quantity and
@@ -96,8 +99,20 @@ def review_quote(compare: Mapping[str, Any], row: int, inputs: Mapping[str, Any]
             margin is not None and floor is not None and margin < floor,
             "margin_below_floor",
         ),
-        check("minimum", [c("min_order_qty_milli"), i("use_in_shelf_life_qty_milli")], None, moq > shelf, "moq_exceeds_need"),
-        check("overlap", [i("open_commit_qty_milli"), i("need_qty_milli")], None, open_qty >= need, "open_commitment_overlap"),
+        check(
+            "minimum",
+            [c("min_order_qty_milli"), i("use_in_shelf_life_qty_milli"), c("qty_milli")],
+            None,
+            moq > shelf or moq > q["qty_milli"],
+            "moq_exceeds_need",
+        ),
+        check(
+            "overlap",
+            [i("open_commit_qty_milli"), i("need_qty_milli")],
+            "missing_ref" if need == 0 else None,
+            open_qty >= need,
+            "open_commitment_overlap",
+        ),
         check(
             "payment",
             [i("quote_payment_days"), i("min_payment_days")],
@@ -127,6 +142,9 @@ class PoRequest:
     #: Canonical ref of the shortfall cell the RFQ quantity came from.
     shortfall_ref: str
     shortfall_snapshot_id: str
+    #: Canonical ref of the last-price cell the policy's target and walk-away were computed from.
+    reference_ref: str
+    reference_snapshot_id: str
     finding_id: str | None
 
 
@@ -156,11 +174,13 @@ def po_draft(win: Reviewed, compare: Mapping[str, Any], req: PoRequest) -> dict[
         },
         "outlet_ids": list(req.outlet_ids),
         "finding_id": req.finding_id,
-        "evidence": [f"snap:{cs}", f"snap:{win.deal_inputs_id}", f"snap:{req.shortfall_snapshot_id}"],
+        "evidence": [f"snap:{cs}", f"snap:{win.deal_inputs_id}", f"snap:{req.shortfall_snapshot_id}", f"snap:{req.reference_snapshot_id}"],
         # A workflow draft (DECISIONS 11 Oct, "W3.2 ruling — workflow draftables"): posted by this code from a run the
-        # supplier replies tainted; based_on = the shortfall, the budget left and the quote cells approval re-checks.
+        # supplier replies tainted; based_on = the shortfall, the last price the bounds came from, the budget left and the
+        # quote cells approval re-checks.
         "based_on": [
             req.shortfall_ref,
+            req.reference_ref,
             snap_ref(win.deal_inputs_id, 0, "budget_left_minor"),
             snap_ref(cs, win.row, "unit_price_minor"),
             snap_ref(cs, win.row, "qty_milli"),

@@ -6,8 +6,11 @@ of the transcript. The transcript becomes the document's text (its chunks, writt
 draft is a span of it — `⟨cite:doc:<document>·<start>-<end>⟩` — that the approver sees beside the value; core's
 resolver checks the span lies inside the document's chunks. A span is not a snapshot cell, so the draft executes only
 once the approver has typed each number (R26). Strings that are not numbers (invoice number, date, unit, an unlinked
-line's description) must be in the transcript too. The supplier and each ingredient come from exact-alias linking;
-an unlinked supplier, a value not found on the page or an unreadable date abstains — a person records it by hand.
+line's description) must be in the transcript too. A number is found only as a whole token (R-C F5): "2" is not the
+"2" inside "12", "20.00" not the tail of "320.00"; and the unit must follow its quantity directly ("12 kg", "12kg") —
+a unit found elsewhere on the page ("l" in "Malai") is no reading of this line. The supplier and each ingredient come
+from exact-alias linking; an unlinked supplier, a value not found on the page or an unreadable date abstains — a person
+records it by hand.
 
 Descriptions are prose a person reads, so core's number grammar checks them (DECISIONS 11 Oct, W3.2): the quantity and
 the unit a vision read may leave inside a line's description ("Malai cream 4 l") are moved out — they are already the
@@ -96,8 +99,15 @@ class _Cursor:
     text: str
     at: int = 0
 
-    def find(self, value: str) -> tuple[int, int]:
-        """The next occurrence of `value` at or after the cursor; the cursor moves past it."""
+    def find(self, value: str, *, number: bool = False) -> tuple[int, int]:
+        """The next occurrence of `value` at or after the cursor; the cursor moves past it. A number only as a whole
+        token: no digit, letter or "<digit>." / "<digit>," right before it, no digit or ".<digit>" / ",<digit>" after."""
+        if number:
+            m = re.compile(rf"(?<!\w)(?<!\d[.,]){re.escape(value)}(?!\d)(?![.,]\d)").search(self.text, self.at)
+            if m is None:
+                raise _NotOnPage
+            self.at = m.end()
+            return m.span()
         i = self.text.find(value, self.at)
         if i < 0:
             raise _NotOnPage
@@ -144,15 +154,17 @@ def invoice_draft(document_id: str, read: InvoiceRead, aliases: AliasTable, curr
                 return abstain("description_unreadable")
             cursor.find(description)
             refs: dict[str, str] = {}
+            unit = line.unit.lower()
+            if not _UNIT.match(unit):
+                return abstain("unit_unreadable")
             for name, value in (("qty_milli", line.qty), ("unit_price_minor", line.unit_price), ("tax_minor", line.tax)):
                 if not _NUMBER.match(value):
                     return abstain("amount_unreadable")
-                s, e = cursor.find(value)
+                s, e = cursor.find(value, number=True)
+                if name == "qty_milli" and not re.compile(rf"\s*{re.escape(unit)}(?![^\W\d_])", re.IGNORECASE).match(page, e):
+                    return abstain("unit_unreadable")
                 spans.append((s, e))
                 refs[name] = doc_ref(document_id, s, e)
-            unit = line.unit.lower()
-            if not _UNIT.match(unit) or line.unit.lower() not in page.lower():
-                return abstain("unit_unreadable")
             ingredient = aliases.link(description, "ingredient")
             ingredient_id = ingredient.core_id("ingredient") if ingredient else None
             if ingredient_id is None and any(ch.isdigit() for ch in description):

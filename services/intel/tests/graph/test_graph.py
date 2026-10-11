@@ -202,3 +202,14 @@ def test_core_refuses_what_check_args_refuses_and_another_tenant_gets_no_rows(br
     args, expected = fx.EXPECTED["claim_support"]
     assert len(run(a.graph_query("claim_support", cast(dict[str, str | int], args)))) == len(expected) > 0
     assert run(b.graph_query("claim_support", cast(dict[str, str | int], args))) == []
+
+
+def test_an_id_seen_again_with_other_content_is_refused(backend: Backend) -> None:
+    """The port's rule (graph/port.py): idempotent by id; the same id with other content is an error — core's 409 for
+    Postgres (the bridge raises it), `idempotency_conflict` from the graph-database adapter (never a silent MERGE). Paired:
+    the same content again is `existing`."""
+    [rice] = [e for e in fx.entities() if e.id.root == fx.RICE]
+    again = run(backend.a.upsert([rice], []))
+    assert (again.entities_inserted, again.entities_existing) == (0, 1)
+    with pytest.raises((GraphError, AssertionError), match="conflict"):
+        run(backend.a.upsert([rice.model_copy(update={"name": "Rice (renamed)"})], []))

@@ -2,6 +2,11 @@
 tools and a JSON response schema, sent straight to the role's BaseLlm — no ADK agent, so there is no tool table to
 reach. The run is tainted before the call: the untrusted text is in a context of the run from then on, whatever the
 call returns. A response that tries a function call is refused whole (nothing in it is used), and nothing executes it.
+
+Every call spends the run's model budget (`state.budget`, the same counter the ADK plugin keeps for agent calls): with
+the budget spent, no call is made (`ai_budget_cap`). A provider failure leaves as `ModelUnavailable` carrying only a code
+(`model_error:<exception class>`), raised outside the handler so neither `__cause__` nor `__context__` holds the
+provider's text — which may quote a key, the prompt, or the untrusted input itself.
 """
 
 from __future__ import annotations
@@ -35,6 +40,14 @@ class QuarantineBreach(Exception):
 
 class Unreadable(Exception):
     """The response is not the schema's JSON. The message is a code, never the model's text."""
+
+
+class ModelUnavailable(Exception):
+    """No answer: the run's budget is spent (`ai_budget_cap`) or the provider failed (`model_error:<class>`). Code only."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 def tool_count(req: LlmRequest) -> int:
@@ -77,14 +90,30 @@ def build_request(llm: BaseLlm, system: str, parts: list[types.Part], schema: ty
 async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], state: RunState) -> M:
     if tool_count(req) != 0:
         raise QuarantineBreach("request_has_tools")
+    budget = state.budget
+    # Check and count with no await between (as the plugin does), so concurrent callers cannot both take the last call.
+    if budget.models_exhausted():
+        raise ModelUnavailable("ai_budget_cap")
+    budget.model_calls += 1
     state.tainted = True
     last: LlmResponse | None = None
-    async for resp in llm.generate_content_async(req, stream=False):
-        parts = (resp.content.parts or []) if resp.content else []
-        if any(p.function_call is not None for p in parts):
-            raise QuarantineBreach("tool_call_attempted")
-        if not resp.partial:
-            last = resp
+    failed: str | None = None
+    try:
+        async for resp in llm.generate_content_async(req, stream=False):
+            parts = (resp.content.parts or []) if resp.content else []
+            if any(p.function_call is not None for p in parts):
+                raise QuarantineBreach("tool_call_attempted")
+            if resp.usage_metadata is not None:
+                budget.input_tokens += resp.usage_metadata.prompt_token_count or 0
+                budget.output_tokens += resp.usage_metadata.candidates_token_count or 0
+            if not resp.partial:
+                last = resp
+    except QuarantineBreach:
+        raise
+    except Exception as e:  # noqa: BLE001 — re-raised below as a code, outside this handler
+        failed = f"model_error:{type(e).__name__}"
+    if failed is not None:
+        raise ModelUnavailable(failed)
     text = "".join(p.text or "" for p in (last.content.parts or []) if not p.thought) if last and last.content else ""
     try:
         return schema.model_validate(json.loads(text))

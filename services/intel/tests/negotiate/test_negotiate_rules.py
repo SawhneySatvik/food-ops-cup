@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
+import shutil
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -17,8 +19,10 @@ from a2a.client import A2ACardResolver
 from test_lockfile import lock_violations
 
 from conftest import REPO
-from kit import KEYS, PUBLIC, SUPPLIER_IDS, WORLD, Run, StubChooser, build_app, load_data, run_s1, supplier_key
+from kit import FIXTURES, KEYS, PUBLIC, SUPPLIER_IDS, WORLD, CountingLlm, Run, StubChooser, build_app, load_data, run_s1, supplier_key
+from kit import no_fixture_misses as no_fixture_misses  # autouse: a missing recorded fixture fails the test
 from munim_intel.negotiate.policy import NegotiationPolicy
+from munim_intel.negotiate.review import review_quote
 
 EXPECT = WORLD["expected"]
 #: Hard rule 5, literal (never the code's own constant): cards carry the words, traces the slug (labels have no spaces).
@@ -156,3 +160,90 @@ def test_gate6_every_a2a_trace_carries_the_specialist(tmp_path: Path) -> None:
     print(f"a2a traces {len(a2a)}, actor {ACTOR}: {sum(e.actor == ACTOR for e in a2a)}; all run traces {mine}/{len(every)}")
     assert len(a2a) >= 2 * EXPECT["rfqs"] and all(e.actor == ACTOR for e in a2a)
     assert all(e.actor == ACTOR for e in every)
+
+
+def test_gate2_an_omitted_minimum_order_drops_the_quote_ten_of_ten(tmp_path: Path) -> None:
+    """Gate 2 above passes because the recorded extractor reads each minimum order; this measures the grounding instead:
+    every discounter reading with the minimum order left out (0, "none stated") is dropped — the clause's number is
+    claimed by no field — under each of the 10 phrasings."""
+    out = tmp_path / "omitted"
+    shutil.copytree(FIXTURES, out)
+    for f in out.glob("*.json"):
+        fx = json.loads(f.read_text("utf8"))
+        if fx["request"]["model"] == "recorded/extract" and "Bargain Bulk" in json.dumps(fx["request"], ensure_ascii=False):
+            part = fx["responses"][0]["content"]["parts"][0]
+            part["text"] = json.dumps({**json.loads(part["text"]), "min_order_qty_milli": 0})
+            f.write_text(json.dumps(fx, ensure_ascii=False))
+    dropped = 0
+    for clause in range(10):
+        r = asyncio.run(run_s1(tmp_path / str(clause), clause=clause, fixtures=out, chooser=StubChooser(lambda _r, _l: None)))
+        legs = {supplier_key(leg.supplier.id): leg.dropped for leg in r.outcome.legs}
+        dropped += legs == {"steady": None, "discounter": "unbound_number", "premium": None}
+        assert supplier_key(_po(r)["payload"]["supplier_id"]) == EXPECT["po_supplier"]
+    print(f"omitted minimum order dropped {dropped}/10")
+    assert dropped == 10
+
+
+def test_a_need_of_zero_cannot_be_verified_not_an_overlap(tmp_path: Path) -> None:
+    """R-C F7: deal_inputs need 0 (packaging no recipe uses, or no forecast) is `cannot_verify missing_ref` for the overlap
+    rule — "open commitments of 0 cover a need of 0" is not evidence. No quote passes, so no PO. Paired: need 20 pc → PO."""
+    r = asyncio.run(run_s1(tmp_path / "zero", deal_inputs={**WORLD["deal_inputs"], "need_qty_milli": 0}))
+    overlap = {supplier_key(x.supplier_id): next(c for c in x.checks if c.rule == "overlap") for x in r.outcome.reviewed}
+    print(f"need 0: overlap {[(k, c.verdict, c.reason_code) for k, c in overlap.items()]}; PO {r.outcome.draft_request is not None}")
+    assert overlap and all((c.verdict, c.reason_code) == ("cannot_verify", "missing_ref") for c in overlap.values())
+    assert r.outcome.draft_request is None and r.core.drafts == []
+    ok = asyncio.run(run_s1(tmp_path / "need"))
+    assert all(next(c for c in x.checks if c.rule == "overlap").verdict == "pass" for x in ok.outcome.reviewed)
+    assert ok.outcome.draft_request is not None
+
+
+def _compare(moq: int, qty: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    sid, did = "0199a000-0000-7000-8000-00000000f001", "0199a000-0000-7000-8000-00000000f002"
+    compare = {
+        "snapshot_id": sid,
+        "rows": [{"quote_id": "q", "supplier_id": "s", "unit_price_minor": 792, "qty_milli": qty, "min_order_qty_milli": moq}],
+    }
+    d = WORLD["deal_inputs"]
+    row = {"quote_total_minor": 15_840, "quote_payment_days": 15, "budget_left_minor": d["budget_left_minor"], "open_commit_qty_milli": 0,
+           "need_qty_milli": 20_000, "use_in_shelf_life_qty_milli": 30_000, "margin_at_quote_bp": 6_400, "margin_floor_bp": 6_000,
+           "min_payment_days": 7}  # fmt: skip
+    inputs = {"snapshot_id": did, "rows": [row]}
+    return compare, inputs
+
+
+def test_a_po_below_the_suppliers_minimum_order_fails_review() -> None:
+    """Minimum 25 pc fits the 30 pc usable before expiry, but the PO would order 20 pc: below the supplier's minimum."""
+    compare, inputs = _compare(25_000, 20_000)
+    below = review_quote(compare, 0, inputs)
+    compare, inputs = _compare(20_000, 20_000)
+    met = review_quote(compare, 0, inputs)
+    rule = {r.rule: r for r in below.checks}["minimum"]
+    assert (rule.verdict, rule.reason_code) == ("fail", "moq_exceeds_need") and not below.passed
+    assert met.passed
+
+
+def test_a_function_call_from_the_extractor_drops_that_reply_and_runs_nothing(tmp_path: Path) -> None:
+    """R-C F8: the reply goes through the quarantine, which refuses a response that tries a function call outright —
+    nothing in it is read, nothing is called, and no second model call is made for it."""
+    out = tmp_path / "called"
+    shutil.copytree(FIXTURES, out)
+    hits = 0
+    for f in out.glob("*.json"):
+        fx = json.loads(f.read_text("utf8"))
+        asked = json.dumps(fx["request"], ensure_ascii=False)
+        if fx["request"]["model"] == "recorded/extract" and "Premium Provisions" in asked and "we can supply" in asked:
+            fx["responses"][0]["content"]["parts"] = [{"function_call": {"name": "propose_purchasing_po_create_v1", "args": {}}}]
+            f.write_text(json.dumps(fx, ensure_ascii=False))
+            hits += 1
+    assert hits == 1
+    CountingLlm.log.clear()
+    r = asyncio.run(run_s1(tmp_path / "run", chooser=StubChooser(lambda _r, _l: None), fixtures=out))
+    premium = next(leg for leg in r.outcome.legs if supplier_key(leg.supplier.id) == "premium")
+    extracts = [m for m, _ in CountingLlm.log if m == "recorded/extract"]
+    print(
+        f"function call planted: premium dropped {premium.dropped}; extract calls {len(extracts)}; "
+        f"PO {supplier_key(_po(r)['payload']['supplier_id'])}"
+    )
+    # Hand: 3 RFQ readings; premium out, steady counters twice (2 more) = 5 — one per reply, none repeated.
+    assert premium.dropped == "tool_call_attempted" and len(extracts) == 5
+    assert supplier_key(_po(r)["payload"]["supplier_id"]) == EXPECT["po_supplier"]

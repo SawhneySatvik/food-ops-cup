@@ -129,7 +129,7 @@ export const ChunksBatchRequest = z.strictObject({
     seq: z.int().min(0),
     char_start: z.int().min(0),
     text: z.string().min(1).max(8000),
-  }).refine((c) => (c.document_id === null) !== (c.message_id === null), { message: "exactly one of document_id, message_id" })),
+  }).refine((c) => !(c.document_id !== null && c.message_id !== null), { message: "at most one of document_id, message_id (neither: a run's own text, e.g. a supplier reply)" })),
 });
 export const ClaimsBatchRequest = z.strictObject({
   claims: rows(z.strictObject({
@@ -213,8 +213,14 @@ export const ForecastsBatchRequest = z.strictObject({
   })).max(500),
 });
 export const ForecastsBatchResponse = z.strictObject({ run_inserted: z.boolean(), inserted: z.int().min(0), existing: z.int().min(0) });
+/** A field's [start, end) in its source chunk's text, in characters (as Postgres counts them). */
+const QuoteSpan = z.tuple([z.int().min(0), z.int().min(1)]).refine(([s, e]) => e > s, { message: "end > start" });
 /** Quotes from SIMULATED suppliers only (R22/R23: the DB refuses any other supplier kind). Typed fields from the
- *  no-tools extractor — supplier prose never reaches this table; `terms` holds flags, counts and codes only. */
+ *  no-tools extractor — supplier prose never reaches this table; `terms` holds flags, counts and codes only.
+ *  Provenance (DECISIONS 11 Oct, "W3.2 review ruling — quote provenance"): the supplier's reply is an untrusted chunk of
+ *  this run (`chunks:batch` first) and each field keeps its span in it, so the approver sees every PO number beside
+ *  "from the supplier's reply". Price and quantity always have a span; minimum order and payment days exactly when
+ *  non-zero, else null (zero = the reply states none). Core refuses a chunk of another run or a span outside the chunk's text. */
 export const QuotesBatchRequest = z.strictObject({
   quotes: rows(z.strictObject({
     id: Uuid7,
@@ -229,7 +235,15 @@ export const QuotesBatchRequest = z.strictObject({
     payment_days: z.int().min(0).max(365),
     terms: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), z.union([z.boolean(), z.int(), z.string().regex(/^[a-z][a-z0-9_]{0,39}$/)])),
     trace_event_id: Uuid7.nullable(),
-  }), 100),
+    source_chunk_id: Uuid7,
+    spans: z.strictObject({
+      unit_price_minor: QuoteSpan,
+      qty_milli: QuoteSpan,
+      min_order_qty_milli: QuoteSpan.nullable(),
+      payment_days: QuoteSpan.nullable(),
+    }),
+  }).refine((q) => (q.min_order_qty_milli === 0) === (q.spans.min_order_qty_milli === null)
+    && (q.payment_days === 0) === (q.spans.payment_days === null), { message: "a span exactly for each non-zero field" }), 100),
 });
 /** Model spend per call (04 §10). Stamped by core at receipt (never backdated out of a month); always recorded,
  *  even past the cap (run tokens are never refused for budget). The currency must be the month's budget currency

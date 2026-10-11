@@ -3,10 +3,13 @@
 - The suppliers are the real `suppliers-sim` app (loaded from services/suppliers-sim by path — intel does not import
   another service), spoken to over A2A through httpx's ASGI transport: no socket opens (intel's tests block them).
 - `FakeCore` stands in for core-api's internal routes at the service boundary: it validates every body with the
-  generated contract models, refuses a quote for a supplier that is not simulated (core's composite FK) or whose trace is
-  not stored yet (the trace_event FK), mints `purchasing.quote_compare` from the stored quotes as 0021's SQL orders them,
-  `purchasing.deal_inputs` from the quote plus the world's hand values, and resolves every ref of a draft.
-- Models are `RecordedLlm` over this directory's fixtures (MUNIM_MODEL_MODE=recorded); a missing fixture fails the run.
+  generated contract models, refuses a quote for a supplier that is not simulated (core's composite FK), whose trace is
+  not stored yet (the trace_event FK), or whose source chunk is not stored or whose spans are not inside it (0024 and
+  core's writeQuotes) — and, stricter than core, whose span text is not the field's value. It mints
+  `purchasing.quote_compare` from the stored quotes as 0021's SQL orders them, `purchasing.deal_inputs` from the quote
+  plus the world's hand values, a last-price cell (`purchasing.price_creep`), and resolves every ref of a draft.
+- Models are `RecordedLlm` over this directory's fixtures (MUNIM_MODEL_MODE=recorded). A missing fixture is counted
+  (`no_fixture_misses`, autouse in every gate module): a run that silently fell back to a default fails its test.
 """
 
 from __future__ import annotations
@@ -14,19 +17,22 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, ClassVar
 
 import httpx
+import pytest
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 
 from munim_intel.config import Config
 from munim_intel.contracts_gen.models import (
     InternalBatchResponse,
+    InternalChunksBatchRequest,
     InternalDraftsRequest,
     InternalDraftsResponse,
     InternalQuotesBatchRequest,
@@ -35,12 +41,12 @@ from munim_intel.contracts_gen.models import (
     InternalTracesBatchResponse,
     Snapshot,
 )
-from munim_intel.llm.recorded import RecordedLlm
-from munim_intel.mapping import SNAP_CLOSE, SNAP_OPEN, snap_ref
+from munim_intel.llm.recorded import RecordedFixtureMissing, RecordedLlm
+from munim_intel.mapping import SNAP_CLOSE, SNAP_OPEN
 from munim_intel.negotiate.chooser import LlmChooser, Pick, View
 from munim_intel.negotiate.policy import NegotiationPolicy
 from munim_intel.negotiate.port import A2aSuppliers, Supplier
-from munim_intel.negotiate.run import Outcome, Rfq, negotiate
+from munim_intel.negotiate.run import Outcome, negotiate, rfq_from
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.tools.generated import uuid7
@@ -69,15 +75,31 @@ def now_iso() -> str:
 
 
 class CountingLlm(RecordedLlm):
-    """RecordedLlm that logs (model, tool declarations) per request: the extractor tool-count gate reads it."""
+    """RecordedLlm that logs (model, tool declarations) per request — the extractor tool-count gate reads it — and every
+    fixture it could not find (`misses`; R-C F9: a miss is not a silent default)."""
 
     log: ClassVar[list[tuple[str, int]]] = []
+    misses: ClassVar[list[str]] = []
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False):  # type: ignore[no-untyped-def]
         tools = [fd for t in (llm_request.config.tools or []) for fd in (getattr(t, "function_declarations", None) or [])]
         CountingLlm.log.append((self.model, len(tools) + len(llm_request.tools_dict)))
-        async for r in super().generate_content_async(llm_request, stream):
-            yield r
+        try:
+            async for r in super().generate_content_async(llm_request, stream):
+                yield r
+        except RecordedFixtureMissing as e:
+            CountingLlm.misses.append(e.key)
+            raise
+
+
+@pytest.fixture(autouse=True)
+def no_fixture_misses() -> Iterator[list[str]]:
+    """Imported into every gate module (autouse there): the test fails when any recorded fixture was missing — the run
+    would otherwise have carried on with a rule default and passed for the wrong reason. A test that plants a miss on
+    purpose clears the list it is handed."""
+    CountingLlm.misses.clear()
+    yield CountingLlm.misses
+    assert CountingLlm.misses == [], f"recorded fixtures missing: {CountingLlm.misses}"
 
 
 #: record.py swaps in its authoring class; the gates always replay.
@@ -93,6 +115,7 @@ class FakeCore:
     deal_inputs: Mapping[str, Any]
     simulated: frozenset[str] = frozenset(SUPPLIER_IDS.values())
     traces: dict[str, Any] = field(default_factory=dict)
+    chunks: dict[str, dict[str, Any]] = field(default_factory=dict)
     quotes: list[dict[str, Any]] = field(default_factory=list)
     snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
     drafts: list[dict[str, Any]] = field(default_factory=list)
@@ -103,13 +126,31 @@ class FakeCore:
             self.traces[e.id.root] = e
         return InternalTracesBatchResponse(inserted=len(req.events), last_seq=len(self.traces))
 
+    async def write_chunks(self, req: InternalChunksBatchRequest) -> InternalBatchResponse:
+        for c in req.model_dump(mode="json")["chunks"]:
+            self.chunks[c["id"]] = c
+        return InternalBatchResponse(inserted=len(req.chunks), existing=0)
+
     async def write_quotes(self, req: InternalQuotesBatchRequest) -> InternalBatchResponse:
         body = req.model_dump(mode="json")
+        scale = {
+            "unit_price_minor": Decimal(10) ** WORLD["rfq"]["minor_unit"],
+            "qty_milli": 1000,
+            "min_order_qty_milli": 1000,
+            "payment_days": 1,
+        }
         for q in body["quotes"]:
             if q["supplier_id"] not in self.simulated:
                 raise AssertionError("422: supplier is not simulated (composite FK)")
             if q["trace_event_id"] is not None and q["trace_event_id"] not in self.traces:
                 raise AssertionError("422: trace_event_id not stored (FK)")
+            text = self.chunks[q["source_chunk_id"]]["text"]  # KeyError: the reply chunk was not stored first
+            for name, span in q["spans"].items():
+                assert (span is None) == (q[name] == 0), f"422: span for {name}"
+                if span is not None:
+                    s, e = span
+                    assert 0 <= s < e <= len(text), "422: span outside the chunk"
+                    assert Decimal(text[s:e].replace(",", "")) * scale[name] == q[name], f"span text is not {name}"
         self.quotes += body["quotes"]
         return InternalBatchResponse(inserted=len(body["quotes"]), existing=0)
 
@@ -139,6 +180,15 @@ class FakeCore:
             {"outlet_id": OUTLET, "lead_days": "2", "as_of": None},
             [("ingredient_id", "uuid"), ("shortfall_qty_milli", "integer")],
             [{"ingredient_id": INGREDIENT, "shortfall_qty_milli": r["qty_milli"]}],
+        )
+
+    def last_price(self) -> Snapshot:
+        """RG-S1's last price (800 paise), as the `purchasing.price_creep` cell `latest_minor` a caller would read."""
+        return self._snapshot(
+            "purchasing.price_creep",
+            {"as_of": "2026-10-10"},  # price_creep's as_of is a required date (not nullable)
+            [("supplier_id", "uuid"), ("ingredient_id", "uuid"), ("latest_minor", "integer")],
+            [{"supplier_id": SUPPLIER_IDS["steady"], "ingredient_id": INGREDIENT, "latest_minor": WORLD["rfq"]["reference_price_minor"]}],
         )
 
     async def mint_snapshot(self, req: InternalSnapshotsRequest) -> Snapshot:
@@ -187,7 +237,7 @@ class FakeCore:
 
 
 def suppliers() -> list[Supplier]:
-    return [Supplier(SUPPLIER_IDS[k], f"{PUBLIC}/{k}/.well-known/agent-card.json") for k in KEYS]
+    return [Supplier(SUPPLIER_IDS[k], f"{PUBLIC}/{k}/.well-known/agent-card.json", "simulated") for k in KEYS]
 
 
 def cfg(tmp: Path) -> Config:
@@ -227,8 +277,11 @@ async def run_s1(
     choice_calls: int | None = None,
     deal_inputs: Mapping[str, Any] | None = None,
     max_model_calls: int | None = None,
+    supplier_list: Sequence[Supplier] | None = None,
+    run_id: str | None = None,
+    sim_url: str = PUBLIC,
 ) -> Run:
-    run_id = uuid7(int(datetime.now(UTC).timestamp() * 1000), f"run/{tmp}")
+    run_id = run_id or uuid7(int(datetime.now(UTC).timestamp() * 1000), f"run/{tmp}")
     ctx = RunContext(
         run_id=run_id,
         tenant_id=TENANT,
@@ -255,32 +308,30 @@ async def run_s1(
             unit=WORLD["rfq"]["unit"],
             calls=policy.decision_rounds if choice_calls is None else choice_calls,
         )
-    short = core.shortfall()
     w = WORLD["rfq"]
-    rfq = Rfq(
-        INGREDIENT,
-        w["item_name"],
-        w["unit"],
-        w["qty_milli"],
-        snap_ref(short.snapshot_id.root, 0, "shortfall_qty_milli"),
-        short.snapshot_id.root,
-        w["reference_price_minor"],
-        w["currency"],
-        w["minor_unit"],
-        w["needed_by"],
-        (OUTLET,),
+    rfq = rfq_from(
+        core.shortfall().model_dump(mode="json"),
+        0,
+        core.last_price().model_dump(mode="json"),
+        0,
+        "latest_minor",
+        item_name=w["item_name"],
+        unit=w["unit"],
+        currency=w["currency"],
+        minor_unit=w["minor_unit"],
+        needed_by=w["needed_by"],
+        outlet_ids=(OUTLET,),
     )
-    app = build_app(PUBLIC, data=data or load_data(), clause=clause)
+    app = build_app(sim_url, data=data or load_data(), clause=clause)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=PUBLIC) as http:
         outcome = await negotiate(
             ctx,
             rfq,
-            suppliers(),
-            port=A2aSuppliers(http),
+            suppliers() if supplier_list is None else supplier_list,
+            port=A2aSuppliers(http, PUBLIC),
             core=core,
             chooser=chooser,
             extract_llm=llm("extract", fixtures),
-            cfg=c,
             state=state,
             policy=policy,
         )

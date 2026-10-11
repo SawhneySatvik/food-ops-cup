@@ -28,6 +28,8 @@ QUOTE = {
     "payment_days": 15,
     "terms": {"simulated": True},
     "trace_event_id": None,
+    "source_chunk_id": "0199a000-0000-7000-8000-00000000d002",
+    "spans": {"unit_price_minor": [60, 64], "qty_milli": [42, 44], "min_order_qty_milli": None, "payment_days": [80, 82]},
 }
 CTX = RunContext("0199a000-0000-7000-8000-00000000e001", TENANT, (OUTLET,), "event", "watcher:inventory_purchasing", 2_000_000_000, "tok")
 

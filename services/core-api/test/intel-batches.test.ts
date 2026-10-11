@@ -133,6 +133,8 @@ describe("knowledge batches: entities, aliases, chunks, edges, wiki, embeddings"
     const ch = { id: uuidv7(), document_id: null, message_id: A.message, seq: 1, char_start: 0, text: "Synthetic second chunk." };
     expect((await intel(all, "chunks:batch", { chunks: [ch] })).status).toBe(201);
     expect(await count(`SELECT count(*) n FROM intel.chunk c JOIN intel.run r ON r.id = c.run_id AND r.trigger = 'event' WHERE c.id = $1`, [ch.id])).toBe(1);
+    // At most one source: a document and a message both → 422.
+    expect(await refusal(await intel(all, "chunks:batch", { chunks: [{ ...ch, id: uuidv7(), document_id: uuidv7() }] }))).toEqual([422, "invalid_payload"]);
     const edge = { id: uuidv7(), kind: "supplies", src_entity_id: e1, dst_entity_id: e2, claim_id: null, source_ref: `core.supplier:${A.supplier}`, valid_from: null, valid_to: null };
     expect(BatchResponse.parse(await (await intel(all, "edges:batch", { edges: [edge] })).json())).toEqual({ inserted: 1, existing: 0 });
     expect((await intel(all, "edges:batch", { edges: [{ ...edge, id: uuidv7(), claim_id: null, source_ref: null }] })).status).toBe(422);
@@ -180,12 +182,29 @@ describe("forecasts:batch, quotes:batch", () => {
     expect(await count(`SELECT count(*) n FROM intel.forecast_point WHERE forecast_run_id = $1`, [fr.id])).toBe(2);
   });
 
+  // The supplier's reply as an untrusted chunk of the `all` run (a negotiation stores it with chunks:batch first). Hand
+  // spans in REPLY (74 characters), checked against the text by the first test.
+  const REPLY = "Simulated supplier: 10 kg at INR 385.00 per kg, minimum 5 kg, net 15 days.";
+  const SPANS = { unit_price_minor: [33, 39], qty_milli: [20, 22], min_order_qty_milli: [56, 57], payment_days: [66, 68] };
+  const replyChunk = uuidv7();
+  const otherRunsChunk = uuidv7(); // the same text, stored by another run (`one`)
+  beforeAll(async () => {
+    // A run-held chunk (0024): no document, no message — the reply the run received.
+    const r = await intel(all, "chunks:batch", { chunks: [{ id: replyChunk, document_id: null, message_id: null, seq: 9, char_start: 0, text: REPLY }] });
+    expect(r.status).toBe(201);
+    const o = await intel(one, "chunks:batch", { chunks: [{ id: otherRunsChunk, document_id: null, message_id: null, seq: 10, char_start: 0, text: REPLY }] });
+    expect(o.status).toBe(201);
+  });
+
   it("quotes from the simulated supplier → stored; a real supplier → 422 (R22: simulated only), 0 rows", async () => {
     const real = uuidv7();
     await db.withContext("munim_core", ownerCtx(A, { command_type: "purchasing.supplier.upsert.v1" }), (c) =>
       c.query(`INSERT INTO core.supplier (tenant_id, id, name, kind) VALUES ($1, $2, 'Synthetic Real Supplier', 'real')`, [A.tenant, real]));
     const q = (supplier: string) => ({ id: uuidv7(), supplier_id: supplier, ingredient_id: A.ingredient, round: 1, qty_milli: 10000, unit: "kg",
-      unit_price_minor: 38500, currency: "INR", min_order_qty_milli: 5000, payment_days: 15, terms: { delivery_days: 2, cold_chain: true }, trace_event_id: null });
+      unit_price_minor: 38500, currency: "INR", min_order_qty_milli: 5000, payment_days: 15, terms: { delivery_days: 2, cold_chain: true }, trace_event_id: null,
+      source_chunk_id: replyChunk, spans: SPANS });
+    expect(Object.fromEntries(Object.entries(SPANS).map(([k, [s, e]]) => [k, REPLY.slice(s, e)])))
+      .toEqual({ unit_price_minor: "385.00", qty_milli: "10", min_order_qty_milli: "5", payment_days: "15" });
     const ok = await intel(all, "quotes:batch", { quotes: [q(A.supplier)] });
     expect([ok.status, (await ok.json()).inserted]).toEqual([201, 1]);
     const before = await count(`SELECT count(*) n FROM intel.supplier_quote WHERE tenant_id = $1`, [A.tenant]);
@@ -193,6 +212,34 @@ describe("forecasts:batch, quotes:batch", () => {
     expect(await count(`SELECT count(*) n FROM intel.supplier_quote WHERE tenant_id = $1`, [A.tenant])).toBe(before);
     // Supplier prose never rides in terms (flags, counts and codes only).
     expect((await intel(all, "quotes:batch", { quotes: [{ ...q(A.supplier), terms: { note: "Call me at 98…" } }] })).status).toBe(422);
+  });
+
+  it("quote provenance (R-C F3): a stored quote keeps its reply chunk and spans; another run's chunk, a span past the chunk's end, no span for a non-zero field or no source → 422, 0 rows", async () => {
+    const q = (o: Record<string, unknown> = {}) => ({ id: uuidv7(), supplier_id: A.supplier, ingredient_id: A.ingredient, round: 1, qty_milli: 10000,
+      unit: "kg", unit_price_minor: 38500, currency: "INR", min_order_qty_milli: 5000, payment_days: 15, terms: {}, trace_event_id: null,
+      source_chunk_id: replyChunk, spans: SPANS, ...o });
+    const good = q();
+    const ok = await intel(all, "quotes:batch", { quotes: [good] });
+    expect(ok.status).toBe(201);
+    expect((await db.admin(`SELECT source_chunk_id::text AS c, spans FROM intel.supplier_quote WHERE id = $1`, [good.id])).rows)
+      .toEqual([{ c: replyChunk, spans: SPANS }]);
+    const before = await count(`SELECT count(*) n FROM intel.supplier_quote WHERE tenant_id = $1`, [A.tenant]);
+    // The same reply text, but stored by another run: not this run's source.
+    expect(await refusal(await intel(all, "quotes:batch", { quotes: [q({ source_chunk_id: otherRunsChunk })] }))).toEqual([422, "invalid_payload"]);
+    expect(await refusal(await intel(all, "quotes:batch", { quotes: [q({ spans: { ...SPANS, payment_days: [66, REPLY.length + 1] } })] })))
+      .toEqual([422, "invalid_payload"]);
+    expect(await refusal(await intel(all, "quotes:batch", { quotes: [q({ spans: { ...SPANS, min_order_qty_milli: null } })] })))
+      .toEqual([422, "invalid_payload"]);
+    expect(await refusal(await intel(all, "quotes:batch", { quotes: [q({ source_chunk_id: undefined, spans: undefined })] }))).toEqual([422, "invalid_payload"]);
+    expect(await count(`SELECT count(*) n FROM intel.supplier_quote WHERE tenant_id = $1`, [A.tenant])).toBe(before);
+    // Paired accept: zero minimum order and payment days carry no span.
+    const none = q({ min_order_qty_milli: 0, payment_days: 0, spans: { ...SPANS, min_order_qty_milli: null, payment_days: null } });
+    expect((await intel(all, "quotes:batch", { quotes: [none] })).status).toBe(201);
+    // Stored with no key for a zero field (0024's spans_match admits no null span).
+    expect((await db.admin(`SELECT spans FROM intel.supplier_quote WHERE id = $1`, [none.id])).rows)
+      .toEqual([{ spans: { unit_price_minor: SPANS.unit_price_minor, qty_milli: SPANS.qty_milli } }]);
+    // A retry of the same null-span body is the stored row, not a conflict.
+    expect(BatchResponse.parse(await (await intel(all, "quotes:batch", { quotes: [none] })).json())).toEqual({ inserted: 0, existing: 1 });
   });
 });
 
@@ -220,11 +267,12 @@ const returnDraft = (note: string, pack = "inventory_purchasing", basis = "on_ha
 const drafts = () => count(`SELECT count(*) n FROM core.draft WHERE tenant_id = $1`, [A.tenant]);
 
 describe("drafts: number grammar over prose leaves (gate 6), pack = an F8 id (gate 7)", () => {
-  it("the prose leaves of every intel-proposable draftable = the hand list (4); imports.* are excepted (no specialist proposes them)", async () => {
+  it("the prose leaves of every intel-proposable draftable = the hand list (3); imports.* are excepted (no specialist proposes them)", async () => {
     await loadRegistry();
     // Hand list (T-080's finding, read from the proposal schemas by eye): free strings a person reads on the draft. The
     // workflow invoice's `invoice_no` is an identifier (excepted by name, beside the coupon code); its description is prose.
-    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "customers.campaign.create.v1:name", "purchasing.invoice.record.v1:lines[].description",
+    // customers.campaign.create.v1's `name` left with the campaign draftable (R-B S1-D ruling, 11 Oct: no specialist proposes it).
+    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "purchasing.invoice.record.v1:lines[].description",
       "purchasing.supplier_return.create.v1:note"];
     const proposable = [...new Set(SPECIALIST_REGISTRY.specialists.flatMap((s) => [...s.draftables, ...s.workflow_draftables]))];
     expect(proposable.length).toBeGreaterThan(10);

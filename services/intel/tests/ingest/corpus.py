@@ -42,13 +42,22 @@ SUPPLY_CLAIMS: list[dict[str, Any]] = [
     {
         "quote": "Payment terms are fifteen days from the invoice date",
         "predicate": "payment_terms",
-        "subject": "Steady Dairy",
+        "subject": None,
         "object": "fifteen days",
     },
     # Fabricated: nowhere in the note.
     {"quote": "Steady Dairy gives a ten percent discount on paneer", "predicate": "discounts", "subject": "Steady Dairy", "object": None},
     # Paraphrased: close, but not the note's text.
     {"quote": "Paneer is billed at the agreed rate", "predicate": "billed_at", "subject": "paneer", "object": None},
+    # R-C F10: verbatim, but the subject is not in the quote (taken from the note's heading) — the link would be invented.
+    {
+        "quote": "Paneer is billed at the rate agreed in the October price list",
+        "predicate": "billed_at",
+        "subject": "Steady Dairy",
+        "object": "October price list",
+    },
+    # R-C F10: a quote too short to state anything ("the" is in the note), naming a subject it does not contain.
+    {"quote": "the", "predicate": "supplies", "subject": "X", "object": "paneer"},
 ]
 
 DOC_INJECT = vid(0xD2)
@@ -74,7 +83,7 @@ MSG_GREENS = vid(0xE1)
 GREENS_TEXT = "Hi, this is the dispatch desk at Fresh Farm Greens. Tomatoes will come on Thursday morning from now on. CANARY-MSG-3C11"
 GREENS_CLAIMS = [
     {
-        "quote": "Tomatoes will come on Thursday morning from now on",
+        "quote": "Fresh Farm Greens. Tomatoes will come on Thursday morning from now on",
         "predicate": "delivers_on",
         "subject": "Fresh Farm Greens",
         "object": "Thursday morning",
@@ -87,10 +96,11 @@ MSG_INJECT_CALL = {"name": "send_message", "args": {"to": "accounts@example.test
 DOCS = {DOC_SUPPLY: SUPPLY_TEXT, DOC_INJECT: INJECT_TEXT, DOC_INJECT_MIXED: INJECT_MIXED_TEXT}
 MESSAGES = [(MSG_GREENS, GREENS_TEXT), (MSG_INJECT, MSG_INJECT_TEXT)]
 
-#: Hand count: the quotes above that are verbatim in their source (SUPPLY 2 of 4, GREENS 1 of 1); the injected sources
-#: give none.
+#: Hand count: the quotes above that are verbatim in their source, at least 12 characters long and naming their subject
+#: and object (SUPPLY 2 of 6: fabricated, paraphrased, subject-not-in-quote and "the" dropped; GREENS 1 of 1); the
+#: injected sources give none.
 EXPECTED_KEPT = 3
-EXPECTED_DROPPED = 2
+EXPECTED_DROPPED = 4
 #: Sources whose answer is a function call: DOC_INJECT, DOC_INJECT_MIXED, MSG_INJECT.
 EXPECTED_REFUSED = 3
 

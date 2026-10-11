@@ -4,12 +4,20 @@ A message to a simulated supplier is a typed data part (`rfq`, `counter`, `accep
 (code-rendered numbers after any model note). The reply comes back as text and is untrusted: the caller hands it only to
 the no-tools extractor. Suppliers are `core.supplier` rows of kind `simulated` (R22); `card_url` is the agent-card URL
 the row records (the card the simulated agent publishes).
+
+Simulated only, checked before anything is sent (R-C F4; DECISIONS 11 Oct, "W3.2 review ruling"): a `Supplier` carries
+the row's `kind` (`simulated_suppliers` keeps only `simulated` rows of a core read), and `check` refuses a supplier whose
+kind is not `simulated`, whose card URL is not on the configured suppliers-sim origin (`SUPPLIERS_SIM_PUBLIC_URL`), or
+whose published card is not named "Simulated supplier" or advertises an interface on another origin. 0024 adds the same
+rule to the database (`a2a_card_url IS NULL OR kind = 'simulated'`).
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import httpx
 from a2a.client import A2ACardResolver, Client, ClientConfig, ClientFactory
@@ -25,23 +33,63 @@ LABEL_SLUG = "simulated_supplier"
 class Supplier:
     id: str
     card_url: str
+    #: `core.supplier.kind` as core read it; only `simulated` is ever sent anything.
+    kind: str
+
+
+class NotSimulated(Exception):
+    """A supplier that is not a labelled simulated agent on the configured origin. The message is the code, never a URL."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def simulated_suppliers(rows: Iterable[Mapping[str, Any]]) -> list[Supplier]:
+    """Suppliers from a core read of `core.supplier` (`supplier_id`, `kind`, `a2a_card_url`): simulated rows with a card."""
+    return [
+        Supplier(str(r["supplier_id"]), str(r["a2a_card_url"]), str(r["kind"]))
+        for r in rows
+        if r["kind"] == "simulated" and r["a2a_card_url"]
+    ]
+
+
+def origin(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}".lower()
 
 
 class SupplierPort(Protocol):
+    async def check(self, supplier: Supplier) -> None: ...
+
     async def send(self, supplier: Supplier, context_id: str, data: dict[str, Any], text: str) -> str: ...
 
 
 class A2aSuppliers:
-    """One A2A client per supplier card, over the caller's httpx client (its timeouts and transport)."""
+    """One A2A client per supplier card, over the caller's httpx client (its timeouts and transport). `sim_url` is the
+    configured `SUPPLIERS_SIM_PUBLIC_URL`: no card is fetched and nothing is sent anywhere else."""
 
-    def __init__(self, http: httpx.AsyncClient) -> None:
+    def __init__(self, http: httpx.AsyncClient, sim_url: str) -> None:
         self._http = http
+        self._origin = origin(sim_url)
         self._clients: dict[str, Client] = {}
 
-    async def _client(self, s: Supplier) -> Client:
+    async def check(self, s: Supplier) -> None:
+        """Refuses (NotSimulated) unless the supplier is a labelled simulated agent on the configured origin."""
+        if s.kind != "simulated":
+            raise NotSimulated("not_simulated")
+        if origin(s.card_url) != self._origin:
+            raise NotSimulated("card_off_origin")
         if s.id not in self._clients:
             card = await A2ACardResolver(self._http, s.card_url, agent_card_path="").get_agent_card()
+            if LABEL not in card.name:
+                raise NotSimulated("card_not_labelled")
+            if not card.supported_interfaces or any(origin(i.url) != self._origin for i in card.supported_interfaces):
+                raise NotSimulated("interface_off_origin")
             self._clients[s.id] = ClientFactory(ClientConfig(httpx_client=self._http, streaming=False)).create(card)
+
+    async def _client(self, s: Supplier) -> Client:
+        await self.check(s)
         return self._clients[s.id]
 
     async def send(self, supplier: Supplier, context_id: str, data: dict[str, Any], text: str) -> str:

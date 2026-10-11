@@ -35,6 +35,11 @@ class NegotiationPolicy:
     #: Pack §6: ≤ 2 counter rounds. With the RFQ round, a supplier quotes at most 3 times (quote `round` 1..3).
     max_counters: int = 2
 
+    def __post_init__(self) -> None:
+        # intel.supplier_quote CHECK (round BETWEEN 1 AND 3): the RFQ round plus at most two counters.
+        if not 0 <= self.max_counters <= 2:
+            raise ValueError("max_counters must be 0..2: a supplier quotes in rounds 1..3")
+
     @property
     def decision_rounds(self) -> int:
         return self.max_counters + 1

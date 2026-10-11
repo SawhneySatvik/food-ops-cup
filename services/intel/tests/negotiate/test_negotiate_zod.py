@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from conftest import INTEL
+from kit import no_fixture_misses as no_fixture_misses  # autouse: a missing recorded fixture fails the test
 from kit import run_s1
 
 

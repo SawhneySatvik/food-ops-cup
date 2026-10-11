@@ -42,7 +42,8 @@ export const SAMPLES: Record<string, unknown> = {
   "internal.forecasts-batch.response": { run_inserted: true, inserted: 2, existing: 0 },
   "internal.quotes-batch.request": { quotes: [{ id: u(151), supplier_id: u(60), ingredient_id: u(40), round: 1, qty_milli: 10000, unit: "kg",
     unit_price_minor: 38500, currency: "INR", min_order_qty_milli: 5000, payment_days: 15, terms: { delivery_days: 2, cold_chain: true, incoterm: "door" },
-    trace_event_id: null }] },
+    trace_event_id: null, source_chunk_id: u(153),
+    spans: { unit_price_minor: [61, 67], qty_milli: [37, 39], min_order_qty_milli: [112, 113], payment_days: [84, 86] } }] },
   "internal.spend.request": { entries: [{ id: u(152), role: "narrate", provider: "gemini", model_id: "gemini-3-flash", input_tokens: 900, output_tokens: 120,
     amount_minor: 40, currency: "INR" }] },
   "internal.run-frame.response": {

@@ -1,9 +1,13 @@
 """The negotiation run (ledger R45 F4; 04 §6; pack inventory-purchasing §6), owned by Inventory & Purchasing (F8).
 
+  0. Every supplier is checked before anything is sent (`SupplierPort.check`: kind `simulated`, card on the configured
+     suppliers-sim origin and named "Simulated supplier"); one that fails refuses the whole negotiation (NotSimulated).
   1. The same RFQ to every simulated supplier over A2A (`SupplierPort`); every message is an `a2a_send` / `a2a_receive`
      trace (actor `specialist:inventory_purchasing`, payload ids and labels only — never message text).
-  2. Each reply goes to the no-tools extractor (the run is tainted from the first one) → typed fields → `quotes:batch`
-     (simulated suppliers only; core's composite FK refuses any other).
+  2. Each reply goes to the no-tools extractor (the run is tainted from the first one) → typed fields grounded field by
+     field in the reply → the reply as an untrusted chunk of this run (`chunks:batch`), then the quote with that chunk
+     and each field's span in it (`quotes:batch`; simulated suppliers only — core's composite FK refuses any other). The
+     approver sees each PO number beside "from the supplier's reply" with its span (DECISIONS 11 Oct, R-C F3).
   3. Decision rounds: the policy computes each open supplier's allowed moves and default; the chooser picks; the policy
      re-validates; code renders the message. A counter brings a new quote (round + 1); accept and walk close the supplier.
      After `max_counters` counters only accept or walk remain, so the run ends by itself.
@@ -22,23 +26,23 @@ RFQs are non-binding and go only to simulated suppliers (R22); a PO exists only 
 from __future__ import annotations
 
 import string
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 from google.adk.models import BaseLlm
 
-from munim_intel.config import Config
 from munim_intel.contracts_gen.models import (
     InternalBatchResponse,
+    InternalChunksBatchRequest,
     InternalDraftsRequest,
     InternalDraftsResponse,
     InternalQuotesBatchRequest,
     InternalSnapshotsRequest,
     Snapshot,
 )
-from munim_intel.mapping import uuid7_ms
+from munim_intel.mapping import snap_ref, uuid7_ms
+from munim_intel.negotiate import extract as ex
 from munim_intel.negotiate.chooser import Chooser, View, compose, note_ok, qty
 from munim_intel.negotiate.extract import Extracted, extract
 from munim_intel.negotiate.policy import Move, NegotiationPolicy, Options, options, resolve
@@ -55,6 +59,7 @@ class Core(Protocol):
     """The internal routes a negotiation uses (core-api, R25); `InternalClient` implements it."""
 
     async def mint_snapshot(self, req: InternalSnapshotsRequest) -> Snapshot: ...
+    async def write_chunks(self, req: InternalChunksBatchRequest) -> InternalBatchResponse: ...
     async def write_quotes(self, req: InternalQuotesBatchRequest) -> InternalBatchResponse: ...
     async def write_draft(self, req: InternalDraftsRequest) -> InternalDraftsResponse: ...
 
@@ -69,7 +74,8 @@ def negotiation_budget(suppliers: int, policy: NegotiationPolicy | None = None) 
 
 @dataclass(frozen=True)
 class Rfq:
-    """What to ask for, from a shortfall cell (pack §6: qty ← `shortfall.shortfall_qty_milli`)."""
+    """What to ask for. Built by `rfq_from` from two snapshot cells core minted, never typed: the quantity from the
+    shortfall (pack §6: qty ← `shortfall.shortfall_qty_milli`) and the reference price from a last-price cell."""
 
     ingredient_id: str
     #: Tenant-trusted name (ADR-014 §6.4), sent to the simulated supplier.
@@ -78,13 +84,55 @@ class Rfq:
     qty_milli: int
     shortfall_ref: str
     shortfall_snapshot_id: str
-    #: The tenant's last supplier price per unit: the policy's and the simulation's anchor.
+    #: The tenant's last supplier price per unit: the policy's and the simulation's anchor, read from `reference_ref`.
     reference_price_minor: int
+    reference_ref: str
+    reference_snapshot_id: str
     currency: str
     minor_unit: int
     needed_by: str
     outlet_ids: tuple[str, ...]
     finding_id: str | None = None
+    #: The business date the shortfall was read at (its snapshot's `as_of`; None = today): deal review reads the same day.
+    as_of: str | None = None
+
+
+def rfq_from(
+    shortfall: Mapping[str, Any],
+    shortfall_row: int,
+    price: Mapping[str, Any],
+    price_row: int,
+    price_column: str,
+    *,
+    item_name: str,
+    unit: str,
+    currency: str,
+    minor_unit: int,
+    needed_by: str,
+    outlet_ids: tuple[str, ...],
+    finding_id: str | None = None,
+) -> Rfq:
+    """`shortfall` / `price`: core Snapshot bodies. The two rows must be the same ingredient's."""
+    s, p = shortfall["rows"][shortfall_row], price["rows"][price_row]
+    if s["ingredient_id"] != p["ingredient_id"]:
+        raise ValueError("the shortfall and the price are not the same ingredient")
+    return Rfq(
+        ingredient_id=str(s["ingredient_id"]),
+        item_name=item_name,
+        unit=unit,
+        qty_milli=int(s["shortfall_qty_milli"]),
+        shortfall_ref=snap_ref(shortfall["snapshot_id"], shortfall_row, "shortfall_qty_milli"),
+        shortfall_snapshot_id=str(shortfall["snapshot_id"]),
+        reference_price_minor=int(p[price_column]),
+        reference_ref=snap_ref(price["snapshot_id"], price_row, price_column),
+        reference_snapshot_id=str(price["snapshot_id"]),
+        currency=currency,
+        minor_unit=minor_unit,
+        needed_by=needed_by,
+        outlet_ids=outlet_ids,
+        finding_id=finding_id,
+        as_of=shortfall["params"].get("as_of"),
+    )
 
 
 LegState = Literal["open", "accepted", "walked", "no_quote"]
@@ -98,9 +146,9 @@ class Leg:
     state: LegState = "open"
     counters: int = 0
     quotes: list[dict[str, Any]] = field(default_factory=list)
-    #: Why the supplier dropped out without a usable quote (`no_text`, `unreadable`, `not_in_reply:<field>`).
+    #: Why the supplier dropped out without a usable quote (extract.Extracted.reason).
     dropped: str | None = None
-    #: Per stored quote, where each field was found in the reply (the reply itself is not kept).
+    #: Per stored quote, where each field was found in the reply (stored with the quote, against its source chunk).
     spans: list[dict[str, tuple[int, int]]] = field(default_factory=list)
 
     @property
@@ -117,7 +165,8 @@ class Decision:
     chosen: object
     move: Move
     in_set: bool
-    #: The note the model wrote, as given (gates read it; it never leaves the process except in the message).
+    #: The note the model wrote, as given (gates read it; it never leaves the process except in the message, and is
+    #: never traced — test_negotiate_wiring asserts no trace payload carries it).
     note: object
     template_note: bool
     message: str
@@ -142,12 +191,15 @@ async def negotiate(
     core: Core,
     chooser: Chooser,
     extract_llm: BaseLlm,
-    cfg: Config,
     state: RunState,
     policy: NegotiationPolicy | None = None,
 ) -> Outcome:
     policy = policy or NegotiationPolicy()
+    # Simulated only, before any message or trace (R22; R-C F4): one supplier that fails refuses the whole run.
+    for s in suppliers:
+        await port.check(s)
     t0 = uuid7_ms(ctx.run_id)
+    read_as = ex.Rfq(rfq.item_name, rfq.unit, rfq.qty_milli, rfq.currency, rfq.minor_unit)
     legs = [Leg(s, string.ascii_uppercase[i], uuid7(t0, f"{ctx.run_id}/a2a/{s.id}")) for i, s in enumerate(suppliers)]
     decisions: list[Decision] = []
 
@@ -165,10 +217,12 @@ async def negotiate(
 
     async def quote(round_: int, replies: list[tuple[Leg, str, str]]) -> None:
         rows: list[dict[str, Any]] = []
+        chunks: list[dict[str, Any]] = []
         for leg, reply, trace_id in replies:
-            x = Extracted(None, "no_text")
-            if reply:
-                x = await extract(reply, rfq.unit, rfq.currency, rfq.minor_unit, llm=extract_llm, ctx=ctx, cfg=cfg, state=state)
+            # contracts ChunksBatchRequest: a chunk holds at most 8000 characters; a longer reply is not read at all.
+            x = Extracted(None, "no_text" if not reply else "reply_too_long" if len(reply) > 8000 else None)
+            if x.reason is None:
+                x = await extract(reply, read_as, llm=extract_llm, state=state)
             f = x.fields
             if f is None:
                 leg.state, leg.dropped = "no_quote", x.reason
@@ -177,8 +231,11 @@ async def negotiate(
                 )
                 continue
             leg.spans.append(x.spans)
+            # Deterministic per (run, supplier, round): a retried batch is `existing`, never a second quote.
+            chunk_id = uuid7(t0, f"{ctx.run_id}/reply/{leg.supplier.id}/{round_}")
+            chunks.append({"id": chunk_id, "document_id": None, "message_id": None, "seq": 0, "char_start": 0, "text": reply})
             row = {
-                "id": uuid7(int(datetime.now(UTC).timestamp() * 1000), f"{ctx.run_id}/quote/{leg.supplier.id}/{round_}"),
+                "id": uuid7(t0, f"{ctx.run_id}/quote/{leg.supplier.id}/{round_}"),
                 "supplier_id": leg.supplier.id,
                 "ingredient_id": rfq.ingredient_id,
                 "round": round_,
@@ -190,12 +247,16 @@ async def negotiate(
                 "payment_days": f.payment_days,
                 "terms": {"simulated": True},
                 "trace_event_id": trace_id,
+                "source_chunk_id": chunk_id,
+                # Every field's key: a zero minimum order or term has no token, so its span is null (contracts).
+                "spans": {k: list(x.spans[k]) if k in x.spans else None for k in ex.QuoteFields.model_fields},
             }
             leg.quotes.append(row)
             rows.append(row)
         if rows:
-            # quote.trace_event_id references intel.trace_event: the traces must be stored first.
+            # quote.trace_event_id references intel.trace_event and source_chunk_id intel.chunk: both are stored first.
             await state.traces.flush()
+            await core.write_chunks(InternalChunksBatchRequest.model_validate({"chunks": chunks}))
             await core.write_quotes(InternalQuotesBatchRequest.model_validate({"quotes": rows}))
 
     rfq_data = {
@@ -278,7 +339,7 @@ async def negotiate(
             qid = leg.quotes[-1]["id"]
             inputs = (
                 await core.mint_snapshot(
-                    InternalSnapshotsRequest(template_id="purchasing.deal_inputs", params={"quote_id": qid, "as_of": None})
+                    InternalSnapshotsRequest(template_id="purchasing.deal_inputs", params={"quote_id": qid, "as_of": rfq.as_of})
                 )
             ).model_dump(mode="json")
             r = review_quote(compare, index[qid], inputs)
@@ -305,6 +366,8 @@ async def negotiate(
                     rfq.needed_by,
                     rfq.shortfall_ref,
                     rfq.shortfall_snapshot_id,
+                    rfq.reference_ref,
+                    rfq.reference_snapshot_id,
                     rfq.finding_id,
                 ),
             )

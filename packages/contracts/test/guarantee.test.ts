@@ -135,7 +135,7 @@ describe("numeric fields intel may still send (reviewed list — a new one turns
   //     holdout are NOT on it, so no template may show them without a new review;
   //   quotes — figures the no-tools EXTRACTOR MODEL typed from a SIMULATED supplier's reply (R22): price, qty,
   //     min order, payment days and round are on the allow-list and shown to people as quote cells; terms integers
-  //     are not on it;
+  //     are not on it; spans (R-C F3) are character positions in the stored reply chunk, never figures;
   //   spend — amount_minor (on the allow-list, shown as budget template cells) is SELF-REPORTED by intel, so core
   //     cannot hold the cap against under-reporting; token counts are not on the allow-list.
   const EXPECTED = [
@@ -161,6 +161,14 @@ describe("numeric fields intel may still send (reviewed list — a new one turns
     "internal.quotes-batch.request: $.properties.quotes.items.properties.payment_days (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.qty_milli (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.round (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.min_order_qty_milli.anyOf[0].prefixItems[0] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.min_order_qty_milli.anyOf[0].prefixItems[1] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.payment_days.anyOf[0].prefixItems[0] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.payment_days.anyOf[0].prefixItems[1] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.qty_milli.prefixItems[0] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.qty_milli.prefixItems[1] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.unit_price_minor.prefixItems[0] (type integer)",
+    "internal.quotes-batch.request: $.properties.quotes.items.properties.spans.properties.unit_price_minor.prefixItems[1] (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.terms.additionalProperties.anyOf[1] (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.unit_price_minor (type integer)",
     "internal.spend.request: $.properties.entries.items.properties.amount_minor (type integer)",

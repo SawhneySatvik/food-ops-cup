@@ -4,7 +4,7 @@
 //   {"op":"http","world","method","path","headers","body"}            → {status, body}: core-api's real app in-process; the
 //        bridge adds the world's run token and the service secret (InternalClient's transport, tests/watch/stack.py Bridge)
 //   {"op":"admin_graph","world","template","args"}                     → rows of core's own graph statement (graph/index.ts
-//        graphStatement, `:tenant_id` bound from the world) run as the cluster superuser, which bypasses RLS: only each
+//        graphStatement, `:tenant_id` bound from the world, a '*' scope) run as the cluster superuser, which bypasses RLS: only each
 //        template's `tenant_id = :tenant_id` predicates isolate the tenant there
 //   {"op":"count","world","table"}                                     → rows of intel.<table> for that tenant (admin)
 //   {"op":"stop"}
@@ -54,7 +54,7 @@ async function main() {
         return { status: r.status, body: await r.text() };
       }
       if (m.op === "admin_graph") {
-        const { text, values } = graphStatement(m.template as string, m.args as Record<string, unknown>, w.tenant);
+        const { text, values } = graphStatement(m.template as string, m.args as Record<string, unknown>, w.tenant, ["*"]);
         return (await db.admin(text, values)).rows;
       }
       if (m.op === "count") {

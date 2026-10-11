@@ -27,10 +27,11 @@ from munim_intel.decide import mimic
 from munim_intel.decide.mimic import LlmMimic
 from munim_intel.decide.port import EgressRefused, egress_payload
 from munim_intel.decide.questions import MAP_COLUMNS
+from munim_intel.ingest import claims as claims_mod
 from munim_intel.ingest import columns, quarantine
-from munim_intel.ingest.claims import ExtractedClaims, extract_request
+from munim_intel.ingest.claims import ExtractedClaim, ExtractedClaims, extract_request
 from munim_intel.ingest.embed import DIMENSIONS, RecordedEmbedder, write_embeddings
-from munim_intel.ingest.invoice import COMMAND, InvoiceRead, invoice_draft, vision_request
+from munim_intel.ingest.invoice import COMMAND, InvoiceDraft, InvoiceRead, invoice_draft, vision_request
 from munim_intel.ingest.link import Alias, AliasTable, normalize_alias
 from munim_intel.ingest.pipeline import Ingest, Report
 from munim_intel.ingest.quarantine import FIXTURES_DIR, QuarantineBreach, tool_count
@@ -38,7 +39,7 @@ from munim_intel.ingest.sink import BATCHES
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import CoreError
-from munim_intel.runtime.state import RunState
+from munim_intel.runtime.state import Budget, RunState
 from munim_intel.trace.buffer import TraceBuffer
 
 from . import corpus as C
@@ -119,6 +120,9 @@ class Run:
     def __init__(self) -> None:
         Spy.seen = []
         self.state, self.traces_sent = new_state()
+        # Hand count of the model calls: 3 documents of one chunk each + 2 messages + 4 invoice pages (R-C F6: every
+        # quarantined call spends the run's budget).
+        self.state.budget = Budget(max_model_calls=9)
         self.sink = FakeSink()
         ing = ingest(self.state, self.sink)
 
@@ -193,7 +197,7 @@ def test_claim_quotes_are_their_source_text_100_percent(run: Run) -> None:
     assert dropped == C.EXPECTED_DROPPED
     # Exact-alias links: Steady Dairy → its entity; "Fresh Farm Greens" matches "fresh  farm GREENS" after normalising.
     subjects = {cl["quote"][:12]: cl["subject_entity_id"] for cl in claims}
-    assert subjects["Steady Dairy"] == C.vid(0xA1) and subjects["Tomatoes wil"] == C.vid(0xA3)
+    assert subjects["Steady Dairy"] == C.vid(0xA1) and subjects["Fresh Farm G"] == C.vid(0xA3)
 
 
 def test_exact_alias_linking_links_one_match_only() -> None:
@@ -223,17 +227,18 @@ def test_injection_fixtures_execute_no_tool_and_taint_the_run(run: Run) -> None:
     assert run.state.budget.tool_calls == 0
 
 
-def test_any_extraction_taints_the_run_even_when_it_fails() -> None:
-    """Taint is set before the call: a clean document taints, and so does a call that never returns (missing fixture)."""
+def test_any_extraction_taints_the_run_even_when_it_fails(no_fixture_misses: list[str]) -> None:
+    """Taint is set before the call: a clean document taints, and so does a call that never returns (missing fixture,
+    which the pipeline records as a refused source, `model_error:RecordedFixtureMissing`)."""
     for text in (C.SUPPLY_TEXT, "a document with no recorded answer"):
         state, _ = new_state()
         assert state.tainted is False
         ing = ingest(state, FakeSink())
-        try:
-            asyncio.run(ing.document(C.vid(0xD9), text))
-        except Exception as e:  # noqa: BLE001 — the missing fixture is the point
-            assert type(e).__name__ == "RecordedFixtureMissing"
+        report = asyncio.run(ing.document(C.vid(0xD9), text))
         assert state.tainted is True, text[:20]
+    assert report.refused == {"model_error:RecordedFixtureMissing": 1}
+    assert len(no_fixture_misses) == 1  # the planted miss, and only it
+    no_fixture_misses.clear()
 
 
 # -- the invoice draft -----------------------------------------------------------------------------------------------
@@ -435,6 +440,7 @@ TRACE_CODES = {
     "none",
     "tool_call_attempted",
     "response_not_schema",
+    "ai_budget_cap",
     "supplier_unlinked",
     "value_not_on_page",
     "invoice_no_not_on_page",
@@ -468,3 +474,143 @@ def test_vision_request_carries_the_image_only() -> None:
     req = vision_request(RecordedLlm(model="recorded/vision", fixtures_dir=FIXTURES_DIR), C.IMAGES[C.DOC_INVOICE], "image/png")
     [part] = req.contents[0].parts or []
     assert part.inline_data is not None and part.text is None
+
+
+# -- R-C F5: invoice numbers are whole tokens; the unit follows its quantity ------------------------------------------
+
+#: Hand-made page and reads: the line prints 12 ml at 320.00 with 16.00 tax.
+F5_PAGE = C.INVOICE_PAGE.replace("Malai cream 4 l 180.00 36.00", "Malai cream 12 ml 320.00 16.00")
+
+
+def _malai(qty: str, unit: str, price: str, tax: str) -> InvoiceDraft:
+    read = json.loads(json.dumps(C.INVOICE_READ))
+    read["transcript"] = F5_PAGE
+    read["lines"][1] = {"description": "Malai cream", "qty": qty, "unit": unit, "unit_price": price, "tax": tax}
+    return invoice_draft(C.DOC_INVOICE, InvoiceRead.model_validate(read), ALIASES, "INR")
+
+
+@pytest.mark.parametrize(
+    "qty,unit,price,tax,reason",
+    [
+        # The reviewer's read: every value is a substring of the printed line ("2" in "12", "l" in "ml" and "Malai").
+        ("2", "l", "20.00", "6.00", "value_not_on_page"),
+        ("12", "l", "320.00", "16.00", "unit_unreadable"),
+        ("12", "ml", "20.00", "16.00", "value_not_on_page"),
+        ("12", "ml", "320.00", "6.00", "value_not_on_page"),
+    ],
+)
+def test_a_value_inside_another_number_or_a_unit_not_after_its_quantity_abstains(
+    qty: str, unit: str, price: str, tax: str, reason: str
+) -> None:
+    d = _malai(qty, unit, price, tax)
+    assert (d.body, d.reason_code) == (None, reason)
+
+
+def test_the_true_read_of_that_line_is_a_draft_of_whole_tokens() -> None:
+    """Paired accept: 12 ml at 320.00, tax 16.00 — each span is exactly the printed token."""
+    d = _malai("12", "ml", "320.00", "16.00")
+    assert d.body is not None, d.reason_code
+    assert [F5_PAGE[s:e] for s, e in d.spans] == ["12", "340.00", "204.00", "12", "320.00", "16.00"]
+    assert d.body["payload"]["lines"][1]["unit"] == "ml"
+
+
+# -- R-C F6: quarantined calls spend the run's budget; provider errors leave as codes ---------------------------------
+
+
+class _Echo(RecordedLlm):
+    """A stand-in provider (no fixtures): answers every extraction with no claims, or raises a provider-style error that
+    quotes a secret and the prompt."""
+
+    raise_with: str | None = None
+    calls: ClassVar[int] = 0
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        _Echo.calls += 1
+        if self.raise_with is not None:
+            raise RuntimeError(self.raise_with)
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text='{"claims": []}')]))
+
+
+def _ingest_with(llm: RecordedLlm, budget: Budget) -> tuple[Ingest, RunState, FakeSink, list[InternalTracesBatchRequest]]:
+    state, sent = new_state()
+    state.budget = budget
+    sink = FakeSink()
+    ing = Ingest(state=state, sink=sink, extract_llm=llm, vision_llm=llm, embedder=RecordedEmbedder(), aliases=ALIASES)
+    return ing, state, sink, sent
+
+
+def test_a_one_megabyte_document_stops_at_the_budget() -> None:
+    """1 MB of text = 525 chunks of 2000 characters (hand: 1,048,576 / 2000 → 524 full + 1 partial, every cut at a line
+    break of the 2000-character lines below). With a budget of 3 model calls, exactly 3 extractions run, the rest of the
+    document is one `ai_budget_cap` abstain, and every chunk is still stored (in batches of at most 500)."""
+    line = ("Steady Dairy note " * 111)[:1999] + "\n"
+    text = (line * 525)[: 1024 * 1024]
+    _Echo.calls = 0
+    ing, state, sink, _ = _ingest_with(_Echo(model="echo/extract"), Budget(max_model_calls=3))
+    report = asyncio.run(ing.document(C.vid(0xD8), text))
+    batches = [len(b["chunks"]) for p, b in sink.posts if p == "chunks:batch"]
+    print(f"1 MB: chunks {report.chunks} in batches {batches}; model calls {_Echo.calls}; refused {report.refused}")
+    assert report.chunks == 525 and batches == [500, 25]
+    assert _Echo.calls == 3 and state.budget.model_calls == 3
+    assert report.refused == {"ai_budget_cap": 1}
+    # Paired: a budget that covers the document reads every chunk.
+    _Echo.calls = 0
+    ing, _, _, _ = _ingest_with(_Echo(model="echo/extract"), Budget(max_model_calls=525))
+    assert asyncio.run(ing.document(C.vid(0xD8), text)).refused == {} and _Echo.calls == 525
+
+
+def test_a_provider_error_never_surfaces_its_text() -> None:
+    secret = "sk-live-NOT-A-REAL-KEY-7731"
+    raw = f"400 Bad Request: invalid key {secret} for prompt 'Steady Dairy delivers paneer'"
+    llm = _Echo(model="echo/extract", raise_with=raw)
+    state, _ = new_state()
+    with pytest.raises(quarantine.ModelUnavailable) as e:
+        asyncio.run(quarantine.call(llm, extract_request(llm, C.SUPPLY_TEXT), ExtractedClaims, state))
+    assert e.value.code == "model_error:RuntimeError" and str(e.value) == "model_error:RuntimeError"
+    assert e.value.__cause__ is None and e.value.__context__ is None
+    ing, _, _, sent = _ingest_with(llm, Budget(max_model_calls=5))
+    report = asyncio.run(ing.document(C.vid(0xD7), C.SUPPLY_TEXT))
+    asyncio.run(ing.state.traces.flush())
+    dumped = json.dumps([e.model_dump(mode="json") for req in sent for e in req.events]) + repr(report)
+    assert report.refused == {"model_error:RuntimeError": 1}
+    assert secret not in dumped and "Bad Request" not in dumped and "Steady Dairy delivers" not in dumped
+
+
+def test_a_spent_budget_makes_no_call() -> None:
+    _Echo.calls = 0
+    llm = _Echo(model="echo/extract")
+    state, _ = new_state()
+    state.budget = Budget(max_model_calls=1, model_calls=1)
+    with pytest.raises(quarantine.ModelUnavailable) as e:
+        asyncio.run(quarantine.call(llm, extract_request(llm, C.SUPPLY_TEXT), ExtractedClaims, state))
+    assert e.value.code == "ai_budget_cap" and _Echo.calls == 0 and state.budget.model_calls == 1
+    state.budget = Budget(max_model_calls=1)
+    asyncio.run(quarantine.call(llm, extract_request(llm, C.SUPPLY_TEXT), ExtractedClaims, state))
+    assert _Echo.calls == 1 and state.budget.model_calls == 1
+
+
+# -- R-C F10: a claim's quote names its subject and object --------------------------------------------------------------
+
+F10_SOURCE = "Note: X supplies paneer to the Indiranagar kitchen. The order is due on Friday."
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        {"quote": "the", "predicate": "supplies", "subject": "X", "object": "paneer"},
+        # Names its subject, but 10 characters cannot state who supplies what.
+        {"quote": "X supplies", "predicate": "supplies", "subject": "X", "object": None},
+        {"quote": "the Indiranagar kitchen", "predicate": "supplies", "subject": "X", "object": "paneer"},
+        {"quote": "X supplies paneer to the Indiranagar kitchen", "predicate": "supplies", "subject": "Y", "object": "paneer"},
+        {"quote": "X supplies paneer to the Indiranagar kitchen", "predicate": "supplies", "subject": "X", "object": "pan"},
+    ],
+)
+def test_a_claim_whose_quote_does_not_carry_it_is_dropped(claim: dict[str, Any]) -> None:
+    kept = claims_mod.claim_rows([ExtractedClaim(**claim)], F10_SOURCE, chunk_id=C.vid(0xC9), message_id=None, aliases=ALIASES)
+    assert (kept.rows, kept.dropped) == ([], 1)
+
+
+def test_a_claim_whose_quote_names_both_is_kept_after_normalising() -> None:
+    claim = ExtractedClaim(quote="X supplies paneer to the Indiranagar kitchen", predicate="supplies", subject=" x ", object="PANEER")
+    kept = claims_mod.claim_rows([claim], F10_SOURCE, chunk_id=C.vid(0xC9), message_id=None, aliases=ALIASES)
+    assert kept.dropped == 0 and [(r["span_start"], r["quote"]) for r in kept.rows] == [(6, "X supplies paneer to the Indiranagar kitchen")]

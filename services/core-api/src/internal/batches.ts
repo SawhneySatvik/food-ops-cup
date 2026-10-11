@@ -176,13 +176,24 @@ export async function writeForecasts(c: Queryable, run: Run, raw: unknown) {
   return { run_inserted: head.inserted === 1, ...pts };
 }
 
-/** Simulated suppliers only: the composite FK to core.supplier (id, kind = 'simulated') refuses any other (→ 422). */
+/** Simulated suppliers only: the composite FK to core.supplier (id, kind = 'simulated') refuses any other (→ 422).
+ *  Provenance (DECISIONS 11 Oct, "W3.2 review ruling — quote provenance"; columns from 0024): each quote names the
+ *  supplier's reply as a chunk THIS run stored, and every field's span lies inside that chunk's text (characters, as
+ *  Postgres counts them) — else 422 and nothing is stored. 0024's own check holds the same rule in the database. */
 export async function writeQuotes(c: Queryable, run: Run, raw: unknown) {
   const { quotes } = parse(QuotesBatchRequest, raw);
+  const outside = await c.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM jsonb_to_recordset($1::jsonb) AS r(source_chunk_id uuid, spans jsonb)
+       LEFT JOIN intel.chunk k ON k.id = r.source_chunk_id AND k.run_id = $2
+      WHERE k.id IS NULL OR EXISTS (SELECT 1 FROM jsonb_each(r.spans) s WHERE (s.value ->> 1)::int > char_length(k.text))`,
+    [JSON.stringify(quotes), run.runId]);
+  if (outside.rows[0]!.n > 0) throw new ApiError("invalid_payload");
+  // A zero field's span is null on the wire; 0024's spans_match admits a span or no key, so null keys are not stored.
+  const rows = quotes.map((q) => ({ ...q, spans: Object.fromEntries(Object.entries(q.spans).filter(([, s]) => s !== null)) }));
   return insertRows(c, run, "intel.supplier_quote",
     [["id", "uuid"], ["supplier_id", "uuid"], ["ingredient_id", "uuid"], ["round", "smallint"], ["qty_milli", "bigint"], ["unit", "text"],
      ["unit_price_minor", "bigint"], ["currency", "char(3)"], ["min_order_qty_milli", "bigint"], ["payment_days", "int"], ["terms", "jsonb"],
-     ["trace_event_id", "uuid"]], quotes, RUN(run));
+     ["trace_event_id", "uuid"], ["source_chunk_id", "uuid"], ["spans", "jsonb"]], rows, RUN(run));
 }
 
 /** Always recorded — past the cap too (the cap decides narration, never whether spend is written). Stamped `at` = core's

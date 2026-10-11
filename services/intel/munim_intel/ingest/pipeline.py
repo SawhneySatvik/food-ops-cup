@@ -18,7 +18,7 @@ from munim_intel.ingest import claims as claims_mod
 from munim_intel.ingest.embed import Embedder, EmbedOutcome, write_embeddings
 from munim_intel.ingest.invoice import invoice_draft, read_invoice
 from munim_intel.ingest.link import AliasTable
-from munim_intel.ingest.quarantine import QuarantineBreach, Unreadable
+from munim_intel.ingest.quarantine import ModelUnavailable, QuarantineBreach, Unreadable
 from munim_intel.ingest.sink import IngestSink
 from munim_intel.mapping import uuid7_ms
 from munim_intel.runtime.state import RunState, check_actor
@@ -46,8 +46,9 @@ class Report:
     claims: int = 0
     #: Claims the extractor returned whose quote is not the source's text.
     dropped: int = 0
-    #: Sources whose extraction was refused: the model tried a function call (`tool_call_attempted`) or answered
-    #: outside the schema. Nothing from such a source becomes a claim, and no call is executed.
+    #: Sources whose extraction was refused: the model tried a function call (`tool_call_attempted`), answered outside
+    #: the schema, failed (`model_error:<class>`) or was not called because the run's budget is spent (`ai_budget_cap`).
+    #: Nothing from such a source becomes a claim, and no call is executed.
     refused: dict[str, int] = field(default_factory=dict)
     embeddings: EmbedOutcome = EmbedOutcome("none")
     draft_id: str | None = None
@@ -76,8 +77,8 @@ class Ingest:
         await self._trace("subagent_start", agent=agent, source=source)
         try:
             out = await claims_mod.extract(self.extract_llm, text, self.state)
-        except (QuarantineBreach, Unreadable) as e:
-            code = e.code if isinstance(e, QuarantineBreach) else "response_not_schema"
+        except (QuarantineBreach, ModelUnavailable, Unreadable) as e:
+            code = "response_not_schema" if isinstance(e, Unreadable) else e.code
             report.refused[code] = report.refused.get(code, 0) + 1
             await self._trace("abstain", agent=agent, source=source, reason_code=code)
             return None
@@ -88,9 +89,14 @@ class Ingest:
         chunks = _doc_chunks(document_id, text)
         if not chunks:
             return report
-        report.chunks = (await self.sink.batch("chunks:batch", {"chunks": chunks})).inserted
+        report.chunks = await self._chunks(chunks)
         rows: list[dict[str, Any]] = []
         for c in chunks:
+            if self.state.budget.models_exhausted():
+                # The rest of the document is not read: one abstain, not one per chunk (a long document has hundreds).
+                report.refused["ai_budget_cap"] = report.refused.get("ai_budget_cap", 0) + 1
+                await self._trace("abstain", agent="extractor", source=f"doc:{document_id}", reason_code="ai_budget_cap")
+                break
             got = await self._extract("extractor", f"doc:{document_id}", c["text"], report)
             if got is None:
                 continue
@@ -120,10 +126,13 @@ class Ingest:
             for mid, body in messages
             for seq, (at, t) in enumerate(claims_mod.chunk_text(body))
         ]
-        if chunks:
-            report.chunks = (await self.sink.batch("chunks:batch", {"chunks": chunks})).inserted
+        report.chunks = await self._chunks(chunks)
         rows: list[dict[str, Any]] = []
         for mid, body in messages:
+            if self.state.budget.models_exhausted():
+                report.refused["ai_budget_cap"] = report.refused.get("ai_budget_cap", 0) + 1
+                await self._trace("abstain", agent="extractor", source="messages", reason_code="ai_budget_cap")
+                break
             got = await self._extract("extractor", f"msg:{mid}", body, report)
             if got is None:
                 continue
@@ -135,6 +144,13 @@ class Ingest:
         report.embeddings = await write_embeddings(self.sink, self.embedder, [(c["id"], c["text"]) for c in chunks])
         await self._trace("tool_result", step="embeddings", source="messages", status=report.embeddings.status)
         return report
+
+    async def _chunks(self, chunks: list[dict[str, Any]]) -> int:
+        """In batches of 500 (contracts ChunksBatchRequest): a long document has more chunks than one batch takes."""
+        inserted = 0
+        for i in range(0, len(chunks), 500):
+            inserted += (await self.sink.batch("chunks:batch", {"chunks": chunks[i : i + 500]})).inserted
+        return inserted
 
     async def _claims(self, rows: list[dict[str, Any]]) -> int:
         inserted = 0
@@ -148,8 +164,8 @@ class Ingest:
         await self._trace("subagent_start", agent="vision", source=source)
         try:
             read = await read_invoice(self.vision_llm, image, mime_type, self.state)
-        except (QuarantineBreach, Unreadable) as e:
-            code = e.code if isinstance(e, QuarantineBreach) else "response_not_schema"
+        except (QuarantineBreach, ModelUnavailable, Unreadable) as e:
+            code = "response_not_schema" if isinstance(e, Unreadable) else e.code
             report.refused[code] = 1
             report.reason_code = code
             await self._trace("abstain", agent="vision", source=source, reason_code=code)
@@ -161,7 +177,7 @@ class Ingest:
             return report
         # The draft's spans resolve against the document's chunks, so they are stored first.
         chunks = _doc_chunks(document_id, read.transcript)
-        report.chunks = (await self.sink.batch("chunks:batch", {"chunks": chunks})).inserted
+        report.chunks = await self._chunks(chunks)
         r = await self.sink.draft(draft.body)
         report.draft_id, report.draft_status = r.draft_id.root, r.status
         report.reason_code = r.reason_code.root if r.reason_code else None
