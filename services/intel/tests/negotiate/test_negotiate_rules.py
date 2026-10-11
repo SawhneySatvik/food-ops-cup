@@ -1,0 +1,158 @@
+"""T-055a gates — negotiation, rule half (BOARD b-55; ledger R45 F4; pack inventory-purchasing §6, §10 I7/S1).
+
+Expected values come from the hand-kept world (s1_world.json `expected`, worked from the pack §6 personalities and the
+RG-S1 answer-key shortfall), never from the code under test. Recorded models only (MUNIM_MODEL_MODE=recorded).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+import tomllib
+from pathlib import Path
+from typing import Any
+
+import httpx
+from a2a.client import A2ACardResolver
+from test_lockfile import lock_violations
+
+from conftest import REPO
+from kit import KEYS, PUBLIC, SUPPLIER_IDS, WORLD, Run, StubChooser, build_app, load_data, run_s1, supplier_key
+from munim_intel.negotiate.policy import NegotiationPolicy
+
+EXPECT = WORLD["expected"]
+#: Hard rule 5, literal (never the code's own constant): cards carry the words, traces the slug (labels have no spaces).
+LABEL = "Simulated supplier"
+LABEL_SLUG = "simulated_supplier"
+ACTOR = "specialist:inventory_purchasing"
+
+
+def _traces(r: Run, kind: str) -> list[Any]:
+    return [e for e in r.state.traces.events if e.kind == kind]
+
+
+def _po(r: Run) -> dict[str, Any]:
+    assert r.outcome.draft is not None and r.outcome.draft_request is not None, "no PO draft"
+    return r.outcome.draft_request
+
+
+def _refused(r: Run) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for x in r.outcome.reviewed:
+        if x.refused is not None and x.refused.reason_code:
+            out[supplier_key(x.supplier_id)] = x.refused.reason_code
+    return out
+
+
+def test_gate1_default_policy_three_rfqs_two_counters_one_po(tmp_path: Path) -> None:
+    r = asyncio.run(run_s1(tmp_path, chooser=StubChooser(lambda _r, _l: None)))
+    sends = _traces(r, "a2a_send")
+    rfqs = [e for e in sends if e.payload["move"].root == "rfq"]
+    counters = [e for e in sends if e.payload["move"].root == "counter"]
+    per_supplier = {k: sum(e.payload["supplier"].root == SUPPLIER_IDS[k] for e in counters) for k in KEYS}
+    counter_rounds = sorted({e.payload["round"].root for e in counters})
+    po = _po(r)
+    line = po["payload"]["lines"][0]
+    receives = len(_traces(r, "a2a_receive"))
+    print(f"rfqs {len(rfqs)}, counters per supplier {per_supplier}, counter rounds {counter_rounds}, receives {receives}")
+    print(
+        f"PO supplier {supplier_key(po['payload']['supplier_id'])}, price {r.core.cell(line['unit_price_minor'])}, "
+        f"qty {r.core.cell(line['qty_milli'])}, refused {_refused(r)}, draft {r.outcome.draft.status if r.outcome.draft else None}"
+    )
+    assert len(rfqs) == EXPECT["rfqs"]
+    assert counters and max(per_supplier.values()) <= 2 and len(counter_rounds) <= 2
+    assert len(_traces(r, "a2a_receive")) == len(sends)
+    assert len(r.core.drafts) == 1 and r.outcome.draft is not None and r.outcome.draft.status == "proposed"
+    assert supplier_key(po["payload"]["supplier_id"]) == EXPECT["po_supplier"]
+    assert r.core.cell(line["unit_price_minor"]) == EXPECT["po_unit_price_minor"]
+    assert r.core.cell(line["qty_milli"]) == EXPECT["po_qty_milli"]
+    compare = next(s for s in r.core.snapshots.values() if s["template_id"] == "purchasing.quote_compare")
+    prefix = f"⟨snap:{compare['snapshot_id']}·"
+    assert line["unit_price_minor"].startswith(prefix) and line["qty_milli"].startswith(prefix)
+    assert _refused(r) == EXPECT["refused"]
+
+
+def test_gate2_hidden_minimum_order_refused_ten_of_ten(tmp_path: Path) -> None:
+    refused = 0
+    for clause in range(10):
+        r = asyncio.run(run_s1(tmp_path / str(clause), clause=clause))
+        refused += _refused(r).get("discounter") == "moq_exceeds_need"
+        # Every phrasing is still read and grounded: no supplier is dropped for a field missing from its reply.
+        assert [leg.dropped for leg in r.outcome.legs] == [None, None, None]
+        assert supplier_key(_po(r)["payload"]["supplier_id"]) == EXPECT["po_supplier"]
+    print(f"hidden minimum-order clause refused {refused}/10")
+    assert refused == 10
+
+
+def test_gate2_paired_accept_no_clause_the_discounter_passes(tmp_path: Path) -> None:
+    data = copy.deepcopy(load_data())
+    for p in data["personalities"]:
+        if p["key"] == "discounter":
+            p["min_order_factor_bp"] = 0
+    r = asyncio.run(run_s1(tmp_path, data=data))
+    disc = next(x for x in r.outcome.reviewed if supplier_key(x.supplier_id) == "discounter")
+    print(f"no clause: discounter passed {disc.passed}, PO supplier {supplier_key(_po(r)['payload']['supplier_id'])}")
+    # Hand: 720 is the lowest accepted price; with no minimum it passes every rule and wins.
+    assert disc.passed and supplier_key(_po(r)["payload"]["supplier_id"]) == "discounter"
+
+
+def test_gate3_every_supplier_label_reads_simulated_supplier(tmp_path: Path) -> None:
+    async def cards() -> list[Any]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=build_app(PUBLIC)), base_url=PUBLIC) as http:
+            urls = [f"{PUBLIC}/{k}/.well-known/agent-card.json" for k in KEYS]
+            return [await A2ACardResolver(http, u, agent_card_path="").get_agent_card() for u in urls]
+
+    got = asyncio.run(cards())
+    labelled_cards = sum(LABEL in c.name and LABEL in c.description for c in got)
+    r = asyncio.run(run_s1(tmp_path))
+    a2a = _traces(r, "a2a_send") + _traces(r, "a2a_receive")
+    labelled_traces = sum(e.payload["label"].root == LABEL_SLUG for e in a2a)
+    print(f"cards {labelled_cards}/{len(got)} labelled; a2a traces {labelled_traces}/{len(a2a)} labelled {LABEL_SLUG}")
+    assert len(got) == 3 and labelled_cards == 3  # 3 = the pack §6 personalities
+    assert a2a and labelled_traces == len(a2a)
+
+
+def test_gate4_planted_accept_above_walk_away_becomes_walk(tmp_path: Path) -> None:
+    # Walk-away 10500 bp = 840. Premium: 896 → (counter) 880 → (counter) 864 > 840 with both counters spent: only walk.
+    r = asyncio.run(run_s1(tmp_path, chooser=StubChooser(lambda _r, _l: "accept"), policy=NegotiationPolicy(walk_away_bp=10_500)))
+    above = [d for d in r.outcome.decisions if d.chosen == "accept" and "accept" not in d.allowed and d.default == "walk"]
+    kept = [d for d in r.outcome.decisions if d.chosen == "accept" and d.in_set]
+    print(f"accept above walk-away -> {[d.move for d in above]}; in-set accepts kept {len(kept)}")
+    assert len(above) == 1 and above[0].move == "walk" and not above[0].in_set
+    assert supplier_key(above[0].supplier_id) == "premium" and above[0].round == 3
+    assert kept and all(d.move == "accept" for d in kept)
+
+
+def test_gate4_planted_counter_after_max_rounds_becomes_default(tmp_path: Path) -> None:
+    r = asyncio.run(run_s1(tmp_path, chooser=StubChooser(lambda _r, _l: "counter")))
+    late = [d for d in r.outcome.decisions if d.chosen == "counter" and "counter" not in d.allowed and d.round == 3]
+    early = [d for d in r.outcome.decisions if d.chosen == "counter" and d.in_set]
+    print(f"counter after max rounds -> {[(supplier_key(d.supplier_id), d.move) for d in late]}; in-set counters {len(early)}")
+    # Hand: steady and premium are countered in decision rounds 1 and 2; at round 3 only accept / walk remain.
+    assert len(late) == 2 and all(d.move == d.default == "accept" and not d.in_set for d in late)
+    assert len(early) == 4 and all(d.move == "counter" for d in early)
+
+
+LOCK = REPO / "uv.lock"
+
+
+def test_gate5_lock_clean_with_a2a_red_with_planted_litellm() -> None:
+    text = LOCK.read_text("utf8")
+    lock = tomllib.loads(text)
+    names = {p["name"]: p.get("version") for p in lock["package"]}
+    members = set(lock["manifest"]["members"])
+    print(f"a2a-sdk {names.get('a2a-sdk')}, members {sorted(members)}, violations {lock_violations(text)}")
+    assert names.get("a2a-sdk") == "1.2.2" and {"munim-intel", "munim-suppliers-sim"} <= members
+    assert lock_violations(text) == []
+    planted = text + '\n[[package]]\nname = "litellm"\nversion = "1.84.0"\nsource = { registry = "https://pypi.org/simple" }\n'
+    assert lock_violations(planted)
+
+
+def test_gate6_every_a2a_trace_carries_the_specialist(tmp_path: Path) -> None:
+    r = asyncio.run(run_s1(tmp_path))
+    a2a = _traces(r, "a2a_send") + _traces(r, "a2a_receive")
+    every = r.state.traces.events
+    mine = sum(e.actor == ACTOR for e in every)
+    print(f"a2a traces {len(a2a)}, actor {ACTOR}: {sum(e.actor == ACTOR for e in a2a)}; all run traces {mine}/{len(every)}")
+    assert len(a2a) >= 2 * EXPECT["rfqs"] and all(e.actor == ACTOR for e in a2a)
+    assert all(e.actor == ACTOR for e in every)

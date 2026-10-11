@@ -1,0 +1,41 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "Draft the purchase order."
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/manager",
+  "output": [
+   null,
+   null,
+   null
+  ],
+  "system": "Draft what the owner asked for.\n\nYou are an agent. Your internal name is \"manager\".",
+  "tools": [
+   {
+    "name": "propose_purchasing_po_create_v1"
+   }
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {},
+       "name": "propose_purchasing_po_create_v1"
+      }
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

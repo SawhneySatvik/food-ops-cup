@@ -1,0 +1,44 @@
+# suppliers-sim (T-055a): three SIMULATED supplier agents over A2A — never real suppliers, never real money (hard rule 5,
+# R22). Deterministic: personalities are data (suppliers_sim/personalities.json), no model is called. A uv workspace member
+# (root pyproject), so it shares the root uv.lock. Pins from a live PyPI probe on 11 Oct 2026: a2a-sdk 1.2.2 (latest; ADK
+# 2.11's [a2a] extra allows >=0.3.4,<2) and uvicorn 0.54.0 (latest, the version the lock already holds for intel).
+# No ADK here: `to_a2a()` is not used, the card URL comes from SUPPLIERS_SIM_PUBLIC_URL (gotcha 6). Never litellm.
+[project]
+name = "munim-suppliers-sim"
+version = "0.0.0"
+requires-python = "==3.12.*"
+dependencies = [
+  "a2a-sdk[http-server]==1.2.2",
+  "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "ruff==0.17.0", "mypy==2.4.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["suppliers_sim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE"]
+per-file-ignores = { "tests/**" = ["S101"] }
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["suppliers_sim", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["a2a.*"]
+ignore_missing_imports = true

@@ -1,0 +1,58 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "Draft the purchase order."
+     }
+    ],
+    "role": "user"
+   },
+   {
+    "parts": [
+     {
+      "args": {},
+      "call": "propose_purchasing_po_create_v1"
+     }
+    ],
+    "role": "model"
+   },
+   {
+    "parts": [
+     {
+      "data": {
+       "error": "Drafts are unavailable after reading untrusted text in this run."
+      },
+      "response": "propose_purchasing_po_create_v1"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/manager",
+  "output": [
+   null,
+   null,
+   null
+  ],
+  "system": "Draft what the owner asked for.\n\nYou are an agent. Your internal name is \"manager\".",
+  "tools": [
+   {
+    "name": "propose_purchasing_po_create_v1"
+   }
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "{\"answer\": \"cannot verify\"}"
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+  "_note": "Synthetic data for SIMULATED suppliers (hard rule 5, R22): no real business, no real price, no real order. Values are docs/plan/packs/inventory-purchasing.md §6 (INFERENCE there). Prices are basis points of the reference price the buyer's RFQ carries (the tenant's last supplier price). `min_order_factor_bp` 30000 = the pack's min_order_factor 3.0: a minimum order of 3x the quantity asked, stated only in the terms sentence, never in the headline.",
+  "label": "Simulated supplier",
+  "personalities": [
+    {"key": "steady", "name": "Steady Wholesale", "style": "fair, firm",
+     "first_bp": 10200, "concede_bp_per_round": 150, "floor_bp": 9900, "min_order_factor_bp": 0, "payment_days": 15},
+    {"key": "discounter", "name": "Bargain Bulk Traders", "style": "low first quote, minimum order hidden in the terms",
+     "first_bp": 9000, "concede_bp_per_round": 50, "floor_bp": 8800, "min_order_factor_bp": 30000, "payment_days": 7},
+    {"key": "premium", "name": "Premium Provisions", "style": "higher price, better terms",
+     "first_bp": 11200, "concede_bp_per_round": 200, "floor_bp": 10600, "min_order_factor_bp": 0, "payment_days": 30}
+  ],
+  "moq_clauses": [
+    "Terms: minimum order {moq}.",
+    "Please note we only dispatch orders of {moq} or more.",
+    "Orders below {moq} cannot be accepted.",
+    "MOQ applies: {moq}.",
+    "This price holds only for a minimum order of {moq}.",
+    "The smallest order we ship is {moq}.",
+    "Delivery needs an order of at least {moq}.",
+    "Kindly note a minimum purchase of {moq} per order.",
+    "This rate is for lots of {moq} and above.",
+    "We cannot split cartons, so the minimum is {moq}."
+  ]
+}
