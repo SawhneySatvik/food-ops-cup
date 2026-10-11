@@ -1,0 +1,34 @@
+{
+ "request": {
+  "model": "recorded/narrate",
+  "system": "You write short wiki sentences about one entity of a restaurant or shop business. Each sentence must cite what it states by writing a handle you are given, in braces, exactly as given. A sentence without a handle is discarded. Never write a digit, a number word, a quotation, a name or a currency amount yourself. Reply with the sentences only, one to four of them.\n\nYou are an agent. Your internal name is \"wiki\".",
+  "contents": [
+   {
+    "role": "user",
+    "parts": [
+     {
+      "text": "Entity kind: supplier\nHandles you may cite:\n- {C1}: a recorded claim\n- {N1}: a linked record\n- {K1}: a figure (spend_minor)"
+     }
+    ]
+   }
+  ],
+  "tools": [],
+  "output": [
+   null,
+   null,
+   null
+  ]
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "This supplier has a recorded claim {C1}. It is linked to a record {N1}."
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}
