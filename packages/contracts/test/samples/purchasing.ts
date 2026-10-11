@@ -54,6 +54,12 @@ export const SAMPLES: Record<string, unknown> = {
   "proposal.purchasing.invoice.dispute.v1": {
     dispute_id: u(85), supplier_invoice_id: u(80), basis: "overbilled", lines: [{ invoice_line_id: u(81), claimed_minor: snapRef(S1, 0, "overbilled_minor") }],
   },
+  // Invoice vision (T-056): numbers are spans of document u(87)'s text; the strings are as read off the page.
+  "proposal.purchasing.invoice.record.v1": {
+    supplier_invoice_id: u(80), supplier_id: u(51), invoice_no: "INV-1042", invoice_date: "2026-10-09", po_id: null, currency: "INR",
+    lines: [{ line_id: u(81), po_line_id: null, ingredient_id: u(40), description: null, qty_milli: citeRef("doc", u(87), [112, 114]), unit: "kg",
+      unit_price_minor: citeRef("doc", u(87), [118, 124]), tax_minor: citeRef("doc", u(87), [131, 137]) }],
+  },
   "proposal.purchasing.supplier_return.create.v1": {
     supplier_return_id: u(90), outlet_id: u(2), supplier_id: u(50), goods_received_id: u(70), reason_code: "expired", note: "unsellable before expiry",
     lines: [{ batch_id: u(72), ingredient_id: u(40), qty_milli: citeRef("row", `core.stock_movement:${u(95)}`), unit: "kg" }],

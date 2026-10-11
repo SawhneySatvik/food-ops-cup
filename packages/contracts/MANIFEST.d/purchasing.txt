@@ -7,6 +7,7 @@ purchasing.invoice.dispute.v1
 purchasing.supplier_return.create.v1
 proposal.purchasing.po.create.v1
 proposal.purchasing.invoice.dispute.v1
+proposal.purchasing.invoice.record.v1
 proposal.purchasing.supplier_return.create.v1
 v1.supplier
 v1.suppliers

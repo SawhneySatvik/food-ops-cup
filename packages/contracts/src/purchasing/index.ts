@@ -133,6 +133,11 @@ export const PurchasingSupplierReturnCreateV1 = z.strictObject({
 export const PO_CREATE_DRAFT = defineDraftable("purchasing.po.create.v1", PurchasingPoCreateV1);
 export const INVOICE_DISPUTE_DRAFT = defineDraftable("purchasing.invoice.dispute.v1", PurchasingInvoiceDisputeV1);
 export const SUPPLIER_RETURN_DRAFT = defineDraftable("purchasing.supplier_return.create.v1", PurchasingSupplierReturnCreateV1);
+/** Invoice vision (T-056, ADR-014 §2.1): intel reads a supplier invoice into this draft; each number is a span of the
+ *  document's text (`⟨cite:doc:<id>·<start>-<end>⟩`), shown beside the value. A span is not a cell, so the draft cannot
+ *  execute as proposed: the approver types each number (R26) and core totals the invoice. Proposed only by the
+ *  ingestion workflow, never by a model tool. */
+export const INVOICE_RECORD_DRAFT = defineDraftable("purchasing.invoice.record.v1", PurchasingInvoiceRecordV1);
 
 // ---- read models: row fields only (One Guarantee clause 2); no sums or aggregates ----
 const SupplierRef = z.strictObject({
@@ -256,6 +261,7 @@ export const SCHEMAS = {
   "purchasing.supplier_return.create.v1": PurchasingSupplierReturnCreateV1,
   "proposal.purchasing.po.create.v1": PO_CREATE_DRAFT.proposal,
   "proposal.purchasing.invoice.dispute.v1": INVOICE_DISPUTE_DRAFT.proposal,
+  "proposal.purchasing.invoice.record.v1": INVOICE_RECORD_DRAFT.proposal,
   "proposal.purchasing.supplier_return.create.v1": SUPPLIER_RETURN_DRAFT.proposal,
   "v1.supplier": SupplierView,
   "v1.suppliers": list(SupplierView),

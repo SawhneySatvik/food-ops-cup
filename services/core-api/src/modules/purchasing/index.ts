@@ -29,7 +29,9 @@ export type { Seams } from "./seams.ts";
 
 // Draftable commands (R16): the AI proposes, approvals executes through the same handler a person's own command
 // uses. A second registration is ignored: the module can be evaluated twice in one process (by path and by URL).
-for (const h of [poCreate, invoiceDispute, supplierReturnCreate]) {
+// invoiceRecord: invoice vision's draft (T-056) — its numbers are document spans, so it executes only once the approver
+// has typed each one (approvals refuses an unresolved ref).
+for (const h of [poCreate, invoiceDispute, invoiceRecord, supplierReturnCreate]) {
   if (!draftable(h.type)) throw new Error(`purchasing: '${h.type}' is not a registered draftable (contracts)`);
   try {
     registerDraftHandler(h);

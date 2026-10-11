@@ -6,7 +6,8 @@
 import type { LeafOverrides } from "./transform.ts";
 
 /** ADR-014 §5.1: `imports.*` drafts are produced only by the import workflows (R28). */
-export const NOT_AGENT_EXPOSED = ["imports.format.approve.v1", "imports.run.commit.v1"] as const;
+// purchasing.invoice.record.v1 is a workflow draftable (DECISIONS 11 Oct, W3.2): emitted by ingestion code, never a model tool.
+export const NOT_AGENT_EXPOSED = ["imports.format.approve.v1", "imports.run.commit.v1", "purchasing.invoice.record.v1"] as const;
 
 export const ACTION_LEAVES: Record<string, LeafOverrides> = {
   "catalogue.price.set.v1": { minted: ["/price_id"] },
@@ -32,6 +33,7 @@ export const ACTION_LEAVES: Record<string, LeafOverrides> = {
   "purchasing.supplier_return.create.v1": { minted: ["/supplier_return_id"] },
   "imports.format.approve.v1": {},
   "imports.run.commit.v1": {},
+  "purchasing.invoice.record.v1": { minted: ["/supplier_invoice_id", "/lines/*/line_id"] },
 };
 
 /** Arguments a propose tool takes besides the payload fields (names a payload may not use). */
