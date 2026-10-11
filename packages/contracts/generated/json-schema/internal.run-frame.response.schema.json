@@ -198,6 +198,54 @@
         "model",
         "template"
       ]
+    },
+    "licence_kinds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "business",
+              "outlet"
+            ]
+          },
+          "outlet_kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "restaurant",
+                "cloud_kitchen",
+                "store"
+              ]
+            }
+          },
+          "unverified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "holder",
+          "outlet_kinds",
+          "unverified"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "payroll_scope": {
+      "type": "string",
+      "enum": [
+        "drafts",
+        "roster_only"
+      ]
     }
   },
   "required": [
@@ -207,7 +255,9 @@
     "detectors",
     "outlets",
     "budget",
-    "narration"
+    "narration",
+    "licence_kinds",
+    "payroll_scope"
   ],
   "additionalProperties": false
 }

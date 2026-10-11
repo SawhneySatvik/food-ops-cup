@@ -207,7 +207,7 @@ describe("priceLines — 20 hand-computed carts", () => {
     expect(totals(r)).toEqual({ subtotal: 24900, discount: 0, tax: 1246, total: 26146 });
     expect(r.lines[0]!.price_ref).toMatch(/^⟨cite:row:core\.price:[0-9a-f-]{36}⟩$/);
     expect(r.lines[0]!.option_refs).toEqual([row("option", I.sMild)]);
-    expect(r.tax_rule).toEqual({ pack_code: "IN", pack_version: 2 });
+    expect(r.tax_rule).toEqual({ pack_code: "IN", pack_version: 3 });
   });
   it("2 · A × 2 extra cheese + hot: unit 24900 + 3000 + 500 = 28400; amount 56800; tax 1420 × 2; total 59640", async () => {
     const r = await sale(IN, { at: WED_1230, lines: [line(I.A, 2, [I.xCheese, I.sHot])] });
@@ -295,7 +295,7 @@ describe("priceLines — 20 hand-computed carts", () => {
     const r = await sale(AU, { at: WED_1400_MEL, lines: [line(I.F, 1)] });
     expect(shape(r)).toEqual([[1, 550, 0, 50, 550]]);
     expect(totals(r)).toEqual({ subtotal: 500, discount: 0, tax: 50, total: 550 });
-    expect(r.tax_rule).toEqual({ pack_code: "AU", pack_version: 2 });
+    expect(r.tax_rule).toEqual({ pack_code: "AU", pack_version: 3 });
   });
   it("17 · AU F × 2 oat at Mon 08:00 (20% breakfast deal): 1260 − 252 = 1008 incl GST 91.64 → 92", async () => {
     const r = await sale(AU, { at: "2026-10-11T21:00:00Z", lines: [line(I.F, 2, [I.oat])] });

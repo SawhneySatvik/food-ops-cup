@@ -13,7 +13,7 @@ tests/watch/test_detect.py checks every registered id against the specialist reg
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import TYPE_CHECKING, Any, Literal
@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from munim_intel.runtime.state import PACKS
 
 if TYPE_CHECKING:
-    from munim_intel.mapping import DraftMapping
+    from munim_intel.mapping import DraftMapping, FollowUp
 
 Severity = Literal["low", "medium", "high", "critical"]
 OutletKind = Literal["restaurant", "cloud_kitchen", "store"]
@@ -57,11 +57,23 @@ def at_least(severity: Severity, floor: Severity) -> Severity:
 
 
 @dataclass(frozen=True)
+class LicenceKind:
+    """A country-pack `licence_kinds` entry as the run-frame carries it: code and holder, and whether the pack marks the
+    kind `_unverified` (its applicability is not confirmed — DECISIONS 11 Oct: never reported missing, only expiring)."""
+
+    code: str
+    holder: Literal["business", "outlet"]
+    unverified: bool
+
+
+@dataclass(frozen=True)
 class OutletFrame:
     id: str
     kind: OutletKind
     #: The outlet's business date now, from core's one tz module (run-frame), never computed in intel.
     business_date: date
+    #: The pack's licence kinds that apply to this outlet's kind (run-frame `licence_kinds`, rule 7: never named in code).
+    licence_kinds: tuple[LicenceKind, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -71,6 +83,28 @@ class Window:
 
     params: dict[str, Any]
     key: str
+
+
+@dataclass(frozen=True)
+class Hit:
+    """One detection: the row that fired, the row holding its impact cell (the same row, or a Σ row), and its severity."""
+
+    row: int
+    impact_row: int
+    severity: Severity
+
+
+@dataclass(frozen=True)
+class Driver:
+    """Enumeration: a list template minted once per outlet whose rows name what the detector's own template is minted
+    for (an invoice, a stock count, a coupon, a goal) — one Window per distinct uuid in `id_column`. A row whose id cell
+    is not a uuid string (a Σ row) names nothing."""
+
+    template: str
+    params: Callable[[OutletFrame, Thresholds], dict[str, Any]]
+    id_column: str
+    #: (listed id, outlet, thresholds) -> the detector's window for that id.
+    window: Callable[[str, OutletFrame, Thresholds], Window]
 
 
 @dataclass(frozen=True)
@@ -100,6 +134,26 @@ class DetectorSpec:
     #: the pack names none (catalogue, finance): the detector reads complete records, so FULL_COVERAGE_BP.
     coverage_column: str | None = None
     mapping: DraftMapping | None = field(default=None)
+    #: A rule over several rows (a Σ row's total, consecutive weeks, n of the last m slots): (rows, window, thresholds,
+    #: ladder) -> the hits. None → `fires` and `severity` on each row, the impact on the firing row.
+    select: Callable[[Sequence[Row], Window, Thresholds, Ladder], list[Hit]] | None = None
+    #: Severity that needs the window or the outlet's business date (pack §4 "high if stockout ≤ tomorrow"); replaces
+    #: `severity` when set. Dates come from the run-frame (core's one tz module), never from intel's clock.
+    severity_at: Callable[[Row, Thresholds, Ladder, Window, OutletFrame], Severity] | None = None
+    #: Windows from a list template's rows, minted in addition to `windows` (see Driver).
+    driver: Driver | None = None
+    #: Snapshots the mapping needs beyond the detection's own, minted after the finding is stored (see FollowUp).
+    follow_ups: tuple[FollowUp, ...] = ()
+
+    def hits(self, rows: Sequence[Row], w: Window, t: Thresholds, ladder: Ladder, outlet: OutletFrame) -> list[Hit]:
+        if self.select is not None:
+            return self.select(rows, w, t, ladder)
+        sev = self.severity_at
+        return [
+            Hit(i, i, sev(r, t, ladder, w, outlet) if sev is not None else self.severity(r, t, ladder))
+            for i, r in enumerate(rows)
+            if self.fires(r, t)
+        ]
 
     def confidence_bp(self, row: Row) -> int:
         if self.coverage_column is None:

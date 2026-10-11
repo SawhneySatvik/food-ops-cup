@@ -47,24 +47,26 @@ FINDING = "01920000-0000-7000-8000-00000000c001"
 # Per-specialist toolset size = agent-exposed templates + draftables, by hand from the pack md §3 tables (ADR-014 §5.1;
 # no `forecast.*` input-only, no `purchasing.deal_inputs` / `invoice_duplicates` review-only) and the registry draftables:
 #   catalogue 6 reads (catalogue.md §3) + 3 proposes = 9
-#   finance 7 reads (finance.md §3) + margin_bridge (registry) = 8, + 3 proposes = 11
-#   inventory_purchasing 11 reads (inventory-purchasing.md §3) - 2 review-only = 9, + 5 proposes = 14
-#   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · customers 7 + 2 = 9 · compliance 5 + 2 = 7 · market 6 + 2 = 8
-# Every one is <= 20 (F3). Reads over all specialists = 6+8+9+5+6+7+5+6 = 52, plus forecast's 3 exposed (points, accuracy,
-# freshness; forecast.md §3 lists 5 minus the 2 input-only) = 55.
+#   finance 7 reads (finance.md §3) + margin_bridge + gst_summary (registry) = 9, + 3 proposes = 12
+#   inventory_purchasing 11 reads (inventory-purchasing.md §3) - 2 review-only = 9, + purchasing.invoices, inventory.counts,
+#     inventory.count_variance (registry-only: 0022, assigned by orchestrator 11 Oct) = 12, + 5 proposes = 17
+#   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · customers 7 + 2 = 9 · compliance 5 + 2 = 7
+#   market 6 reads + market.goals (registry-only: 0022, assigned by orchestrator 11 Oct) = 7, + 2 proposes = 9
+# Every one is <= 20 (F3). Reads over all specialists = 6+9+12+5+6+7+5+7 = 57, plus forecast's 3 exposed (points, accuracy,
+# freshness; forecast.md §3 lists 5 minus the 2 input-only) = 60 = EVERY_TOOL reads below.
 TOOLSET_SIZE = {
     "catalogue": 9,
-    "finance": 11,
-    "inventory_purchasing": 14,
+    "finance": 12,
+    "inventory_purchasing": 17,
     "kitchen": 7,
     "people": 8,
     "customers": 9,
     "compliance": 7,
-    "market": 8,
+    "market": 9,
 }
-#: Every model tool: 20 proposals + 55 agent-exposed templates (db/tests/manifest.ts TEMPLATES 63 - 1 platform operator
-#: - 3 intel.* - 4 ADR-014 §5.1 not-agent-exposed = 55).
-EVERY_TOOL = 75
+#: Every model tool: 20 proposals + 60 agent-exposed templates (db/tests/manifest.ts TEMPLATES 68 after 0022 - 1 platform
+#: operator - 3 intel.* - 4 ADR-014 §5.1 not-agent-exposed = 60; 0022's five new ones are owned by specialists now).
+EVERY_TOOL = 80
 
 
 def snapshot(template: str, columns: list[dict[str, Any]], rows: list[dict[str, Any]], sid: str = SNAP_ID) -> dict[str, Any]:
@@ -263,9 +265,15 @@ def test_read_params_expand_id_handles_to_literals() -> None:
     h = HandleTable()
     h.add_snapshot(QUOTES)
     read = tool(build_toolset("catalogue", CTX, core.client(), h), "read_catalogue_recipe_current")
-    run(read.run_async(args={"item_id": "S1.r0.ingredient_id", "outlet_id": "S1.r0.outlet_id", "page": 0}, tool_context=None))
-    assert core.requests[-1][1]["params"] == {"item_id": INGREDIENT, "outlet_id": OUTLET}
-    bad = run(read.run_async(args={"item_id": "01920000-0000-7000-8000-00000000b003", "outlet_id": None, "page": 0}, tool_context=None))
+    run(
+        read.run_async(args={"item_id": "S1.r0.ingredient_id", "outlet_id": "S1.r0.outlet_id", "as_of": None, "page": 0}, tool_context=None)
+    )
+    assert core.requests[-1][1]["params"] == {"item_id": INGREDIENT, "outlet_id": OUTLET, "as_of": None}
+    bad = run(
+        read.run_async(
+            args={"item_id": "01920000-0000-7000-8000-00000000b003", "outlet_id": None, "as_of": None, "page": 0}, tool_context=None
+        )
+    )
     assert bad["error"].startswith("'01920000-0000-7000-8000-00000000b003' is not a cell handle")
 
 
@@ -374,7 +382,7 @@ def test_each_specialist_toolset_is_within_its_registry_entry() -> None:
     print(f"toolsets: {sizes}")
     assert sizes == TOOLSET_SIZE
     reads = [t.name for t in build_toolset("finance", CTX, client, HandleTable(), propose=False)]
-    assert all(n.startswith("read_") for n in reads) and len(reads) == 8
+    assert all(n.startswith("read_") for n in reads) and len(reads) == 9
     # planted: a foreign template in catalogue's toolset is caught
     planted = [t.name for t in build_toolset("catalogue", CTX, client, HandleTable())] + ["read_finance_pnl"]
     assert foreign_tools("catalogue", planted) == ["read_finance_pnl"]

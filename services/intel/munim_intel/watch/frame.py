@@ -2,7 +2,9 @@
 
   pack_code, currency     the tenant's country pack (rule 7: thresholds and the ladder are pack data, not code)
   detectors, ladder       `detectors.<id>.thresholds` and `severity_ladder` from that pack
-  outlets                 id, kind and business date of every outlet in the run's scope (core's one tz module)
+  outlets                 id, kind and business date of every outlet in the run's scope (core's one tz module), each
+                          with the pack's `licence_kinds` that apply to its kind (code, holder, `_unverified` as a flag)
+  payroll_scope           the pack's `payroll_scope` ("drafts" | "roster_only"): where payroll may be drafted at all
   narration               "model" or "template" — the typed kill switch; the budget's soft cap means "template"
 
 It comes from core's `GET /internal/intel/v1/run-frame` (T-040b; `core_frame_source`, the app's default). When core
@@ -15,7 +17,7 @@ budget and the kill switch. An ask's thread excerpt is not in the run-frame: it 
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
@@ -23,13 +25,14 @@ from typing import Any, Literal
 import httpx
 
 from munim_intel.config import Config, ConfigError
-from munim_intel.detect import Ladder, OutletFrame, Thresholds
+from munim_intel.detect import Ladder, LicenceKind, OutletFrame, Thresholds
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER
 
 log = logging.getLogger("munim_intel.watch.frame")
 
 Narration = Literal["template", "model"]
+PayrollScope = Literal["drafts", "roster_only"]
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,7 @@ class Frame:
     detectors: Mapping[str, Thresholds]
     outlets: tuple[OutletFrame, ...]
     narration: Narration
+    payroll_scope: PayrollScope
 
     def in_scope(self, ctx: RunContext) -> tuple[OutletFrame, ...]:
         if ctx.outlet_scope == ("*",):
@@ -47,16 +51,34 @@ class Frame:
         return tuple(o for o in self.outlets if o.id in ctx.outlet_scope)
 
 
+def _outlet(o: Mapping[str, Any], kinds: Sequence[Mapping[str, Any]]) -> OutletFrame:
+    """An outlet with the licence kinds that apply to its kind, in pack order."""
+    return OutletFrame(
+        o["id"],
+        o["kind"],
+        date.fromisoformat(o["business_date"]),
+        tuple(LicenceKind(k["code"], k["holder"], bool(k["unverified"])) for k in kinds if o["kind"] in k["outlet_kinds"]),
+    )
+
+
+def _payroll_scope(v: object) -> PayrollScope:
+    if v == "drafts" or v == "roster_only":
+        return v
+    raise ValueError("payroll_scope")
+
+
 def frame_from_pack(pack: Mapping[str, Any], outlets: list[dict[str, str]], narration: Narration) -> Frame:
     """A Frame from a country-pack document (packages/contracts/packs/<CODE>.json shape) and the outlets' rows."""
     ladder = pack["severity_ladder"]
+    kinds = [{**k, "unverified": bool(k.get("_unverified"))} for k in pack["licence_kinds"]]
     return Frame(
         pack_code=pack["code"],
         currency=pack["currency"]["code"],
         ladder=Ladder(ladder["critical_minor_gte"], ladder["high_minor_gte"], ladder["medium_minor_gte"]),
         detectors={k: dict(v["thresholds"]) for k, v in pack["detectors"].items()},
-        outlets=tuple(OutletFrame(o["id"], o["kind"], date.fromisoformat(o["business_date"])) for o in outlets),  # type: ignore[arg-type]
+        outlets=tuple(_outlet(o, kinds) for o in outlets),
         narration=narration,
+        payroll_scope=_payroll_scope(pack["payroll_scope"]),
     )
 
 
@@ -71,8 +93,9 @@ def frame_from_run_frame(body: Mapping[str, Any]) -> Frame:
         currency=body["currency"],
         ladder=Ladder(int(ladder["critical_minor_gte"]), int(ladder["high_minor_gte"]), int(ladder["medium_minor_gte"])),
         detectors={k: {n: int(x) for n, x in v["thresholds"].items()} for k, v in body["detectors"].items()},
-        outlets=tuple(OutletFrame(o["id"], o["kind"], date.fromisoformat(o["business_date"])) for o in body["outlets"]),
+        outlets=tuple(_outlet(o, body["licence_kinds"]) for o in body["outlets"]),
         narration=narration,
+        payroll_scope=_payroll_scope(body["payroll_scope"]),
     )
 
 

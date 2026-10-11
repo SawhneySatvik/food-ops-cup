@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.draftables",
+  "title": "V1Draftables",
+  "x-munim-module": "lineage",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z_]*(\\.[a-z][a-z_]*)+\\.v[1-9][0-9]*$"
+          },
+          "proposal_schema": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "command_schema": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "command_type",
+          "proposal_schema",
+          "command_schema"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "additionalProperties": false
+}

@@ -228,7 +228,8 @@ def test_every_registered_detector_belongs_to_its_specialist_in_the_registry() -
     detectors_for(None)
     registered = [(pack, s.id, s.pack) for pack, specs in REGISTRY.items() for s in specs]
     print("registered:", registered)
-    assert len(registered) == 2  # the two reference detectors (T-043); the pack lanes add theirs
+    # The two reference detectors (T-043) are registered; the pack lanes add theirs, each owned by its specialist below.
+    assert {("catalogue", "catalogue.above_mrp"), ("finance", "finance.unapproved_ad_fee")} <= {(r[0], r[1]) for r in registered}
     assert [r for r in registered if r[1] not in owned.get(r[0], set()) or r[0] != r[2]] == []
 
 

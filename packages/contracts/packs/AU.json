@@ -1,7 +1,7 @@
 {
   "code": "AU",
-  "version": 2,
-  "effective_from": "2026-10-10",
+  "version": 3,
+  "effective_from": "2026-10-11",
   "name": "Australia",
   "locale": "en-AU",
   "currency": {
@@ -199,19 +199,23 @@
     "catalogue.cost_drift": {
       "thresholds": {
         "cost_change_bp_gte": 800,
-        "cost_increase_minor_gte": 10
+        "cost_increase_minor_gte": 10,
+        "lookback_days": 90
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): lookback_days 90 — catalogue.md §4 names no lookback; any lookback past the cost move gives the same drift cell"
       ]
     },
     "catalogue.recipe_waste_gap": {
       "thresholds": {
         "waste_gap_bp_gte": 300,
-        "units_sold_gte": 20
+        "units_sold_gte": 20,
+        "window_days": 14
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): window_days 14 — the 14-day window catalogue.md §4 gives negative_margin on the same template"
       ]
     },
     "catalogue.deal_loss": {
@@ -234,10 +238,12 @@
     },
     "catalogue.below_cost": {
       "thresholds": {
-        "below_cost_minor_gt": 0
+        "below_cost_minor_gt": 0,
+        "window_days": 14
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): window_days 14 — catalogue.md §4 \"14-day window\""
       ]
     },
     "compliance.licence_expiring": {
@@ -446,10 +452,12 @@
     "inventory.shrinkage": {
       "thresholds": {
         "loss_share_bp_gte": 200,
-        "loss_minor_gte": 4000
+        "loss_minor_gte": 4000,
+        "window_days": 30
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists submitted stock counts (pack §4 names no listing window); a re-listed count re-detects into its open finding"
       ]
     },
     "inventory.dead_stock": {
@@ -474,18 +482,22 @@
     },
     "purchasing.overbilled": {
       "thresholds": {
-        "overbilled_minor_gte": 200
+        "overbilled_minor_gte": 200,
+        "window_days": 30
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists invoices (pack §4 names no listing window); a re-listed invoice re-detects into its open finding"
       ]
     },
     "purchasing.near_duplicate_invoice": {
       "thresholds": {
-        "days_apart_lte": 7
+        "days_apart_lte": 7,
+        "window_days": 30
       },
       "_notes": [
-        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists invoices (pack §4 names no listing window); a re-listed invoice re-detects into its open finding"
       ]
     },
     "kitchen.ticket_drift": {

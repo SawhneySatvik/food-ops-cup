@@ -11,7 +11,7 @@ and no row is added. New-entity ids inside the payload are sha256(draft id ‖ J
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -31,17 +31,53 @@ def uuid7_ms(uuid: str) -> int:
 
 
 @dataclass(frozen=True)
+class Minted:
+    """A snapshot minted for the mapping (FollowUp): its id and rows, to cite as `⟨snap:<id>·<row>·<col>⟩`."""
+
+    snapshot_id: str
+    rows: Sequence[Row]
+
+    def ref(self, row: int, column: str) -> str:
+        return snap_ref(self.snapshot_id, row, column)
+
+
+@dataclass(frozen=True)
 class Detection:
-    """What a mapping may read: the firing row and where it sits, the outlet it was minted for, the pack's currency."""
+    """What a mapping may read: the firing row and where it sits, the outlet it was minted for, the pack's currency;
+    the window's params and every row of the same snapshot (a dispute claims each line of a Σ detection); the id core
+    gave the finding; and the follow-up snapshots by name."""
 
     snapshot_id: str
     row_index: int
     row: Row
     outlet: OutletFrame
     currency: str
+    params: Mapping[str, Any] = field(default_factory=dict)
+    rows: Sequence[Row] = ()
+    finding_id: str | None = None
+    follow: Mapping[str, Minted] = field(default_factory=dict)
 
     def ref(self, column: str) -> str:
         return snap_ref(self.snapshot_id, self.row_index, column)
+
+
+@dataclass(frozen=True)
+class FollowUp:
+    """A snapshot a mapping needs that the detection's own does not hold (a campaign's consented audience, a price's
+    suggested amount): template plus params from the detection. The pipeline mints it after the finding is stored and
+    hands it to the mapping as `follow[name]`. `params` → None: nothing to mint for this detection (not in `follow`)."""
+
+    name: str
+    template: str
+    params: Callable[[Detection], dict[str, Any] | None]
+
+
+@dataclass(frozen=True)
+class Abstain:
+    """A mapping's typed refusal (pack §7, e.g. `no_marketing_consent`): no draft, and the pipeline traces the code —
+    a contracts ReasonCode, never prose."""
+
+    reason_code: str
 
 
 @dataclass(frozen=True)
@@ -57,7 +93,7 @@ class Proposal:
     minted: list[str] = field(default_factory=list)
 
 
-DraftMapping = Callable[[Detection], Proposal | None]
+DraftMapping = Callable[[Detection], Proposal | Abstain | None]
 
 
 def draft_id(finding_id: str, p: Proposal) -> str:

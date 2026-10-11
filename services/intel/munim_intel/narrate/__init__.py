@@ -53,14 +53,15 @@ def refs_of(text: str) -> list[str]:
     return out
 
 
-def template_segments(spec: DetectorSpec, snapshot_id: str, row: int) -> list[dict[str, object]]:
-    text = SLOT.sub(lambda m: snap_ref(snapshot_id, row, m.group(1)), spec.narration)
+def template_segments(spec: DetectorSpec, snapshot_id: str, row: int, impact_row: int) -> list[dict[str, object]]:
+    """The impact column's slot cites the impact row (a Σ row for some detectors); every other slot the firing row."""
+    text = SLOT.sub(lambda m: snap_ref(snapshot_id, impact_row if m.group(1) == spec.impact_column else row, m.group(1)), spec.narration)
     return [{"text": text, "refs": [f"snap:{snapshot_id}"]}]
 
 
-def message(spec: DetectorSpec, severity: Severity, handle: str, row: int) -> str:
-    cells = [spec.impact_column, *[c for c in slots(spec.narration) if c != spec.impact_column]]
-    listed = "\n".join(f"- {{{handle}.r{row}.{c}}}: {c}" for c in cells)
+def message(spec: DetectorSpec, severity: Severity, handle: str, row: int, impact_row: int) -> str:
+    cells = [(impact_row, spec.impact_column), *[(row, c) for c in slots(spec.narration) if c != spec.impact_column]]
+    listed = "\n".join(f"- {{{handle}.r{r}.{c}}}: {c}" for r, c in cells)
     return f"Finding type: {spec.finding_type}\nSeverity: {severity}\nCells you may cite:\n{listed}"
 
 
@@ -69,6 +70,7 @@ async def model_segments(
     severity: Severity,
     snapshot: dict[str, object],
     row: int,
+    impact_row: int,
     *,
     llm: BaseLlm,
     ctx: RunContext,
@@ -79,7 +81,7 @@ async def model_segments(
     """The model's narration with handles expanded, or None (no text). RunFailed propagates to the caller."""
     handle = handles.add_snapshot(snapshot)
     agent = LlmAgent(name="narrate", model=llm, instruction=INSTRUCTION)
-    events = await run_agent(agent, ctx, message(spec, severity, handle, row), cfg, state=state, actor=f"watcher:{spec.pack}")
+    events = await run_agent(agent, ctx, message(spec, severity, handle, row, impact_row), cfg, state=state, actor=f"watcher:{spec.pack}")
     text = "".join(p.text for e in events if e.is_final_response() and e.content for p in e.content.parts or [] if p.text and not p.thought)
     text = handles.expand_text(text.strip())
     if not text:

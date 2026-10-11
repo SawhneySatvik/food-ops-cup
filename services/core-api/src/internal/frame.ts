@@ -8,6 +8,7 @@
 //     never shown (a person sees the template's snapshot);
 //   - the narration mode: `model` only with AI on (`intel.enabled`), a budget for the month, and hard_left > 0.
 //     Run tokens are never refused for budget: at the cap a run still gets its frame and runs rules only;
+//   - the pack's `licence_kinds` (code, holder, outlet kinds, `_unverified` as a flag) and `payroll_scope` (W3.2).
 // No thread block: an ask's thread excerpt travels only in core's `/ask` body (T-088a `threadBlock`), which core binds
 // to the run it mints — a run-frame `?thread_id=` would let intel name a thread nothing ties to the run (ruling, 11 Oct).
 // No soft threshold is decided (ADR-014 §3.4 names a soft cap, no document sets it): the level is ok | hard.
@@ -21,6 +22,8 @@ interface PackDoc {
   currency: { code: string };
   severity_ladder: { critical_minor_gte: number; high_minor_gte: number; medium_minor_gte: number };
   detectors: Record<string, { thresholds: Record<string, number> }>;
+  licence_kinds: Array<{ code: string; holder: "business" | "outlet"; outlet_kinds: Array<"restaurant" | "cloud_kitchen" | "store">; _unverified?: string[] }>;
+  payroll_scope: "drafts" | "roster_only";
 }
 
 /** The first day of `at`'s UTC month (platform.llm_budget.month). */
@@ -60,5 +63,8 @@ export async function runFrame(c: Queryable, run: Run, at: Date) {
     outlets,
     budget,
     narration,
+    // A kind with `_unverified` notes is flagged, never explained: the notes are pack prose, a watcher needs the code.
+    licence_kinds: pack.doc.licence_kinds.map((k) => ({ code: k.code, holder: k.holder, outlet_kinds: k.outlet_kinds, unverified: (k._unverified?.length ?? 0) > 0 })),
+    payroll_scope: pack.doc.payroll_scope,
   };
 }

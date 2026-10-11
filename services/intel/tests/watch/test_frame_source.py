@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 
 from munim_intel.config import Config
-from munim_intel.detect import Ladder, OutletFrame
+from munim_intel.detect import Ladder, LicenceKind, OutletFrame
 from munim_intel.runtime.context import RunContext
 from munim_intel.watch.frame import Frame, core_frame_source
 
@@ -27,6 +27,12 @@ BODY: dict[str, Any] = {
     "outlets": [{"id": OUTLET, "name": "Outlet 1", "kind": "restaurant", "tz": "Asia/Kolkata", "business_date": "2026-10-11"}],
     "budget": None,
     "narration": "template",
+    "licence_kinds": [
+        {"code": "fssai", "holder": "outlet", "outlet_kinds": ["restaurant", "cloud_kitchen", "store"], "unverified": False},
+        {"code": "fire_noc", "holder": "outlet", "outlet_kinds": ["restaurant", "cloud_kitchen"], "unverified": True},
+        {"code": "shop_only", "holder": "business", "outlet_kinds": ["store"], "unverified": True},
+    ],
+    "payroll_scope": "drafts",
 }
 RUN, TENANT = "01920000-0000-7000-8000-0000000000r1", "01920000-0000-7000-8000-0000000000t1"
 CTX = RunContext(RUN, TENANT, ("*",), "watch_sweep", "watcher:sweep", 0, "tok.en.x")
@@ -39,7 +45,10 @@ def fetch(cfg: Config, answer: httpx.Response) -> tuple[Frame | None, list[httpx
         seen.append(request)
         return answer
 
-    return asyncio.run(core_frame_source(cfg, httpx.MockTransport(handler))(CTX)), seen
+    async def go() -> Frame | None:
+        return await core_frame_source(cfg, httpx.MockTransport(handler))(CTX)
+
+    return asyncio.run(go()), seen
 
 
 def test_a_served_frame_becomes_the_runs_frame_under_the_runs_token(cfg: Config) -> None:
@@ -49,8 +58,14 @@ def test_a_served_frame_becomes_the_runs_frame_under_the_runs_token(cfg: Config)
         currency="INR",
         ladder=Ladder(5_000_000, 1_000_000, 200_000),
         detectors={"catalogue.cost_drift": {"cost_change_bp_gte": 800, "cost_increase_minor_gte": 500}},
-        outlets=(OutletFrame(OUTLET, "restaurant", date(2026, 10, 11)),),
+        # A restaurant holds the kinds listing its kind — not the shop-only one — with `_unverified` as a flag.
+        outlets=(
+            OutletFrame(
+                OUTLET, "restaurant", date(2026, 10, 11), (LicenceKind("fssai", "outlet", False), LicenceKind("fire_noc", "outlet", True))
+            ),
+        ),
         narration="template",
+        payroll_scope="drafts",
     )
     assert [(r.method, r.url.path, r.headers["authorization"]) for r in seen] == [
         ("GET", "/internal/intel/v1/run-frame", "Bearer tok.en.x")
@@ -65,6 +80,8 @@ def test_anything_else_core_answers_is_no_frame(cfg: Config) -> None:
         httpx.Response(200, content=b"<html>"),
         httpx.Response(200, json={k: v for k, v in BODY.items() if k != "severity_ladder"}),
         httpx.Response(200, json={**BODY, "narration": "freeform"}),
+        httpx.Response(200, json={**BODY, "payroll_scope": "everything"}),
+        httpx.Response(200, json={k: v for k, v in BODY.items() if k != "licence_kinds"}),
         httpx.Response(200, json={**BODY, "outlets": [{"id": OUTLET, "kind": "restaurant", "business_date": "not a date"}]}),
     ]
     assert [fetch(cfg, r)[0] for r in bad] == [None] * len(bad)

@@ -13,6 +13,16 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 500
+    },
+    "reason_code": {
+      "type": "string",
+      "enum": [
+        "wrong_numbers",
+        "not_needed",
+        "already_done",
+        "bad_timing",
+        "other"
+      ]
     }
   },
   "required": [

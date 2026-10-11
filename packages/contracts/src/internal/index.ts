@@ -252,6 +252,15 @@ export const RunFrameBudget = z.strictObject({
   hard_left_minor: z.int(),
   level: z.enum(["ok", "hard"]),
 });
+/** A country-pack `licence_kinds` entry (rule 7: the kinds are pack data). `unverified` = the pack lists `_unverified`
+ *  notes for it: its applicability is not confirmed, so a watcher reports it expiring, never missing (DECISIONS 11 Oct).
+ *  No label and no note text: a watcher needs the code only. */
+export const RunFrameLicenceKind = z.strictObject({
+  code: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  holder: z.enum(["business", "outlet"]),
+  outlet_kinds: z.array(z.enum(["restaurant", "cloud_kitchen", "store"])).min(1),
+  unverified: z.boolean(),
+});
 export const RunFrameResponse = z.strictObject({
   pack: z.strictObject({ code: z.string().regex(/^[A-Z]{2}$/), version: z.int().min(1) }),
   currency: CurrencyCode,
@@ -264,6 +273,10 @@ export const RunFrameResponse = z.strictObject({
   budget: RunFrameBudget.nullable(),
   /** `model` only with AI on (`intel.enabled`), a budget, and level `ok`; else `template` (rule 11). */
   narration: z.enum(["model", "template"]),
+  /** The pack's licence kinds, in pack order. */
+  licence_kinds: z.array(RunFrameLicenceKind),
+  /** The pack's `payroll_scope`: payroll drafts exist only under `drafts` (core refuses one elsewhere, `payroll_out_of_scope`). */
+  payroll_scope: z.enum(["drafts", "roster_only"]),
 });
 
 export const SCHEMAS = {

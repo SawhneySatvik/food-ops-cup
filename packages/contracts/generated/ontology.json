@@ -1969,6 +1969,11 @@
           "name": "source_state",
           "type": "text",
           "not_null": true
+        },
+        {
+          "name": "binding",
+          "type": "text",
+          "not_null": true
         }
       ]
     },
@@ -12316,7 +12321,7 @@
   "functions": [
     {
       "id": "catalogue.cost_drift",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_catalogue_cost_drift",
@@ -12324,9 +12329,17 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "since"
+          "since",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "since": {
             "type": "string",
             "format": "date"
@@ -12391,11 +12404,30 @@
             "core.stock_movement.unit_cost_per_1000_minor",
             "core.order_line.qty_milli"
           ]
+        },
+        {
+          "name": "price_id",
+          "type": "uuid"
+        },
+        {
+          "name": "channel_kind",
+          "type": "text"
+        },
+        {
+          "name": "tax_class",
+          "type": "text"
         }
       ],
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "since": {
             "type": "string",
             "description": "A calendar date, YYYY-MM-DD."
@@ -12413,6 +12445,7 @@
           }
         },
         "required": [
+          "as_of",
           "since",
           "outlet_id",
           "page"
@@ -12534,7 +12567,7 @@
     },
     {
       "id": "catalogue.dish_margin",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_catalogue_dish_margin",
@@ -12703,6 +12736,18 @@
           "name": "lines_unpriced",
           "type": "integer",
           "numeric_source": "count:core.recipe_line"
+        },
+        {
+          "name": "price_id",
+          "type": "uuid"
+        },
+        {
+          "name": "channel_kind",
+          "type": "text"
+        },
+        {
+          "name": "tax_class",
+          "type": "text"
         }
       ],
       "model_schema": {
@@ -12857,7 +12902,7 @@
     },
     {
       "id": "catalogue.recipe_current",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_catalogue_recipe_current",
@@ -12865,9 +12910,17 @@
         "type": "object",
         "required": [
           "item_id",
-          "outlet_id"
+          "outlet_id",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "item_id": {
             "type": "string",
             "format": "uuid"
@@ -12915,11 +12968,22 @@
           "name": "observed_waste_bp",
           "type": "integer",
           "numeric_source": "core.stock_movement.qty_milli"
+        },
+        {
+          "name": "unit",
+          "type": "text"
         }
       ],
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "item_id": {
             "type": "string",
             "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
@@ -12937,6 +13001,7 @@
           }
         },
         "required": [
+          "as_of",
           "item_id",
           "outlet_id",
           "page"
@@ -13202,7 +13267,7 @@
     },
     {
       "id": "compliance.energy_per_order",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_compliance_energy_per_order",
@@ -13210,9 +13275,17 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "months"
+          "months",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "months": {
             "type": "integer",
             "maximum": 24,
@@ -13271,6 +13344,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "months": {
             "type": "integer"
           },
@@ -13287,6 +13367,7 @@
           }
         },
         "required": [
+          "as_of",
           "months",
           "outlet_id",
           "page"
@@ -14365,6 +14446,67 @@
         },
         {
           "name": "diff_minor",
+          "type": "integer",
+          "numeric_source": "core.posting.amount_minor"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "period_month": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "period_month",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "finance.gst_summary",
+      "version": 1,
+      "min_role": "advisor",
+      "agent_exposed": true,
+      "tool": "read_finance_gst_summary",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "period_month"
+        ],
+        "properties": {
+          "period_month": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "key",
+          "type": "text"
+        },
+        {
+          "name": "output_tax_minor",
+          "type": "integer",
+          "numeric_source": "core.posting.amount_minor"
+        },
+        {
+          "name": "input_tax_minor",
+          "type": "integer",
+          "numeric_source": "core.posting.amount_minor"
+        },
+        {
+          "name": "net_payable_minor",
           "type": "integer",
           "numeric_source": "core.posting.amount_minor"
         }
@@ -15497,7 +15639,7 @@
     },
     {
       "id": "forecast.slot_profile",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": false,
       "tool": null,
@@ -15506,9 +15648,17 @@
         "required": [
           "outlet_id",
           "weeks",
-          "slot_minutes"
+          "slot_minutes",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "weeks": {
             "type": "integer",
             "maximum": 26,
@@ -15821,8 +15971,181 @@
       "optional": []
     },
     {
-      "id": "inventory.dead_stock",
+      "id": "inventory.count_variance",
       "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_count_variance",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "count_id"
+        ],
+        "properties": {
+          "count_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "line_id",
+          "type": "uuid"
+        },
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid"
+        },
+        {
+          "name": "expected_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_count_line.expected_qty_milli"
+        },
+        {
+          "name": "counted_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_count_line.counted_qty_milli"
+        },
+        {
+          "name": "variance_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_count_line.counted_qty_milli",
+            "core.stock_count_line.expected_qty_milli"
+          ]
+        },
+        {
+          "name": "variance_value_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_count_line.counted_qty_milli",
+            "core.stock_count_line.expected_qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "count_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "count_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/count_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.counts",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_counts",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "count_id",
+          "type": "uuid"
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid"
+        },
+        {
+          "name": "counted_at",
+          "type": "timestamptz"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.dead_stock",
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_inventory_dead_stock",
@@ -15830,13 +16153,21 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "days"
+          "days",
+          "as_of"
         ],
         "properties": {
           "days": {
             "type": "integer",
             "maximum": 730,
             "minimum": 1
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           },
           "outlet_id": {
             "type": [
@@ -15877,6 +16208,13 @@
           "days": {
             "type": "integer"
           },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "outlet_id": {
             "type": [
               "string",
@@ -15891,6 +16229,7 @@
         },
         "required": [
           "days",
+          "as_of",
           "outlet_id",
           "page"
         ],
@@ -15907,7 +16246,7 @@
     },
     {
       "id": "inventory.expiry_risk",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_inventory_expiry_risk",
@@ -15915,13 +16254,21 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "days"
+          "days",
+          "as_of"
         ],
         "properties": {
           "days": {
             "type": "integer",
             "maximum": 365,
             "minimum": 0
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           },
           "outlet_id": {
             "type": [
@@ -15989,6 +16336,18 @@
             "core.stock_movement.qty_milli",
             "core.stock_movement.unit_cost_per_1000_minor"
           ]
+        },
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "unit",
+          "type": "text"
+        },
+        {
+          "name": "supplier_id",
+          "type": "uuid"
         }
       ],
       "model_schema": {
@@ -15996,6 +16355,13 @@
         "properties": {
           "days": {
             "type": "integer"
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
           },
           "outlet_id": {
             "type": [
@@ -16011,6 +16377,7 @@
         },
         "required": [
           "days",
+          "as_of",
           "outlet_id",
           "page"
         ],
@@ -16027,7 +16394,7 @@
     },
     {
       "id": "inventory.shortfall",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_inventory_shortfall",
@@ -16035,9 +16402,17 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "lead_days"
+          "lead_days",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "lead_days": {
             "type": "integer",
             "maximum": 30,
@@ -16122,6 +16497,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "lead_days": {
             "type": "integer"
           },
@@ -16138,6 +16520,7 @@
           }
         },
         "required": [
+          "as_of",
           "lead_days",
           "outlet_id",
           "page"
@@ -16848,7 +17231,7 @@
     },
     {
       "id": "market.competitor_gap",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_competitor_gap",
@@ -16856,13 +17239,21 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "days"
+          "days",
+          "as_of"
         ],
         "properties": {
           "days": {
             "type": "integer",
             "maximum": 365,
             "minimum": 1
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           },
           "outlet_id": {
             "type": [
@@ -16933,6 +17324,13 @@
           "days": {
             "type": "integer"
           },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "outlet_id": {
             "type": [
               "string",
@@ -16947,6 +17345,7 @@
         },
         "required": [
           "days",
+          "as_of",
           "outlet_id",
           "page"
         ],
@@ -16963,7 +17362,7 @@
     },
     {
       "id": "market.goal_baseline",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_goal_baseline",
@@ -16972,9 +17371,17 @@
         "required": [
           "outlet_id",
           "metric",
-          "months"
+          "months",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "metric": {
             "enum": [
               "net_sales",
@@ -17024,6 +17431,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "metric": {
             "type": "string",
             "enum": [
@@ -17047,6 +17461,7 @@
           }
         },
         "required": [
+          "as_of",
           "metric",
           "months",
           "outlet_id",
@@ -17065,16 +17480,24 @@
     },
     {
       "id": "market.goal_progress",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_goal_progress",
       "params_schema": {
         "type": "object",
         "required": [
-          "goal_id"
+          "goal_id",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "goal_id": {
             "type": "string",
             "format": "uuid"
@@ -17139,6 +17562,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "goal_id": {
             "type": "string",
             "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
@@ -17149,6 +17579,7 @@
           }
         },
         "required": [
+          "as_of",
           "goal_id",
           "page"
         ],
@@ -17164,8 +17595,82 @@
       "optional": []
     },
     {
-      "id": "market.signal_uplift",
+      "id": "market.goals",
       "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_goals",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "goal_id",
+          "type": "uuid"
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid"
+        },
+        {
+          "name": "metric",
+          "type": "text"
+        },
+        {
+          "name": "period_start",
+          "type": "date"
+        },
+        {
+          "name": "period_end",
+          "type": "date"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.signal_uplift",
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_signal_uplift",
@@ -17175,7 +17680,8 @@
           "outlet_id",
           "kind",
           "label",
-          "lookback_days"
+          "lookback_days",
+          "as_of"
         ],
         "properties": {
           "kind": {
@@ -17187,6 +17693,13 @@
               "other"
             ],
             "type": "string"
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           },
           "label": {
             "type": [
@@ -17251,6 +17764,13 @@
               "other"
             ]
           },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "label": {
             "type": [
               "string",
@@ -17274,6 +17794,7 @@
         },
         "required": [
           "kind",
+          "as_of",
           "label",
           "outlet_id",
           "lookback_days",
@@ -17292,7 +17813,7 @@
     },
     {
       "id": "market.upcoming",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_upcoming",
@@ -17300,13 +17821,21 @@
         "type": "object",
         "required": [
           "outlet_id",
-          "days"
+          "days",
+          "as_of"
         ],
         "properties": {
           "days": {
             "type": "integer",
             "maximum": 60,
             "minimum": 0
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           },
           "outlet_id": {
             "type": [
@@ -17350,7 +17879,7 @@
           "numeric_source": "count:core.market_signal"
         },
         {
-          "name": "forecast_orders",
+          "name": "forecast_units",
           "type": "integer",
           "numeric_source": "intel.forecast_point.qty_milli"
         },
@@ -17380,6 +17909,13 @@
           "days": {
             "type": "integer"
           },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "outlet_id": {
             "type": [
               "string",
@@ -17394,6 +17930,7 @@
         },
         "required": [
           "days",
+          "as_of",
           "outlet_id",
           "page"
         ],
@@ -17508,16 +18045,24 @@
     },
     {
       "id": "people.advances_open",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_people_advances_open",
       "params_schema": {
         "type": "object",
         "required": [
-          "outlet_id"
+          "outlet_id",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "outlet_id": {
             "type": [
               "string",
@@ -17547,6 +18092,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A calendar date, YYYY-MM-DD."
+          },
           "outlet_id": {
             "type": [
               "string",
@@ -17560,6 +18112,7 @@
           }
         },
         "required": [
+          "as_of",
           "outlet_id",
           "page"
         ],
@@ -18231,16 +18784,24 @@
     },
     {
       "id": "purchasing.deal_inputs",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": false,
       "tool": null,
       "params_schema": {
         "type": "object",
         "required": [
-          "quote_id"
+          "quote_id",
+          "as_of"
         ],
         "properties": {
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "quote_id": {
             "type": "string",
             "format": "uuid"
@@ -18460,6 +19021,79 @@
           "nullable": false
         }
       ],
+      "optional": []
+    },
+    {
+      "id": "purchasing.invoices",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_purchasing_invoices",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "supplier_invoice_id",
+          "type": "uuid"
+        },
+        {
+          "name": "supplier_id",
+          "type": "uuid"
+        },
+        {
+          "name": "invoice_date",
+          "type": "date"
+        },
+        {
+          "name": "total_minor",
+          "type": "integer",
+          "numeric_source": "core.supplier_invoice.total_minor"
+        },
+        {
+          "name": "currency",
+          "type": "text"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
       "optional": []
     },
     {
@@ -20903,6 +21537,76 @@
       "optional": []
     },
     {
+      "command_type": "purchasing.invoice.record.v1",
+      "contract": "proposal.purchasing.invoice.record.v1",
+      "tool": null,
+      "agent_exposed": false,
+      "stages": [
+        "preview",
+        "approve",
+        "commit"
+      ],
+      "auto_apply": false,
+      "authority": {
+        "allowed_roles": [
+          "judge",
+          "manager",
+          "owner"
+        ],
+        "scope": "tenant",
+        "max_amount_minor": null
+      },
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/supplier_invoice_id",
+          "kind": "minted",
+          "nullable": false
+        },
+        {
+          "path": "/supplier_id",
+          "kind": "entity",
+          "nullable": false
+        },
+        {
+          "path": "/po_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/line_id",
+          "kind": "minted",
+          "nullable": false
+        },
+        {
+          "path": "/lines/*/po_line_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/ingredient_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/qty_milli",
+          "kind": "ref",
+          "nullable": false
+        },
+        {
+          "path": "/lines/*/unit_price_minor",
+          "kind": "ref",
+          "nullable": false
+        },
+        {
+          "path": "/lines/*/tax_minor",
+          "kind": "ref",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
       "command_type": "purchasing.po.create.v1",
       "contract": "proposal.purchasing.po.create.v1",
       "tool": "propose_purchasing_po_create",
@@ -21254,7 +21958,10 @@
         "inventory.dead_stock",
         "purchasing.price_creep",
         "purchasing.invoice_vs_po",
-        "purchasing.quote_compare"
+        "purchasing.quote_compare",
+        "purchasing.invoices",
+        "inventory.counts",
+        "inventory.count_variance"
       ],
       "templates_pending": [],
       "draftables": [
@@ -21276,7 +21983,8 @@
         "finance.pnl",
         "finance.gst_check",
         "finance.close_status",
-        "finance.margin_bridge"
+        "finance.margin_bridge",
+        "finance.gst_summary"
       ],
       "templates_pending": [],
       "draftables": [
@@ -21345,7 +22053,8 @@
         "market.competitor_gap",
         "market.viability",
         "market.goal_progress",
-        "market.goal_baseline"
+        "market.goal_baseline",
+        "market.goals"
       ],
       "templates_pending": [],
       "draftables": [
@@ -21367,7 +22076,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "6c0fcb0bd9d0787775678c73422e10d0cac780691b3546d67d4b96baf51e81ce",
+      "sha256": "87952da3812bd3ccc0e913c115dc38b3930aeeffa5caa058f6a3bce019d98c77",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -21390,26 +22099,29 @@
         "db/migrations/0019_mc1a_templates_outlet_rls.sql": "c16ae27b28b62f651474ab3c1cd2c969fde95034b138c536a3c40fa57db088c0",
         "db/migrations/0020_mc23_threads_policy_investigations.sql": "de3a04ef4f9c95630d6a88afeb6bd01eff374ca4f147354befa76a20934f98ae",
         "db/migrations/0021_mc1bc_pack_templates_history_kinds.sql": "a2b8cbf0a15fbb75e508e3551364c1c3e1938c1304ef7f1bce790267e4e9eba2",
+        "db/migrations/0022_mc1d_guard_binding_f8_asof.sql": "6a373c5154b07961fd3258f16158983a539b9f282189830e7f6a8cc5055b5034",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "a3e615664f854e4264e095c32122895e97d4777e9bf3f88740e75679f33004ca",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
         "packages/contracts/src/ai_policy/index.ts": "c500bc3c8a46b6bc4f170d8c84bc6faf1a3a92bf6ecc21f261623cafd538c4c3",
-        "packages/contracts/src/approvals/index.ts": "86364e8ea930198acc9231f52fa40dc37360d13b0bbfe4523737a2624923accd",
+        "packages/contracts/src/approvals/index.ts": "59bfae3b93c01414a6f3396bbfccfa13c6968d467b933277300809ddefa97f53",
         "packages/contracts/src/catalogue/index.ts": "801fd856288e0178c3f9bb37a0972c4dfb24f47fca61c85507fd655949a567d9",
         "packages/contracts/src/compliance/index.ts": "4e6db3e379d9df14cce7b7f03a3e9f0301d3ab0803bdd0b81a60e250e370aa0b",
         "packages/contracts/src/customers/index.ts": "4eaaea926342d68e8095c90f0e881e9b81c641b1a2f84ff59f2d8e9df9908323",
         "packages/contracts/src/events/index.ts": "1eeb49f27f475ab12caacfa5f65bedd7c3d76483c4f6a8f3425214db0bf5eecb",
         "packages/contracts/src/finance/index.ts": "9234c7dac075dd94e5b66a961cc9ebaaac0b79488124152d6ba32f831f3aafd6",
+        "packages/contracts/src/findings/index.ts": "33ca0bb6cb4f8ec360ca7c0792c3479e2d2bff491cd3362f41c0c8583d72df03",
         "packages/contracts/src/goals/index.ts": "a175c1db84787f86284324852b30af8d37ed3d5de0ee2786473f53a246a48bc2",
-        "packages/contracts/src/imports/index.ts": "7c02338c7d4b2ab7b7cdb34074224c8aeabe673f90e059f3f707df87cb718942",
+        "packages/contracts/src/imports/index.ts": "c22e8da9180dbe12f5d2d567e05476350adcdcd4b23ede076f2f08733956ee0c",
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "b0a29fed9fa29f8e9b3f862619c71d5b803f82a9c917aab2e5d49523c97ffb74",
-        "packages/contracts/src/intel/specialists.ts": "3056cfa4a3ae59b68997d794b75569fec51441a7460da1e3b698cf301e8a0a00",
-        "packages/contracts/src/internal/index.ts": "d03319f982470a31766cb53dc35ad849eb857f8ae1b31bfa4e47890a4015377f",
+        "packages/contracts/src/intel/specialists.ts": "703c0710a6ee79c2a41f9f26317505a4c2689252ff65e59be25d833192b7fed0",
+        "packages/contracts/src/internal/index.ts": "8a35df3f7e30a8757f31317f578ea79b3885aa275521992dbda482bedfc17eb1",
         "packages/contracts/src/inventory/index.ts": "f143368409ece4afea8ee531d71e866191aea6291e933d54047866dbd6812241",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
-        "packages/contracts/src/ontology/actions.ts": "713846a46360863b5d29107e504fd6f465ab7f926ce298079901c9af22dc3a4b",
+        "packages/contracts/src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
+        "packages/contracts/src/ontology/actions.ts": "874ecce61f244650158b9d65868801aeed12d76c88956ff69fd49f85f95bd05b",
         "packages/contracts/src/ontology/lint.ts": "6bf298e6a9773960c53936e6aff4396e4a5d0af6f80cb278bffd7bb565d26005",
         "packages/contracts/src/ontology/stamp.ts": "9ceb542b08ee8c73f39d6f66e290193dfa081412d295b8a0ceddac8dec117c2e",
         "packages/contracts/src/ontology/transform.ts": "8124bc743d70aa8fbd0ee41f29b2ef8d0be4010ae323935588dde85237709cd5",
@@ -21419,7 +22131,7 @@
         "packages/contracts/src/packs/index.ts": "fefeb6495c4655f1e92da5e34991a7b7f4813fcf38d29c1d96bb79f07baf0e3d",
         "packages/contracts/src/people/index.ts": "55ff3528a42902c3b72969eba5f15588c842a9639c790ae62d2142e8915c6928",
         "packages/contracts/src/platform/index.ts": "dfb8eb040fd8863acfbd9477e34b0c1da03f3f186b7694e781e2a056a9b61ef0",
-        "packages/contracts/src/purchasing/index.ts": "3b23c2a0dd516816910770ddfee73a709cc6924e12ae2a7a43aab516f8472c08",
+        "packages/contracts/src/purchasing/index.ts": "075d0cad98daac8618f16f13127a2babc5d7d61aca385b5eb264a14c16a578aa",
         "packages/contracts/src/registry.ts": "3bf9e3d6c17675f4ea3877cfcb94ef18f9b97cbd75b7d9a1bdd92291f1330b42",
         "packages/contracts/src/shared/cloudevents.ts": "33700ec7cfef94d50183f19f8175c31fdff87adfa9e047a550e40488d724088f",
         "packages/contracts/src/shared/command.ts": "54b44302d0fa5e1f54eb9dafc18cec2bcb8e68b3afdce15dc82fe2c2bfc68b38",
@@ -21443,6 +22155,6 @@
         "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
       }
     },
-    "body_sha256": "1b7179250c3e244aac0e33ce75d7522651c4732b63abc5ae8bd7106fb9b5ad3c"
+    "body_sha256": "1053cdc922b3869c90d724323031891ab7e466b2fb568521f63f51a2a7f04bf8"
   }
 }

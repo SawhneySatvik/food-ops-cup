@@ -67,19 +67,23 @@ def scan(tools: dict[str, ToolFactory], generated: list[BaseTool] | None = None)
 
 
 def expected_generated() -> int:
-    """Independent count: MANIFEST.d proposal lines minus the two import-only drafts (ADR-014 §5.1), plus the
-    db/tests/manifest.ts TEMPLATES list (63) minus the operator template (platform.spend_by_tenant), the core-consumed
-    `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1 not-agent-exposed
-    templates (hand list below): 63 - 1 - 3 - 4 = 55 reads, + 20 proposals = 75."""
+    """Independent count: MANIFEST.d proposal lines (23 after 0022) minus the three not-agent-exposed drafts (the two
+    import-only ones, ADR-014 §5.1, and the purchasing.invoice.record workflow draftable), plus the
+    db/tests/manifest.ts TEMPLATES list (83 entries after 0022, 15 of them "@2" rows; 68 distinct ids) minus the
+    operator template (platform.spend_by_tenant), the
+    core-consumed `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1
+    not-agent-exposed templates (hand list below): 68 - 1 - 3 - 4 = 60 reads, + (23 - 3) = 20 proposals = 80."""
     lines = [n for f in (REPO / "packages/contracts/MANIFEST.d").glob("*.txt") for n in f.read_text().split()]
     proposals = [n for n in lines if n.startswith("proposal.")]
     listed = re.search(r"export const TEMPLATES = \[(.*?)\]\.sort\(\);", (REPO / "db/tests/manifest.ts").read_text(), re.S)
     assert listed is not None
-    templates = re.findall(r'"([a-z_.]+)"', listed.group(1))
+    entries = re.findall(r'"([a-z_]+\.[a-z_.]+(?:@[0-9]+)?)"', listed.group(1))  # template ids only (a comment may quote a word)
+    templates = sorted({e.split("@")[0] for e in entries})  # the tools bind the latest version of each id
     not_exposed = {"forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"}
     exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.") and t not in not_exposed]
-    assert (len(templates), len(exposed)) == (63, 55)
-    return (len(proposals) - 2) + len(exposed)
+    # Cross-check literals: 83 entries - 15 "@2" rows = 68 ids; 68 - 8 = 60 reads; 23 proposal lines - 3 = 20.
+    assert (len(entries), len(templates), len(exposed), len(proposals)) == (83, 68, 60, 23)
+    return (len(proposals) - 3) + len(exposed)
 
 
 def test_no_registered_tool_takes_a_tenant() -> None:

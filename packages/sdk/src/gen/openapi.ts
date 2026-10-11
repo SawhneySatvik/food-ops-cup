@@ -896,6 +896,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/findings/{id}:dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** findings.dismiss.v1 — dismiss an open finding with a reason code (payload finding_id must equal the path id) */
+        post: operations["dismissFinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/goals": {
         parameters: {
             query?: never;
@@ -1436,6 +1453,57 @@ export interface paths {
         };
         /** Whether the outlet's prep list for a business date is approved, waiting for approval, absent, or cannot be verified */
         get: operations["getPrepList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lineage of one book row via core.audit_log (row=<schema>.<table>:<uuid>); a row outside the caller's scope is 404 */
+        get: operations["getRowLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/drafts/{id}/lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A draft up (finding, run, snapshots) and down (decision, touched rows), including rejected, stale and failed ones */
+        get: operations["getDraftLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/draftables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The draftable command types, for forms and the SDK */
+        get: operations["listDraftables"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3378,7 +3446,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
                 name: string;
                 header: string[];
                 header_signature: string;
@@ -3491,6 +3559,33 @@ export interface components {
                     };
                 }[];
             } | {
+                supplier_invoice_id: string;
+                supplier_id: string;
+                invoice_no: string;
+                /** Format: date */
+                invoice_date: string;
+                po_id: string | null;
+                currency: string;
+                lines: {
+                    line_id: string;
+                    po_line_id: string | null;
+                    ingredient_id: string | null;
+                    description: string | null;
+                    qty_milli: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    unit: string;
+                    unit_price_minor: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    tax_minor: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                }[];
+            } | {
                 po_id: string;
                 supplier_id: string;
                 outlet_ids: string[];
@@ -3532,6 +3627,8 @@ export interface components {
         DraftsRejectV1: {
             draft_id: components["schemas"]["Uuid7"];
             reason: string;
+            /** @enum {string} */
+            reason_code?: "wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other";
         };
         /** V1Draft */
         V1Draft: {
@@ -3727,7 +3824,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
                 name: string;
                 header: string[];
                 header_signature: string;
@@ -3835,6 +3932,33 @@ export interface components {
                 lines: {
                     invoice_line_id: string;
                     claimed_minor: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                }[];
+            } | {
+                supplier_invoice_id: string;
+                supplier_id: string;
+                invoice_no: string;
+                /** Format: date */
+                invoice_date: string;
+                po_id: string | null;
+                currency: string;
+                lines: {
+                    line_id: string;
+                    po_line_id: string | null;
+                    ingredient_id: string | null;
+                    description: string | null;
+                    qty_milli: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    unit: string;
+                    unit_price_minor: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    tax_minor: string | {
                         value: number;
                         typed_by: string;
                     };
@@ -5159,6 +5283,12 @@ export interface components {
         V1FinanceChannelTerms: {
             channel_terms: components["schemas"]["FinanceChannelTermsSetV1"][];
         };
+        /** FindingsDismissV1 */
+        FindingsDismissV1: {
+            finding_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            reason_code: "wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other";
+        };
         /** GoalsGoalCreateV1 */
         GoalsGoalCreateV1: {
             goal_id: components["schemas"]["Uuid7"];
@@ -5256,7 +5386,7 @@ export interface components {
         ImportsFormatApproveV1: {
             format_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
             name: string;
             header: string[];
             header_signature: string;
@@ -5274,7 +5404,7 @@ export interface components {
         ProposalImportsFormatApproveV1: {
             format_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
             name: string;
             header: string[];
             header_signature: string;
@@ -5304,7 +5434,7 @@ export interface components {
             import_run_id: components["schemas"]["Uuid7"];
             document_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
             parser: string | null;
             format_id: components["schemas"]["Uuid7"] | null;
             /** @enum {string} */
@@ -5322,7 +5452,7 @@ export interface components {
         /** V1ImportsUploadRequest */
         V1ImportsUploadRequest: {
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
             filename: string;
             media_type: string;
             content_base64: string;
@@ -5363,7 +5493,7 @@ export interface components {
         V1ImportsFormatProposeRequest: {
             document_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
             name: string;
             mapping: {
                 source: string;
@@ -5641,7 +5771,7 @@ export interface components {
             } | {
                 format_id: string;
                 /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
                 name: string;
                 header: string[];
                 header_signature: string;
@@ -5719,6 +5849,24 @@ export interface components {
                 lines: {
                     invoice_line_id: string;
                     claimed_minor: string;
+                }[];
+            } | {
+                supplier_invoice_id: string;
+                supplier_id: string;
+                invoice_no: string;
+                /** Format: date */
+                invoice_date: string;
+                po_id: string | null;
+                currency: string;
+                lines: {
+                    line_id: string;
+                    po_line_id: string | null;
+                    ingredient_id: string | null;
+                    description: string | null;
+                    qty_milli: string;
+                    unit: string;
+                    unit_price_minor: string;
+                    tax_minor: string;
                 }[];
             } | {
                 po_id: string;
@@ -6006,6 +6154,15 @@ export interface components {
             } | null;
             /** @enum {string} */
             narration: "model" | "template";
+            licence_kinds: {
+                code: string;
+                /** @enum {string} */
+                holder: "business" | "outlet";
+                outlet_kinds: ("restaurant" | "cloud_kitchen" | "store")[];
+                unverified: boolean;
+            }[];
+            /** @enum {string} */
+            payroll_scope: "drafts" | "roster_only";
         };
         /** InventoryIngredientUpsertV1 */
         InventoryIngredientUpsertV1: {
@@ -6271,6 +6428,170 @@ export interface components {
                     unit: string;
                 }[];
             } | null;
+        };
+        /** V1LineageRow */
+        V1LineageRow: {
+            row: {
+                table: string;
+                id: components["schemas"]["Uuid7"];
+            };
+            chains: {
+                audit: {
+                    seq: number;
+                    action: string;
+                    entity: string;
+                    entity_id: string;
+                    at: components["schemas"]["IsoDatetime"];
+                    actor: {
+                        member_id: components["schemas"]["Uuid7"] | null;
+                        kind: string;
+                        role: string;
+                    };
+                    decision_id: components["schemas"]["Uuid7"] | null;
+                } | null;
+                decision: {
+                    decision_id: components["schemas"]["Uuid7"];
+                    /** @enum {string} */
+                    verdict: "approved" | "edited" | "rejected";
+                    reason: string | null;
+                    reason_code: ("wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other") | null;
+                    decided_by: {
+                        member_id: components["schemas"]["Uuid7"];
+                        name: string | null;
+                    };
+                    decided_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                draft: {
+                    draft_id: components["schemas"]["Uuid7"];
+                    command_type: string;
+                    source: string;
+                    outlet_ids: components["schemas"]["Uuid7"][];
+                    created_at: components["schemas"]["IsoDatetime"];
+                    /** LineageDraftOutcome */
+                    outcome: {
+                        /** @enum {string} */
+                        status: "proposed" | "executing" | "executed" | "failed" | "rejected" | "stale";
+                        reason: string | null;
+                        reason_code: ("wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other") | null;
+                        changes: {
+                            ref: string;
+                            now_ref: string | null;
+                        }[];
+                        sqlstate: string | null;
+                        failure_reason: string | null;
+                    };
+                } | null;
+                finding: {
+                    finding_id: components["schemas"]["Uuid7"];
+                    pack: string;
+                    type: string;
+                    /** @enum {string} */
+                    status: "open" | "dismissed" | "resolved";
+                    created_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                run: {
+                    run_id: components["schemas"]["Uuid7"];
+                    trigger: string;
+                    actor: string;
+                    issued_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                snapshots: {
+                    snapshot_id: components["schemas"]["Uuid7"];
+                    template_id: string;
+                    template_version: number;
+                    refs: components["schemas"]["Ref"][];
+                }[];
+                unverified_refs: string[];
+            }[];
+        };
+        /** V1LineageDraft */
+        V1LineageDraft: {
+            chain: {
+                audit: {
+                    seq: number;
+                    action: string;
+                    entity: string;
+                    entity_id: string;
+                    at: components["schemas"]["IsoDatetime"];
+                    actor: {
+                        member_id: components["schemas"]["Uuid7"] | null;
+                        kind: string;
+                        role: string;
+                    };
+                    decision_id: components["schemas"]["Uuid7"] | null;
+                } | null;
+                decision: {
+                    decision_id: components["schemas"]["Uuid7"];
+                    /** @enum {string} */
+                    verdict: "approved" | "edited" | "rejected";
+                    reason: string | null;
+                    reason_code: ("wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other") | null;
+                    decided_by: {
+                        member_id: components["schemas"]["Uuid7"];
+                        name: string | null;
+                    };
+                    decided_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                draft: {
+                    draft_id: components["schemas"]["Uuid7"];
+                    command_type: string;
+                    source: string;
+                    outlet_ids: components["schemas"]["Uuid7"][];
+                    created_at: components["schemas"]["IsoDatetime"];
+                    /** LineageDraftOutcome */
+                    outcome: {
+                        /** @enum {string} */
+                        status: "proposed" | "executing" | "executed" | "failed" | "rejected" | "stale";
+                        reason: string | null;
+                        reason_code: ("wrong_numbers" | "not_needed" | "already_done" | "bad_timing" | "other") | null;
+                        changes: {
+                            ref: string;
+                            now_ref: string | null;
+                        }[];
+                        sqlstate: string | null;
+                        failure_reason: string | null;
+                    };
+                } | null;
+                finding: {
+                    finding_id: components["schemas"]["Uuid7"];
+                    pack: string;
+                    type: string;
+                    /** @enum {string} */
+                    status: "open" | "dismissed" | "resolved";
+                    created_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                run: {
+                    run_id: components["schemas"]["Uuid7"];
+                    trigger: string;
+                    actor: string;
+                    issued_at: components["schemas"]["IsoDatetime"];
+                } | null;
+                snapshots: {
+                    snapshot_id: components["schemas"]["Uuid7"];
+                    template_id: string;
+                    template_version: number;
+                    refs: components["schemas"]["Ref"][];
+                }[];
+                unverified_refs: string[];
+            };
+            touched: {
+                table: string;
+                id: string;
+                action: string;
+                seq: number;
+            }[];
+        };
+        /** V1Draftables */
+        V1Draftables: {
+            items: {
+                command_type: string;
+                proposal_schema: {
+                    [key: string]: unknown;
+                };
+                command_schema: {
+                    [key: string]: unknown;
+                };
+            }[];
         };
         /** OrdersPlaceV1 */
         OrdersPlaceV1: {
@@ -7216,6 +7537,26 @@ export interface components {
             lines: {
                 invoice_line_id: components["schemas"]["Uuid7"];
                 claimed_minor: components["schemas"]["Ref"];
+            }[];
+        };
+        /** ProposalPurchasingInvoiceRecordV1 */
+        ProposalPurchasingInvoiceRecordV1: {
+            supplier_invoice_id: components["schemas"]["Uuid7"];
+            supplier_id: components["schemas"]["Uuid7"];
+            invoice_no: string;
+            /** Format: date */
+            invoice_date: string;
+            po_id: components["schemas"]["Uuid7"] | null;
+            currency: string;
+            lines: {
+                line_id: components["schemas"]["Uuid7"];
+                po_line_id: components["schemas"]["Uuid7"] | null;
+                ingredient_id: components["schemas"]["Uuid7"] | null;
+                description: string | null;
+                qty_milli: components["schemas"]["Ref"];
+                unit: string;
+                unit_price_minor: components["schemas"]["Ref"];
+                tax_minor: components["schemas"]["Ref"];
             }[];
         };
         /** ProposalPurchasingSupplierReturnCreateV1 */
@@ -12846,6 +13187,94 @@ export interface operations {
             };
         };
     };
+    dismissFinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "findings.dismiss.v1";
+                    payload: components["schemas"]["FindingsDismissV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listGoals: {
         parameters: {
             query?: {
@@ -15542,6 +15971,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1KitchenPrepList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getRowLineage: {
+        parameters: {
+            query: {
+                row: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1LineageRow"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDraftLineage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1LineageDraft"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDraftables: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Draftables"];
                 };
             };
             /** @description Bad request */

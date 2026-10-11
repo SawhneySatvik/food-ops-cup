@@ -66,14 +66,19 @@ afterAll(async () => {
 });
 
 describe("pack, outlets, business dates (gates 3 and 6)", () => {
-  it("the canonical IN world: pack IN v2, INR, ladder L and cost_drift thresholds from the pack md, 3 restaurant outlets in Kolkata", async () => {
+  it("the canonical IN world: pack IN v3, INR, ladder L and cost_drift thresholds from the pack md, 3 restaurant outlets in Kolkata", async () => {
     clock = new Date("2026-10-11T20:00:00Z"); // 01:30 IST on the 12th: before the 04:00 cutoff → business date the 11th
     const f = await frame(await run(A, ["*"]));
-    expect([f.pack, f.currency]).toEqual([{ code: "IN", version: 2 }, "INR"]);
+    expect([f.pack, f.currency]).toEqual([{ code: "IN", version: 3 }, "INR"]);
     // packs header L: ₹50,000 / ₹10,000 / ₹2,000 of monthly impact, in paise.
     expect(f.severity_ladder).toEqual({ critical_minor_gte: 5_000_000, high_minor_gte: 1_000_000, medium_minor_gte: 200_000 });
     // catalogue.md §4: cost_change_bp ≥ 800 and a cost rise ≥ ₹5.
-    expect(f.detectors["catalogue.cost_drift"]).toEqual({ thresholds: { cost_change_bp_gte: 800, cost_increase_minor_gte: 500 } });
+    expect(f.detectors["catalogue.cost_drift"]).toEqual({ thresholds: { cost_change_bp_gte: 800, cost_increase_minor_gte: 500, lookback_days: 90 } });
+    // IN.json by hand: payroll drafts; five licence kinds, only FSSAI without `_unverified` notes; fire NOC not for shops.
+    expect(f.payroll_scope).toBe("drafts");
+    expect(f.licence_kinds.map((k) => [k.code, k.holder, k.unverified, k.outlet_kinds.includes("store")])).toEqual([
+      ["fssai", "outlet", false, true], ["gst", "business", true, true], ["trade_licence", "outlet", true, true],
+      ["fire_noc", "outlet", true, false], ["shops_establishment", "outlet", true, true]]);
     expect(f.outlets.map((o) => o.id)).toEqual([...A.outlets].sort());
     expect(f.outlets.map((o) => [o.kind, o.tz, o.business_date])).toEqual(Array(3).fill(["restaurant", "Asia/Kolkata", "2026-10-11"]));
     clock = new Date("2026-10-11T23:00:00Z"); // 04:30 IST on the 12th → the 12th (Kolkata control: no DST)
@@ -102,6 +107,9 @@ describe("pack, outlets, business dates (gates 3 and 6)", () => {
     // packs header L: A$1,000 / A$200 / A$40 in cents; catalogue.md §4: a cost rise ≥ A$0.10.
     expect([f.pack.code, f.currency, f.severity_ladder]).toEqual(["AU", "AUD", { critical_minor_gte: 100_000, high_minor_gte: 20_000, medium_minor_gte: 4_000 }]);
     expect(f.detectors["catalogue.cost_drift"]!.thresholds.cost_increase_minor_gte).toBe(10);
+    // AU.json by hand: rosters only; both licence kinds carry `_unverified` notes.
+    expect([f.payroll_scope, f.licence_kinds.map((k) => [k.code, k.holder, k.unverified])]).toEqual(
+      ["roster_only", [["food_business_registration", "outlet", true], ["abn", "business", true]]]);
   });
 });
 

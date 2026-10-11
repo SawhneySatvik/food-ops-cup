@@ -3,6 +3,7 @@
 // the run's munim_svc transaction (tenant + outlet scope from the token):
 //   1. Same draft_id + same body → the original response (byte-identical); same id + another body → 409.
 //   0. The pack is a registered specialist that may propose this command type (F8, T-087a registry), else 422.
+//  0b. A payroll draft outside the pack's `payroll_scope` → 422 `payroll_out_of_scope` (W3.2; nothing stored).
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
 //      every ref and every based_on cell resolves for this run → else `abstained` + reason, nothing stored.
 //   2b. The number grammar over the payload's PROSE leaves (T-040b, T-080's finding): a model-typed string a person
@@ -32,6 +33,7 @@ import { SPECIALIST_REGISTRY } from "@munim/contracts/intel";
 import { checkGrammar, validateDraft } from "@munim/core-domain/envelope";
 import { canonicalJson, sha256Hex } from "../commit/index.ts";
 import { ApiError } from "../lib/errors.ts";
+import { payrollScope } from "../modules/people/payroll.ts";
 import type { Queryable } from "../runtoken/index.ts";
 import type { Run } from "./auth.ts";
 import { dbResolver } from "./resolver.ts";
@@ -40,6 +42,7 @@ type Body = { draft_id: string; status: "proposed" | "abstained"; reason_code: s
 type Cells = Map<string, { template_id: string; template_version: number; params: unknown; rows: Array<Record<string, unknown>>; columns: Array<{ name: string; type: string }> }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const PAYROLL = new Set(["people.payroll_draft.create.v1"]);
 const REJECTION_WINDOW = "30 days";
 
 interface Proposal { command_type: string; outlet_ids: string[]; payload: unknown; based_on: string[] }
@@ -144,6 +147,9 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   // import-only draftables (imports.*) belong to no specialist, so intel can never propose them.
   const specialist = SPECIALIST_REGISTRY.specialists.find((x) => x.id === req.pack && x.kind === "specialist");
   if (!specialist?.draftables.includes(req.command_type)) throw new ApiError("invalid_payload");
+  // Payroll is drafted only where the country pack prepares it (`payroll_scope = drafts`, packs/people.md §6); elsewhere
+  // the proposal is refused before anything is resolved or stored (P6), as the member route refuses it.
+  if (PAYROLL.has(req.command_type) && (await payrollScope(c)) !== "drafts") throw new ApiError("out_of_pack_scope", "payroll_out_of_scope");
   const answer = (b: Body) => JSON.stringify(b);
   // A run proposes only inside its own scope; a tenant-wide draft ([]) needs a run over every outlet.
   if (run.scope[0] !== "*" && (req.outlet_ids.length === 0 || req.outlet_ids.some((o) => !(run.scope as string[]).includes(o)))) throw new ApiError("forbidden");

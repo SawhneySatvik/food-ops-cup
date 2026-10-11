@@ -79,7 +79,16 @@ async def main() -> None:
         llm = Capture(reply=reply, seen=[])
         state = RunState(traces=TraceBuffer(sink))
         await model_segments(
-            spec, severity, fake_snapshot(spec, row + 1), row, llm=llm, ctx=ctx, cfg=cfg, state=state, handles=HandleTable(state.handles)
+            spec,
+            severity,
+            fake_snapshot(spec, row + 1),
+            row,
+            row,
+            llm=llm,
+            ctx=ctx,
+            cfg=cfg,
+            state=state,
+            handles=HandleTable(state.handles),
         )
         (req,) = llm.seen
         key, _, _ = request_key(req)

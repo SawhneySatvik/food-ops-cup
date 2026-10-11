@@ -65,6 +65,8 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       [
         "inventory.below_reorder", "inventory.shortfall", "inventory.waste_week", "inventory.expiry_risk", "inventory.shrinkage", "inventory.dead_stock",
         "purchasing.price_creep", "purchasing.invoice_vs_po", "purchasing.quote_compare",
+        // 0022: lists the detectors drive from (purchasing.invoices, inventory.counts) and the count variance read.
+        "purchasing.invoices", "inventory.counts", "inventory.count_variance",
       ],
       [
         "purchasing.po.create.v1", "purchasing.invoice.dispute.v1", "purchasing.supplier_return.create.v1",
@@ -76,7 +78,7 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       "desk.finance",
       ["finance", "accounts", "accounting"],
       ["finance.unapproved_ad_fee", "finance.short_payout", "finance.missing_payout", "finance.tender_gap", "finance.gst_mismatch"],
-      ["finance.unapproved_deductions", "finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.pnl", "finance.gst_check", "finance.close_status", "finance.margin_bridge"],
+      ["finance.unapproved_deductions", "finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.pnl", "finance.gst_check", "finance.close_status", "finance.margin_bridge", "finance.gst_summary"],
       ["finance.dispute.draft.v1", "finance.journal.adjust.v1", "finance.period.close.v1"],
     ),
     e(
@@ -108,7 +110,7 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       "desk.market",
       ["market", "strategy", "market_strategy"],
       ["market.event_ahead", "market.competitor_undercut", "market.goal_off_track"],
-      ["market.signal_uplift", "market.upcoming", "market.competitor_gap", "market.viability", "market.goal_progress", "market.goal_baseline"],
+      ["market.signal_uplift", "market.upcoming", "market.competitor_gap", "market.viability", "market.goal_progress", "market.goal_baseline", "market.goals"],
       ["goals.goal.create.v1", "goals.task.create.v1"],
     ),
     // A shared service, not a team member: no desk, no alias, proposes nothing (pack forecast §6 drafts
