@@ -1,0 +1,74 @@
+"""`finance.tender_gap` (packs/finance.md §4, §5; plant F5; answer key RG-F5). No draft (pack §6 maps none).
+
+Template `finance.tender_vs_bank` **version 2** (requested from the migrator: tests/packs/finance/
+requested_templates_v2.sql), minted per outlet and method (UPI and card: the counter money a bank statement credits,
+pack §1; cash reaches the bank as deposits, not per-day credits) over the current ISO week and the five before it.
+Version 2 puts one Σ row per ISO week first (`business_on` null, `week_start`, `gap_days`): the sums over the week's gap
+days — days the statement reaches whose gap is at least the pack's `gap_minor_gte` (₹500, A$10), read by the template
+from the same pack. A week with no credit the statement reaches has no Σ row, so a missing statement is never a gap
+(pack §7 `bank_lines_missing`). On version 1 (no Σ row) this detector never fires.
+
+Fires on a week's Σ row with `gap_days` ≥ the pack's `gap_days_gte` (3 of the ISO week's 7 days). Impact: the week's Σ
+`gap_minor` (RG-F5's key is the three weekly sums). Severity L on it; `critical` when the gap days share one
+`shift_member_id` and their voids reach the pack's `critical_voids_vs_median_bp_gte` (2×) of the outlet's median per
+day — Σ voids × 10,000 ≥ bp × median × gap days. Dedupe `<outlet>:<method>:<iso_week>`. Names shifts, never motives.
+"""
+
+from __future__ import annotations
+
+from datetime import date, timedelta
+
+from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
+from munim_intel.watch.detectors.finance.periods import iso_week
+
+#: The current ISO week and the five before it.
+WEEKS_BACK = 6
+METHODS = ("upi", "card")
+
+
+def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
+    day = outlet.business_date
+    first = day - timedelta(days=day.weekday() + 7 * (WEEKS_BACK - 1))
+    return [Window({"outlet_id": outlet.id, "method": m, "from": first.isoformat(), "to": day.isoformat()}, m) for m in METHODS]
+
+
+def fires(row: Row, t: Thresholds) -> bool:
+    days = num(row, "gap_days")
+    # Only a week's Σ row has a week_start (day rows carry business_on instead).
+    return isinstance(row.get("week_start"), str) and days is not None and days >= t["gap_days_gte"]
+
+
+def severity(row: Row, t: Thresholds, ladder: Ladder) -> Severity:
+    voids, median, days = num(row, "voids"), num(row, "outlet_median_voids"), num(row, "gap_days")
+    if (
+        isinstance(row.get("shift_member_id"), str)
+        and voids is not None
+        and median is not None
+        and days is not None
+        and voids * 10_000 >= t["critical_voids_vs_median_bp_gte"] * median * days
+    ):
+        return "critical"
+    return ladder.of(num(row, "gap_minor") or 0)
+
+
+def dedupe(row: Row, w: Window) -> str:
+    return f"{w.params['outlet_id']}:{w.key}:{iso_week(date.fromisoformat(str(row['week_start'])))}"
+
+
+SPEC = register(
+    DetectorSpec(
+        id="finance.tender_gap",
+        pack="finance",
+        template="finance.tender_vs_bank",
+        finding_type="cash_control.tender_gap",
+        impact_column="gap_minor",
+        windows=windows,
+        fires=fires,
+        severity=severity,
+        dedupe=dedupe,
+        narration=(
+            "Counter payments recorded this week were not all credited by the bank: {gap_minor} missing over {gap_days} days, "
+            "{tendered_minor} recorded against {credited_minor} credited, with {voids} voided bills on those days."
+        ),
+    )
+)
