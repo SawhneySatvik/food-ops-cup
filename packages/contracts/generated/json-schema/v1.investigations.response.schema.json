@@ -78,7 +78,8 @@
               "no_driver_found",
               "cannot_verify",
               "cancelled",
-              "exhausted"
+              "exhausted",
+              "restricted"
             ]
           },
           "stop_reason": {

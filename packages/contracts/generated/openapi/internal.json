@@ -20709,13 +20709,13 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                            "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                           },
                           {
                             "type": "array",
                             "items": {
                               "type": "string",
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                              "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                             }
                           }
                         ]
@@ -23750,7 +23750,15 @@
         "x-munim-contract": "v1.investigation.approve-plan.request",
         "x-munim-module": "investigations",
         "type": "object",
-        "properties": {},
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "auto"
+            ]
+          }
+        },
         "additionalProperties": false
       },
       "V1Investigation": {
@@ -23825,7 +23833,8 @@
               "no_driver_found",
               "cannot_verify",
               "cancelled",
-              "exhausted"
+              "exhausted",
+              "restricted"
             ]
           },
           "stop_reason": {
@@ -23928,7 +23937,8 @@
                     "pending",
                     "supported",
                     "refuted",
-                    "cannot_verify"
+                    "cannot_verify",
+                    "restricted"
                   ]
                 },
                 "frozen": {
@@ -24162,7 +24172,8 @@
                           "pending",
                           "supported",
                           "refuted",
-                          "cannot_verify"
+                          "cannot_verify",
+                          "restricted"
                         ]
                       },
                       "to": {
@@ -24171,7 +24182,8 @@
                           "pending",
                           "supported",
                           "refuted",
-                          "cannot_verify"
+                          "cannot_verify",
+                          "restricted"
                         ]
                       },
                       "frozen": {
@@ -24414,7 +24426,8 @@
                     "no_driver_found",
                     "cannot_verify",
                     "cancelled",
-                    "exhausted"
+                    "exhausted",
+                    "restricted"
                   ]
                 },
                 "stop_reason": {
@@ -33706,13 +33719,13 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                      "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                     },
                     {
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                        "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                       }
                     }
                   ]
@@ -36093,6 +36106,44 @@
             "const": true
           }
         },
+        "additionalProperties": false
+      },
+      "TenancyPolicySetV1": {
+        "title": "TenancyPolicySetV1",
+        "x-munim-contract": "tenancy.policy.set.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+          },
+          "labour_target_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "target_margin_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "outlet_id",
+          "valid_from"
+        ],
         "additionalProperties": false
       },
       "TenancyMemberBindV1": {

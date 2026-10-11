@@ -262,6 +262,7 @@ export const OPERATIONS = [
   "POST /v1/devices",
   "POST /v1/members:invite",
   "POST /v1/tenant:update",
+  "POST /v1/policy",
   "POST /platform/v1/demo-sessions",
   "POST /v1/storefront-keys",
   "GET /v1/storefront-keys",

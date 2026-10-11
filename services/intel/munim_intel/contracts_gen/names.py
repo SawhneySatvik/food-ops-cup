@@ -336,6 +336,7 @@ CONTRACTS: dict[str, str] = {
     "tenancy.onboard.v1": "TenancyOnboardV1",
     "tenancy.outlet.update.v1": "TenancyOutletUpdateV1",
     "tenancy.tenant.update.v1": "TenancyTenantUpdateV1",
+    "tenancy.policy.set.v1": "TenancyPolicySetV1",
     "tenancy.member.bind.v1": "TenancyMemberBindV1",
     "tenancy.member.role.set.v1": "TenancyMemberRoleSetV1",
     "tenancy.member.deactivate.v1": "TenancyMemberDeactivateV1",

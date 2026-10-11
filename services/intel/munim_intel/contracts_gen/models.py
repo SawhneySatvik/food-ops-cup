@@ -3625,11 +3625,17 @@ class BasedOnItem1(RootModel[str]):
 
 
 class Payload46(RootModel[str]):
-    root: Annotated[str, Field(pattern='^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$')]
+    model_config = ConfigDict(
+        regex_engine="python-re",
+    )
+    root: Annotated[str, Field(pattern='^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$')]
 
 
 class PayloadItem(RootModel[str]):
-    root: Annotated[str, Field(pattern='^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$')]
+    model_config = ConfigDict(
+        regex_engine="python-re",
+    )
+    root: Annotated[str, Field(pattern='^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$')]
 
 
 class InternalTracesBatchResponse(BaseModel):
@@ -3925,6 +3931,7 @@ class V1InvestigationApprovePlanRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    mode: Literal['plan', 'auto'] | None = None
 
 
 class Signature(BaseModel):
@@ -5314,6 +5321,21 @@ class TenancyTenantUpdateV1(BaseModel):
     home_tz: HomeTz | None = None
     country_code: Annotated[str | None, Field(pattern='^[A-Z]{2}$')] = None
     complete_onboarding: Literal[True] | None = None
+
+
+class TenancyPolicySetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    outlet_id: Uuid7 | None
+    valid_from: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    labour_target_bp: Annotated[int | None, Field(ge=0, le=10000)] = None
+    target_margin_bp: Annotated[int | None, Field(ge=0, le=10000)] = None
 
 
 class TenancyMemberBindV1(BaseModel):
@@ -9332,7 +9354,7 @@ class ChecklistItem6(BaseModel):
     label_key: Annotated[str, Field(min_length=1)]
     specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
     signature: Signature
-    status: Literal['pending', 'supported', 'refuted', 'cannot_verify']
+    status: Literal['pending', 'supported', 'refuted', 'cannot_verify', 'restricted']
     frozen: bool
     snapshot_ids: list[Uuid7]
     refs: list[Ref2]
@@ -9369,8 +9391,8 @@ class ItemUpdate(BaseModel):
     )
     item_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
     specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
-    from_: Annotated[Literal['pending', 'supported', 'refuted', 'cannot_verify'], Field(alias='from')]
-    to: Literal['pending', 'supported', 'refuted', 'cannot_verify']
+    from_: Annotated[Literal['pending', 'supported', 'refuted', 'cannot_verify', 'restricted'], Field(alias='from')]
+    to: Literal['pending', 'supported', 'refuted', 'cannot_verify', 'restricted']
     frozen: bool
     reopened: bool
     snapshot_ids: list[Uuid7]
@@ -9416,7 +9438,7 @@ class V1Investigation(BaseModel):
     params: Params3
     outlet_scope: OutletScope | OutletScope1
     mode: Literal['step', 'plan', 'auto']
-    status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted']
+    status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted', 'restricted']
     stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting'] | None
     created_by: Uuid7
     steps_done: Annotated[int, Field(ge=0, le=9007199254740991)]
@@ -9438,7 +9460,7 @@ class Item19(BaseModel):
     params: Params3
     outlet_scope: OutletScope | OutletScope1
     mode: Literal['step', 'plan', 'auto']
-    status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted']
+    status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted', 'restricted']
     stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting'] | None
     created_by: Uuid7
     steps_done: Annotated[int, Field(ge=0, le=9007199254740991)]

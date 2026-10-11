@@ -1652,7 +1652,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve a Plan-mode investigation (its creator, within the role's ceiling) and run its steps inside this request until a stop */
+        /** Approve a Plan-mode investigation (its creator, within the role's ceiling), as Plan or Auto, and run its steps inside this request until a stop */
         post: operations["approveInvestigationPlan"];
         delete?: never;
         options?: never;
@@ -3065,6 +3065,23 @@ export interface paths {
         put?: never;
         /** tenancy.tenant.update.v1 — business settings; country is locked after onboarding (R30) */
         post: operations["updateTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** tenancy.policy.set.v1 — the owner's labour and margin targets, as a new dated version (owner) */
+        post: operations["setBusinessPolicy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7084,7 +7101,10 @@ export interface components {
         /** V1InvestigationCancelRequest */
         V1InvestigationCancelRequest: Record<string, never>;
         /** V1InvestigationApprovePlanRequest */
-        V1InvestigationApprovePlanRequest: Record<string, never>;
+        V1InvestigationApprovePlanRequest: {
+            /** @enum {string} */
+            mode?: "plan" | "auto";
+        };
         /** V1Investigation */
         V1Investigation: {
             investigation_id: components["schemas"]["Uuid7"];
@@ -7100,7 +7120,7 @@ export interface components {
             /** @enum {string} */
             mode: "step" | "plan" | "auto";
             /** @enum {string} */
-            status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted";
+            status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted" | "restricted";
             stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
             created_by: components["schemas"]["Uuid7"];
             steps_done: number;
@@ -7120,7 +7140,7 @@ export interface components {
                     name_key: string;
                 };
                 /** @enum {string} */
-                status: "pending" | "supported" | "refuted" | "cannot_verify";
+                status: "pending" | "supported" | "refuted" | "cannot_verify" | "restricted";
                 frozen: boolean;
                 snapshot_ids: components["schemas"]["Uuid7"][];
                 refs: string[];
@@ -7156,9 +7176,9 @@ export interface components {
                     /** @enum {string} */
                     specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
                     /** @enum {string} */
-                    from: "pending" | "supported" | "refuted" | "cannot_verify";
+                    from: "pending" | "supported" | "refuted" | "cannot_verify" | "restricted";
                     /** @enum {string} */
-                    to: "pending" | "supported" | "refuted" | "cannot_verify";
+                    to: "pending" | "supported" | "refuted" | "cannot_verify" | "restricted";
                     frozen: boolean;
                     reopened: boolean;
                     snapshot_ids: components["schemas"]["Uuid7"][];
@@ -7198,7 +7218,7 @@ export interface components {
                 /** @enum {string} */
                 mode: "step" | "plan" | "auto";
                 /** @enum {string} */
-                status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted";
+                status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted" | "restricted";
                 stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
                 created_by: components["schemas"]["Uuid7"];
                 steps_done: number;
@@ -9330,6 +9350,14 @@ export interface components {
             country_code?: string;
             /** @constant */
             complete_onboarding?: true;
+        };
+        /** TenancyPolicySetV1 */
+        TenancyPolicySetV1: {
+            outlet_id: components["schemas"]["Uuid7"] | null;
+            /** Format: date */
+            valid_from: string;
+            labour_target_bp?: number;
+            target_margin_bp?: number;
         };
         /** TenancyMemberBindV1 */
         TenancyMemberBindV1: {
@@ -26154,6 +26182,92 @@ export interface operations {
                     /** @constant */
                     type: "tenancy.tenant.update.v1";
                     payload: components["schemas"]["TenancyTenantUpdateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setBusinessPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "tenancy.policy.set.v1";
+                    payload: components["schemas"]["TenancyPolicySetV1"];
                 };
             };
         };

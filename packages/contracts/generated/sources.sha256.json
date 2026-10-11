@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "16b9a70dfd31cc27c731f2db33e816382cc1fab443426dfac0ff0b1260cf0f2a",
+    "sha256": "ee7cc8c0daf72820bf0a015f407c868c2cc8ae80072d7c71e178501ea46678ff",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "7ef211308a14666fb9e14238d265da0c390d5f3a9d346eb76b888959119f9c8c",
@@ -30,7 +30,7 @@
       "src/internal/index.ts": "a71274a4abbbc3e5a91927016121a7eea9925579a774797aedc6603d47b25dfb",
       "src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
       "src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
-      "src/investigations/index.ts": "0d792276174a5277c36136abd2ff1d27e11e4f7cbc52cb177a8f8de4af02d52f",
+      "src/investigations/index.ts": "f6ce47fd1c3a022b6633dfd4189bdf917c1dc7842d4ada3206efe7a8a4f40901",
       "src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
       "src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
       "src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
@@ -64,16 +64,16 @@
       "src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
       "src/shared/run-token.ts": "0edaf277e73c31a5ea7bc45c16c452e06950dcf17beb9c1cc1007dbab5321097",
       "src/shared/snapshot.ts": "3d3ca4eda9abae7a51208c8bcc4df616f99001f67499c8793e650a1dacde0e02",
-      "src/shared/trace.ts": "dfb88af38ba81afde3128812c14ca9fde3150709c0fbf3c8e68c1b4c96bf9930",
+      "src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
       "src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
       "src/storefront/index.ts": "57240f351ecd3d3c8872b3f50a667b9a3784ef93e1a5aaf25604e9a0d14efb65",
-      "src/tenancy/index.ts": "d4ff099f1673082132a1b65a2ece7b8ce3a6b05fb72581b1262fc7181673bb7f",
+      "src/tenancy/index.ts": "bdb1409a5a1d5709901dabbc1cc215ba2af727f31122093f0c8e581e6e3e8b01",
       "src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
       "src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
     }
   },
   "outputs": {
-    "sha256": "d66e818292fe2af42614aecc751949241fa8f124bde77db26ccab29c60759ea2",
+    "sha256": "3fa16c04151468ef62bd8c2300fae110befce56051af7ef07e75e33ac524f349",
     "files": {
       "packages/contracts/generated/json-schema/ai_policy.cap.set.v1.schema.json": "228d897944481f937931e9b4ae34e80c21c534892a782c25aa1202cbbc374a83",
       "packages/contracts/generated/json-schema/ai_policy.ceiling.set.v1.schema.json": "9d5c5260af71c0a0cb09f5a29fc98f1456aff30fe2daad1785bf98f0f034eeaf",
@@ -159,7 +159,7 @@
       "packages/contracts/generated/json-schema/internal.run-frame.response.schema.json": "bca6fc8eec9a243e90ec90b448f7dcf649a4aa868ea77e26f04ee7a4ee26908c",
       "packages/contracts/generated/json-schema/internal.snapshots.request.schema.json": "e4c4df5f783b31980a88597850cfe6e2d02777b29608e3bc28c4c5fdde819d42",
       "packages/contracts/generated/json-schema/internal.spend.request.schema.json": "53892f15e5782f8c6bb09bef0cef4872e6bc3e90dac331263062ff4ba17afd0f",
-      "packages/contracts/generated/json-schema/internal.traces-batch.request.schema.json": "f345328144f28577f2d6bbc545e0495669b889d5c9b987ede46656191091812d",
+      "packages/contracts/generated/json-schema/internal.traces-batch.request.schema.json": "032374ba914af22750fcc19a972c55f734fc1c4e391b4f327b019474ce537b30",
       "packages/contracts/generated/json-schema/internal.traces-batch.response.schema.json": "236022af5b21a5192cfd67aab34eb9faec28706745e0161d2fb003c8cb4b8408",
       "packages/contracts/generated/json-schema/internal.watch-claim.request.schema.json": "92b8d090f472f0e3a71abd3f60147643eec9f88e44a4c6fc8b3f927a1a1c4d80",
       "packages/contracts/generated/json-schema/internal.watch-claim.response.schema.json": "5a7cf141e8e65730542c383cfecd40a8af7ec0fe062ae63cdb30089286cc3386",
@@ -300,6 +300,7 @@
       "packages/contracts/generated/json-schema/tenancy.onboard.v1.schema.json": "0647ae88d78fb7998442bae67843eff7df36d13f279900aa0bd6c4ca6c503461",
       "packages/contracts/generated/json-schema/tenancy.outlet.create.v1.schema.json": "a1e818c21b74e25e0d92275bedadecd6fad38682de0378d9c601226920e14e27",
       "packages/contracts/generated/json-schema/tenancy.outlet.update.v1.schema.json": "cfba1ad478f507fd50988388f9367c2d63a4c315eb8b80985bc2f399842db374",
+      "packages/contracts/generated/json-schema/tenancy.policy.set.v1.schema.json": "989d0169bec2cb3d7d3447a61818f84efd8b9855cebbf3fc1abaa98a896c3985",
       "packages/contracts/generated/json-schema/tenancy.provision.v1.schema.json": "2c5e7652e8c319c393f403a0f0881be03c9fb44062b27466a3b22603d90e609b",
       "packages/contracts/generated/json-schema/tenancy.storefront-key.create.schema.json": "51c935010a16cffb43185876acf1d79231b5932178b7814d72cc32f65374959d",
       "packages/contracts/generated/json-schema/tenancy.storefront-key.created.schema.json": "0e42f20c861fd21d328f39f67f13b366545ac4a597a66dd3c8a8953ecc327c76",
@@ -309,7 +310,7 @@
       "packages/contracts/generated/json-schema/threads.block.schema.json": "3efb2dd0f5b642132e8c486bfcfbd502885df0a946e934175d315dacb89d1171",
       "packages/contracts/generated/json-schema/threads.intel-ask.request.schema.json": "110dcf390346d015efb212c1aafcbe088fcc05ed7701c0629a21b612741f633e",
       "packages/contracts/generated/json-schema/threads.intel-ask.response.schema.json": "c62ae5d3540b99d2998aba3b2f3dd143171ca2ada861c8c3d79bd9af40fff98e",
-      "packages/contracts/generated/json-schema/trace-event.schema.json": "dfe58f72e60b7a104f6b08cab9e63ba03af3fd73c4920cb02354a56a1a5957f3",
+      "packages/contracts/generated/json-schema/trace-event.schema.json": "1c4801a2f5bcdadc3760cd37e9d65a74c7a304fc66087f5db26c550ac6dd6d1b",
       "packages/contracts/generated/json-schema/trace-review-payload.schema.json": "17a60045d3a954ca91518b614d1476bec0c0cd3261654b3247e4cd7a9fb52785",
       "packages/contracts/generated/json-schema/uuid7.schema.json": "9d58e40dfe01699b9745829a4b4a93e839ce73fe8da93b5e8dfa3086d00c2f90",
       "packages/contracts/generated/json-schema/v1.account.export.schema.json": "69cf27e4ed8f48d13cde62e7c3e0f3b6e1fe07f8db96e002e4757047638adffe",
@@ -379,12 +380,12 @@
       "packages/contracts/generated/json-schema/v1.inventory.reorder-levels.schema.json": "8b35f368b3b40e4a2f239c59b75ea563b33667936cda0236f103b3157aea596e",
       "packages/contracts/generated/json-schema/v1.inventory.transfers.schema.json": "747f4117297e7857e5beaabf1404027a37fa2ccd0673b51504a115b5ee0eaec0",
       "packages/contracts/generated/json-schema/v1.inventory.waste.schema.json": "95a4f6be936c5b690aeb8bcb7370cf2087b26790b23f8df9c64048c004ddb48a",
-      "packages/contracts/generated/json-schema/v1.investigation.approve-plan.request.schema.json": "3b41abdd31538188b8214ab202b535c887ff0e934fa8b5ef92bb3c7dd3bdeed2",
+      "packages/contracts/generated/json-schema/v1.investigation.approve-plan.request.schema.json": "54a0624f374b72f52080689fc03640675845e9ed05a1e554c9df25ef23be711e",
       "packages/contracts/generated/json-schema/v1.investigation.cancel.request.schema.json": "1b14e8be6b9c2fbc0b551f5e3150c772d3c74061bfe4bc725d3ef54d9293e620",
       "packages/contracts/generated/json-schema/v1.investigation.continue.request.schema.json": "2075a6970f01322a68f53e9f1d725bdc9e118d6a1c7c94f7e935184ce0d3d87d",
       "packages/contracts/generated/json-schema/v1.investigation.create.request.schema.json": "7dd9c003c4a0b3024743f2ad948a610efc36200d4576eca9caba765991ecc7b7",
-      "packages/contracts/generated/json-schema/v1.investigation.schema.json": "ebff3cdf425b280333c0d80d6d11433a9e12a778b5e74c432a41418672f3ba8d",
-      "packages/contracts/generated/json-schema/v1.investigations.response.schema.json": "43dfc15eb0962e30e8a1dc16979808e69ccb317280ef05e56584b1c40b8e9d6e",
+      "packages/contracts/generated/json-schema/v1.investigation.schema.json": "0451e8768a9bb46c621cf4dc61ecb4cc568536f4a81bb965848d565e75b6d2c7",
+      "packages/contracts/generated/json-schema/v1.investigations.response.schema.json": "0bcad5ec5efdf64d6ebe3fad9282e37144c96be852245e932b3ed46095da8e51",
       "packages/contracts/generated/json-schema/v1.kds.board.schema.json": "d78e0502b43a69cab74fd34c464803ac66f56849aa01415ed5d455c8497d7c38",
       "packages/contracts/generated/json-schema/v1.kitchen.prep_list.schema.json": "f5cd7e554f02b4dd92964ee75e2e9cbcac7fe3f546a8ef15db09bff7678f047f",
       "packages/contracts/generated/json-schema/v1.lineage.draft.schema.json": "094aa69778836deba644c102e22345024e8c3e395d3d152f7536005ca618cb2c",
@@ -427,17 +428,17 @@
       "packages/contracts/generated/json-schema/v1.tender.schema.json": "e638960dcc8b99b0645fb6ae2136135c8544b851fd75aef79ebd810496ac198a",
       "packages/contracts/generated/json-schema/v1.thread.schema.json": "70bc24f0c8cc956d4e850602cc45aff436325374f828498b1de14b41f04dc597",
       "packages/contracts/generated/json-schema/v1.threads.response.schema.json": "66e2571e606930913b214fd9a9bf1a5d75fa165ad0b3b725896c25198d11af09",
-      "packages/contracts/generated/json-schema/v1.traces.response.schema.json": "3e726b0b89a30b6c779b6e10349a3fbde5a0da186c236782eca299195d3a2ea5",
+      "packages/contracts/generated/json-schema/v1.traces.response.schema.json": "f44af1d26d72cef31675384d60101afd07f0f5534a633732b0045d3090e4bf8f",
       "packages/contracts/generated/json-schema/v1.wiki.page.schema.json": "ecc53d79b450ef1be0ef23cea8f1871dd62b01ab584ed2ecf7154813820457ee",
       "packages/contracts/generated/json-schema/v1.wiki.pages.schema.json": "09d6180befde63a25f3e761415a6272019b5dd806eb84c87c490776c0e63cd02",
       "packages/contracts/generated/json-schema/v1.wiki.versions.schema.json": "42aa36edb9167c1a83959039d5fdd48678ec7780cecadeb6462effae9cbb8b52",
-      "packages/contracts/generated/openapi/internal.json": "bbaf7f0d957c6b682e485d6421ff047f230b430124471e4d55f41ca046a69934",
-      "packages/contracts/generated/openapi/public.json": "7d4e22f76aa68cfbcec67628a3570b95067dd46d09a6e8de78d4b5b1e50525cf",
-      "packages/sdk/src/gen/client.ts": "0d4640934da844fa5903826eb045ec2ab37532c21e6dd457311e79fe1b49e366",
-      "packages/sdk/src/gen/openapi.ts": "2f45671359db4e4d6899f6fcb1d43a9f357cfbec24e5b0e78e2f8bdab9c3db02",
+      "packages/contracts/generated/openapi/internal.json": "337df092af4f334b107ab53c56ed95c9f2fb1fd1f33bab0a4d514a7793a4fb6c",
+      "packages/contracts/generated/openapi/public.json": "3d405a4cb6fc2f33e3946fa33119057d979644c6828975e0f7a4b3fff9832069",
+      "packages/sdk/src/gen/client.ts": "f6a1cc0e9de4db74f7867746f6e8e987db5eda5939eb1f6ed0bf739b1b03dd40",
+      "packages/sdk/src/gen/openapi.ts": "02e9925eee140443971013f682eef7ed376018f7f6935bb10fbc5e432d294676",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "3ee23884014e3fa140189ec4ff2236b1334076984a55b0a5572d07ccba00c99e",
-      "services/intel/munim_intel/contracts_gen/names.py": "23552ff3fd586ca140583b6ee52c4711199803a7220dd198a0f131b71dcfc6f7"
+      "services/intel/munim_intel/contracts_gen/models.py": "ac759997cc9a382faa975729b067a9aa15ccc05e6633aa7f4722fcb91c942edf",
+      "services/intel/munim_intel/contracts_gen/names.py": "7be8a3fe0684f74653f620fcdc9ebea6791991327b02e5290366d8b548f4f338"
     }
   }
 }

@@ -15959,7 +15959,7 @@
     },
     {
       "id": "intel.investigation_cost_estimate",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": false,
       "tool": null,
@@ -16000,11 +16000,22 @@
           "numeric_source": "core.investigation.checklist"
         },
         {
+          "name": "remaining_steps",
+          "type": "integer",
+          "numeric_source": [
+            "core.investigation.max_steps",
+            "core.investigation.steps_done",
+            "core.investigation.checklist"
+          ]
+        },
+        {
           "name": "estimate_minor",
           "type": "integer",
           "numeric_source": [
             "intel.intel_spend.amount_minor",
             "count:core.investigation_step",
+            "core.investigation.max_steps",
+            "core.investigation.steps_done",
             "core.investigation.checklist"
           ]
         },
@@ -21953,7 +21964,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "ca0b108411ce942310c088ab96f41348807e0bd1553d5386ed78cbf270842faa",
+      "sha256": "b90b609635e967b7205817e0136bfdb0b97dc1cfcca94f1dfc233614657ee3ab",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -21979,6 +21990,7 @@
         "db/migrations/0022_mc1d_guard_binding_f8_asof.sql": "6a373c5154b07961fd3258f16158983a539b9f282189830e7f6a8cc5055b5034",
         "db/migrations/0023_mc1e_template_versions.sql": "b469db215ee0110933bc416f4d39f3656af9e88f3fb5c4062a4322a17e6d69cc",
         "db/migrations/0024_w32_review_fixes.sql": "542c06a388851d28213590315aadc943a746042d367792dc2429e29a14ad8d9e",
+        "db/migrations/0025_w3_close.sql": "f8f4905e79d0075f17e83dbaaf16ee13974a9ee3a8079b9bd3944cd71c15f044",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -22003,7 +22015,7 @@
         "packages/contracts/src/internal/index.ts": "a71274a4abbbc3e5a91927016121a7eea9925579a774797aedc6603d47b25dfb",
         "packages/contracts/src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
         "packages/contracts/src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
-        "packages/contracts/src/investigations/index.ts": "0d792276174a5277c36136abd2ff1d27e11e4f7cbc52cb177a8f8de4af02d52f",
+        "packages/contracts/src/investigations/index.ts": "f6ce47fd1c3a022b6633dfd4189bdf917c1dc7842d4ada3206efe7a8a4f40901",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
         "packages/contracts/src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
@@ -22037,14 +22049,14 @@
         "packages/contracts/src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
         "packages/contracts/src/shared/run-token.ts": "0edaf277e73c31a5ea7bc45c16c452e06950dcf17beb9c1cc1007dbab5321097",
         "packages/contracts/src/shared/snapshot.ts": "3d3ca4eda9abae7a51208c8bcc4df616f99001f67499c8793e650a1dacde0e02",
-        "packages/contracts/src/shared/trace.ts": "dfb88af38ba81afde3128812c14ca9fde3150709c0fbf3c8e68c1b4c96bf9930",
+        "packages/contracts/src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
         "packages/contracts/src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
         "packages/contracts/src/storefront/index.ts": "57240f351ecd3d3c8872b3f50a667b9a3784ef93e1a5aaf25604e9a0d14efb65",
-        "packages/contracts/src/tenancy/index.ts": "d4ff099f1673082132a1b65a2ece7b8ce3a6b05fb72581b1262fc7181673bb7f",
+        "packages/contracts/src/tenancy/index.ts": "bdb1409a5a1d5709901dabbc1cc215ba2af727f31122093f0c8e581e6e3e8b01",
         "packages/contracts/src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
         "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
       }
     },
-    "body_sha256": "96a27547de7bcede341ae3202d656402da448b8a489d357ce40995e35fc19b69"
+    "body_sha256": "557f2d46586020ccf801f50be6b07a6ab9cadbffebedd603a78757eb1c8c8bd1"
   }
 }

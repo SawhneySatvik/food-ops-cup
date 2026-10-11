@@ -4,6 +4,14 @@
   "title": "V1InvestigationApprovePlanRequest",
   "x-munim-module": "investigations",
   "type": "object",
-  "properties": {},
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "auto"
+      ]
+    }
+  },
   "additionalProperties": false
 }

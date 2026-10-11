@@ -13257,7 +13257,7 @@
     "/v1/investigations/{id}:approve-plan": {
       "post": {
         "operationId": "approveInvestigationPlan",
-        "summary": "Approve a Plan-mode investigation (its creator, within the role's ceiling) and run its steps inside this request until a stop",
+        "summary": "Approve a Plan-mode investigation (its creator, within the role's ceiling), as Plan or Auto, and run its steps inside this request until a stop",
         "security": [
           {
             "memberToken": [],
@@ -23857,6 +23857,135 @@
                   },
                   "payload": {
                     "$ref": "#/components/schemas/TenancyTenantUpdateV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/policy": {
+      "post": {
+        "operationId": "setBusinessPolicy",
+        "summary": "tenancy.policy.set.v1 — the owner's labour and margin targets, as a new dated version (owner)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "TenancyPolicySetV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "tenancy.policy.set.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/TenancyPolicySetV1"
                   }
                 },
                 "required": [
@@ -44242,13 +44371,13 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                            "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                           },
                           {
                             "type": "array",
                             "items": {
                               "type": "string",
-                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                              "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                             }
                           }
                         ]
@@ -47283,7 +47412,15 @@
         "x-munim-contract": "v1.investigation.approve-plan.request",
         "x-munim-module": "investigations",
         "type": "object",
-        "properties": {},
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "auto"
+            ]
+          }
+        },
         "additionalProperties": false
       },
       "V1Investigation": {
@@ -47358,7 +47495,8 @@
               "no_driver_found",
               "cannot_verify",
               "cancelled",
-              "exhausted"
+              "exhausted",
+              "restricted"
             ]
           },
           "stop_reason": {
@@ -47461,7 +47599,8 @@
                     "pending",
                     "supported",
                     "refuted",
-                    "cannot_verify"
+                    "cannot_verify",
+                    "restricted"
                   ]
                 },
                 "frozen": {
@@ -47695,7 +47834,8 @@
                           "pending",
                           "supported",
                           "refuted",
-                          "cannot_verify"
+                          "cannot_verify",
+                          "restricted"
                         ]
                       },
                       "to": {
@@ -47704,7 +47844,8 @@
                           "pending",
                           "supported",
                           "refuted",
-                          "cannot_verify"
+                          "cannot_verify",
+                          "restricted"
                         ]
                       },
                       "frozen": {
@@ -47947,7 +48088,8 @@
                     "no_driver_found",
                     "cannot_verify",
                     "cancelled",
-                    "exhausted"
+                    "exhausted",
+                    "restricted"
                   ]
                 },
                 "stop_reason": {
@@ -57239,13 +57381,13 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                      "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                     },
                     {
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
+                        "pattern": "^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                       }
                     }
                   ]
@@ -59626,6 +59768,44 @@
             "const": true
           }
         },
+        "additionalProperties": false
+      },
+      "TenancyPolicySetV1": {
+        "title": "TenancyPolicySetV1",
+        "x-munim-contract": "tenancy.policy.set.v1",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+          },
+          "labour_target_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "target_margin_bp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "outlet_id",
+          "valid_from"
+        ],
         "additionalProperties": false
       },
       "TenancyMemberBindV1": {

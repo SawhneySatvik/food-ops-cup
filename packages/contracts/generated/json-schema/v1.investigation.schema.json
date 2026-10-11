@@ -73,7 +73,8 @@
         "no_driver_found",
         "cannot_verify",
         "cancelled",
-        "exhausted"
+        "exhausted",
+        "restricted"
       ]
     },
     "stop_reason": {
@@ -181,7 +182,8 @@
               "pending",
               "supported",
               "refuted",
-              "cannot_verify"
+              "cannot_verify",
+              "restricted"
             ]
           },
           "frozen": {
@@ -423,7 +425,8 @@
                     "pending",
                     "supported",
                     "refuted",
-                    "cannot_verify"
+                    "cannot_verify",
+                    "restricted"
                   ]
                 },
                 "to": {
@@ -432,7 +435,8 @@
                     "pending",
                     "supported",
                     "refuted",
-                    "cannot_verify"
+                    "cannot_verify",
+                    "restricted"
                   ]
                 },
                 "frozen": {
