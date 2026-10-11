@@ -1,9 +1,8 @@
 """`finance.missing_payout` (packs/finance.md §4, §5, §6; plants F4, F7; answer keys RG-F4, RG-F7).
 
-Template `finance.missing_payouts` **version 2** (requested from the migrator: tests/packs/finance/
-requested_templates_v2.sql), minted per outlet as of the outlet's business date. Version 2 puts one Σ row per channel
-first (`order_id` null, with `channel_id`), whose `days_unsettled` is the oldest unsettled order's age; version 1's Σ
-row has a null age and no channel, so on version 1 this detector never fires.
+Template `finance.missing_payouts` **version 2** (migration 0023 F2), minted per outlet as of the outlet's business
+date. Version 2 puts one Σ row per channel first (`order_id` null, with `channel_id` appended), whose `days_unsettled`
+is the oldest unsettled order's age; a channel with nothing unsettled has no row.
 
 Fires on a channel's Σ row when the oldest completed order in no payout is older than the pack's `days_unsettled_gt`
 (10 days): the channel is overdue. Impact: the Σ `order_total_minor` of every order of that channel in no payout — the

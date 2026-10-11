@@ -5577,6 +5577,7 @@ export interface components {
                 detectors: string[];
                 templates: string[];
                 draftables: string[];
+                workflow_draftables: string[];
             }[];
         };
         /** V1SnapshotsRequest */
@@ -6095,6 +6096,20 @@ export interface components {
                     [key: string]: boolean | number | string;
                 };
                 trace_event_id: components["schemas"]["Uuid7"] | null;
+            }[];
+        };
+        /** InternalGraphQueryRequest */
+        InternalGraphQueryRequest: {
+            /** @enum {string} */
+            template: "price_shock_path" | "dish_margin_drivers" | "supplier_dependency" | "claim_support" | "neighbourhood";
+            args: {
+                [key: string]: string | number;
+            };
+        };
+        /** InternalGraphQueryResponse */
+        InternalGraphQueryResponse: {
+            rows: {
+                [key: string]: string | number | null;
             }[];
         };
         /** InternalSpendRequest */
@@ -7756,7 +7771,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -7909,6 +7924,7 @@ export interface components {
                 detectors: string[];
                 templates: string[];
                 draftables: string[];
+                workflow_draftables: string[];
             }[];
         };
         /** V1SpecialistDesk */
@@ -7923,6 +7939,7 @@ export interface components {
                 detectors: string[];
                 templates: string[];
                 draftables: string[];
+                workflow_draftables: string[];
             };
             applicable: boolean;
             findings: components["schemas"]["V1Finding"][];

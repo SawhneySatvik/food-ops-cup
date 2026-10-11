@@ -26,6 +26,7 @@ WEEK = "2026-10-05"  # the ISO week of the frame's business date (Sat 10 Oct 202
 ITEM = "01920000-0000-7000-8000-0000000046e1"
 ITEM_K = "01920000-0000-7000-8000-0000000046e2"
 ITEM_J = "01920000-0000-7000-8000-0000000046e3"
+ITEM_L = "01920000-0000-7000-8000-0000000046e4"
 
 
 def sweep(serve: Any, kind: str = "restaurant", code: str = "IN") -> FakeCore:
@@ -134,25 +135,30 @@ def test_overprep_fires_on_the_sigma_row_at_one_and_a_half_times_the_median_and_
     ]
 
 
-def times(item: str, station: str, slot_start: str, tickets: int, p80: int, configured: int | None) -> dict[str, Any]:
+def times(item: str, station: str, slot_start: str | None, tickets: int, p80: int, configured: int | None) -> dict[str, Any]:
+    """`slot_start` None: v2's whole-window row of the item and station (0023 K1), listed first."""
     return {"station": station, "item_id": item, "slot_start": slot_start, "tickets": tickets, "p50_sec": p80 - 60, "p80_sec": p80,
             "late_tickets": 0, "configured_prep_sec": configured}  # fmt: skip
 
 
-def test_prep_time_gap_one_finding_per_dish_on_its_busiest_slot_with_a_prep_time_draft_citing_p80() -> None:
+def test_prep_time_gap_one_finding_per_dish_on_its_whole_window_row_with_a_prep_time_draft_citing_p80() -> None:
     rows = [
-        times(ITEM, "biryani", "12:00", 50, 900, 600),  # qualifies
-        times(ITEM, "biryani", "13:00", 80, 800, 600),  # qualifies, busier → the finding's row
-        times(ITEM, "biryani", "19:00", 49, 1200, 600),  # one ticket short
-        times(ITEM_J, "grill", "13:00", 300, 1200, None),  # nothing promised
-        times(ITEM_K, "grill", "20:00", 60, 420, 600),  # faster than promised by exactly 180 s → low
-        times(ITEM_K, "grill", "21:00", 60, 779, 600),  # 179 s
+        # whole-window rows first (slot_start None)
+        times(ITEM, "biryani", None, 179, 860, 600),  # qualifies → the finding's row (0)
+        times(ITEM_J, "grill", None, 300, 1200, None),  # nothing promised
+        times(ITEM_K, "grill", None, 120, 420, 600),  # faster than promised by exactly 180 s → low (row 2)
+        times(ITEM_L, "grill", None, 49, 1200, 600),  # one ticket short over the window
+        # per-slot rows: never read, even where one alone would qualify (a slot's p80 is not the dish's)
+        times(ITEM, "biryani", "12:00", 50, 900, 600),
+        times(ITEM, "biryani", "13:00", 80, 800, 600),
+        times(ITEM_L, "grill", "20:00", 60, 1200, 600),
+        times(ITEM_K, "grill", "21:00", 60, 779, 600),
     ]
     core = sweep(only("kitchen.ticket_times", rows, **{"from": "2026-09-27", "to": "2026-10-10"}))
     found = sorted(core.finding_rows(), key=lambda f: f["impact_row"])
     assert [(f["dedupe_key"], f["severity"], f["impact_row"], f["impact_column"]) for f in found] == [
-        (f"kitchen.prep_time_gap:{OUTLET}:{ITEM}:biryani", "medium", 1, "p80_sec"),
-        (f"kitchen.prep_time_gap:{OUTLET}:{ITEM_K}:grill", "low", 4, "p80_sec"),
+        (f"kitchen.prep_time_gap:{OUTLET}:{ITEM}:biryani", "medium", 0, "p80_sec"),
+        (f"kitchen.prep_time_gap:{OUTLET}:{ITEM_K}:grill", "low", 2, "p80_sec"),
     ]
     by_finding = {d.model_dump(mode="json")["finding_id"]: d.model_dump(mode="json") for d in core.drafts}
     assert len(by_finding) == 2
@@ -170,7 +176,7 @@ def test_every_kitchen_finding_draft_and_trace_carries_the_kitchen_specialist() 
     rows = {
         "kitchen.ticket_drift": [slot("tandoor", "20:00", 9000, 40, 9000), sigma_drift(0)],
         "kitchen.remakes_overprep": [remake("grill", 9, 900_000), remake(None, 9, 900_000, 100) | {"overprep_minor": 500_000}],
-        "kitchen.ticket_times": [times(ITEM, "biryani", "12:00", 300, 900, 600)],
+        "kitchen.ticket_times": [times(ITEM, "biryani", None, 300, 900, 600)],
     }
     core = sweep(lambda t, p: rows.get(t, []) if p.get("week_start", WEEK) == WEEK else [])
     types = sorted(f["type"] for f in core.finding_rows())

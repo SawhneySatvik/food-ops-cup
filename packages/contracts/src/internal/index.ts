@@ -7,7 +7,7 @@ import { AnswerEnvelope, FindingEnvelope, Segment } from "../shared/envelope.ts"
 import { checkDraftPayload, draftPayload } from "../shared/draftables.ts";
 import { BasisPoints, CommandType, CurrencyCode, IanaZone, IsoDate, IsoDateTime, LocalTime, Slug, Unit, Uuid7 } from "../shared/primitives.ts";
 import { ReasonCode } from "../shared/reason-codes.ts";
-import { RefId, SnapCellRef } from "../shared/refs.ts";
+import { parseRef, RefId, SnapCellRef } from "../shared/refs.ts";
 import type { Route } from "../shared/routes.ts";
 import { MintSnapshotRequest } from "../shared/snapshot.ts";
 import { TraceEventInput } from "../shared/trace.ts";
@@ -60,10 +60,28 @@ export const DraftsRequest = z
     finding_id: Uuid7.nullable(),
     evidence: z.array(RefId).min(1),
     /** The snapshot cells the proposal assumes; core copies their current values into `expected` and
-     *  re-checks them at approval (changed → stale, no execution). */
-    based_on: z.array(SnapCellRef).min(1),
+     *  re-checks them at approval (changed → stale, no execution). ≥ 1, except a workflow draft (below). */
+    based_on: z.array(SnapCellRef),
   })
-  .superRefine(checkDraftPayload("proposal", "payload"));
+  .superRefine(checkDraftPayload("proposal", "payload"))
+  .superRefine(checkEmptyBasedOn);
+
+const refLeaves = (v: unknown): string[] =>
+  typeof v === "string" ? (parseRef(v) ? [v] : []) : Array.isArray(v) ? v.flatMap(refLeaves) : v && typeof v === "object" ? Object.values(v).flatMap(refLeaves) : [];
+/** A document span or a negotiation quote row: a value a person confirms or types (R26), never a snapshot cell. */
+const documentOrQuote = (ref: string) => {
+  const p = parseRef(ref);
+  return p !== null && (p.kind === "doc" || (p.kind === "row" && p.id.startsWith("intel.supplier_quote:")));
+};
+/** DECISIONS 11 Oct (W3.2): `based_on` may be empty only for a workflow draft of the proposing pack whose every numeric
+ *  leaf is a document or quote ref (a document-sourced draft cites no snapshot cell); every other draft cites ≥ 1 cell. */
+function checkEmptyBasedOn(v: { pack: string; command_type: string; payload: unknown; based_on: string[] }, ctx: z.RefinementCtx) {
+  if (v.based_on.length > 0) return;
+  const workflow = SPECIALIST_REGISTRY.specialists.find((s) => s.id === v.pack)?.workflow_draftables.includes(v.command_type) ?? false;
+  const refs = refLeaves(v.payload);
+  if (!workflow || refs.length === 0 || !refs.every(documentOrQuote))
+    ctx.addIssue({ code: "custom", path: ["based_on"], message: "based_on needs >= 1 snapshot cell unless a workflow draft's every numeric leaf is a document or quote ref" });
+}
 /** Core-side idempotency (ADR-014 §5.5): same id + same body → the original response; same id + another body →
  *  409. An open draft with the same fingerprint → its id (`proposed`, no new row). A fingerprint a person rejected
  *  within 30 days → `abstained` + `recently_rejected` (nothing stored). Other refusals → `abstained` + reason. */
@@ -229,6 +247,19 @@ export const SpendRequest = z.strictObject({
   }), 100),
 });
 
+// POST graph:query (T-058 wiring; ADR-014 "Graph port", F7): one of five bounded, core-owned graph templates over
+// intel.entity / intel.edge, run by core as munim_svc with `:tenant_id` bound from the run token — the tenant is never an
+// argument. A template takes exactly its own id argument (a uuid) and, for walks, `depth` 1..3 (default 3); anything else
+// refuses (422). Rows are ids, kinds, names and hop counts only — never a number to display.
+export const GRAPH_TEMPLATES = ["price_shock_path", "dish_margin_drivers", "supplier_dependency", "claim_support", "neighbourhood"] as const;
+export const GraphQueryRequest = z.strictObject({
+  template: z.enum(GRAPH_TEMPLATES),
+  args: z.record(z.string().regex(/^[a-z_]{1,40}$/), z.union([z.string().max(64), z.int()])),
+});
+export const GraphQueryResponse = z.strictObject({
+  rows: z.array(z.record(z.string(), z.union([z.string(), z.int(), z.null()]))).max(50),
+});
+
 // GET run-frame (04 §1 RunFrame; ADR-014 §6.1 block 5, §14 C1): what a run needs that its token does not carry. An
 // ask's thread excerpt is not here: it rides only in core's `/ask` body (`threads.block`), bound to the run core mints.
 export const RunFrameOutlet = z.strictObject({
@@ -305,6 +336,8 @@ export const SCHEMAS = {
   "internal.forecasts-batch.request": ForecastsBatchRequest,
   "internal.forecasts-batch.response": ForecastsBatchResponse,
   "internal.quotes-batch.request": QuotesBatchRequest,
+  "internal.graph-query.request": GraphQueryRequest,
+  "internal.graph-query.response": GraphQueryResponse,
   "internal.spend.request": SpendRequest,
   "internal.run-frame.response": RunFrameResponse,
 };
@@ -343,6 +376,7 @@ export const ROUTES: readonly Route[] = [
   intel("wiki:batch", "writeWiki", "Wiki page versions of validated cited segments", "internal.wiki-batch.request", "internal.wiki-batch.response", 201, true),
   intel("forecasts:batch", "writeForecasts", "A forecast run and its points (T-052 output)", "internal.forecasts-batch.request", "internal.forecasts-batch.response", 201, true),
   intel("quotes:batch", "writeQuotes", "Simulated-supplier quotes as typed fields", "internal.quotes-batch.request", "internal.batch.response", 201, true),
+  intel("graph:query", "graphQuery", "One bounded graph template under the run's tenant (ids, kinds, names, depth)", "internal.graph-query.request", "internal.graph-query.response", 200),
   intel("spend", "writeSpend", "Model spend per call; always recorded, stamped by core", "internal.spend.request", "internal.batch.response", 201, true),
   { surface: "internal", method: "get", path: `${P}/run-frame`, operationId: "getRunFrame",
     summary: "The run's pack, thresholds, outlets with business dates, AI budget and narration mode",

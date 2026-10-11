@@ -70,8 +70,9 @@ export const W2_REASON_CODES = ["not_applicable", "item_unavailable", "reason_re
 
 /** W3 (ADR-014 §5.5, §14 C5): core refuses an intel draft whose fingerprint a person rejected within 30 days.
  *  T-090 (F10, F11 O-2): an investigation mode above the role's ceiling; an owner's AI cap above the operator's monthly
- *  limit, or set while the operator has no limit for this month in the business currency. */
-export const W3_REASON_CODES = ["recently_rejected", "mode_above_ceiling", "cap_above_platform_budget", "platform_budget_missing"] as const;
+ *  limit, or set while the operator has no limit for this month in the business currency.
+ *  W3.2 (i-2): a task draft whose outlet has no manager to assign it to — the mapping abstains, it never guesses. */
+export const W3_REASON_CODES = ["recently_rejected", "mode_above_ceiling", "cap_above_platform_budget", "platform_budget_missing", "assignee_missing"] as const;
 
 export const REASON_CODES = [
   ...CORE_REASON_CODES,

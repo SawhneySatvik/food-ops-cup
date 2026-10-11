@@ -2,7 +2,10 @@
 // and stores a `proposed` core.draft — it never executes anything (a named person approves, T-008). All in core, on
 // the run's munim_svc transaction (tenant + outlet scope from the token):
 //   1. Same draft_id + same body → the original response (byte-identical); same id + another body → 409.
-//   0. The pack is a registered specialist that may propose this command type (F8, T-087a registry), else 422.
+//   0. The pack is a registered specialist that may propose this command type (F8, T-087a registry) — one of its
+//      `draftables`, or one of its `workflow_draftables` (DECISIONS 11 Oct, W3.2: emitted by deterministic intel code,
+//      never a model tool; contracts DraftsRequest lets such a draft cite no snapshot cell when every numeric leaf is a
+//      document span or a quote row) — else 422.
 //  0b. A payroll draft outside the pack's `payroll_scope` → 422 `payroll_out_of_scope` (W3.2; nothing stored).
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
 //      every ref and every based_on cell resolves for this run → else `abstained` + reason, nothing stored.
@@ -12,8 +15,11 @@
 //      A prose leaf is a string the proposal schema leaves free: no pattern, format, enum or const (`proseLeafPaths`).
 //      Every other string leaf is EXCEPTED, each fixed by its pattern: ids, refs, dates and times, currency and unit
 //      codes, i18n keys, slugs, and short codes such as a coupon code (`^[A-Z0-9][A-Z0-9-]{2,31}$`, which may hold
-//      digits: a code is an identifier, not a number shown as a fact). imports.* draftables are excepted as a whole:
-//      no specialist may propose them (step 0), so intel never reaches this check with one.
+//      digits: a code is an identifier, not a number shown as a fact). Beside it, by an explicit list (IDENTIFIER_LEAVES)
+//      because the schema is also the member route's and stays free: a supplier invoice's `invoice_no` (DECISIONS 11 Oct,
+//      W3.2) — the number printed on the supplier's page, an identifier a person matches, not a quantity; its
+//      `lines[].description` stays prose and is checked. imports.* draftables are excepted as a whole: no specialist may
+//      propose them (step 0), so intel never reaches this check with one.
 //   3. Fingerprint (below). An OPEN draft with it → that draft's id, 0 new rows. A draft a person REJECTED with it
 //      within 30 days → `abstained` + `recently_rejected` (the verdict only, never the reason text).
 //   4. Insert, with `expected` copied from each based_on cell (approval re-checks them; changed → stale).
@@ -24,7 +30,10 @@
 //     rows reach a payload only from a snapshot cell (§5.7: the model never types a UUID). INFERENCE;
 //   - per based_on cell: template id, version and params, the cited row's key (its uuid / date cells, the way
 //     approval matches a re-run row; the index when it has none) and the column. Snapshot ids are NOT in it, so a
-//     re-detection on a fresh snapshot of the same rows is the same proposal; another row is another proposal.
+//     re-detection on a fresh snapshot of the same rows is the same proposal; another row is another proposal;
+//   - the payload's cited rows and spans (`⟨cite:…⟩`, sorted): a workflow draft may cite no snapshot and target no
+//     outlet, so without them every document's invoice draft would share one fingerprint (the second would answer with
+//     the first's id, and one rejection would bar every invoice for 30 days).
 // There is no fingerprint column (ADR §14 C7 keeps this in code): candidates of the same command type are re-hashed
 // under a per-(tenant, fingerprint) transaction lock, so two concurrent identical proposals store one row.
 import { draftable, type ParsedRef, parseRef } from "@munim/contracts";
@@ -43,6 +52,8 @@ type Cells = Map<string, { template_id: string; template_version: number; params
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PAYROLL = new Set(["people.payroll_draft.create.v1"]);
+/** Free-string leaves that are identifiers, not prose (step 2b): excepted from the number grammar by name. */
+const IDENTIFIER_LEAVES: Record<string, readonly string[]> = { "purchasing.invoice.record.v1": ["invoice_no"] };
 const REJECTION_WINDOW = "30 days";
 
 interface Proposal { command_type: string; outlet_ids: string[]; payload: unknown; based_on: string[] }
@@ -86,7 +97,8 @@ export function fingerprint(p: Proposal, cells: Cells): string {
     return canonicalJson({ template: s?.template_id ?? null, version: s?.template_version ?? null, params: s?.params ?? null,
       row: keys.length ? Object.fromEntries(keys.map((k) => [k, row[k] ?? null])) : at.row, column: at.column });
   }).sort();
-  return sha256Hex(canonicalJson({ command_type: p.command_type, outlets: [...p.outlet_ids].sort(), targets, based_on: basedOn }));
+  const cites = refsIn(p.payload).filter((r) => parseRef(r)?.kind !== "snap").sort();
+  return sha256Hex(canonicalJson({ command_type: p.command_type, outlets: [...p.outlet_ids].sort(), targets, based_on: basedOn, cites }));
 }
 
 const asProposal = (d: StoredDraft): Proposal =>
@@ -117,7 +129,9 @@ const PROSE = new Map<string, Set<string>>();
 export function proseLeafPaths(commandType: string): Set<string> {
   if (!PROSE.has(commandType)) {
     const d = draftable(commandType);
-    PROSE.set(commandType, d ? freeStrings(d.proposal.toJSONSchema({ unrepresentable: "any", io: "input" }) as JsonSchema, "", new Set()) : new Set());
+    const free = d ? freeStrings(d.proposal.toJSONSchema({ unrepresentable: "any", io: "input" }) as JsonSchema, "", new Set()) : new Set<string>();
+    for (const leaf of IDENTIFIER_LEAVES[commandType] ?? []) free.delete(leaf);
+    PROSE.set(commandType, free);
   }
   return PROSE.get(commandType)!;
 }
@@ -146,7 +160,7 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   // F8: the proposer is a registered specialist and the command is one it may propose (ADR-014 §3.2 "Can propose");
   // import-only draftables (imports.*) belong to no specialist, so intel can never propose them.
   const specialist = SPECIALIST_REGISTRY.specialists.find((x) => x.id === req.pack && x.kind === "specialist");
-  if (!specialist?.draftables.includes(req.command_type)) throw new ApiError("invalid_payload");
+  if (!specialist?.draftables.includes(req.command_type) && !specialist?.workflow_draftables.includes(req.command_type)) throw new ApiError("invalid_payload");
   // Payroll is drafted only where the country pack prepares it (`payroll_scope = drafts`, packs/people.md §6); elsewhere
   // the proposal is refused before anything is resolved or stored (P6), as the member route refuses it.
   if (PAYROLL.has(req.command_type) && (await payrollScope(c)) !== "drafts") throw new ApiError("out_of_pack_scope", "payroll_out_of_scope");

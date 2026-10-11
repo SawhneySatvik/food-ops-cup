@@ -3,8 +3,12 @@
 //   (1) 500 claims → 500 rows; the same 500 again → 0 inserted; a quote that is not its source → MB012, 0 rows
 //   (6) a draft's free-text note with a digit → abstained number_grammar, 0 rows / plain text → proposed, 1 row
 //   (7) draft pack `inventory` (not an F8 id) → 422, 0 rows / `inventory_purchasing` → 201
+//   (8) W3.2 workflow draft (DECISIONS 11 Oct): ingestion's invoice — based_on [], every number a doc span, invoice_no
+//       with digits (an identifier) → proposed; the same type from another pack → 422; two documents → two drafts and
+//       the same document again → the first draft (the fingerprint holds the cited spans); a digit in a description → abstained
 //   plus every other batch: idempotent by id, same id + other body → 409, refusals typed (never a 500).
 // Expected counts are hand values (the batch sizes sent here, the canonical world's rows), never read from the code.
+import { createHash } from "node:crypto";
 import { createLogger } from "@munim/config";
 import { Snapshot, snapRef } from "@munim/contracts";
 import { BatchResponse, DraftsResponse, ForecastsBatchResponse, WikiBatchResponse } from "@munim/contracts/internal";
@@ -14,7 +18,7 @@ import { ownerCtx, type TestDb, uuidv7 } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
-import { createApp, type Deps } from "../src/app.ts";
+import { createApp, type Deps, TENANT_HEADER } from "../src/app.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";
 import { configureInternal } from "../src/internal/index.ts";
 import { proseLeafPaths } from "../src/internal/drafts.ts";
@@ -23,6 +27,7 @@ import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 
 const keys = testKeys();
+const idp = createLocalIdp();
 const SECRET = "t040b-test-service-secret-not-real-0123456789abcdef";
 const CLOCK = new Date("2026-10-11T08:00:00Z");
 let db: TestDb;
@@ -49,7 +54,7 @@ beforeAll(async () => {
   A = await buildTenant(db, "a");
   pools = { core: db.pool("munim_core", 4), svc: db.pool("munim_svc", 4) };
   const config = { nodeEnv: "test", redact: (s: string) => s };
-  const deps: Deps = { pools, idp: createLocalIdp(), storefronts: async () => null, config, log: createLogger(config, () => {}) };
+  const deps: Deps = { pools, idp, storefronts: async () => null, config, log: createLogger(config, () => {}) };
   app = await createApp(deps);
   configureInternal(deps, { serviceSecret: SECRET, keys, watchWindowMs: 0, clock: () => CLOCK });
   all = await run(A, ["*"]);
@@ -215,11 +220,13 @@ const returnDraft = (note: string, pack = "inventory_purchasing", basis = "on_ha
 const drafts = () => count(`SELECT count(*) n FROM core.draft WHERE tenant_id = $1`, [A.tenant]);
 
 describe("drafts: number grammar over prose leaves (gate 6), pack = an F8 id (gate 7)", () => {
-  it("the prose leaves of every intel-proposable draftable = the hand list (3); imports.* are excepted (no specialist proposes them)", async () => {
+  it("the prose leaves of every intel-proposable draftable = the hand list (4); imports.* are excepted (no specialist proposes them)", async () => {
     await loadRegistry();
-    // Hand list (T-080's finding, read from the proposal schemas by eye): free strings a person reads on the draft.
-    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "customers.campaign.create.v1:name", "purchasing.supplier_return.create.v1:note"];
-    const proposable = [...new Set(SPECIALIST_REGISTRY.specialists.flatMap((s) => s.draftables))];
+    // Hand list (T-080's finding, read from the proposal schemas by eye): free strings a person reads on the draft. The
+    // workflow invoice's `invoice_no` is an identifier (excepted by name, beside the coupon code); its description is prose.
+    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "customers.campaign.create.v1:name", "purchasing.invoice.record.v1:lines[].description",
+      "purchasing.supplier_return.create.v1:note"];
+    const proposable = [...new Set(SPECIALIST_REGISTRY.specialists.flatMap((s) => [...s.draftables, ...s.workflow_draftables]))];
     expect(proposable.length).toBeGreaterThan(10);
     expect(proposable.flatMap((t) => [...proseLeafPaths(t)].map((p) => `${t}:${p}`)).sort()).toEqual(HAND);
     expect(proposable.some((t) => t.startsWith("imports."))).toBe(false);
@@ -244,5 +251,97 @@ describe("drafts: number grammar over prose leaves (gate 6), pack = an F8 id (ga
     const ok = await intel(one, "drafts", returnDraft("The seal was broken; return it.", "inventory_purchasing", "min_qty_milli"));
     expect([ok.status, DraftsResponse.parse(await ok.json()).status]).toEqual([201, "proposed"]);
     expect(await drafts()).toBe(before + 1);
+  });
+});
+
+// Ingestion's supplier-invoice draft (T-056): a document whose text is stored as chunks; each number is a span of it.
+const PAGE = "Steady Dairy (simulated supplier)\nTax invoice INV-1042\nPaneer 12 kg 340.00 204.00\n";
+const span = (doc: string, text: string) => { const i = PAGE.indexOf(text); return `⟨cite:doc:${doc}·${i}-${i + text.length}⟩`; };
+async function invoiceDocument(): Promise<string> {
+  const doc = uuidv7();
+  await db.admin(`INSERT INTO core.document (tenant_id, id, kind, media_type, byte_size, sha256, storage_ref) VALUES ($1, $2, 'supplier_invoice', 'image/png', 10, $3, $4)`,
+    [A.tenant, doc, createHash("sha256").update(doc).digest("hex"), `fixture:${doc}`]);
+  const r = await intel(all, "chunks:batch", { chunks: [{ id: uuidv7(), document_id: doc, message_id: null, seq: 0, char_start: 0, text: PAGE }] });
+  expect(r.status).toBe(201);
+  return doc;
+}
+const invoiceDraft = (doc: string, over: { pack?: string; description?: string | null; invoice_no?: string; unit?: string } = {}) => ({
+  draft_id: uuidv7(), pack: over.pack ?? "inventory_purchasing", command_type: "purchasing.invoice.record.v1",
+  payload: { supplier_invoice_id: uuidv7(), supplier_id: A.supplier, invoice_no: over.invoice_no ?? "INV-1042", invoice_date: "2026-10-09", po_id: null, currency: A.currency,
+    lines: [{ line_id: uuidv7(), po_line_id: null, ingredient_id: over.description === undefined ? A.ingredient : null, description: over.description ?? null,
+      qty_milli: span(doc, "12"), unit: over.unit ?? "kg", unit_price_minor: span(doc, "340.00"), tax_minor: span(doc, "204.00") }] },
+  outlet_ids: [], finding_id: null, evidence: [`doc:${doc}`], based_on: [],
+});
+
+describe("workflow draft: ingestion's supplier invoice (gate 8)", () => {
+  it("based_on [] with doc-span numbers and invoice_no 'INV-1042' (digits: an identifier) → proposed, 1 row stored as sent", async () => {
+    const doc = await invoiceDocument();
+    const before = await drafts();
+    const d = invoiceDraft(doc);
+    const r = await intel(all, "drafts", d);
+    expect([r.status, DraftsResponse.parse(await r.json())]).toEqual([201, { draft_id: d.draft_id, status: "proposed", reason_code: null }]);
+    expect(await drafts()).toBe(before + 1);
+    const row = (await db.admin(`SELECT source, status, command_payload, based_on FROM core.draft WHERE id = $1`, [d.draft_id])).rows[0]!;
+    expect([row.source, row.status, row.command_payload, row.based_on]).toEqual(["intel:inventory_purchasing", "proposed", d.payload, []]);
+  });
+
+  it("the same workflow type from another pack → 422, 0 rows; a normal draft with based_on [] → 422 (contracts), 0 rows", async () => {
+    const doc = await invoiceDocument();
+    const before = await drafts();
+    expect(await refusal(await intel(all, "drafts", invoiceDraft(doc, { pack: "finance" })))).toEqual([422, "invalid_payload"]);
+    expect(await refusal(await intel(one, "drafts", { ...returnDraft("The crates arrived warm; return them all."), based_on: [] }))).toEqual([422, "invalid_payload"]);
+    expect(await drafts()).toBe(before);
+  });
+
+  it("two documents → two drafts; the same document's draft again (new draft id) → the first draft's id, 0 new rows", async () => {
+    const [d1, d2] = [await invoiceDocument(), await invoiceDocument()];
+    const before = await drafts();
+    const first = invoiceDraft(d1);
+    const ids = [];
+    for (const d of [first, invoiceDraft(d2), { ...first, draft_id: uuidv7() }]) ids.push(DraftsResponse.parse(await (await intel(all, "drafts", d)).json()).draft_id);
+    expect(ids[0]).toBe(first.draft_id);
+    expect(ids[1]).not.toBe(first.draft_id);
+    expect(ids[2]).toBe(first.draft_id);
+    expect(await drafts()).toBe(before + 2);
+  });
+
+  it("an unlinked line's description with a quantity in it → abstained number_grammar, 0 rows; the bare name → proposed", async () => {
+    const doc = await invoiceDocument();
+    const before = await drafts();
+    const bad = await intel(all, "drafts", invoiceDraft(doc, { description: "Paneer 12 kg" }));
+    expect(DraftsResponse.parse(await bad.json())).toMatchObject({ status: "abstained", reason_code: "number_grammar" });
+    expect(await drafts()).toBe(before);
+    const ok = await intel(all, "drafts", invoiceDraft(doc, { description: "Paneer" }));
+    expect(DraftsResponse.parse(await ok.json()).status).toBe("proposed");
+    expect(await drafts()).toBe(before + 1);
+  });
+});
+
+describe("workflow draft: approval fails closed until the approver types each document number (R26)", () => {
+  const approve = async (draftId: string, edited: Record<string, unknown> | null) =>
+    (await app.request(`/v1/drafts/${draftId}:approve`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idp.sign({ sub: A.ownerSub })}`, [TENANT_HEADER]: A.tenant, "Content-Type": "application/json" },
+      body: JSON.stringify({ command_id: uuidv7(), idempotency_key: `approve-${uuidv7()}`, type: "drafts.approve.v1",
+        payload: { draft_id: draftId, command_type: "purchasing.invoice.record.v1", edited_payload: edited, reason: edited ? "Typed from the page" : null } }),
+    })) as Res;
+  const invoices = () => count(`SELECT count(*) n FROM core.supplier_invoice WHERE tenant_id = $1 AND invoice_no = 'INV-2001'`, [A.tenant]);
+
+  it("approve as proposed → 422 cannot_verify (a span is not a cell), 0 invoices; the owner's typed numbers → executed under the owner", async () => {
+    const doc = await invoiceDocument();
+    const d = invoiceDraft(doc, { invoice_no: "INV-2001", unit: "g" });
+    expect(DraftsResponse.parse(await (await intel(all, "drafts", d)).json()).status).toBe("proposed");
+    const asProposed = await approve(d.draft_id, null);
+    expect([asProposed.status, (await asProposed.json()).error.code]).toEqual([422, "cannot_verify"]);
+    expect(await invoices()).toBe(0);
+    expect((await db.admin(`SELECT status FROM core.draft WHERE id = $1`, [d.draft_id])).rows[0]!.status).toBe("proposed");
+    const line = d.payload.lines[0]!;
+    const typed = { ...d.payload, lines: [{ ...line, qty_milli: { value: 12000, typed_by: A.owner }, unit_price_minor: { value: 34000, typed_by: A.owner },
+      tax_minor: { value: 20400, typed_by: A.owner } }] };
+    const ok = await approve(d.draft_id, typed);
+    expect(ok.status, JSON.stringify(await ok.clone().json())).toBe(200);
+    expect(await invoices()).toBe(1);
+    const dec = (await db.admin(`SELECT verdict, decided_by FROM core.decision WHERE draft_id = $1`, [d.draft_id])).rows[0]!;
+    expect([dec.verdict, dec.decided_by]).toEqual(["edited", A.owner]);
   });
 });

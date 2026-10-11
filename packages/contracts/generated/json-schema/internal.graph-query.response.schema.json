@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal.graph-query.response",
+  "title": "InternalGraphQueryResponse",
+  "x-munim-module": "internal",
+  "type": "object",
+  "properties": {
+    "rows": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "rows"
+  ],
+  "additionalProperties": false
+}

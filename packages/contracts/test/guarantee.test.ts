@@ -125,6 +125,7 @@ describe("numeric fields intel may still send (reviewed list — a new one turns
   // Each is a count / bound / score that is not a book number and not shown as a figure:
   //   findings.request confidence_bp — model self-assessment, shown as a band;
   //   snapshots.request params — template parameters (limits, flags), validated by the template;
+  //   graph-query.request args — a graph template's `depth` (1..3 hops), checked by core like intel's check_args (W3.2);
   //   traces-batch seq — ordering counter.
   // T-040b batches (each lands in an allow-listed intel numeric source or is not a figure at all):
   //   chunks seq/char_start, claims span_start/span_end, wiki version — positions and ordinals, never figures;
@@ -155,6 +156,7 @@ describe("numeric fields intel may still send (reviewed list — a new one turns
     "internal.forecasts-batch.request: $.properties.points.items.properties.hi_qty_milli (type integer)",
     "internal.forecasts-batch.request: $.properties.points.items.properties.lo_qty_milli (type integer)",
     "internal.forecasts-batch.request: $.properties.points.items.properties.qty_milli (type integer)",
+    "internal.graph-query.request: $.properties.args.additionalProperties.anyOf[1] (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.min_order_qty_milli (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.payment_days (type integer)",
     "internal.quotes-batch.request: $.properties.quotes.items.properties.qty_milli (type integer)",

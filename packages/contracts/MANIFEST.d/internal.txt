@@ -23,5 +23,7 @@ internal.wiki-batch.response
 internal.forecasts-batch.request
 internal.forecasts-batch.response
 internal.quotes-batch.request
+internal.graph-query.request
+internal.graph-query.response
 internal.spend.request
 internal.run-frame.response

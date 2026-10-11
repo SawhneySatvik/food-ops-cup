@@ -1,13 +1,13 @@
 """`people.overtime_drift` (packs/people.md §4, §5; plants P1, trap P7; answer keys RG-P1, AU-P1).
 
-Template `people.overtime_drift` over the last `window_weeks` (4) ISO weeks, outlet-local, ending today: one row per
-staff member and week (attended minutes beyond rostered ones, costed at the overtime multiplier). The rule spans a
-member's rows: Σ `extra_min` ≥ `extra_min_gte` (600) and the last week's `extra_min` > the first week's — drift, not
-one long week. Worked-as-rostered long shifts have no extra minutes (P7). The finding sits on the member's last-week
-row, and its impact is that row's `extra_cost_minor`: the template has no per-member 4-week Σ row (pack §5 names one;
-requested from the migrator), and intel never adds cells up into a number it shows. Severity L on the four weeks'
-`extra_cost_minor` (a band, not a shown number). Dedupe `<outlet>:<staff>:<iso_week>`. No draft (pack §6 attaches none:
-rosters are drafted on request through the skill).
+Template `people.overtime_drift` **version 2** (migration 0023 P1) over the last `window_weeks` (4) ISO weeks,
+outlet-local, ending today: one Σ row per staff member first (`iso_week` NULL, the member's window totals), then one row
+per member and week (attended minutes beyond rostered ones, costed at the overtime multiplier). The rule: the Σ row's
+`extra_min` ≥ `extra_min_gte` (600) and the last week's `extra_min` > the first week's — drift, not one long week.
+Worked-as-rostered long shifts have no extra minutes (P7). The finding sits on the member's last-week row (its dedupe
+week and narration), and its impact is the member's Σ `extra_cost_minor` — pack §5's "4-week Σ row", a cell core
+minted, never a sum intel adds up. Severity L on that cell. Dedupe `<outlet>:<staff>:<iso_week>`. No draft (pack §6
+attaches none: rosters are drafted on request through the skill).
 """
 
 from __future__ import annotations
@@ -26,27 +26,34 @@ def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
 
 
 def fires(row: Row, _: Thresholds) -> bool:
+    """A week row (the Σ rows carry no `iso_week`)."""
     return isinstance(row.get("staff_id"), str) and isinstance(row.get("iso_week"), str) and num(row, "extra_min") is not None
 
 
 def severity(row: Row, _: Thresholds, ladder: Ladder) -> Severity:
-    """`row` carries the member's four-week Σ `extra_cost_minor` (see `select`)."""
+    """`row` is the member's Σ row: L on the window's `extra_cost_minor`."""
     return ladder.of(num(row, "extra_cost_minor") or 0)
 
 
 def select(rows: Sequence[Row], w: Window, t: Thresholds, ladder: Ladder) -> list[Hit]:
     first, last = label(date.fromisoformat(w.params["from"])), label(date.fromisoformat(w.params["to"]))
-    by_staff: dict[str, list[int]] = {}
+    sigma: dict[str, int] = {}
+    weeks: dict[str, dict[str, int]] = {}
     for i, r in enumerate(rows):
-        if fires(r, t):
-            by_staff.setdefault(str(r["staff_id"]), []).append(i)
+        staff = r.get("staff_id")
+        if not isinstance(staff, str):
+            continue
+        if r.get("iso_week") is None:
+            sigma[staff] = i
+        elif fires(r, t):
+            weeks.setdefault(staff, {})[str(r["iso_week"])] = i
     hits = []
-    for idx in by_staff.values():
-        week = {rows[i]["iso_week"]: i for i in idx}
+    for staff, s in sigma.items():
+        week = weeks.get(staff, {})
+        total = num(rows[s], "extra_min")
         extra = {wk: num(rows[i], "extra_min") or 0 for wk, i in week.items()}
-        if last in week and sum(extra.values()) >= t["extra_min_gte"] and extra[last] > extra.get(first, 0):
-            total_cost = sum(num(rows[i], "extra_cost_minor") or 0 for i in idx)
-            hits.append(Hit(week[last], week[last], severity({"extra_cost_minor": total_cost}, t, ladder)))
+        if last in week and total is not None and total >= t["extra_min_gte"] and extra[last] > extra.get(first, 0):
+            hits.append(Hit(week[last], s, severity(rows[s], t, ladder)))
     return sorted(hits, key=lambda h: h.row)
 
 
@@ -66,8 +73,8 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Shifts ran past the roster this week: {extra_min} minutes beyond the {rostered_min} rostered, "
-            "costing {extra_cost_minor} at the overtime rate, and it has grown over the last few weeks."
+            "Shifts have run past the roster over the last few weeks and the overrun is growing: this week {extra_min} minutes "
+            "beyond the {rostered_min} rostered; over the whole window the extra time cost {extra_cost_minor} at the overtime rate."
         ),
         select=select,
     )

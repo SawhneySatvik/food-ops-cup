@@ -18,6 +18,8 @@ export const SAMPLES: Record<string, unknown> = {
   "internal.traces-batch.response": { inserted: 3, last_seq: 3 },
   // T-040b batches and the run-frame.
   "internal.batch.response": { inserted: 2, existing: 0 },
+  "internal.graph-query.request": { template: "price_shock_path", args: { ingredient_id: u(141), depth: 2 } },
+  "internal.graph-query.response": { rows: [{ node_id: u(150), kind: "item", name: "Dosa (synthetic)", depth: 1 }] },
   "internal.entities-batch.request": { entities: [{ id: u(140), kind: "supplier", core_ref: `core.supplier:${u(60)}`, name: "Simulated Dairy" },
     { id: u(141), kind: "ingredient", core_ref: null, name: "Paneer" }] },
   "internal.aliases-batch.request": { aliases: [{ id: u(142), entity_id: u(140), alias: "Sim Dairy", source: "claim" }] },

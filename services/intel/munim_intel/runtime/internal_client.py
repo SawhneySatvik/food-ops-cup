@@ -16,14 +16,24 @@ from pydantic import BaseModel, ValidationError
 
 from munim_intel.contracts_gen.models import (
     Error,
+    InternalAliasesBatchRequest,
     InternalAnswersRequest,
     InternalAnswersResponse,
+    InternalBatchResponse,
+    InternalChunksBatchRequest,
+    InternalClaimsBatchRequest,
     InternalDraftsRequest,
     InternalDraftsResponse,
+    InternalEdgesBatchRequest,
+    InternalEmbeddingsBatchRequest,
+    InternalEntitiesBatchRequest,
     InternalEventsClaimRequest,
     InternalEventsClaimResponse,
     InternalFindingsRequest,
     InternalFindingsResponse,
+    InternalGraphQueryRequest,
+    InternalGraphQueryResponse,
+    InternalQuotesBatchRequest,
     InternalSnapshotsRequest,
     InternalTracesBatchRequest,
     InternalTracesBatchResponse,
@@ -115,6 +125,37 @@ class InternalClient:
 
     async def write_traces(self, req: InternalTracesBatchRequest) -> InternalTracesBatchResponse:
         return await self._post("traces:batch", req, InternalTracesBatchResponse)
+
+    # T-040b batch writes (idempotent by id; same id + another body → 409). Ingestion, the graph projector and the
+    # negotiation write only through these.
+    async def write_entities(self, req: InternalEntitiesBatchRequest) -> InternalBatchResponse:
+        return await self._post("entities:batch", req, InternalBatchResponse)
+
+    async def write_edges(self, req: InternalEdgesBatchRequest) -> InternalBatchResponse:
+        return await self._post("edges:batch", req, InternalBatchResponse)
+
+    async def write_aliases(self, req: InternalAliasesBatchRequest) -> InternalBatchResponse:
+        return await self._post("aliases:batch", req, InternalBatchResponse)
+
+    async def write_chunks(self, req: InternalChunksBatchRequest) -> InternalBatchResponse:
+        return await self._post("chunks:batch", req, InternalBatchResponse)
+
+    async def write_claims(self, req: InternalClaimsBatchRequest) -> InternalBatchResponse:
+        return await self._post("claims:batch", req, InternalBatchResponse)
+
+    async def write_embeddings(self, req: InternalEmbeddingsBatchRequest) -> InternalBatchResponse:
+        return await self._post("embeddings:batch", req, InternalBatchResponse)
+
+    async def write_quotes(self, req: InternalQuotesBatchRequest) -> InternalBatchResponse:
+        return await self._post("quotes:batch", req, InternalBatchResponse)
+
+    async def graph_query(self, template: str, args: dict[str, str | int]) -> list[dict[str, str | int | None]]:
+        """One core-owned graph template under the run's tenant (core binds it from the token; never an argument).
+        A POST, but it writes nothing; not retried all the same, like every internal POST."""
+        req = InternalGraphQueryRequest.model_validate({"template": template, "args": args})
+        res = await self._post("graph:query", req, InternalGraphQueryResponse)
+        rows: list[dict[str, str | int | None]] = res.model_dump(mode="json")["rows"]
+        return rows
 
     async def model_roles(self) -> PlatformModelRoles:
         """platform.model_role (R36). Retried on a network error, 429 or 5xx — a GET writes nothing."""

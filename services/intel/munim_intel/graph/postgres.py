@@ -1,20 +1,19 @@
 """Graph adapter over Postgres edges (R35, F7): reads and writes both go through core-api, never a database from here.
 
 * writes — `entities:batch` / `edges:batch` (idempotent by id) through a `BatchWriter` (the InternalClient);
-* reads  — the template's recursive-CTE SQL (`sql/<template>.sql`) runs in core under the run token's tenant
-  (`munim_intel_ro` has no view over intel.edge). `GraphReader.read` is that call; core binds `:tenant_id`.
+* reads  — `graph:query` (the InternalClient): core owns the five templates' SQL
+  (services/core-api/src/internal/graph/), validates the arguments exactly as `check_args` does and runs the template
+  as munim_svc with `:tenant_id` bound from the run token. Intel keeps only the template names and their arguments.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Protocol
 
 from munim_intel.contracts_gen.models import Edge, Entity, InternalBatchResponse, InternalEdgesBatchRequest, InternalEntitiesBatchRequest
-from munim_intel.graph.port import GraphError, Row, UpsertResult, check_args
+from munim_intel.graph.port import Row, UpsertResult, check_args
 
-SQL_DIR = Path(__file__).resolve().parent / "sql"
 BATCH = 500  # the contracts' max rows per batch
 
 
@@ -25,9 +24,9 @@ class BatchWriter(Protocol):
 
 
 class GraphReader(Protocol):
-    """Runs template `name` with `params` (no tenant) for the run's tenant; rows are ids, kinds, names, depth."""
+    """Runs template `template` with `args` (no tenant) for the run's tenant; rows are ids, kinds, names, depth."""
 
-    async def read(self, name: str, params: Mapping[str, str | int]) -> list[Row]: ...
+    async def graph_query(self, template: str, args: dict[str, str | int]) -> list[Row]: ...
 
 
 class PostgresGraph:
@@ -50,11 +49,4 @@ class PostgresGraph:
         return UpsertResult(ent[0], ent[1], edg[0], edg[1])
 
     async def query(self, template: str, args: Mapping[str, object]) -> list[Row]:
-        return await self._reader.read(template, check_args(template, args))
-
-
-def template_sql(name: str) -> str:
-    """The SQL text core runs for `name` (named parameters `:tenant_id`, the template's id and `:depth`)."""
-    if name not in {p.stem for p in SQL_DIR.glob("*.sql")}:
-        raise GraphError("unknown_template")
-    return (SQL_DIR / f"{name}.sql").read_text(encoding="utf-8")
+        return await self._reader.graph_query(template, check_args(template, args))

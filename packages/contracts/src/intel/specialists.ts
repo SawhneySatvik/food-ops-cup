@@ -21,6 +21,10 @@ export const SpecialistEntry = z.strictObject({
   templates: z.array(Slug),
   /** Draftable command types this specialist may propose (ADR-014 §3.2 "Can propose"). */
   draftables: z.array(Slug),
+  /** Workflow draftables (DECISIONS 11 Oct, W3.2): drafts deterministic intel code emits for this specialist — never a
+   *  model tool (NOT_AGENT_EXPOSED, no `propose_*`). core's internal drafts route admits them for this pack only; one may
+   *  cite no snapshot cell (`based_on` []) only when every numeric leaf is a document span or a quote row. */
+  workflow_draftables: z.array(Slug),
 });
 
 export const SpecialistRegistry = z.strictObject({ specialists: z.array(SpecialistEntry) });
@@ -33,7 +37,8 @@ const e = (
   templates: string[],
   draftables: string[],
   kind: "specialist" | "manager" | "service" = "specialist",
-) => ({ id, kind, name_key: `specialist.${id}.name`, desk_key: desk, aliases, detectors, templates, draftables });
+  workflow_draftables: string[] = [],
+) => ({ id, kind, name_key: `specialist.${id}.name`, desk_key: desk, aliases, detectors, templates, draftables, workflow_draftables });
 
 export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
   specialists: [
@@ -72,6 +77,10 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
         "purchasing.po.create.v1", "purchasing.invoice.dispute.v1", "purchasing.supplier_return.create.v1",
         "inventory.reorder_level.set.v1", "inventory.transfer.create.v1",
       ],
+      "specialist",
+      // Ingestion's supplier-invoice draft (T-056). The negotiation's PO (T-055) is purchasing.po.create.v1, already a
+      // propose draftable above, so it is not repeated here.
+      ["purchasing.invoice.record.v1"],
     ),
     e(
       "finance",

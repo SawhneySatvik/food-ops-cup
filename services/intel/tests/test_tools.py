@@ -69,7 +69,8 @@ def scan(tools: dict[str, ToolFactory], generated: list[BaseTool] | None = None)
 def expected_generated() -> int:
     """Independent count: MANIFEST.d proposal lines (23 after 0022) minus the three not-agent-exposed drafts (the two
     import-only ones, ADR-014 §5.1, and the purchasing.invoice.record workflow draftable), plus the
-    db/tests/manifest.ts TEMPLATES list (83 entries after 0022, 15 of them "@2" rows; 68 distinct ids) minus the
+    db/tests/manifest.ts TEMPLATES list (92 entries after 0023: 83 after 0022, 15 of them "@2" rows, plus 0023's nine "@2"
+    rows; 68 distinct ids) minus the
     operator template (platform.spend_by_tenant), the
     core-consumed `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1
     not-agent-exposed templates (hand list below): 68 - 1 - 3 - 4 = 60 reads, + (23 - 3) = 20 proposals = 80."""
@@ -81,8 +82,9 @@ def expected_generated() -> int:
     templates = sorted({e.split("@")[0] for e in entries})  # the tools bind the latest version of each id
     not_exposed = {"forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"}
     exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.") and t not in not_exposed]
-    # Cross-check literals: 83 entries - 15 "@2" rows = 68 ids; 68 - 8 = 60 reads; 23 proposal lines - 3 = 20.
-    assert (len(entries), len(templates), len(exposed), len(proposals)) == (83, 68, 60, 23)
+    # Cross-check literals: 92 entries - 24 "@2" rows = 68 ids; 68 - 8 = 60 reads; 23 proposal lines - 3 = 20.
+    assert (len(entries), len(templates), len(exposed), len(proposals)) == (92, 68, 60, 23)
+    assert len([e for e in entries if e.endswith("@2")]) == 24
     return (len(proposals) - 3) + len(exposed)
 
 

@@ -36377,6 +36377,13 @@
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
                   }
+                },
+                "workflow_draftables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
                 }
               },
               "required": [
@@ -36387,7 +36394,8 @@
                 "aliases",
                 "detectors",
                 "templates",
-                "draftables"
+                "draftables",
+                "workflow_draftables"
               ],
               "additionalProperties": false
             }
@@ -38313,7 +38321,6 @@
             }
           },
           "based_on": {
-            "minItems": 1,
             "type": "array",
             "items": {
               "type": "string",
@@ -39489,6 +39496,86 @@
         },
         "required": [
           "quotes"
+        ],
+        "additionalProperties": false
+      },
+      "InternalGraphQueryRequest": {
+        "title": "InternalGraphQueryRequest",
+        "x-munim-contract": "internal.graph-query.request",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "enum": [
+              "price_shock_path",
+              "dish_margin_drivers",
+              "supplier_dependency",
+              "claim_support",
+              "neighbourhood"
+            ]
+          },
+          "args": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z_]{1,40}$"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "template",
+          "args"
+        ],
+        "additionalProperties": false
+      },
+      "InternalGraphQueryResponse": {
+        "title": "InternalGraphQueryResponse",
+        "x-munim-contract": "internal.graph-query.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "rows": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "rows"
         ],
         "additionalProperties": false
       },
@@ -48570,7 +48657,8 @@
           "recently_rejected",
           "mode_above_ceiling",
           "cap_above_platform_budget",
-          "platform_budget_missing"
+          "platform_budget_missing",
+          "assignee_missing"
         ]
       },
       "AnswerEnvelope": {
@@ -49444,6 +49532,13 @@
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
                   }
+                },
+                "workflow_draftables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                  }
                 }
               },
               "required": [
@@ -49454,7 +49549,8 @@
                 "aliases",
                 "detectors",
                 "templates",
-                "draftables"
+                "draftables",
+                "workflow_draftables"
               ],
               "additionalProperties": false
             }
@@ -49528,6 +49624,13 @@
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
                 }
+              },
+              "workflow_draftables": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                }
               }
             },
             "required": [
@@ -49538,7 +49641,8 @@
               "aliases",
               "detectors",
               "templates",
-              "draftables"
+              "draftables",
+              "workflow_draftables"
             ],
             "additionalProperties": false
           },

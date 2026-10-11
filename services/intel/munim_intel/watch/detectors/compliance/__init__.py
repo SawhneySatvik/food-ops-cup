@@ -4,13 +4,14 @@ Every date a detector mints with is the outlet's business date from core's one t
 temperature readings and waste in the outlet's own zone and cutoff, so expiry, excursions and checklists are judged in
 outlet time.
 
-Not here yet: `compliance.licence_expiring`, whose `required_kinds` param is the country pack's `licence_kinds`. The
-run-frame carries only integer thresholds, and naming kinds in code would be country logic (R21). Also not here: the
-`goals.task.create` draft, which needs an assignee member that no template carries. Both are reported.
+`compliance.licence_expiring` mints with the run-frame's `licence_kinds` (rule 7: no kind named in code). Licence expiry
+and missed logs draft `goals.task.create.v1` for the outlet's manager (`tasks.py`; 0023's `manager_member_id` cell), or
+abstain `assignee_missing` where the outlet has none.
 """
 
 from munim_intel.watch.detectors.compliance import amc_waste as amc_waste
 from munim_intel.watch.detectors.compliance import energy_drift as energy_drift
+from munim_intel.watch.detectors.compliance import licence_expiring as licence_expiring
 from munim_intel.watch.detectors.compliance import maintenance_overdue as maintenance_overdue
 from munim_intel.watch.detectors.compliance import missed_logs as missed_logs
 from munim_intel.watch.detectors.compliance import temp_excursion as temp_excursion

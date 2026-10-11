@@ -1,12 +1,10 @@
 """`finance.gst_mismatch` (packs/finance.md §4, §5; plant F6 — not plantable today, detector-map.json pack_cases F6).
 
-Template `finance.gst_check` (version 1): one row per outlet, the month's order tax against the output tax posted from
-those orders. Fires when |`diff_minor`| ≥ the pack's `abs_diff_minor_gte` (IN ₹10, AU A$1), either sign. Severity at
-least `high` (filing risk), above that L on |diff|. Dedupe `<outlet>:<month>` from the row's outlet. No draft (pack §6).
-
-Version 1 has no `outlet_id` param (its params_schema refuses one), so each outlet's window mints the tenant-wide
-snapshot and the finding is filed tenant-wide; a repeat within the run merges under the same key. An `outlet_id` param
-is requested from the migrator (narrow per outlet, as the other finance templates do).
+Template `finance.gst_check` **version 2** (migration 0023 F4): one row per outlet, the month's order tax against the
+output tax posted from those orders. Each outlet's window passes its own `outlet_id`, which narrows both sides, so the
+snapshot — and the finding cut from it — belong to that outlet (core mints a one-outlet param under that outlet's scope).
+Fires when |`diff_minor`| ≥ the pack's `abs_diff_minor_gte` (IN ₹10, AU A$1), either sign. Severity at least `high`
+(filing risk), above that L on |diff|. Dedupe `<outlet>:<month>` from the row's outlet. No draft (pack §6).
 """
 
 from __future__ import annotations
@@ -19,7 +17,10 @@ MONTHS_BACK = 2
 
 
 def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
-    return [Window({"period_month": m.isoformat()}, m.isoformat()[:7]) for m in month_starts(outlet.business_date, MONTHS_BACK)]
+    return [
+        Window({"period_month": m.isoformat(), "outlet_id": outlet.id}, m.isoformat()[:7])
+        for m in month_starts(outlet.business_date, MONTHS_BACK)
+    ]
 
 
 def fires(row: Row, t: Thresholds) -> bool:

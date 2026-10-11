@@ -11,7 +11,7 @@ import sys
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -20,6 +20,7 @@ from bridge import Bridge, BridgeReader, BridgeWriter
 from conftest import REPO
 from munim_intel.contracts_gen.models import Edge
 from munim_intel.graph import Graph, GraphError, PostgresGraph, project
+from munim_intel.runtime.internal_client import CoreError
 
 
 def run(coro: Any) -> Any:
@@ -85,8 +86,11 @@ def graph_database() -> Iterator[Backend]:
 @pytest.fixture(params=["postgres", "graphdb"])
 def backend(request: pytest.FixtureRequest, bridge: Bridge, first_load: Any) -> Iterator[Backend]:
     if request.param == "postgres":
-        yield Backend("postgres", PostgresGraph(BridgeWriter(bridge, "A"), BridgeReader(bridge, "A")),
-                      PostgresGraph(BridgeWriter(bridge, "B"), BridgeReader(bridge, "B")))
+        yield Backend(
+            "postgres",
+            PostgresGraph(BridgeWriter(bridge, "A"), BridgeReader(bridge, "A")),
+            PostgresGraph(BridgeWriter(bridge, "B"), BridgeReader(bridge, "B")),
+        )
     else:
         yield from graph_database()
 
@@ -113,7 +117,10 @@ def test_depth_is_capped_by_the_argument_and_the_cap(backend: Backend) -> None:
 
 def test_a_tenant_id_or_any_other_argument_is_refused(backend: Backend) -> None:
     bad: list[dict[str, Any]] = [
-        {"ingredient_id": fx.RICE, "tenant_id": fx.uid(99)}, {"ingredient_id": "not-a-uuid"}, {"ingredient_id": fx.RICE, "x": 1}, {},
+        {"ingredient_id": fx.RICE, "tenant_id": fx.uid(99)},
+        {"ingredient_id": "not-a-uuid"},
+        {"ingredient_id": fx.RICE, "x": 1},
+        {},
     ]
     for args in bad:
         with pytest.raises(GraphError):
@@ -183,3 +190,15 @@ def test_rls_isolates_tenants_under_the_service_role(bridge: Bridge, first_load:
     args, expected = fx.EXPECTED[template]
     g = PostgresGraph(BridgeWriter(bridge, "A"), BridgeReader(bridge, "A", role="svc"))
     assert tuples(template, run(g.query(template, args))) == sorted(expected, key=repr)
+
+
+def test_core_refuses_what_check_args_refuses_and_another_tenant_gets_no_rows(bridge: Bridge, first_load: Any) -> None:
+    """The real `graph:query` route, bypassing intel's own check_args: core refuses a tenant_id (or any other key) by
+    itself (422), and tenant B asking about A's finding and A's dosa gets 200 with 0 rows. Paired: A gets its rows."""
+    a, b = BridgeReader(bridge, "A"), BridgeReader(bridge, "B")
+    with pytest.raises(CoreError) as e:
+        run(a.graph_query("price_shock_path", {"ingredient_id": fx.RICE, "tenant_id": bridge.ready["B"]["tenant"]}))
+    assert e.value.status == 422
+    args, expected = fx.EXPECTED["claim_support"]
+    assert len(run(a.graph_query("claim_support", cast(dict[str, str | int], args)))) == len(expected) > 0
+    assert run(b.graph_query("claim_support", cast(dict[str, str | int], args))) == []

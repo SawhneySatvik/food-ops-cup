@@ -23,9 +23,16 @@ RECIPE_LINE = f"core.recipe_line:{uid(901)}"
 INVOICE = f"core.supplier_invoice:{uid(902)}"
 
 BASE = [
-    (O1, "outlet", "Koramangala"), (O2, "outlet", "Indiranagar"), (DOSA, "item", "Dosa"), (CHUTNEY, "item", "Chutney"),
-    (RICE, "ingredient", "Rice"), (COCO, "ingredient", "Coconut"), (OIL, "ingredient", "Oil"),
-    (S1, "supplier", "Sri Grains"), (S2, "supplier", "Kerala Coco"), (S3, "supplier", "Backup Grains"),
+    (O1, "outlet", "Koramangala"),
+    (O2, "outlet", "Indiranagar"),
+    (DOSA, "item", "Dosa"),
+    (CHUTNEY, "item", "Chutney"),
+    (RICE, "ingredient", "Rice"),
+    (COCO, "ingredient", "Coconut"),
+    (OIL, "ingredient", "Oil"),
+    (S1, "supplier", "Sri Grains"),
+    (S2, "supplier", "Kerala Coco"),
+    (S3, "supplier", "Backup Grains"),
 ]
 
 
@@ -37,12 +44,22 @@ def entities(suffix: str = "", extra: tuple[tuple[str, str, str], ...] = ()) -> 
 CORE_A = [
     CoreEdgeIn(k, s, d, RECIPE_LINE)
     for k, s, d in (
-        ("uses", DOSA, RICE), ("uses", DOSA, CHUTNEY), ("uses", DOSA, OIL), ("uses", CHUTNEY, COCO), ("uses", CHUTNEY, DOSA),
-        ("sold", O1, DOSA), ("sold", O2, CHUTNEY), ("supplies", S1, RICE), ("supplies", S3, RICE), ("supplies", S2, COCO),
+        ("uses", DOSA, RICE),
+        ("uses", DOSA, CHUTNEY),
+        ("uses", DOSA, OIL),
+        ("uses", CHUTNEY, COCO),
+        ("uses", CHUTNEY, DOSA),
+        ("sold", O1, DOSA),
+        ("sold", O2, CHUTNEY),
+        ("supplies", S1, RICE),
+        ("supplies", S3, RICE),
+        ("supplies", S2, COCO),
     )
 ]
 CORE_B = [
-    CoreEdgeIn("uses", IDLI, RICE, RECIPE_LINE), CoreEdgeIn("uses", DOSA, RICE, RECIPE_LINE), CoreEdgeIn("supplies", S2, RICE, RECIPE_LINE),
+    CoreEdgeIn("uses", IDLI, RICE, RECIPE_LINE),
+    CoreEdgeIn("uses", DOSA, RICE, RECIPE_LINE),
+    CoreEdgeIn("supplies", S2, RICE, RECIPE_LINE),
 ]
 CLAIMS = [ClaimIn(C1, S1, RICE, "raised_price"), ClaimIn(C2, S1, None, "denies_price_rise", contradicts=(C1,))]
 FINDING = FindingIn(F1, INVOICE, about=(RICE,), supported_by=(C1,))
@@ -56,8 +73,18 @@ NODES_A = 13  # 10 entities + claim:C1, claim:C2, finding:F1
 def claim_rows(message: str, body: str) -> list[dict[str, Any]]:
     quote = body[:6]
     return [
-        {"id": c.id, "chunk_id": None, "message_id": message, "span_start": 0, "span_end": 6, "quote": quote,
-         "subject_entity_id": c.subject_entity_id, "predicate": c.predicate, "object": None, "object_entity_id": c.object_entity_id}
+        {
+            "id": c.id,
+            "chunk_id": None,
+            "message_id": message,
+            "span_start": 0,
+            "span_end": 6,
+            "quote": quote,
+            "subject_entity_id": c.subject_entity_id,
+            "predicate": c.predicate,
+            "object": None,
+            "object_entity_id": c.object_entity_id,
+        }
         for c in CLAIMS
     ]
 
@@ -81,7 +108,9 @@ EXPECTED: dict[str, tuple[dict[str, object], list[tuple[object, ...]]]] = {
     "dish_margin_drivers": (
         {"item_id": DOSA},
         [
-            (OIL, "Oil", 1, None, None), (RICE, "Rice", 1, S3, "Backup Grains"), (RICE, "Rice", 1, S1, "Sri Grains"),
+            (OIL, "Oil", 1, None, None),
+            (RICE, "Rice", 1, S3, "Backup Grains"),
+            (RICE, "Rice", 1, S1, "Sri Grains"),
             (COCO, "Coconut", 2, S2, "Kerala Coco"),
         ],
     ),
@@ -89,16 +118,23 @@ EXPECTED: dict[str, tuple[dict[str, object], list[tuple[object, ...]]]] = {
     "claim_support": (
         {"finding_id": F1},
         [
-            (C1, claim(C1), "supports", RICE, "Rice"), (C1, claim(C1), "supports", S1, "Sri Grains"),
+            (C1, claim(C1), "supports", RICE, "Rice"),
+            (C1, claim(C1), "supports", S1, "Sri Grains"),
             (C2, claim(C2), "contradicts", S1, "Sri Grains"),
         ],
     ),
     "neighbourhood": (
         {"entity_id": RICE, "depth": 2},
         [
-            (DOSA, "item", "Dosa", 1), (S3, "supplier", "Backup Grains", 1), (S1, "supplier", "Sri Grains", 1),
-            (C1, "other", claim(C1), 1), (F1, "other", f"finding:{F1}", 1),
-            (CHUTNEY, "item", "Chutney", 2), (O1, "outlet", "Koramangala", 2), (OIL, "ingredient", "Oil", 2), (C2, "other", claim(C2), 2),
+            (DOSA, "item", "Dosa", 1),
+            (S3, "supplier", "Backup Grains", 1),
+            (S1, "supplier", "Sri Grains", 1),
+            (C1, "other", claim(C1), 1),
+            (F1, "other", f"finding:{F1}", 1),
+            (CHUTNEY, "item", "Chutney", 2),
+            (O1, "outlet", "Koramangala", 2),
+            (OIL, "ingredient", "Oil", 2),
+            (C2, "other", claim(C2), 2),
         ],
     ),
 }

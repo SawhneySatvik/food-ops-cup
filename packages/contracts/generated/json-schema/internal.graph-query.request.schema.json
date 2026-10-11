@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "internal.graph-query.request",
+  "title": "InternalGraphQueryRequest",
+  "x-munim-module": "internal",
+  "type": "object",
+  "properties": {
+    "template": {
+      "type": "string",
+      "enum": [
+        "price_shock_path",
+        "dish_margin_drivers",
+        "supplier_dependency",
+        "claim_support",
+        "neighbourhood"
+      ]
+    },
+    "args": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z_]{1,40}$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 64
+          },
+          {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "template",
+    "args"
+  ],
+  "additionalProperties": false
+}

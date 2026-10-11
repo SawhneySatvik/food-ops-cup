@@ -53,10 +53,18 @@ class Projection:
 def _edge(kind: str, src: str, dst: str, claim_id: str | None, source_ref: str | None) -> Edge:
     # The id's clock is the source row's own (a uuid7 carries its creation ms), so the same input is the same id.
     seed = f"edge:{kind}:{src}:{dst}:{claim_id or ''}:{source_ref or ''}"
-    return Edge.model_validate({
-        "id": uuid7(run_start_ms(claim_id or src), seed), "kind": kind, "src_entity_id": src, "dst_entity_id": dst,
-        "claim_id": claim_id, "source_ref": source_ref, "valid_from": None, "valid_to": None,
-    })
+    return Edge.model_validate(
+        {
+            "id": uuid7(run_start_ms(claim_id or src), seed),
+            "kind": kind,
+            "src_entity_id": src,
+            "dst_entity_id": dst,
+            "claim_id": claim_id,
+            "source_ref": source_ref,
+            "valid_from": None,
+            "valid_to": None,
+        }
+    )
 
 
 def _node(id_: str, label: str) -> Entity:

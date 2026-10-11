@@ -58,12 +58,16 @@ def test_refusal_codes_are_registered_reason_codes_named_in_the_instructions() -
     assert all(code in skill.INSTRUCTIONS_MD for code in skill.REFUSAL_CODES)
 
 
+#: The orchestrator's W3.2 graph wiring (pack §9): two graph tools, bound in both bindings (they read, never propose).
+GRAPH = {"graph_supplier_dependency", "graph_price_shock_path"}
+
+
 def test_the_read_binding_is_the_twelve_reads_and_the_draft_binding_adds_the_five_proposals() -> None:
     reads, both = names(propose=False), names(propose=True)
     print("reads:", sorted(reads), "proposes:", sorted(both - reads))
-    assert reads == READS
-    assert both == READS | PROPOSES
-    assert len(both) <= 20
+    assert reads == READS | GRAPH
+    assert both == READS | PROPOSES | GRAPH
+    assert len(both) == 19 <= 20  # 12 reads + 5 proposals + 2 graph tools (F3 cap 20)
 
 
 def test_the_skill_names_no_negotiation_tool() -> None:

@@ -180,6 +180,9 @@ try {
   for (const s of SPECIALIST_REGISTRY.specialists) {
     const foreign = s.draftables.filter((d) => !exposedActions.has(d));
     if (foreign.length) fail(`specialist ${s.id} proposes non-exposed draftables ${foreign.join(", ")}`);
+    // Workflow draftables (DECISIONS 11 Oct, W3.2) are emitted by code, never by a model: registered, and NOT agent-exposed.
+    const workflow = s.workflow_draftables.filter((d) => !draftable(d) || exposedActions.has(d));
+    if (workflow.length) fail(`specialist ${s.id} lists workflow draftables that are unregistered or agent-exposed: ${workflow.join(", ")}`);
   }
   const owned = new Set(specialists.flatMap((s) => s.templates));
   step(`unowned agent-exposed templates: ${[...exposedTemplates].filter((t) => !owned.has(t)).join(", ") || "none"}`);

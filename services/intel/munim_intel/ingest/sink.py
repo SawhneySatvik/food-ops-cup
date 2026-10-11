@@ -1,22 +1,22 @@
 """Where ingestion writes: core's `/internal/intel/v1` batch routes and `drafts` (R25 — intel never writes Postgres).
 
 `CoreSink` posts through the run's InternalClient (run token + service secret; core takes the tenant from the token).
-Batch bodies are validated against the generated contract models before they leave. The draft body goes as a plain
-object: the invoice proposal is new in contracts and the shared `contracts_gen` gains it at the next regeneration; core
-validates it either way. InternalClient has no batch methods yet (i-1's file), so this uses its one POST helper.
+Every body is validated against the generated contract model before it leaves.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 
 from munim_intel.contracts_gen.models import (
     InternalAliasesBatchRequest,
     InternalBatchResponse,
     InternalChunksBatchRequest,
     InternalClaimsBatchRequest,
+    InternalDraftsRequest,
     InternalDraftsResponse,
     InternalEmbeddingsBatchRequest,
     InternalEntitiesBatchRequest,
@@ -38,16 +38,19 @@ class IngestSink(Protocol):
     async def draft(self, body: dict[str, Any]) -> InternalDraftsResponse: ...
 
 
-class _Body(RootModel[dict[str, Any]]):
-    pass
-
-
 class CoreSink:
     def __init__(self, client: InternalClient) -> None:
         self._client = client
+        self._writers: dict[str, Callable[[Any], Awaitable[InternalBatchResponse]]] = {
+            "entities:batch": client.write_entities,
+            "aliases:batch": client.write_aliases,
+            "chunks:batch": client.write_chunks,
+            "claims:batch": client.write_claims,
+            "embeddings:batch": client.write_embeddings,
+        }
 
     async def batch(self, route: str, body: dict[str, Any]) -> InternalBatchResponse:
-        return await self._client._post(route, BATCHES[route].model_validate(body), InternalBatchResponse)
+        return await self._writers[route](BATCHES[route].model_validate(body))
 
     async def draft(self, body: dict[str, Any]) -> InternalDraftsResponse:
-        return await self._client._post("drafts", _Body(body), InternalDraftsResponse)
+        return await self._client.write_draft(InternalDraftsRequest.model_validate(body))

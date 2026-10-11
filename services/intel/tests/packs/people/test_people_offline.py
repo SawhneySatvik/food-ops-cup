@@ -53,9 +53,15 @@ def ot(staff: str, week: str, extra: int, cost: int) -> dict[str, Any]:
     }
 
 
+def sigma(staff: str, extra: int, cost: int, rostered: int = 9600) -> dict[str, Any]:
+    """The member's Σ row (0023 P1: `iso_week` NULL, first), totals typed by hand from the week rows below it."""
+    return {**ot(staff, "", extra, cost), "iso_week": None, "rostered_min": rostered, "attended_min": rostered + extra}
+
+
 def test_overtime_drift_needs_600_minutes_in_four_weeks_and_a_growing_last_week() -> None:
     rows = [
-        # STAFF: 100 + 150 + 150 + 200 = 600 min, and W41 (200) > W38 (100) → fires on the W41 row.
+        # Σ rows first (0023 P1). STAFF: 100 + 150 + 150 + 200 = 600 min, and W41 (200) > W38 (100) → fires on the W41 row.
+        sigma(STAFF, 600, 180_000), sigma(STAFF_B, 600, 180_000, 7200),
         ot(STAFF, "2026-W38", 100, 30_000), ot(STAFF, "2026-W39", 150, 45_000), ot(STAFF, "2026-W40", 150, 45_000),
         ot(STAFF, "2026-W41", 200, 60_000),
         # STAFF_B: 300 + 300 = 600 min but the last week (W41: 0 extra, a row) is not above the first (W38: 300).
@@ -63,23 +69,33 @@ def test_overtime_drift_needs_600_minutes_in_four_weeks_and_a_growing_last_week(
     ]  # fmt: skip
     core = sweep(lambda t, p: rows if t == "people.overtime_drift" and (p["from"], p["to"]) == ("2026-09-14", "2026-10-10") else [])
     (f,) = found(core, "people.overtime_drift")
-    # Four-week Σ cost 180,000 → low (< 200,000). The impact is the W41 row's own extra_cost_minor.
+    # Four-week Σ cost 180,000 → low (< 200,000). The impact is STAFF's Σ row (row 0), pack §5's "4-week Σ row".
     assert (f["dedupe_key"], f["severity"], f["impact_row"], f["impact_column"]) == (
         f"people.overtime_drift:{OUTLET}:{STAFF}:2026-w41",
         "low",
-        3,
+        0,
         "extra_cost_minor",
     )
 
 
 def test_overtime_drift_one_minute_short_finds_nothing() -> None:
-    rows = [ot(STAFF, "2026-W38", 99, 0), ot(STAFF, "2026-W39", 150, 0), ot(STAFF, "2026-W40", 150, 0), ot(STAFF, "2026-W41", 200, 0)]
+    weeks = [ot(STAFF, "2026-W38", 99, 0), ot(STAFF, "2026-W39", 150, 0), ot(STAFF, "2026-W40", 150, 0), ot(STAFF, "2026-W41", 200, 0)]
+    rows = [sigma(STAFF, 599, 0), *weeks]
     assert found(sweep(lambda t, _: rows if t == "people.overtime_drift" else []), "people.overtime_drift") == []
+
+
+def test_overtime_drift_reads_the_sigma_cell_not_a_sum_of_week_rows() -> None:
+    """Paired accept/refuse on the Σ cell alone: the same week rows fire when the Σ row says 600, not when it says 599."""
+    weeks = [ot(STAFF, "2026-W38", 100, 0), ot(STAFF, "2026-W41", 200, 0)]
+    kind = "people.overtime_drift"
+    got = [len(found(sweep(lambda t, _, s=s: [sigma(STAFF, s, 0), *weeks] if t == kind else []), kind)) for s in (600, 599)]
+    assert got == [1, 0]
 
 
 def test_overtime_drift_ignores_rostered_long_shifts_p7() -> None:
     # P7 trap: festival-week long shifts were rostered and worked as rostered — no extra minutes in any week.
-    rows = [{**ot(STAFF, w, 0, 0), "rostered_min": 4200, "attended_min": 4200} for w in ("2026-W38", "2026-W39", "2026-W40", "2026-W41")]
+    weeks = ("2026-W38", "2026-W39", "2026-W40", "2026-W41")
+    rows = [sigma(STAFF, 0, 0, 16800), *({**ot(STAFF, w, 0, 0), "rostered_min": 4200, "attended_min": 4200} for w in weeks)]
     assert found(sweep(lambda t, _: rows if t == "people.overtime_drift" else []), "people.overtime_drift") == []
 
 
@@ -157,7 +173,7 @@ def test_advance_unrecovered_is_in_only_and_fires_from_two_thousand_rupees_after
 
 def test_every_people_finding_and_trace_carries_the_people_specialist() -> None:
     rows = {
-        "people.overtime_drift": [ot(STAFF, "2026-W38", 0, 0), ot(STAFF, "2026-W41", 700, 210_000)],
+        "people.overtime_drift": [sigma(STAFF, 700, 210_000), ot(STAFF, "2026-W38", 0, 0), ot(STAFF, "2026-W41", 700, 210_000)],
         "people.advances_open": [{"staff_id": STAFF, "outstanding_minor": 1_500_000, "days_since_given": 90}],
     }
     core = sweep(lambda t, _: rows.get(t, []))

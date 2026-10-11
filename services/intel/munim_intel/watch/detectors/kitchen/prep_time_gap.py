@@ -1,20 +1,19 @@
 """`kitchen.prep_time_gap` (packs/kitchen.md §4, §5, §6; plant K4 — not plantable today, T-086: a fixture).
 
-Template `kitchen.ticket_times` over the last `window_days` (14) business days. The pack judges an item at a station;
-the template's rows are per station, item **and** 30-minute slot (its §3 purpose line), with the configured prep time
-beside each. A row qualifies when `configured_prep_sec` is set, `tickets` ≥ `tickets_gte` (50) and |`p80_sec` −
-`configured_prep_sec`| ≥ `abs_gap_sec_gte` (180 s); one finding per station and item, on its qualifying row with the
-most tickets (the busiest slot; ties → the earlier slot), because p80s of different slots cannot be combined.
-Severity `medium` when slower than promised, else `low` (non-₹: the impact is `p80_sec`). Dedupe
-`<outlet>:<item>:<station>`. Draft `kitchen.prep_time.set.v1`: `prep_sec` ← that row's `p80_sec`, from tomorrow.
+Template `kitchen.ticket_times` **version 2** (migration 0023 K1) over the last `window_days` (14) business days. The
+pack judges an item at a station over the window; v2 puts one row per station and item over the whole window first
+(`slot_start` NULL, its own p50/p80 — slot p80s cannot be combined), then v1's per-slot rows, which this detector does
+not read. A whole-window row qualifies when `configured_prep_sec` is set, `tickets` ≥ `tickets_gte` (50) and |`p80_sec` −
+`configured_prep_sec`| ≥ `abs_gap_sec_gte` (180 s). Severity `medium` when slower than promised, else `low` (non-₹: the
+impact is `p80_sec`). Dedupe `<outlet>:<item>:<station>`. Draft `kitchen.prep_time.set.v1`: `prep_sec` ← that row's
+`p80_sec`, from tomorrow.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import timedelta
 
-from munim_intel.detect import DetectorSpec, Hit, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
+from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
 from munim_intel.mapping import Detection, Proposal
 from munim_intel.watch.detectors.kitchen.weeks import KITCHENS
 
@@ -28,8 +27,8 @@ def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
 
 def fires(row: Row, t: Thresholds) -> bool:
     p80, configured, tickets = num(row, "p80_sec"), num(row, "configured_prep_sec"), num(row, "tickets")
-    if not isinstance(row.get("item_id"), str) or not isinstance(row.get("station"), str):
-        return False
+    if not isinstance(row.get("item_id"), str) or not isinstance(row.get("station"), str) or row.get("slot_start") is not None:
+        return False  # a per-slot row (0023 K1): the whole-window row of the same item and station is the judgement
     if p80 is None or configured is None or tickets is None:
         return False  # no configured prep time: nothing promised to compare against
     return tickets >= t["tickets_gte"] and abs(p80 - configured) >= t["abs_gap_sec_gte"]
@@ -37,16 +36,6 @@ def fires(row: Row, t: Thresholds) -> bool:
 
 def severity(row: Row, _: Thresholds, __: Ladder) -> Severity:
     return "medium" if (num(row, "p80_sec") or 0) > (num(row, "configured_prep_sec") or 0) else "low"
-
-
-def select(rows: Sequence[Row], _: Window, t: Thresholds, ladder: Ladder) -> list[Hit]:
-    best: dict[tuple[str, str], int] = {}
-    for i, r in enumerate(rows):
-        if fires(r, t):
-            key = (str(r["station"]), str(r["item_id"]))
-            if key not in best or (num(r, "tickets") or 0) > (num(rows[best[key]], "tickets") or 0):
-                best[key] = i
-    return [Hit(i, i, severity(rows[i], t, ladder)) for i in sorted(best.values())]
 
 
 def dedupe(row: Row, w: Window) -> str:
@@ -84,11 +73,10 @@ SPEC = register(
         dedupe=dedupe,
         narration=(
             "This dish at this station is promised in {configured_prep_sec} seconds, but slow tickets take {p80_sec} seconds "
-            "over {tickets} tickets in this slot."
+            "over {tickets} tickets in the window."
         ),
         watches=frozenset({TICKET_ADVANCED}),
         outlet_kinds=KITCHENS,
         mapping=prep_time,
-        select=select,
     )
 )

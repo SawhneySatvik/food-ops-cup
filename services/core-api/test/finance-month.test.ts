@@ -44,17 +44,21 @@ const call = async (method: string, path: string, who: Who, body?: unknown): Pro
   })) as Res;
 const envelope = (type: string, payload: Record<string, unknown>, key = `fin-${uuidv7()}`) => ({ command_id: uuidv7(), idempotency_key: key, type, payload });
 
+/** Runs the version this file's FINANCE_TEMPLATES declares (finance.gst_check is v2 since 0023). */
+const versionOf = (id: string) => FINANCE_TEMPLATES.find((t) => t.id === id)!.version;
 async function template(id: string, params: Record<string, unknown>) {
-  return db.withContext("munim_core", own(fx, "drafts.approve.v1"), (c) => runTemplate(c, id, 1, params));
+  return db.withContext("munim_core", own(fx, "drafts.approve.v1"), (c) => runTemplate(c, id, versionOf(id), params));
 }
 const byKey = <R extends Record<string, unknown>>(rows: R[], k: string) => Object.fromEntries(rows.map((r) => [String(r[k]), r]));
 
 beforeAll(async () => {
   db = await openDb();
   fx = await buildFinanceTenant(db, "IN");
-  // W3/M-C installs these templates; the gate installs the same rows into this clone.
+  // W3/M-C installs these templates; the gate runs THIS file's SQL in this clone (the migration's copy is replaced here, so
+  // a drift between read.ts and the migration fails the answer keys below rather than hiding behind the migration's SQL).
   for (const t of FINANCE_TEMPLATES) {
-    await db.admin(`INSERT INTO evidence.snapshot_template (id, version, sql, params_schema, columns, min_role) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id, version) DO NOTHING`,
+    await db.admin(`INSERT INTO evidence.snapshot_template (id, version, sql, params_schema, columns, min_role) VALUES ($1, $2, $3, $4, $5, $6)
+                    ON CONFLICT (id, version) DO UPDATE SET sql = EXCLUDED.sql`,
       [t.id, t.version, t.sql, JSON.stringify(t.params_schema), JSON.stringify(t.columns), t.min_role]);
   }
   pools = { core: db.pool("munim_core", 6), svc: db.pool("munim_svc", 2) };
@@ -130,8 +134,17 @@ describe("P&L of the fixture month = answer key (finance.pnl template)", () => {
 
 describe("GST read models = answer key", () => {
   it("finance.gst_check: own-liability order tax 5000 + 900 = 5900 = posted; aggregator (operator pays) excluded", async () => {
-    const r = await template("finance.gst_check", { period_month: M });
+    const r = await template("finance.gst_check", { period_month: M, outlet_id: null });
     expect(r.rows).toEqual([{ outlet_id: fx.outlets[0], order_tax_minor: 5900, posted_tax_minor: 5900, diff_minor: 0 }]);
+  });
+
+  it("finance.gst_check v2: outlet_id narrows both sides (A → its row; B, aggregator-only, → none); the installed v2 has this file's params and columns", async () => {
+    expect((await template("finance.gst_check", { period_month: M, outlet_id: fx.outlets[0] })).rows)
+      .toEqual([{ outlet_id: fx.outlets[0], order_tax_minor: 5900, posted_tax_minor: 5900, diff_minor: 0 }]);
+    expect((await template("finance.gst_check", { period_month: M, outlet_id: fx.outlets[1] })).rows).toEqual([]);
+    const t = FINANCE_TEMPLATES.find((x) => x.id === "finance.gst_check")!;
+    const installed = (await db.admin(`SELECT params_schema, columns FROM evidence.snapshot_template WHERE id = $1 AND version = $2`, [t.id, t.version])).rows[0]!;
+    expect([installed.params_schema, installed.columns]).toEqual([t.params_schema, t.columns]);
   });
 
   it("finance.gst_summary: output tax 5000 + 900 − 500 refunded = 5400; no input tax (IN chart)", async () => {
@@ -159,7 +172,7 @@ describe("AU tenant: pack-driven branches through the database", () => {
       [A]: { key: A, output_tax_minor: 890, input_tax_minor: 0, net_payable_minor: 890 },
       unassigned: { key: "unassigned", output_tax_minor: 0, input_tax_minor: 20400, net_payable_minor: -20400 },
     });
-    const chk = await db.withContext("munim_core", own(au, "drafts.approve.v1"), (c) => runTemplate(c, "finance.gst_check", 1, { period_month: month }));
+    const chk = await db.withContext("munim_core", own(au, "drafts.approve.v1"), (c) => runTemplate(c, "finance.gst_check", 2, { period_month: month, outlet_id: null }));
     expect(chk.rows).toEqual([{ outlet_id: A, order_tax_minor: 1000, posted_tax_minor: 1000, diff_minor: 0 }]);
   });
 });

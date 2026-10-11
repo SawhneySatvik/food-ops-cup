@@ -1,17 +1,19 @@
 """`finance.tender_gap` (packs/finance.md §4, §5; plant F5; answer key RG-F5). No draft (pack §6 maps none).
 
-Template `finance.tender_vs_bank` **version 2** (requested from the migrator: tests/packs/finance/
-requested_templates_v2.sql), minted per outlet and method (UPI and card: the counter money a bank statement credits,
-pack §1; cash reaches the bank as deposits, not per-day credits) over the current ISO week and the five before it.
+Template `finance.tender_vs_bank` **version 2** (migration 0023 F3), minted per outlet and method (UPI and card: the
+counter money a bank statement credits, pack §1; cash reaches the bank as deposits, not per-day credits) over the
+current ISO week and the five before it.
 Version 2 puts one Σ row per ISO week first (`business_on` null, `week_start`, `gap_days`): the sums over the week's gap
 days — days the statement reaches whose gap is at least the pack's `gap_minor_gte` (₹500, A$10), read by the template
 from the same pack. A week with no credit the statement reaches has no Σ row, so a missing statement is never a gap
-(pack §7 `bank_lines_missing`). On version 1 (no Σ row) this detector never fires.
+(pack §7 `bank_lines_missing`).
 
 Fires on a week's Σ row with `gap_days` ≥ the pack's `gap_days_gte` (3 of the ISO week's 7 days). Impact: the week's Σ
 `gap_minor` (RG-F5's key is the three weekly sums). Severity L on it; `critical` when the gap days share one
-`shift_member_id` and their voids reach the pack's `critical_voids_vs_median_bp_gte` (2×) of the outlet's median per
-day — Σ voids × 10,000 ≥ bp × median × gap days. Dedupe `<outlet>:<method>:<iso_week>`. Names shifts, never motives.
+`shift_member_id` and their voids reach the pack's `critical_voids_vs_median_bp_gte` (2×) of the Σ row's
+`outlet_median_voids` — which 0023 already states as the per-day median × `gap_days`, so Σ voids × 10,000 ≥ bp × that
+cell compares a week's gap days with as many median days (multiplying by `gap_days` again would count the days twice).
+Dedupe `<outlet>:<method>:<iso_week>`. Names shifts, never motives.
 """
 
 from __future__ import annotations
@@ -39,13 +41,12 @@ def fires(row: Row, t: Thresholds) -> bool:
 
 
 def severity(row: Row, t: Thresholds, ladder: Ladder) -> Severity:
-    voids, median, days = num(row, "voids"), num(row, "outlet_median_voids"), num(row, "gap_days")
+    voids, median = num(row, "voids"), num(row, "outlet_median_voids")
     if (
         isinstance(row.get("shift_member_id"), str)
         and voids is not None
         and median is not None
-        and days is not None
-        and voids * 10_000 >= t["critical_voids_vs_median_bp_gte"] * median * days
+        and voids * 10_000 >= t["critical_voids_vs_median_bp_gte"] * median
     ):
         return "critical"
     return ladder.of(num(row, "gap_minor") or 0)

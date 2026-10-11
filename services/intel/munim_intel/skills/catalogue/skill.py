@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from google.adk.tools.base_tool import BaseTool
 
+from munim_intel.graph.tools import build_graph_tools
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.tools.generated import build_toolset
@@ -42,11 +43,12 @@ READ_TEMPLATES = (
 DRAFTABLES = ("catalogue.price.set.v1", "catalogue.recipe.version.create.v1", "catalogue.deal.end.v1")
 #: The pack §7 refusals this skill names when it cannot verify a margin.
 REFUSAL_CODES = ("recipe_missing", "cost_price_missing")
-#: packs/catalogue.md §9.
-GRAPH_TEMPLATES = ("dish_margin_drivers", "price_shock_path")
+#: Bound as `graph_*` tools (W3.2 wiring, the orchestrator's assignment). packs/catalogue.md §9 names
+#: dish_margin_drivers and price_shock_path; price_shock_path is bound under inventory_purchasing (reported).
+GRAPH_TEMPLATES = ("dish_margin_drivers", "neighbourhood")
 SHARED_TOOLS: tuple[str, ...] = ()
 
 
 def toolset(ctx: RunContext, client: InternalClient, handles: HandleTable, *, propose: bool) -> list[BaseTool]:
     """The skill's generated tools; `propose` only on a `draft_request` with this skill alone loaded (T-082a's rule)."""
-    return build_toolset(PACK, ctx, client, handles, propose=propose)
+    return build_toolset(PACK, ctx, client, handles, propose=propose) + build_graph_tools(GRAPH_TEMPLATES, client, handles)

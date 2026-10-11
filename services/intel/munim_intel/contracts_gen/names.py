@@ -151,6 +151,8 @@ CONTRACTS: dict[str, str] = {
     "internal.forecasts-batch.request": "InternalForecastsBatchRequest",
     "internal.forecasts-batch.response": "InternalForecastsBatchResponse",
     "internal.quotes-batch.request": "InternalQuotesBatchRequest",
+    "internal.graph-query.request": "InternalGraphQueryRequest",
+    "internal.graph-query.response": "InternalGraphQueryResponse",
     "internal.spend.request": "InternalSpendRequest",
     "internal.run-frame.response": "InternalRunFrameResponse",
     "inventory.ingredient.upsert.v1": "InventoryIngredientUpsertV1",

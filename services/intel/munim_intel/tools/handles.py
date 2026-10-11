@@ -3,6 +3,7 @@ through the tool factories' closures, so handles never need re-basing.
 
     S<n>            a snapshot minted in this run        S<n>.r<i>.<column>   one of its cells
     D<n>            a document / chunk / claim cite       F<n>                 a finding          P<n>   a draft
+    G<n>            a graph node a graph tool returned (an intel.entity id)
 
 The model writes handles; the tool layer expands them before anything reaches core-api:
   • a payload leaf or `{S2.r3.unit_price_minor}` in prose → the canonical ref ⟨snap:<uuid>·3·unit_price_minor⟩;
@@ -25,6 +26,7 @@ SNAPSHOT = re.compile(rf"^S({_N})$")
 DOC = re.compile(rf"^D({_N})$")
 FINDING = re.compile(rf"^F({_N})$")
 DRAFT = re.compile(rf"^P({_N})$")
+NODE = re.compile(rf"^G({_N})$")
 #: A handle written in prose: {S2.r3.col} or {D1}.
 PROSE_HANDLE = re.compile(rf"\{{(S{_N}\.r{_INDEX}\.[a-z_][a-z0-9_]*|D{_N})\}}")
 
@@ -47,6 +49,7 @@ class HandleTable:
         self._docs: list[str] = []
         self._findings: list[str] = []
         self._drafts: list[str] = []
+        self._nodes: list[str] = []
 
     # -- minting --------------------------------------------------------------------------------------------
 
@@ -84,6 +87,9 @@ class HandleTable:
 
     def add_draft(self, draft_id: str) -> str:
         return self._add("P", self._drafts, draft_id)
+
+    def add_node(self, entity_id: str) -> str:
+        return self._add("G", self._nodes, entity_id)
 
     # -- reading --------------------------------------------------------------------------------------------
 
@@ -145,6 +151,18 @@ class HandleTable:
         if n > len(self._findings):
             raise HandleError(f"{handle} does not exist in this run. Known: {_range('F', len(self._findings))}.")
         return self._findings[n - 1]
+
+    def entity_id(self, handle: str) -> str:
+        """A graph start: a node (G<n>), a finding (F<n> — a finding node reuses the finding's id) or an id cell."""
+        m = NODE.match(handle)
+        if m:
+            n = int(m.group(1))
+            if n > len(self._nodes):
+                raise HandleError(f"{handle} does not exist in this run. Known: {_range('G', len(self._nodes))}.")
+            return self._nodes[n - 1]
+        if FINDING.match(handle):
+            return self.finding_id(handle)
+        return self.literal_id(handle)
 
     def expand_text(self, text: str) -> str:
         """Replace every resolvable {S<n>.r<i>.<col>} / {D<n>} with its canonical ref; leave the rest untouched."""

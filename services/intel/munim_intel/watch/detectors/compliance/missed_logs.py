@@ -11,7 +11,8 @@ log". Severity is `medium`, or `high` below `high_coverage_bp_lt` (6,000).
 
 The dedupe key is `<outlet>:<checklist>:<iso_week>`, with `temp_log` standing in for the temperature row and the window's
 last day giving the week. `coverage_bp` is the finding itself, not how complete the records are, so it is not used as
-confidence. No draft yet: the pack §6 task draft needs an assignee member that no template carries (reported).
+confidence. Draft (pack §6): a `goals.task.create.v1` "fix log discipline" for the outlet's manager (0023 L2
+`manager_member_id`), due the outlet's next business day (`tasks.py`; no manager → `assignee_missing`).
 """
 
 from __future__ import annotations
@@ -19,6 +20,10 @@ from __future__ import annotations
 from datetime import timedelta
 
 from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
+from munim_intel.mapping import Abstain, Detection, Proposal
+from munim_intel.watch.detectors.compliance.tasks import task
+
+TITLE = "goals.task.fix_log_discipline"
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
@@ -45,6 +50,10 @@ def dedupe(row: Row, w: Window) -> str:
     return f"{w.params['outlet_id']}:{row.get('checklist_id') or 'temp_log'}:{w.key}"
 
 
+def fix_logs(d: Detection) -> Proposal | Abstain:
+    return task(d, TITLE, "coverage_bp", d.outlet.business_date + timedelta(days=1))
+
+
 SPEC = register(
     DetectorSpec(
         id="compliance.missed_logs",
@@ -60,5 +69,6 @@ SPEC = register(
             "Records for this log were kept on fewer days than expected last week: {coverage_bp} coverage. "
             "These are evidence records, not a certificate."
         ),
+        mapping=fix_logs,
     )
 )

@@ -1,5 +1,6 @@
-"""Finance specialist detectors (packs/finance.md §4): all five. Three read the version-2 templates requested from the
-migrator (tests/packs/finance/requested_templates_v2.sql) and stay silent on version 1."""
+"""Finance specialist detectors (packs/finance.md §4): all five. Four read the version-2 templates of migration 0023
+(M-C1e: settlement_vs_orders, missing_payouts, tender_vs_bank Σ rows first; gst_check's outlet_id) — core mints the
+latest version, so a detector reads exactly those shapes."""
 
 from munim_intel.watch.detectors.finance import gst_mismatch as gst_mismatch
 from munim_intel.watch.detectors.finance import missing_payout as missing_payout

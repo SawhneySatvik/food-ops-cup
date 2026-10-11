@@ -1,18 +1,22 @@
-"""pg_bridge.mts from Python: embedded Postgres + core-api's batch writers as a subprocess, spoken to in JSON lines.
-The writer and reader here are the test stand-ins for InternalClient (writes) and core's graph read (SQL under the
-run token's tenant); the SQL they run is the adapter's own `sql/<template>.sql`."""
+"""pg_bridge.mts from Python: embedded Postgres + core-api's batch writers and app as a subprocess, spoken to in JSON
+lines. Writes are core's batch writers; the service-role reader is the real InternalClient over core's real
+`graph:query` route (run token + service secret, munim_svc); the admin reader runs core's own graph statement as the
+superuser, so only the templates' tenant predicates isolate there."""
 
 from __future__ import annotations
 
 import json
 import shutil
 import subprocess
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from munim_intel.contracts_gen.models import InternalBatchResponse, InternalEdgesBatchRequest, InternalEntitiesBatchRequest
-from munim_intel.graph import Row, template_sql
+from munim_intel.graph import Row
+from munim_intel.runtime.context import RunContext
+from munim_intel.runtime.internal_client import InternalClient
 
 HERE = Path(__file__).resolve().parent
 
@@ -77,10 +81,42 @@ class BridgeWriter:
         return self._write("claims", {"claims": claims})
 
 
+class _Transport(httpx.AsyncBaseTransport):
+    """core-api's app, in-process inside the bridge; the bridge adds the world's run token and the service secret."""
+
+    def __init__(self, bridge: Bridge, world: str) -> None:
+        self._b, self._w = bridge, world
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        body = (await request.aread()).decode() or None
+        out = self._b.call(
+            "http",
+            world=self._w,
+            method=request.method,
+            path=request.url.raw_path.decode(),
+            headers={"content-type": "application/json"},
+            body=body,
+        )
+        return httpx.Response(out["status"], content=out["body"].encode(), headers={"content-type": "application/json"})
+
+
+#: A context for the client; core reads the tenant from the bridge's token, never from here.
+CTX = RunContext(
+    "01920000-0000-7000-8000-0000000058a1", "01920000-0000-7000-8000-0000000058a2", ("*",), "ask", "member:test", 2_000_000_000, "t"
+)
+
+
 class BridgeReader:
+    """role "svc": InternalClient.graph_query through core's real route. role "admin": core's statement as superuser."""
+
     def __init__(self, bridge: Bridge, world: str, role: str = "svc") -> None:
         self._b, self._w, self._role = bridge, world, role
+        self._client = InternalClient(
+            CTX, base_url="http://core.test", service_secret="bridge-adds-it", transport=_Transport(bridge, world)
+        )
 
-    async def read(self, name: str, params: Mapping[str, str | int]) -> list[Row]:
-        rows: list[Row] = self._b.call("read", world=self._w, sql=template_sql(name), params=dict(params), **{"as": self._role})
+    async def graph_query(self, template: str, args: dict[str, str | int]) -> list[Row]:
+        if self._role == "svc":
+            return await self._client.graph_query(template, args)
+        rows: list[Row] = self._b.call("admin_graph", world=self._w, template=template, args=dict(args))
         return rows

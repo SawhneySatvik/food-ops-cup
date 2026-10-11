@@ -207,7 +207,8 @@
                           "recently_rejected",
                           "mode_above_ceiling",
                           "cap_above_platform_budget",
-                          "platform_budget_missing"
+                          "platform_budget_missing",
+                          "assignee_missing"
                         ]
                       },
                       {

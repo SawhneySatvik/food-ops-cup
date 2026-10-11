@@ -91,6 +91,9 @@ class Proposal:
     targets: list[str]
     #: Top-level payload keys that take a minted new-entity id.
     minted: list[str] = field(default_factory=list)
+    #: The draft's target outlets when they are not the detection's outlet (a coupon's own outlet list; `[]` = tenant-wide,
+    #: which only an owner approves). None → `[detection outlet]`.
+    outlet_ids: list[str] | None = None
 
 
 DraftMapping = Callable[[Detection], Proposal | Abstain | None]
@@ -116,7 +119,7 @@ def draft_body(pack: str, finding_id: str, d: Detection, p: Proposal) -> dict[st
         "pack": pack,
         "command_type": p.command_type,
         "payload": payload,
-        "outlet_ids": [d.outlet.id],
+        "outlet_ids": [d.outlet.id] if p.outlet_ids is None else p.outlet_ids,
         "finding_id": finding_id,
         "evidence": evidence,
         "based_on": p.based_on,

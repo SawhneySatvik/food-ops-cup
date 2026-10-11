@@ -64,6 +64,13 @@
               "type": "string",
               "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
             }
+          },
+          "workflow_draftables": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+            }
           }
         },
         "required": [
@@ -74,7 +81,8 @@
           "aliases",
           "detectors",
           "templates",
-          "draftables"
+          "draftables",
+          "workflow_draftables"
         ],
         "additionalProperties": false
       }

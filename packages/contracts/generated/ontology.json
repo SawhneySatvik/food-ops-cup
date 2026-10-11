@@ -13385,7 +13385,7 @@
     },
     {
       "id": "compliance.licence_calendar",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_compliance_licence_calendar",
@@ -13437,6 +13437,14 @@
         {
           "name": "missing",
           "type": "boolean"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        },
+        {
+          "name": "manager_member_id",
+          "type": "uuid"
         }
       ],
       "model_schema": {
@@ -13472,7 +13480,7 @@
     },
     {
       "id": "compliance.log_coverage",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_compliance_log_coverage",
@@ -13536,6 +13544,10 @@
           "name": "temp_logged",
           "type": "integer",
           "numeric_source": "count:core.temp_log"
+        },
+        {
+          "name": "manager_member_id",
+          "type": "uuid"
         }
       ],
       "model_schema": {
@@ -13867,7 +13879,7 @@
     },
     {
       "id": "customers.coupon_current",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_customers_coupon_current",
@@ -13909,6 +13921,34 @@
           "name": "min_spend_minor",
           "type": "integer",
           "numeric_source": "core.coupon.min_spend_minor"
+        },
+        {
+          "name": "code",
+          "type": "text"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "valid_from",
+          "type": "timestamptz"
+        },
+        {
+          "name": "valid_to",
+          "type": "timestamptz"
+        },
+        {
+          "name": "outlet_ids",
+          "type": "text"
+        },
+        {
+          "name": "active",
+          "type": "boolean"
+        },
+        {
+          "name": "requires_customer",
+          "type": "boolean"
         }
       ],
       "model_schema": {
@@ -14412,16 +14452,24 @@
     },
     {
       "id": "finance.gst_check",
-      "version": 1,
+      "version": 2,
       "min_role": "advisor",
       "agent_exposed": true,
       "tool": "read_finance_gst_check",
       "params_schema": {
         "type": "object",
         "required": [
-          "period_month"
+          "period_month",
+          "outlet_id"
         ],
         "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "period_month": {
             "type": "string",
             "format": "date"
@@ -14453,6 +14501,13 @@
       "model_schema": {
         "type": "object",
         "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
           "period_month": {
             "type": "string",
             "description": "A calendar date, YYYY-MM-DD."
@@ -14463,12 +14518,19 @@
           }
         },
         "required": [
+          "outlet_id",
           "period_month",
           "page"
         ],
         "additionalProperties": false
       },
-      "leaves": [],
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
       "optional": []
     },
     {
@@ -14650,7 +14712,7 @@
     },
     {
       "id": "finance.missing_payouts",
-      "version": 1,
+      "version": 2,
       "min_role": "advisor",
       "agent_exposed": true,
       "tool": "read_finance_missing_payouts",
@@ -14709,6 +14771,10 @@
             "core.order_event.at",
             "core.order.business_date"
           ]
+        },
+        {
+          "name": "channel_id",
+          "type": "uuid"
         }
       ],
       "model_schema": {
@@ -14855,7 +14921,7 @@
     },
     {
       "id": "finance.settlement_vs_orders",
-      "version": 1,
+      "version": 2,
       "min_role": "advisor",
       "agent_exposed": true,
       "tool": "read_finance_settlement_vs_orders",
@@ -14934,6 +15000,7 @@
           "name": "expected_net_minor",
           "type": "integer",
           "numeric_source": [
+            "core.order.total_minor",
             "core.settlement_line.gross_minor",
             "core.channel_terms.commission_bp",
             "core.order.tax_minor",
@@ -14945,6 +15012,7 @@
           "name": "short_minor",
           "type": "integer",
           "numeric_source": [
+            "core.order.total_minor",
             "core.settlement_line.gross_minor",
             "core.channel_terms.commission_bp",
             "core.order.tax_minor",
@@ -14952,6 +15020,14 @@
             "core.refund.amount_minor",
             "core.settlement_line.net_minor"
           ]
+        },
+        {
+          "name": "settlement_id",
+          "type": "uuid"
+        },
+        {
+          "name": "channel_id",
+          "type": "uuid"
         }
       ],
       "model_schema": {
@@ -15009,7 +15085,7 @@
     },
     {
       "id": "finance.tender_vs_bank",
-      "version": 1,
+      "version": 2,
       "min_role": "advisor",
       "agent_exposed": true,
       "tool": "read_finance_tender_vs_bank",
@@ -15084,11 +15160,27 @@
         {
           "name": "outlet_median_voids",
           "type": "integer",
-          "numeric_source": "count:core.void"
+          "numeric_source": [
+            "count:core.void",
+            "core.tender.amount_minor",
+            "core.bank_line.amount_minor"
+          ]
         },
         {
           "name": "shift_member_id",
           "type": "uuid"
+        },
+        {
+          "name": "week_start",
+          "type": "date"
+        },
+        {
+          "name": "gap_days",
+          "type": "integer",
+          "numeric_source": [
+            "core.tender.amount_minor",
+            "core.bank_line.amount_minor"
+          ]
         }
       ],
       "model_schema": {
@@ -17110,7 +17202,7 @@
     },
     {
       "id": "kitchen.ticket_times",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_kitchen_ticket_times",
@@ -18501,7 +18593,7 @@
     },
     {
       "id": "people.overtime_drift",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_people_overtime_drift",
@@ -22076,7 +22168,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "87952da3812bd3ccc0e913c115dc38b3930aeeffa5caa058f6a3bce019d98c77",
+      "sha256": "9fbb646d0ab77056c3a2fa56ce6f341f57714893c92aac0d1b84d277e6fa1c25",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -22100,8 +22192,9 @@
         "db/migrations/0020_mc23_threads_policy_investigations.sql": "de3a04ef4f9c95630d6a88afeb6bd01eff374ca4f147354befa76a20934f98ae",
         "db/migrations/0021_mc1bc_pack_templates_history_kinds.sql": "a2b8cbf0a15fbb75e508e3551364c1c3e1938c1304ef7f1bce790267e4e9eba2",
         "db/migrations/0022_mc1d_guard_binding_f8_asof.sql": "6a373c5154b07961fd3258f16158983a539b9f282189830e7f6a8cc5055b5034",
+        "db/migrations/0023_mc1e_template_versions.sql": "b469db215ee0110933bc416f4d39f3656af9e88f3fb5c4062a4322a17e6d69cc",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
-        "packages/contracts/scripts/ontology.ts": "a3e615664f854e4264e095c32122895e97d4777e9bf3f88740e75679f33004ca",
+        "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
         "packages/contracts/src/ai_policy/index.ts": "c500bc3c8a46b6bc4f170d8c84bc6faf1a3a92bf6ecc21f261623cafd538c4c3",
         "packages/contracts/src/approvals/index.ts": "59bfae3b93c01414a6f3396bbfccfa13c6968d467b933277300809ddefa97f53",
@@ -22115,8 +22208,8 @@
         "packages/contracts/src/imports/index.ts": "c22e8da9180dbe12f5d2d567e05476350adcdcd4b23ede076f2f08733956ee0c",
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "b0a29fed9fa29f8e9b3f862619c71d5b803f82a9c917aab2e5d49523c97ffb74",
-        "packages/contracts/src/intel/specialists.ts": "703c0710a6ee79c2a41f9f26317505a4c2689252ff65e59be25d833192b7fed0",
-        "packages/contracts/src/internal/index.ts": "8a35df3f7e30a8757f31317f578ea79b3885aa275521992dbda482bedfc17eb1",
+        "packages/contracts/src/intel/specialists.ts": "7fc07468501f0fb7b339c8509927efabc139a8e0357e895244452e3a047aa505",
+        "packages/contracts/src/internal/index.ts": "47f326a2b7d0df264fdeb375a651608cbc3e1e0b03288b1b6e5ec63994cab5ca",
         "packages/contracts/src/inventory/index.ts": "f143368409ece4afea8ee531d71e866191aea6291e933d54047866dbd6812241",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
@@ -22143,7 +22236,7 @@
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
         "packages/contracts/src/shared/primitives.ts": "97b9d196f7f5354c5924e12475ab6f2c7fa79b109e8ce3fb3ab961167bdf7de2",
-        "packages/contracts/src/shared/reason-codes.ts": "9c170c2917af90aa74f151309f835d641c9acf8a3f512fa907c845f977accda7",
+        "packages/contracts/src/shared/reason-codes.ts": "8a83d813e3608300a0130b9968564d1bbb1eaf48b1a7e923b788134cea3457bd",
         "packages/contracts/src/shared/refs.ts": "1ca3960ba3c317b909b6dfddf6c73ac16b4d7afd1acbccae8a8405c6ca1c006c",
         "packages/contracts/src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
         "packages/contracts/src/shared/run-token.ts": "e9fc4127e1b7ffdc0271908f3992903e4b6204e46e7432b99a134ce94297054f",
@@ -22155,6 +22248,6 @@
         "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
       }
     },
-    "body_sha256": "1053cdc922b3869c90d724323031891ab7e466b2fb568521f63f51a2a7f04bf8"
+    "body_sha256": "fc4623f4f02c1fb23be72ffaf278779bbfb3d4032d97c86f45f4612f7aba25f1"
   }
 }

@@ -2835,6 +2835,10 @@ class Draftable(RootModel[str]):
     root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
 
 
+class WorkflowDraftable(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
 class Specialist(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -2847,6 +2851,7 @@ class Specialist(BaseModel):
     detectors: list[Detector]
     templates: list[Template]
     draftables: list[Draftable]
+    workflow_draftables: list[WorkflowDraftable]
 
 
 class IntelSpecialistsRegistry(BaseModel):
@@ -3647,6 +3652,33 @@ class Terms1(RootModel[str]):
     root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
 
 
+class Args(RootModel[str]):
+    root: Annotated[str, Field(max_length=64)]
+
+
+class Args1(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class InternalGraphQueryRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    template: Literal['price_shock_path', 'dish_margin_drivers', 'supplier_dependency', 'claim_support', 'neighbourhood']
+    args: dict[constr(pattern=r'^[a-z_]{1,40}$'), Args | Args1]
+
+
+class Rows(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
+class InternalGraphQueryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    rows: Annotated[list[dict[str, str | Rows | None]], Field(max_length=50)]
+
+
 class Pack(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4322,10 +4354,10 @@ class RefId(RootModel[str]):
 
 
 class ReasonCode(
-    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing']]
+    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing']]
 ):
     root: Annotated[
-        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing'],
+        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing'],
         Field(title='ReasonCode'),
     ]
 
@@ -4480,10 +4512,6 @@ class Column(BaseModel):
     numeric_source: str | NumericSource | None = None
 
 
-class Rows(RootModel[int]):
-    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
-
-
 class Snapshot(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4530,6 +4558,7 @@ class Item14(BaseModel):
     detectors: list[Detector]
     templates: list[Template]
     draftables: list[Draftable]
+    workflow_draftables: list[WorkflowDraftable]
 
 
 class V1SpecialistsResponse(BaseModel):
@@ -4551,6 +4580,7 @@ class Specialist1(BaseModel):
     detectors: list[Detector]
     templates: list[Template]
     draftables: list[Draftable]
+    workflow_draftables: list[WorkflowDraftable]
 
 
 class Cells(BaseModel):
@@ -7866,7 +7896,7 @@ class InternalDraftsRequest(BaseModel):
     outlet_ids: list[Uuid7]
     finding_id: Uuid7 | None
     evidence: Annotated[list[RefId], Field(min_length=1)]
-    based_on: Annotated[list[BasedOnItem1], Field(min_length=1)]
+    based_on: list[BasedOnItem1]
 
 
 class InternalDraftsResponse(BaseModel):

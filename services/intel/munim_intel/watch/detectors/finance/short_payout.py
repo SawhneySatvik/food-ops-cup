@@ -1,13 +1,14 @@
 """`finance.short_payout` (packs/finance.md §4, §5, §6; plant F3; answer keys RG-F3, CK-F3, AU-F3).
 
-Template `finance.settlement_vs_orders` **version 2** (requested from the migrator: tests/packs/finance/
-requested_templates_v2.sql), minted per outlet for the current business month and the two before it (by settlement
-period end). Version 2 puts one Σ row per settlement first (`settlement_line_id` null, with `settlement_id` and
-`channel_id`); version 1's single Σ row has neither id, so on version 1 this detector never fires.
+Template `finance.settlement_vs_orders` **version 2** (migration 0023 F1), minted per outlet for the current business
+month and the two before it (by settlement period end). Version 2 puts one Σ row per settlement first
+(`settlement_line_id` null, with `settlement_id` and `channel_id`, appended columns). The template applies the pack's
+per-line rule itself: the Σ sums only the lines that count (short ≥ max(`line_short_minor_gte`, ⌈expected ×
+`line_short_bp_gte` ÷ 10,000⌉), core-api reconcileSettlement's rule), and expected net starts from the matched order's
+total — so overpaid or rounding-level lines never net a short payout down, and the impact is what a dispute claims.
 
-Fires on a settlement's Σ row when `short_minor` ≥ the pack's `short_minor_gte` (IN ₹200, AU A$5). Not applied: the
-pack's per-line floor (`line_short_minor_gte`, `line_short_bp_gte`) — a detector sees one row, and the Σ counts every
-line. Severity L on the settlement's Σ (the pack's "monthly Σ" spans settlements, which one row cannot see). Dedupe
+Fires on a settlement's Σ row when `short_minor` ≥ the pack's `short_minor_gte` (IN ₹200, AU A$5). Severity L on the
+settlement's Σ (the pack's "monthly Σ" spans settlements, which one row cannot see). Dedupe
 `<outlet>:<settlement>` (pack `<settlement>`, per outlet — T-040 note a).
 Draft: `finance.dispute.draft.v1`, basis `short_payout`, no lines (the lines sit in other rows), total ← `short_minor`.
 """

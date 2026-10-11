@@ -8,6 +8,12 @@ resolver checks the span lies inside the document's chunks. A span is not a snap
 once the approver has typed each number (R26). Strings that are not numbers (invoice number, date, unit, an unlinked
 line's description) must be in the transcript too. The supplier and each ingredient come from exact-alias linking;
 an unlinked supplier, a value not found on the page or an unreadable date abstains — a person records it by hand.
+
+Descriptions are prose a person reads, so core's number grammar checks them (DECISIONS 11 Oct, W3.2): the quantity and
+the unit a vision read may leave inside a line's description ("Malai cream 4 l") are moved out — they are already the
+line's own span refs — and a linked line carries no description (the ingredient's name stands for it). An unlinked
+line whose remaining words still hold a digit abstains (`description_has_number`): the draft never ships a free figure.
+`invoice_no` is an identifier, excepted from the grammar by core by name.
 """
 
 from __future__ import annotations
@@ -43,6 +49,11 @@ VISION_SYSTEM = (
 _NUMBER = re.compile(r"^[0-9][0-9,]*(\.[0-9]+)?$")
 _UNIT = re.compile(r"^[a-z][a-z_]{0,15}$")
 _ISO_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+
+def bare_description(description: str, qty: str, unit: str) -> str:
+    """The description without the line's quantity and unit words (whole words, the unit in any case)."""
+    return " ".join(w for w in description.split() if w != qty and w.lower() != unit.lower())
 
 
 class InvoiceLineRead(BaseModel):
@@ -128,7 +139,10 @@ def invoice_draft(document_id: str, read: InvoiceRead, aliases: AliasTable, curr
     lines: list[dict[str, Any]] = []
     try:
         for n, line in enumerate(read.lines):
-            cursor.find(line.description)
+            description = bare_description(line.description, line.qty, line.unit)
+            if not description:
+                return abstain("description_unreadable")
+            cursor.find(description)
             refs: dict[str, str] = {}
             for name, value in (("qty_milli", line.qty), ("unit_price_minor", line.unit_price), ("tax_minor", line.tax)):
                 if not _NUMBER.match(value):
@@ -139,15 +153,17 @@ def invoice_draft(document_id: str, read: InvoiceRead, aliases: AliasTable, curr
             unit = line.unit.lower()
             if not _UNIT.match(unit) or line.unit.lower() not in page.lower():
                 return abstain("unit_unreadable")
-            ingredient = aliases.link(line.description, "ingredient")
+            ingredient = aliases.link(description, "ingredient")
             ingredient_id = ingredient.core_id("ingredient") if ingredient else None
+            if ingredient_id is None and any(ch.isdigit() for ch in description):
+                return abstain("description_has_number")
             lines.append(
                 {
                     "line_id": uuid7(ts, f"{invoice_id}/lines/{n}/line_id"),
                     "po_line_id": None,
                     "ingredient_id": ingredient_id,
                     # A linked line needs no description; an unlinked one keeps the page's words for the approver.
-                    "description": None if ingredient_id else line.description,
+                    "description": None if ingredient_id else description,
                     "qty_milli": refs["qty_milli"],
                     "unit": unit,
                     "unit_price_minor": refs["unit_price_minor"],
@@ -175,7 +191,8 @@ def invoice_draft(document_id: str, read: InvoiceRead, aliases: AliasTable, curr
         "outlet_ids": [],
         "finding_id": None,
         "evidence": [f"doc:{document_id}"],
-        # A document-sourced draft assumes no snapshot cell. Core's DraftsRequest requires ≥ 1 today (reported).
+        # A document-sourced workflow draft assumes no snapshot cell: contracts DraftsRequest admits [] for it because
+        # every numeric leaf is a doc span (DECISIONS 11 Oct, W3.2).
         "based_on": [],
     }
     return InvoiceDraft(body, None, spans)

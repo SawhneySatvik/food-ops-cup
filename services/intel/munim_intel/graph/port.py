@@ -2,8 +2,8 @@
 
 SQL stays canonical (P14). The graph answers multi-hop questions only, with ids, kinds and names (never a number to
 display; `depth` is a hop count). Five templates, no free query: a model-facing `graph_<template>` tool passes only the
-template's own arguments. The tenant is never an argument — an adapter gets it from the run token (Postgres: core binds
-`:tenant_id`; a graph-database adapter is built for one tenant).
+template's own arguments. The tenant is never an argument — an adapter gets it from the run token (Postgres: core owns the
+SQL and binds `:tenant_id`, services/core-api/src/internal/graph/; a graph-database adapter is built for one tenant).
 """
 
 from __future__ import annotations

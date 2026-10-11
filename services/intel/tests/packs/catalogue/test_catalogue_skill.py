@@ -34,7 +34,9 @@ def check(module: object, pack: str) -> None:
     asked = sorted(t.name for t in module.toolset(CTX, client, HandleTable(), propose=False))  # type: ignore[attr-defined]
     drafting = sorted(t.name for t in module.toolset(CTX, client, HandleTable(), propose=True))  # type: ignore[attr-defined]
     print(f"{pack} tools:", drafting)
-    assert asked == reads and drafting == sorted(reads + proposes)
+    # The W3.2 graph wiring (orchestrator's hand list): only catalogue and inventory_purchasing bind `graph_*` tools.
+    graph = sorted(f"graph_{g}" for g in module.GRAPH_TEMPLATES) if pack in ("catalogue", "inventory_purchasing") else []  # type: ignore[attr-defined]
+    assert asked == sorted(reads + graph) and drafting == sorted(reads + proposes + graph)
     assert len(drafting) <= TOOL_CAP
     codes = set(get_args(ReasonCode.model_fields["root"].annotation))
     refusals = module.REFUSAL_CODES  # type: ignore[attr-defined]

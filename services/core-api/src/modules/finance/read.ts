@@ -31,11 +31,13 @@ const EXCLUDED_KINDS = `SELECT 'aggregator:' || (a ->> 'code') FROM core.tenant 
          WHERE a ->> 'tax_treatment' = 'operator_collects_excluded'
            AND cp.version = (SELECT max(v.version) FROM platform.country_pack v WHERE v.code = t.country_code AND v.status = 'active')`;
 
-/** finance.gst_check — completed orders' own-liability tax vs output tax posted from them, per outlet. */
+/** finance.gst_check v2 (0023 F4) — completed orders' own-liability tax vs output tax posted from them, per outlet;
+ *  `outlet_id` (nullable, required as every named param) narrows both sides to one outlet, NULL = every outlet in scope. */
 const GST_CHECK_SQL = `WITH ot AS (
   SELECT o.outlet_id, sum(o.tax_minor)::bigint AS order_tax_minor
     FROM core."order" o JOIN core.channel ch ON ch.tenant_id = o.tenant_id AND ch.id = o.channel_id
    WHERE o.status = 'completed' AND ${INMONTH("o.business_date")} AND ch.kind NOT IN (${EXCLUDED_KINDS})
+     AND (:outlet_id::uuid IS NULL OR o.outlet_id = :outlet_id::uuid)
    GROUP BY o.outlet_id),
 pt AS (
   SELECT je.outlet_id, (-sum(p.amount_minor))::bigint AS posted_tax_minor
@@ -43,6 +45,7 @@ pt AS (
     JOIN core.posting p ON p.tenant_id = je.tenant_id AND p.journal_entry_id = je.id
     JOIN core.account a ON a.tenant_id = p.tenant_id AND a.id = p.account_id
    WHERE je.posting_rule = 'finance.post_order' AND a.code IN (${list(ROLES.output_tax.codes)}) AND ${INMONTH("je.entry_date")}
+     AND (:outlet_id::uuid IS NULL OR je.outlet_id = :outlet_id::uuid)
    GROUP BY je.outlet_id)
 SELECT coalesce(ot.outlet_id, pt.outlet_id) AS outlet_id, coalesce(ot.order_tax_minor, 0) AS order_tax_minor,
        coalesce(pt.posted_tax_minor, 0) AS posted_tax_minor, coalesce(pt.posted_tax_minor, 0) - coalesce(ot.order_tax_minor, 0) AS diff_minor
@@ -77,8 +80,9 @@ export const FINANCE_TEMPLATES = [
     ],
   },
   {
-    id: "finance.gst_check", version: 1, sql: GST_CHECK_SQL, min_role: "advisor",
-    params_schema: { type: "object", required: ["period_month"], additionalProperties: false, properties: MONTH_PARAM },
+    id: "finance.gst_check", version: 2, sql: GST_CHECK_SQL, min_role: "advisor",
+    params_schema: { type: "object", required: ["period_month", "outlet_id"], additionalProperties: false,
+      properties: { ...MONTH_PARAM, outlet_id: { type: ["string", "null"], format: "uuid" } } },
     columns: [
       { name: "outlet_id", type: "uuid" },
       { name: "order_tax_minor", type: "integer", numeric_source: "core.order.tax_minor" },

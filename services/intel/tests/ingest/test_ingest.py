@@ -30,7 +30,7 @@ from munim_intel.decide.questions import MAP_COLUMNS
 from munim_intel.ingest import columns, quarantine
 from munim_intel.ingest.claims import ExtractedClaims, extract_request
 from munim_intel.ingest.embed import DIMENSIONS, RecordedEmbedder, write_embeddings
-from munim_intel.ingest.invoice import COMMAND, vision_request
+from munim_intel.ingest.invoice import COMMAND, InvoiceRead, invoice_draft, vision_request
 from munim_intel.ingest.link import Alias, AliasTable, normalize_alias
 from munim_intel.ingest.pipeline import Ingest, Report
 from munim_intel.ingest.quarantine import FIXTURES_DIR, QuarantineBreach, tool_count
@@ -277,10 +277,28 @@ def test_invoice_image_becomes_a_draft_whose_numbers_are_page_spans(run: Run) ->
     assert run.reports[C.DOC_INVOICE_OFFPAGE].reason_code == "value_not_on_page"
 
 
+def test_quantity_and_unit_are_moved_out_of_a_description_and_a_leftover_digit_abstains() -> None:
+    """DECISIONS 11 Oct (W3.2): a vision read that leaves "4 l" inside the unlinked line's description ships the bare
+    words, with the numbers still the line's own spans; a linked line ships no description. Paired: words that still hold
+    a digit after the move abstain (`description_has_number`), no draft."""
+    read = json.loads(json.dumps(C.INVOICE_READ))
+    read["lines"][0]["description"] = "Paneer 12 kg"
+    read["lines"][1]["description"] = "Malai cream 4 l"
+    d = invoice_draft(C.DOC_INVOICE, InvoiceRead.model_validate(read), ALIASES, "INR")
+    assert d.body is not None
+    lines = d.body["payload"]["lines"]
+    assert [(ln["ingredient_id"], ln["description"]) for ln in lines] == [(C.INGREDIENT_PANEER, None), (None, "Malai cream")]
+    assert [C.INVOICE_PAGE[s:e] for s, e in d.spans] == C.INVOICE_NUMBERS
+    read["lines"][1]["description"] = "Malai cream 25% fat"
+    page = C.INVOICE_PAGE.replace("Malai cream 4 l", "Malai cream 25% fat 4 l")
+    bad = invoice_draft(C.DOC_INVOICE, InvoiceRead.model_validate({**read, "transcript": page}), ALIASES, "INR")
+    assert (bad.body, bad.reason_code) == (None, "description_has_number")
+
+
 def test_invoice_payload_is_the_registered_proposal_shape(run: Run) -> None:
-    """core's own zod DraftsRequest (tests/tools/zod_check.mts) over the draft: the payload has 0 issues — numbers are
-    refs, ids and strings as the command wants. `based_on` is the one issue: a document-sourced draft cites no snapshot
-    cell and core requires ≥ 1 (reported to i-1). A bare number at a numeric leaf is refused (paired)."""
+    """core's own zod DraftsRequest (tests/tools/zod_check.mts) over the draft: 0 issues — numbers are doc-span refs,
+    ids and strings as the command wants, and `based_on` [] is admitted for this workflow draftable because every
+    numeric leaf is a document span (DECISIONS 11 Oct, W3.2). A bare number at a numeric leaf is refused (paired)."""
     node = shutil.which("node")
     assert node, "node is required: core-api's zod contracts check the draft"
     [d] = [b for p, b in run.sink.posts if p == "drafts"]
@@ -296,7 +314,7 @@ def test_invoice_payload_is_the_registered_proposal_shape(run: Run) -> None:
     )
     issues = json.loads(out.stdout.strip().splitlines()[-1])["drafts"]
     print("zod issues:", issues)
-    assert issues[0] == ["based_on"]
+    assert issues[0] == []
     assert "payload/lines/0/unit_price_minor" in issues[1]
 
 

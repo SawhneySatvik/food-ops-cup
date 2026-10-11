@@ -54,7 +54,7 @@ def ladder(code: str) -> Ladder:
     return Ladder(lad["critical_minor_gte"], lad["high_minor_gte"], lad["medium_minor_gte"])
 
 
-# Rows shaped as the version-2 templates return them (tests/packs/finance/requested_templates_v2.sql).
+# Rows shaped as the version-2 templates return them (migration 0023 F1–F3).
 def short_sigma(short: int, *, settlement: str | None = SETTLEMENT, channel: str | None = CHANNEL) -> dict[str, Any]:
     return {"settlement_id": settlement, "channel_id": channel, "settlement_line_id": None, "matched_order_id": None,
             "order_total_minor": 0, "commission_minor": 0, "net_minor": 0, "expected_commission_minor": 0, "refund_minor": 0,
@@ -66,6 +66,7 @@ def missing_sigma(days: int | None, total: int = 29_400, *, channel: str | None 
 
 
 def week_sigma(days: int, gap: int, *, member: str | None = None, voids: int = 0, median: int = 0) -> dict[str, Any]:
+    """`median` is the Σ row's `outlet_median_voids`: 0023 states it as the per-day median × `gap_days` already."""
     return {"business_on": None, "week_start": "2026-09-07", "tendered_minor": gap, "credited_minor": 0, "gap_minor": gap,
             "voids": voids, "void_minor": 0, "outlet_median_voids": median, "shift_member_id": member, "gap_days": days}  # fmt: skip
 
@@ -159,12 +160,12 @@ def test_severities_follow_ladder_l_and_the_pack_floors() -> None:
         "missing 898,800 (RG-F4+F7)": missing_payout.severity(missing_sigma(20, 898_800), {}, lad),
         "missing 176,400 (RG-F4)": missing_payout.severity(missing_sigma(12, 176_400), {}, lad),
         "tender 246,000, no shift member": tender_gap.severity(week_sigma(3, 246_000, voids=9), ts, lad),
-        # 2× the outlet's median per gap day: 3 days × median 1 × 2 = 6 voids is the edge
+        # 2× the Σ row's median cell, which 0023 states as median 1 × 3 gap days = 3: 6 voids is the edge (not 18)
         "tender, one member, voids 6 of median 1 × 3 days": tender_gap.severity(
-            week_sigma(3, 246_000, member=MEMBER, voids=6, median=1), ts, lad
+            week_sigma(3, 246_000, member=MEMBER, voids=6, median=3), ts, lad
         ),
         "tender, one member, voids 5 of median 1 × 3 days": tender_gap.severity(
-            week_sigma(3, 246_000, member=MEMBER, voids=5, median=1), ts, lad
+            week_sigma(3, 246_000, member=MEMBER, voids=5, median=3), ts, lad
         ),
         "gst 1,000": gst_mismatch.severity({"diff_minor": 1_000}, tg, lad),
         "gst -6,000,000": gst_mismatch.severity({"diff_minor": -6_000_000}, tg, lad),
@@ -199,7 +200,10 @@ def test_windows_and_dedupe_keys_by_hand() -> None:
     # 10 Oct 2026 is a Saturday: its ISO week starts Monday 5 Oct; five weeks before that is Monday 31 Aug.
     tw = tender_gap.windows(OUT, {})
     assert [w.params for w in tw] == [{"outlet_id": OUTLET, "method": m, "from": "2026-08-31", "to": "2026-10-10"} for m in ("upi", "card")]
-    assert [w.params for w in gst_mismatch.windows(OUT, {})] == [{"period_month": "2026-10-01"}, {"period_month": "2026-09-01"}]
+    assert [w.params for w in gst_mismatch.windows(OUT, {})] == [
+        {"period_month": "2026-10-01", "outlet_id": OUTLET},
+        {"period_month": "2026-09-01", "outlet_id": OUTLET},
+    ]
     assert iso_week(date(2026, 9, 7)) == "2026-w37"
     keys = [
         short_payout.dedupe(short_sigma(1), short_payout.windows(OUT, {})[0]),
