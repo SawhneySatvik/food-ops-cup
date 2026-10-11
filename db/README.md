@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (23 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (24 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -34,7 +34,9 @@ standing grant behind Auto and the `auto_step` run trigger, three intel template
 44 templates; the `shift_log` / `stock_count` history kinds, what an approved import writes for them, `inventory.count_adjust`),
 0022 M-C1d (the guard binds every derived row to its source record, F8 draft sources, `as_of` template versions,
 `finance.gst_summary`, `inventory.count_variance`), 0023 M-C1e (version 2 of nine templates the pack lanes asked for: Σ rows
-first, requested columns, gst_check's outlet filter; the `findings.dismiss.v1` command row) — gates see 22 applied.
+first, requested columns, gst_check's outlet filter; the `findings.dismiss.v1` command row), 0024 W3.2 review fixes (one
+stock count per outlet per instant, A2A endpoints only on simulated suppliers, quote spans into the supplier's reply,
+the `ingest` run trigger, `finance.settlement_vs_orders` v3) — gates see 23 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -247,7 +249,7 @@ second post (no `reverses_id`) is still 23505.
   `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
   write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
   'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
-- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0023` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0025` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
   non-zero naming that item's tests (the plant is removed after each run).
 
 **History imports (0018, R44 b, c) — shapes other lanes code against.**
@@ -277,7 +279,7 @@ second post (no `reverses_id`) is still 23505.
   (409 `period_closed`, nothing written) when a month closed after the preview.
 - **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
   run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
-- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0023` per item (renumbered as later files landed) and requires
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0025` per item (renumbered as later files landed) and requires
   `tests/history.test.ts` to exit non-zero naming that item's tests. `redproof-0017.sh` likewise.
 
 **M-C1a (0019) — shapes other lanes code against.**
@@ -562,7 +564,61 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
 - **Gates:** `tests/mc1e.test.ts` (columns, roles, params, Σ first, scope, v1 inside v2, hand values, D1);
   `node db/tests/templates-worlds.ts` (now four worlds: RG-F3, CK-F3, AU-F3, RG-F4 + F7, RG-F5, RG-P1, AU-P1, RG-A5, ST-A5,
   AU-A5 on v2); `tests/templates.test.ts` + `template-spec.ts` (`SPEC_VERSION`: finance.md §3 describes the finance v2s);
-  `db/tests/redproof-0023.sh`. Other red-proof scripts plant `0024_redproof_plant.sql` now.
+  `db/tests/redproof-0023.sh`. Other red-proof scripts plant `0025_redproof_plant.sql` now.
+
+**W3.2 review fixes (0024) — shapes other lanes code against.** The formula and refusal notes are 0024's header; in short:
+- **One count per outlet per instant (R-A F2).** `core.stock_count_outlet_counted_at_key` UNIQUE `(tenant_id, outlet_id,
+  counted_at)`, over every status: a second count at the same outlet and `counted_at` → 23505 (core maps it to 409, the
+  T-093 "same count" conflict). `counted_at` defaults to `now()` (the transaction's start), so **two counts at one outlet in
+  one transaction collide** — give each its own `counted_at`. No shift EXCLUDE: core serialises shift overlap with a
+  `pg_advisory_xact_lock` per tenant + outlet. The migration refuses to apply while a duplicate exists.
+- **A2A endpoints only on simulated suppliers (R-C F4).** `core.supplier` CHECK `supplier_a2a_simulated_only`
+  (`a2a_card_url IS NULL OR kind = 'simulated'`): `purchasing.supplier.upsert.v1` with a real supplier and a card URL (insert
+  or update) → 23514 (core: 422 `invalid_payload`, or map it to a named refusal). `kind` has no UPDATE grant, so the pairing
+  holds for the row's life. RFQ code must still read `kind` before it sends (defence in depth, R-C F4's code half).
+- **Quote provenance (R-C F3).**
+  - `intel.chunk` also admits a **run-held chunk**: `document_id` and `message_id` NULL, `run_id` set (CHECK
+    `chunk_source_check`; before: exactly one of document / message). It holds text a run received that is neither — a
+    simulated supplier's reply. Untrusted text like any chunk: tenant-only RLS, `intel_ro.chunk_search` lists it, a run
+    that reads it is tainted. contracts `ChunksBatchRequest` must drop its "exactly one" refine for this shape (run-held
+    chunks are stamped with the writing run's id by `writeChunks`).
+  - `intel.supplier_quote` + `source_chunk_id uuid NULL` (FK → `intel.chunk`) + `spans jsonb NULL`, both or neither (CHECK
+    `supplier_quote_spans_with_chunk`). Write the chunk first, then the quote, in the same run. `spans` = `{"<field>":
+    [start, end], …}` for the numeric fields `unit_price_minor`, `qty_milli`, `min_order_qty_milli`, `payment_days`;
+    **0-based, end-exclusive, in code points** (Python `str` indices; in JS slice `Array.from(text)`, never UTF-16
+    `slice`). Every field that is set (≠ 0) needs a span; a zero field may have none (`ground()` emits none for a zero).
+  - Trigger `spans_match` (MB012 → 422 `claim_quote_mismatch`): the chunk must be visible and the quote's own run's; spans an
+    object of those four keys; each `[start, end]` integers with `0 ≤ start < end ≤ length(text)`. The span's text is not
+    re-parsed (intel's tokenizer is the one tokenizer). Errors carry ids and the four field names only, never a key it
+    did not recognise. A chunk with no spans hits the trigger first (MB012); spans with no chunk hit the CHECK (23514).
+  - Grants unchanged: `munim_svc` INSERT (core's `quotes:batch`), `munim_core` / `munim_svc` SELECT; intel writes nothing.
+    contracts `QuotesBatchRequest` and core `writeQuotes` gain `source_chunk_id` + `spans` (both nullable).
+  - **How a quote-ref leaf shows its source.** A draft's numeric leaf that is a quote ref (`⟨cite:row:intel.supplier_quote:<id>⟩`
+    + column) renders the value from the quote row, labelled "Simulated supplier" and "from the supplier's reply", with the
+    reply's span beside it: read `intel.chunk.text` by `source_chunk_id`, cut `[start, end)` of the column's field from
+    `spans` in code points, render it as escaped plain text (never HTML; gotcha 15) with the surrounding sentence if wanted.
+    A quote with no `source_chunk_id` (written before 0024) shows the value with "source not kept" — a person confirms or
+    types it (R26), as before. The span is evidence for a person; it is never re-read by a model.
+- **`intel.run.trigger` `ingest`.** CHECK `run_trigger_check` admits `event, watch_sweep, ask, brief, auto_step, ingest`. An
+  ingest run's `actor` is the uploading member's id (or `watcher:<pack>` for a worker-started ingestion): the 0003 actor
+  CHECK is unchanged. contracts `RunTrigger` lacks both `auto_step` (0020) and `ingest`; core's `ttlSeconds` decides its TTL.
+- **`finance.settlement_vs_orders` v3 (R-A F5)** — core-api `reconcileSettlement`'s rule exactly: the order is INNER-joined, so
+  an unmatched line (no `matched_order_id`, or an order outside the minter's scope) has **no row** and adds nothing to its
+  Σ row; a missing pack threshold takes core's default (`line_short_minor_gte` ?? 1, `line_short_bp_gte` ?? 0). Σ rows are
+  v2's set (one per settlement with ≥ 1 order line, first; zeros when none counts — also when every line is unmatched).
+  Columns, params and `min_role` = v2's. core-api mints v3 from now on. **Callers:** `finance.short_payout` (and the finance
+  skill) see no unmatched lines any more; on today's worldgen worlds the F3 plants (RG-F3 ZM-C-SHORT, CK-F3 SW-K-SHORT,
+  AU-F3 DD-SHORT) are statements whose order lines match no order (0/20, 0/12, 0/15 matched), so v3 — like core, which opens
+  no `short_payout` break for them — reads 0 there until worldgen re-plants F3 on real aggregator orders. Note: with
+  `greatest()` skipping a NULL and `short > 0` already implying ≥ 1, each coalesce alone changes nothing; both together are
+  what stop a pack without line thresholds from counting nothing.
+- **Hosted apply.** Run the two pre-check counts first (the migration refuses otherwise):
+  `SELECT tenant_id, outlet_id, counted_at, count(*) FROM core.stock_count GROUP BY 1, 2, 3 HAVING count(*) > 1` and
+  `SELECT tenant_id, id FROM core.supplier WHERE a2a_card_url IS NOT NULL AND kind <> 'simulated'`. The unique index is
+  built non-concurrently (the runner wraps each file in one transaction): it locks `core.stock_count` writes for the build.
+- **Gates:** `tests/w32fix.test.ts` (each refusal paired with an accept; hand values beside the fixture rows); `node
+  db/tests/templates-worlds.ts` (v3 Σ = core's `short_payout` breaks per settlement on every world with a settlement; the F3
+  keys printed as INFO, blocked as above); `db/tests/redproof-0024.sh`. The manifest's FK count is 366.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

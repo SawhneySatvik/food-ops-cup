@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0023 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0024 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -26,6 +26,7 @@ export const MIGRATIONS = [
   "0021_mc1bc_pack_templates_history_kinds",
   "0022_mc1d_guard_binding_f8_asof",
   "0023_mc1e_template_versions",
+  "0024_w32_review_fixes",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -228,8 +229,9 @@ export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
  *  ontology.json): REFERENCES clauses per file 0002 2, 0003 26, 0004 59, 0005 59, 0007 2, 0008 49, 0009 24, 0010 25, 0011 15,
  *  0012 80, 0014 1, 0015 3, 0016 1 (= 346 through 0019), minus 1 dropped by 0014 (expired_sale_override → order_line, re-added
  *  as its 1) = 345; 0020 adds 20 (ai_thread 2, ai_thread_turn 3, ai_policy 1, ai_budget_cap 1, investigation 3,
- *  investigation_grant 4, investigation_step 5, intel.run.grant_id 1) = 365. */
-export const EXPECTED_COUNTS = { all: 154, core: 125, book: 94, tenant: 140, outlet: 54, fk: 365 };
+ *  investigation_grant 4, investigation_step 5, intel.run.grant_id 1) = 365; 0024 adds 1 (intel.supplier_quote.source_chunk_id
+ *  → intel.chunk) = 366. */
+export const EXPECTED_COUNTS = { all: 154, core: 125, book: 94, tenant: 140, outlet: 54, fk: 366 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -315,6 +317,8 @@ export const TEMPLATES = [
   "finance.settlement_vs_orders@2", "finance.missing_payouts@2", "finance.tender_vs_bank@2", "finance.gst_check@2",
   "customers.coupon_current@2", "compliance.licence_calendar@2", "compliance.log_coverage@2", "people.overtime_drift@2",
   "kitchen.ticket_times@2",
+  // 0024 (R-A F5): settlement_vs_orders v3, core-api reconcileSettlement's lines (matched orders only) and default thresholds.
+  "finance.settlement_vs_orders@3",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read

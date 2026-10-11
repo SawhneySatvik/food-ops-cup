@@ -702,8 +702,10 @@ describe("A1 / A2 — version 2 of the templates", () => {
   test("the list templates: invoices = the non-void invoices; counts and goals = the owner's, and an outlet-A manager sees only outlet A's", async () => {
     // The fixtures' counts are open: one submitted count at each of outlets A and B (and an open one, never listed).
     await F.withContext("munim_core", ownerCtx(w, { command_type: "inventory.count.submit.v1" }), async (c) => {
-      for (const [o, st] of [[fx.A, "submitted"], [fx.B, "submitted"], [fx.A, "open"]] as const) {
-        await c.query(`INSERT INTO core.stock_count (tenant_id, id, outlet_id, counted_by, status) VALUES ($1, $2, $3, $4, $5)`, [T, uuidv7(), o, w.owner, st]);
+      // Each its own counted_at (0024: one count per outlet per instant; now() is the transaction's start).
+      for (const [i, [o, st]] of ([[fx.A, "submitted"], [fx.B, "submitted"], [fx.A, "open"]] as const).entries()) {
+        await c.query(`INSERT INTO core.stock_count (tenant_id, id, outlet_id, counted_by, status, counted_at) VALUES ($1, $2, $3, $4, $5, now() - make_interval(secs => $6))`,
+          [T, uuidv7(), o, w.owner, st, i]);
       }
     });
     const inv = (await run("purchasing.invoices", 1, params("purchasing.invoices"))).rows.map((r) => r.supplier_invoice_id).sort();

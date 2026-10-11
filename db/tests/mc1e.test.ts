@@ -289,7 +289,8 @@ describe("C — columns, roles and params of the nine version 2s", () => {
          WHERE t2.id = $1 AND t2.version = (SELECT max(version) FROM evidence.snapshot_template WHERE id = $1)`, [id])).rows[0]!;
       const v1 = (await run(id, 1, v1Params(id, fx.A))).fields;
       const v2 = (await run(id, 2, params(id, fx.A))).fields;
-      if (t.v !== 2) bad.push(`${id}: latest version ${t.v}`);
+      // 0024 (R-A F5) added settlement_vs_orders v3 (same columns, params and role as v2); every other one is still at 2.
+      if (t.v !== (id === "finance.settlement_vs_orders" ? 3 : 2)) bad.push(`${id}: latest version ${t.v}`);
       if (JSON.stringify(v2) !== JSON.stringify([...v1, ...want.extra])) bad.push(`${id}: returns ${v2.join(",")}`);
       if (JSON.stringify(t.decl) !== JSON.stringify(v2)) bad.push(`${id}: declares ${t.decl.join(",")}`);
       if (t.role !== want.role) bad.push(`${id}: min_role ${t.role}`);
