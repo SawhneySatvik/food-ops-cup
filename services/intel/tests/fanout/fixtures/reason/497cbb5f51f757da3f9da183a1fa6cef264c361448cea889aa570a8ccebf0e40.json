@@ -8,18 +8,20 @@
      {
       "function_call": {
        "args": {
-        "abstain": "insufficient_history",
-        "segments": []
+        "from": "2026-09-14",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
        },
-       "name": "report"
+       "name": "read_customers_review_trend"
       }
      }
     ],
     "role": "model"
    },
    "usage_metadata": {
-    "candidates_token_count": 37,
-    "prompt_token_count": 3160
+    "candidates_token_count": 49,
+    "prompt_token_count": 3095
    }
   }
  ],

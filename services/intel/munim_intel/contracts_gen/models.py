@@ -3652,6 +3652,56 @@ class Terms1(RootModel[str]):
     root: Annotated[str, Field(pattern='^[a-z][a-z0-9_]{0,39}$')]
 
 
+class UnitPriceMinorItem(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class UnitPriceMinorItem1(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class QtyMilliItem(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class QtyMilliItem1(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class MinOrderQtyMilliItem(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class MinOrderQtyMilliItem1(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class MinOrderQtyMilli(RootModel[tuple[MinOrderQtyMilliItem, MinOrderQtyMilliItem1]]):
+    root: Annotated[tuple[MinOrderQtyMilliItem, MinOrderQtyMilliItem1], Field(max_length=2, min_length=2)]
+
+
+class PaymentDay(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class PaymentDay1(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class PaymentDays(RootModel[tuple[PaymentDay, PaymentDay1]]):
+    root: Annotated[tuple[PaymentDay, PaymentDay1], Field(max_length=2, min_length=2)]
+
+
+class Spans(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    unit_price_minor: tuple[UnitPriceMinorItem, UnitPriceMinorItem1]
+    qty_milli: tuple[QtyMilliItem, QtyMilliItem1]
+    min_order_qty_milli: MinOrderQtyMilli | None
+    payment_days: PaymentDays | None
+
+
 class Args(RootModel[str]):
     root: Annotated[str, Field(max_length=64)]
 
@@ -3771,6 +3821,69 @@ class RefType(RootModel[str]):
     root: Annotated[str, Field(pattern='^core\\.[a-z_]+$')]
 
 
+class Params3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    compare_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+
+
+class V1InvestigationContinueRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    step_no: Annotated[int, Field(ge=1, le=10)]
+
+
+class Signature(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: Literal['investigation.signature.specialist']
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
+    name_key: Annotated[str, Field(min_length=1)]
+
+
+class Ref2(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+
+
+class Cell(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ref: Annotated[
+        str,
+        Field(pattern='^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$'),
+    ]
+    column: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+
+
+class Item13(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
+    verdict: Literal['pending', 'supported', 'refuted', 'cannot_verify']
+    cells: Annotated[list[Cell], Field(max_length=12, min_length=1)]
+    template: Annotated[str, Field(max_length=2000, min_length=1)]
+
+
 class Station(RootModel[str]):
     root: Annotated[str, Field(max_length=40, pattern='^[a-z][a-z0-9_]*$')]
 
@@ -3839,7 +3952,7 @@ class TouchedItem(BaseModel):
     seq: Annotated[int, Field(ge=1, le=9007199254740991)]
 
 
-class Item13(BaseModel):
+class Item14(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -3852,7 +3965,7 @@ class V1Draftables(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    items: list[Item13]
+    items: list[Item14]
 
 
 class ExternalRef(RootModel[str]):
@@ -3918,7 +4031,7 @@ class AmountMinor9(RootModel[int]):
     root: Annotated[int, Field(gt=0, le=9007199254740991)]
 
 
-class Ref2(RootModel[str]):
+class Ref4(RootModel[str]):
     root: Annotated[str, Field(max_length=100, min_length=1)]
 
 
@@ -4283,6 +4396,10 @@ class PlatformConfigDraftReject(BaseModel):
     reason: Annotated[str, Field(max_length=500, min_length=1)]
 
 
+class Params5(RootModel[int]):
+    root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
+
+
 class A2aCardUrl(RootModel[str]):
     root: Annotated[str, Field(max_length=500, pattern='^https?:\\/\\/\\S+$')]
 
@@ -4307,7 +4424,7 @@ class UnitCostMinor(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
-class PaymentDays(RootModel[int]):
+class PaymentDays1(RootModel[int]):
     root: Annotated[int, Field(ge=-9007199254740991, le=9007199254740991)]
 
 
@@ -4354,10 +4471,10 @@ class RefId(RootModel[str]):
 
 
 class ReasonCode(
-    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing']]
+    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed']]
 ):
     root: Annotated[
-        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing'],
+        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed'],
         Field(title='ReasonCode'),
     ]
 
@@ -4406,11 +4523,11 @@ class PersonEdit(BaseModel):
     typed_by: Uuid7
 
 
-class OutletScope2(RootModel[list[Uuid7]]):
+class OutletScope6(RootModel[list[Uuid7]]):
     root: Annotated[list[Uuid7], Field(min_length=1)]
 
 
-class OutletScope3(RootModel[list[Literal['*']]]):
+class OutletScope7(RootModel[list[Literal['*']]]):
     root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
 
 
@@ -4422,7 +4539,7 @@ class RunTokenClaims(BaseModel):
     aud: Literal['munim-intel']
     run_id: Uuid7
     tenant_id: Uuid7
-    outlet_scope: OutletScope2 | OutletScope3
+    outlet_scope: OutletScope6 | OutletScope7
     trigger: Literal['event', 'watch_sweep', 'ask', 'brief']
     actor: Annotated[str, Field(pattern='^(watcher:[a-z_]+|brief|[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$')]
     iat: Annotated[int, Field(gt=0, le=9007199254740991)]
@@ -4491,11 +4608,11 @@ class CommandResult(BaseModel):
     committed_at: IsoDatetime
 
 
-class OutletScope4(RootModel[list[Uuid7]]):
+class OutletScope8(RootModel[list[Uuid7]]):
     root: Annotated[list[Uuid7], Field(min_length=1)]
 
 
-class OutletScope5(RootModel[list[Literal['*']]]):
+class OutletScope9(RootModel[list[Literal['*']]]):
     root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
 
 
@@ -4518,11 +4635,11 @@ class Snapshot(BaseModel):
     )
     snapshot_id: Uuid7
     template_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
-    params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params | bool | list[str] | None]
+    params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params5 | bool | list[str] | None]
     run_id: Uuid7 | None
     minted_by_member_id: Uuid7 | None
     minted_by_operator_id: Uuid7 | None
-    outlet_scope: OutletScope4 | OutletScope5
+    outlet_scope: OutletScope8 | OutletScope9
     columns: list[Column]
     rows: Annotated[list[dict[str, str | Rows | bool | None]], Field(max_length=500)]
     row_count: Annotated[int, Field(ge=0, le=500)]
@@ -4546,7 +4663,7 @@ class Error(BaseModel):
     error: Annotated[ErrorBody, Field(title='ErrorBody')]
 
 
-class Item14(BaseModel):
+class Item15(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -4565,7 +4682,7 @@ class V1SpecialistsResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    items: list[Item14]
+    items: list[Item15]
 
 
 class Specialist1(BaseModel):
@@ -4730,7 +4847,7 @@ class OptionGroup4(BaseModel):
     options: list[Option5]
 
 
-class Item15(BaseModel):
+class Item16(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5282,7 +5399,7 @@ class Turn(BaseModel):
     tainted: bool
 
 
-class ResolvedRef2(BaseModel):
+class ResolvedRef3(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5290,7 +5407,7 @@ class ResolvedRef2(BaseModel):
     value: str | Value4 | bool | None
 
 
-class Signature(BaseModel):
+class Signature2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5305,8 +5422,8 @@ class Answer(BaseModel):
     )
     answer_id: Uuid7
     envelope: AnswerEnvelope
-    resolved_refs: list[ResolvedRef2]
-    signature: Signature
+    resolved_refs: list[ResolvedRef3]
+    signature: Signature2
 
 
 class V1AskResponse(BaseModel):
@@ -5318,11 +5435,11 @@ class V1AskResponse(BaseModel):
     answer: Answer
 
 
-class OutletScope6(RootModel[list[Uuid7]]):
+class OutletScope10(RootModel[list[Uuid7]]):
     root: Annotated[list[Uuid7], Field(min_length=1)]
 
 
-class OutletScope7(RootModel[list[Literal['*']]]):
+class OutletScope11(RootModel[list[Literal['*']]]):
     root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
 
 
@@ -5336,7 +5453,7 @@ class SummaryItem(BaseModel):
     refs: Annotated[list[RefId], Field(min_length=1)]
 
 
-class ResolvedRef3(BaseModel):
+class ResolvedRef4(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -5350,8 +5467,8 @@ class Answer1(BaseModel):
     )
     answer_id: Uuid7
     envelope: AnswerEnvelope
-    resolved_refs: list[ResolvedRef3]
-    signature: Signature
+    resolved_refs: list[ResolvedRef4]
+    signature: Signature2
 
 
 class Turn1(BaseModel):
@@ -5375,29 +5492,29 @@ class V1Thread(BaseModel):
     thread_id: Uuid7
     specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
     created_by: Uuid7
-    outlet_scope: OutletScope6 | OutletScope7
+    outlet_scope: OutletScope10 | OutletScope11
     created_at: IsoDatetime
     updated_at: IsoDatetime
     summary: Annotated[list[SummaryItem], Field(max_length=8)]
     turns: list[Turn1]
 
 
-class OutletScope8(RootModel[list[Uuid7]]):
+class OutletScope12(RootModel[list[Uuid7]]):
     root: Annotated[list[Uuid7], Field(min_length=1)]
 
 
-class OutletScope9(RootModel[list[Literal['*']]]):
+class OutletScope13(RootModel[list[Literal['*']]]):
     root: Annotated[list[Literal['*']], Field(max_length=1, min_length=1)]
 
 
-class Item16(BaseModel):
+class Item17(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     thread_id: Uuid7
     specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
     created_by: Uuid7
-    outlet_scope: OutletScope8 | OutletScope9
+    outlet_scope: OutletScope12 | OutletScope13
     created_at: IsoDatetime
     updated_at: IsoDatetime
 
@@ -5406,7 +5523,7 @@ class V1ThreadsResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    items: list[Item16]
+    items: list[Item17]
     next_cursor: str | None
 
 
@@ -8180,6 +8297,8 @@ class Quote(BaseModel):
     payment_days: Annotated[int, Field(ge=0, le=365)]
     terms: dict[constr(pattern=r'^[a-z][a-z0-9_]{0,39}$'), bool | Terms | Terms1]
     trace_event_id: Uuid7 | None
+    source_chunk_id: Uuid7
+    spans: Spans
 
 
 class InternalQuotesBatchRequest(BaseModel):
@@ -8462,6 +8581,115 @@ class V1InventoryReorderLevels(BaseModel):
         extra='forbid',
     )
     reorder_levels: list[ReorderLevel]
+
+
+class V1InvestigationCreateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    investigation_id: Uuid7
+    playbook_id: Literal['margin_fall']
+    params: Params3
+    outlet_scope: OutletScope | OutletScope1 | None = None
+
+
+class ChecklistItem5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    label_key: Annotated[str, Field(min_length=1)]
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
+    signature: Signature
+    status: Literal['pending', 'supported', 'refuted', 'cannot_verify']
+    frozen: bool
+    snapshot_ids: list[Uuid7]
+    refs: list[Ref2]
+
+
+class ItemUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    item_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
+    specialist: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
+    from_: Annotated[Literal['pending', 'supported', 'refuted', 'cannot_verify'], Field(alias='from')]
+    to: Literal['pending', 'supported', 'refuted', 'cannot_verify']
+    frozen: bool
+    reopened: bool
+    snapshot_ids: list[Uuid7]
+    refs: list[Ref2]
+
+
+class Narration(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    envelope: AnswerEnvelope
+    signatures: list[Signature]
+
+
+class Step(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    step_no: Annotated[int, Field(ge=1, le=9007199254740991)]
+    member_id: Uuid7
+    triggered_by: Literal['member', 'plan', 'auto']
+    started_at: IsoDatetime
+    item_updates: list[ItemUpdate]
+    tainted: bool
+    narration: Narration | None
+
+
+class ResolvedRef2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ref: Ref
+    value: str | Value4 | bool | None
+
+
+class V1Investigation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    investigation_id: Uuid7
+    playbook_id: Literal['margin_fall']
+    params: Params3
+    outlet_scope: OutletScope | OutletScope1
+    mode: Literal['step', 'plan', 'auto']
+    status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted']
+    stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting'] | None
+    created_by: Uuid7
+    steps_done: Annotated[int, Field(ge=0, le=9007199254740991)]
+    max_steps: Annotated[int, Field(ge=1, le=10)]
+    checklist: list[ChecklistItem5]
+    steps: list[Step]
+    resolved_refs: list[ResolvedRef2]
+    created_at: IsoDatetime
+    updated_at: IsoDatetime
+
+
+class InvestigationsNarrateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    question: Annotated[str, Field(max_length=200, min_length=1)]
+    playbook_id: Literal['margin_fall']
+    owner: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market']
+    items: Annotated[list[Item13], Field(max_length=12, min_length=1)]
+
+
+class InvestigationsNarrateResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    answer_id: Uuid7
+    tainted: bool
+    source: Literal['model', 'template']
 
 
 class KitchenTicketAdvanceV1(BaseModel):
@@ -8956,7 +9184,7 @@ class OrdersTenderRecordV1(BaseModel):
     tendered_minor: TenderedMinor1 | None
     amount_minor: AmountMinor9 | None
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
-    ref: Ref2 | None
+    ref: Ref4 | None
 
 
 class V1Tender(BaseModel):
@@ -9657,7 +9885,7 @@ class PlatformSnapshotMint(BaseModel):
     )
     tenant_id: Uuid7
     template_id: Annotated[str, Field(pattern='^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$')]
-    params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params | bool | list[str] | None]
+    params: dict[constr(pattern=r'^[a-z_][a-z0-9_]*$'), str | Params5 | bool | list[str] | None]
 
 
 class PlatformTenants(BaseModel):
@@ -9986,7 +10214,7 @@ class V1Supplier(BaseModel):
     kind: Literal['real', 'simulated']
     label: Literal['Simulated supplier'] | None
     a2a_card_url: str | None
-    payment_days: PaymentDays | None
+    payment_days: PaymentDays1 | None
     notes: str | None
     active: bool
     prices: list[Price]
@@ -10223,7 +10451,7 @@ class StorefrontMenuResponse(BaseModel):
     outlet_id: Uuid7
     channel_kind: Literal['counter', 'table_qr', 'pickup', 'own_site'] | ChannelKind
     accepting: StorefrontAcceptingResponse
-    items: list[Item15]
+    items: list[Item16]
     deals: list[Deal2]
     pay_at_counter: Literal[True]
 

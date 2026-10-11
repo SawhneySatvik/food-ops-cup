@@ -204,16 +204,17 @@ async def compile_brief(
         segments.append({"text": text, "refs": refs_of(text)})
     if not segments:
         return report
-    req = InternalAnswersRequest.model_validate({
-        "question": QUESTION,
-        "envelope": {
-            "answer_id": uuid7(uuid7_ms(ctx.run_id), f"brief:{ctx.run_id}"),
-            "segments": segments,
-            "abstained": False,
-            "reason_code": None,
-        },
-    })
+    req = InternalAnswersRequest.model_validate(
+        {
+            "question": QUESTION,
+            "envelope": {
+                "answer_id": uuid7(uuid7_ms(ctx.run_id), f"brief:{ctx.run_id}"),
+                "segments": segments,
+                "abstained": False,
+                "reason_code": None,
+            },
+        }
+    )
     resp = await sink.post(req)
     report.posted, report.abstained = not resp.abstained, resp.abstained
     return report
-

@@ -50,7 +50,8 @@ FINDING = "01920000-0000-7000-8000-00000000c001"
 #   finance 7 reads (finance.md §3) + margin_bridge + gst_summary (registry) = 9, + 3 proposes = 12
 #   inventory_purchasing 11 reads (inventory-purchasing.md §3) - 2 review-only = 9, + purchasing.invoices, inventory.counts,
 #     inventory.count_variance (registry-only: 0022, assigned by orchestrator 11 Oct) = 12, + 5 proposes = 17
-#   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · customers 7 + 2 = 9 · compliance 5 + 2 = 7
+#   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · compliance 5 + 2 = 7
+#   customers 7 + 0 = 7 (R-B S1-B / S1-D ruling, 11 Oct: coupon.set and campaign.create are not agent-exposed)
 #   market 6 reads + market.goals (registry-only: 0022, assigned by orchestrator 11 Oct) = 7, + 2 proposes = 9
 # Every one is <= 20 (F3). Reads over all specialists = 6+9+12+5+6+7+5+7 = 57, plus forecast's 3 exposed (points, accuracy,
 # freshness; forecast.md §3 lists 5 minus the 2 input-only) = 60 = EVERY_TOOL reads below.
@@ -60,13 +61,15 @@ TOOLSET_SIZE = {
     "inventory_purchasing": 17,
     "kitchen": 7,
     "people": 8,
-    "customers": 9,
+    "customers": 7,
     "compliance": 7,
     "market": 9,
 }
-#: Every model tool: 20 proposals + 60 agent-exposed templates (db/tests/manifest.ts TEMPLATES 68 after 0022 - 1 platform
+#: Every model tool: 18 proposals (23 - 5 not agent-exposed) + 60 agent-exposed templates (db/tests/manifest.ts TEMPLATES 68 after 0022 - 1 platform
 #: operator - 3 intel.* - 4 ADR-014 §5.1 not-agent-exposed = 60; 0022's five new ones are owned by specialists now).
-EVERY_TOOL = 80
+EVERY_TOOL = 78
+#: MANIFEST.d proposal lines (23) - 3 workflow / import-only - coupon.set and campaign.create (R-B S1-B / S1-D).
+PROPOSALS = 18
 
 
 def snapshot(template: str, columns: list[dict[str, Any]], rows: list[dict[str, Any]], sid: str = SNAP_ID) -> dict[str, Any]:
@@ -444,7 +447,7 @@ def test_adk_converts_every_generated_declaration_unchanged() -> None:
 
 # -- what the tools post parses with core-api's own zod contracts ----------------------------------------------------
 
-#: Literal values for the plain-text fields of the 20 proposal schemas (by property name), valid per their contracts.
+#: Literal values for the plain-text fields of the proposal schemas (by property name), valid per their contracts.
 LITERALS: dict[str, str] = {
     "currency": "INR",
     "unit": "kg",
@@ -521,7 +524,7 @@ def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
         outcomes[t.name] = run(t.run_async(args=args, tool_context=NO_CONTEXT))
     proposed = [n for n, o in outcomes.items() if o.get("status") == "proposed"]
     errors = {n: o for n, o in outcomes.items() if "error" in o}
-    assert errors == {} and len(proposed) == 20
+    assert errors == {} and len(proposed) == PROPOSALS
     drafts = [b for p, b in core.requests if p == "drafts"]
     mints = [b for p, b in core.requests if p == "snapshots"]
     node = shutil.which("node")
@@ -538,10 +541,13 @@ def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
     print(
         f"zod: {len(drafts)} draft bodies, {len(mints)} mint bodies; failing {[i for i in result['drafts'] if i]} {[i for i in result['snapshots'] if i]}"
     )
-    assert (len(drafts), len(mints)) == (20, EVERY_TOOL - 20)
+    assert (len(drafts), len(mints)) == (PROPOSALS, EVERY_TOOL - PROPOSALS)
     assert result == {"drafts": [[] for _ in drafts], "snapshots": [[] for _ in mints]}
     # the refusal side: a bare number where a Ref belongs is refused by the same check
-    bad = json.loads(json.dumps(drafts[0]))
+    # the first draft whose payload has a top-level ref leaf
+    bad = json.loads(
+        json.dumps(next(d for d in drafts if any(isinstance(v, str) and v.startswith("⟨snap:") for v in d["payload"].values())))
+    )
     leaf = next(k for k, v in bad["payload"].items() if isinstance(v, str) and v.startswith("⟨snap:"))
     bad["payload"][leaf] = "1200"
     refused = subprocess.run(

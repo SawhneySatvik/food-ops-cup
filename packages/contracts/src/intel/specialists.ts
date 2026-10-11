@@ -104,7 +104,8 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       ["customers", "growth", "customers_growth"],
       ["customers.coupon_cap_evasion", "customers.staff_applied_coupon", "customers.coupon_spike", "customers.regulars_lapsing", "customers.rating_drop"],
       ["customers.coupon_leakage", "customers.staff_coupon_use", "customers.coupon_daily", "customers.churn_segments", "customers.review_trend", "customers.consented_audience", "customers.coupon_current"],
-      ["customers.campaign.create.v1", "catalogue.coupon.set.v1"],
+      // No model-path draftables (R-B S1-B, S1-D): coupon.set and campaign.create are not agent-exposed.
+      [],
     ),
     e(
       "compliance",

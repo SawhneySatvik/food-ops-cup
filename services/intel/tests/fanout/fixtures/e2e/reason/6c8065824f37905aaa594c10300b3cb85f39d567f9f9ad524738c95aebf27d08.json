@@ -45,18 +45,18 @@
         {
          "excess_labour_minor": 0,
          "iso_week": "2026-W40",
-         "labour_bp": 1150,
+         "labour_bp": 1083,
          "labour_minor": 361000,
-         "net_sales_minor": 3140200,
+         "net_sales_minor": 3332200,
          "row": "S2.r0",
          "target_bp": null
         },
         {
          "excess_labour_minor": 0,
          "iso_week": "2026-W41",
-         "labour_bp": 1311,
+         "labour_bp": 1245,
          "labour_minor": 1901000,
-         "net_sales_minor": 14499000,
+         "net_sales_minor": 15267000,
          "row": "S2.r1",
          "target_bp": null
         }

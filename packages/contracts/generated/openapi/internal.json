@@ -19935,6 +19935,107 @@
                       "type": "null"
                     }
                   ]
+                },
+                "source_chunk_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "spans": {
+                  "type": "object",
+                  "properties": {
+                    "unit_price_minor": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "qty_milli": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "min_order_qty_milli": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "payment_days": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "prefixItems": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
+                          ],
+                          "items": false,
+                          "minItems": 2,
+                          "maxItems": 2
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "unit_price_minor",
+                    "qty_milli",
+                    "min_order_qty_milli",
+                    "payment_days"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -19949,7 +20050,9 @@
                 "min_order_qty_milli",
                 "payment_days",
                 "terms",
-                "trace_event_id"
+                "trace_event_id",
+                "source_chunk_id",
+                "spans"
               ],
               "additionalProperties": false
             }
@@ -21212,6 +21315,662 @@
         },
         "required": [
           "reorder_levels"
+        ],
+        "additionalProperties": false
+      },
+      "V1InvestigationCreateRequest": {
+        "title": "V1InvestigationCreateRequest",
+        "x-munim-contract": "v1.investigation.create.request",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "investigation_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "playbook_id": {
+            "type": "string",
+            "enum": [
+              "margin_fall"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "period_month": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              },
+              "compare_month": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              }
+            },
+            "required": [
+              "period_month",
+              "compare_month"
+            ],
+            "additionalProperties": false
+          },
+          "outlet_scope": {
+            "anyOf": [
+              {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              {
+                "minItems": 1,
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "const": "*"
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "investigation_id",
+          "playbook_id",
+          "params"
+        ],
+        "additionalProperties": false
+      },
+      "V1InvestigationContinueRequest": {
+        "title": "V1InvestigationContinueRequest",
+        "x-munim-contract": "v1.investigation.continue.request",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "step_no": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "required": [
+          "step_no"
+        ],
+        "additionalProperties": false
+      },
+      "V1Investigation": {
+        "title": "V1Investigation",
+        "x-munim-contract": "v1.investigation",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "investigation_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "playbook_id": {
+            "type": "string",
+            "enum": [
+              "margin_fall"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "period_month": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              },
+              "compare_month": {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+              }
+            },
+            "required": [
+              "period_month",
+              "compare_month"
+            ],
+            "additionalProperties": false
+          },
+          "outlet_scope": {
+            "anyOf": [
+              {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              {
+                "minItems": 1,
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "const": "*"
+                }
+              }
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "step",
+              "plan",
+              "auto"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "waiting",
+              "done",
+              "no_driver_found",
+              "cannot_verify",
+              "cancelled",
+              "exhausted"
+            ]
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "abstain",
+                  "budget",
+                  "scope",
+                  "waiting"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "steps_done": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "max_steps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "label_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "specialist": {
+                  "type": "string",
+                  "enum": [
+                    "catalogue",
+                    "kitchen",
+                    "inventory_purchasing",
+                    "finance",
+                    "people",
+                    "customers",
+                    "compliance",
+                    "market"
+                  ]
+                },
+                "signature": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "const": "investigation.signature.specialist"
+                    },
+                    "specialist": {
+                      "type": "string",
+                      "enum": [
+                        "catalogue",
+                        "kitchen",
+                        "inventory_purchasing",
+                        "finance",
+                        "people",
+                        "customers",
+                        "compliance",
+                        "market"
+                      ]
+                    },
+                    "name_key": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "specialist",
+                    "name_key"
+                  ],
+                  "additionalProperties": false
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "supported",
+                    "refuted",
+                    "cannot_verify"
+                  ]
+                },
+                "frozen": {
+                  "type": "boolean"
+                },
+                "snapshot_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  }
+                },
+                "refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                  }
+                }
+              },
+              "required": [
+                "item_id",
+                "label_key",
+                "specialist",
+                "signature",
+                "status",
+                "frozen",
+                "snapshot_ids",
+                "refs"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "member_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "triggered_by": {
+                  "type": "string",
+                  "enum": [
+                    "member",
+                    "plan",
+                    "auto"
+                  ]
+                },
+                "started_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "item_updates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "item_id": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                      },
+                      "specialist": {
+                        "type": "string",
+                        "enum": [
+                          "catalogue",
+                          "kitchen",
+                          "inventory_purchasing",
+                          "finance",
+                          "people",
+                          "customers",
+                          "compliance",
+                          "market"
+                        ]
+                      },
+                      "from": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "supported",
+                          "refuted",
+                          "cannot_verify"
+                        ]
+                      },
+                      "to": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "supported",
+                          "refuted",
+                          "cannot_verify"
+                        ]
+                      },
+                      "frozen": {
+                        "type": "boolean"
+                      },
+                      "reopened": {
+                        "type": "boolean"
+                      },
+                      "snapshot_ids": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Uuid7"
+                        }
+                      },
+                      "refs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "item_id",
+                      "specialist",
+                      "from",
+                      "to",
+                      "frozen",
+                      "reopened",
+                      "snapshot_ids",
+                      "refs"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tainted": {
+                  "type": "boolean"
+                },
+                "narration": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "answer_id": {
+                          "$ref": "#/components/schemas/Uuid7"
+                        },
+                        "envelope": {
+                          "$ref": "#/components/schemas/AnswerEnvelope"
+                        },
+                        "signatures": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "const": "investigation.signature.specialist"
+                              },
+                              "specialist": {
+                                "type": "string",
+                                "enum": [
+                                  "catalogue",
+                                  "kitchen",
+                                  "inventory_purchasing",
+                                  "finance",
+                                  "people",
+                                  "customers",
+                                  "compliance",
+                                  "market"
+                                ]
+                              },
+                              "name_key": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "specialist",
+                              "name_key"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "answer_id",
+                        "envelope",
+                        "signatures"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "step_no",
+                "member_id",
+                "triggered_by",
+                "started_at",
+                "item_updates",
+                "tainted",
+                "narration"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "resolved_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "$ref": "#/components/schemas/Ref"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "ref",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          }
+        },
+        "required": [
+          "investigation_id",
+          "playbook_id",
+          "params",
+          "outlet_scope",
+          "mode",
+          "status",
+          "stop_reason",
+          "created_by",
+          "steps_done",
+          "max_steps",
+          "checklist",
+          "steps",
+          "resolved_refs",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "InvestigationsNarrateRequest": {
+        "title": "InvestigationsNarrateRequest",
+        "x-munim-contract": "investigations.narrate.request",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "answer_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "playbook_id": {
+            "type": "string",
+            "enum": [
+              "margin_fall"
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "catalogue",
+              "kitchen",
+              "inventory_purchasing",
+              "finance",
+              "people",
+              "customers",
+              "compliance",
+              "market"
+            ]
+          },
+          "items": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "specialist": {
+                  "type": "string",
+                  "enum": [
+                    "catalogue",
+                    "kitchen",
+                    "inventory_purchasing",
+                    "finance",
+                    "people",
+                    "customers",
+                    "compliance",
+                    "market"
+                  ]
+                },
+                "verdict": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "supported",
+                    "refuted",
+                    "cannot_verify"
+                  ]
+                },
+                "cells": {
+                  "minItems": 1,
+                  "maxItems": 12,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                      },
+                      "column": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "column"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "template": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "required": [
+                "item_id",
+                "specialist",
+                "verdict",
+                "cells",
+                "template"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "answer_id",
+          "question",
+          "playbook_id",
+          "owner",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "InvestigationsNarrateResponse": {
+        "title": "InvestigationsNarrateResponse",
+        "x-munim-contract": "investigations.narrate.response",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "answer_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "tainted": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "model",
+              "template"
+            ]
+          }
+        },
+        "required": [
+          "answer_id",
+          "tainted",
+          "source"
         ],
         "additionalProperties": false
       },
@@ -29119,7 +29878,9 @@
           "mode_above_ceiling",
           "cap_above_platform_budget",
           "platform_budget_missing",
-          "assignee_missing"
+          "assignee_missing",
+          "campaign_audience_unscoped",
+          "specialist_needed"
         ]
       },
       "AnswerEnvelope": {

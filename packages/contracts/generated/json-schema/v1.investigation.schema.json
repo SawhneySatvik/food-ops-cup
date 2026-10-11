@@ -1,0 +1,566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.investigation",
+  "title": "V1Investigation",
+  "x-munim-module": "investigations",
+  "type": "object",
+  "properties": {
+    "investigation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "playbook_id": {
+      "type": "string",
+      "enum": [
+        "margin_fall"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "period_month": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+        },
+        "compare_month": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+        }
+      },
+      "required": [
+        "period_month",
+        "compare_month"
+      ],
+      "additionalProperties": false
+    },
+    "outlet_scope": {
+      "anyOf": [
+        {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        {
+          "minItems": 1,
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "const": "*"
+          }
+        }
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "step",
+        "plan",
+        "auto"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "waiting",
+        "done",
+        "no_driver_found",
+        "cannot_verify",
+        "cancelled",
+        "exhausted"
+      ]
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "draft",
+            "abstain",
+            "budget",
+            "scope",
+            "waiting"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "created_by": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "steps_done": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "max_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "label_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specialist": {
+            "type": "string",
+            "enum": [
+              "catalogue",
+              "kitchen",
+              "inventory_purchasing",
+              "finance",
+              "people",
+              "customers",
+              "compliance",
+              "market"
+            ]
+          },
+          "signature": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "const": "investigation.signature.specialist"
+              },
+              "specialist": {
+                "type": "string",
+                "enum": [
+                  "catalogue",
+                  "kitchen",
+                  "inventory_purchasing",
+                  "finance",
+                  "people",
+                  "customers",
+                  "compliance",
+                  "market"
+                ]
+              },
+              "name_key": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "key",
+              "specialist",
+              "name_key"
+            ],
+            "additionalProperties": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "supported",
+              "refuted",
+              "cannot_verify"
+            ]
+          },
+          "frozen": {
+            "type": "boolean"
+          },
+          "snapshot_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+            }
+          }
+        },
+        "required": [
+          "item_id",
+          "label_key",
+          "specialist",
+          "signature",
+          "status",
+          "frozen",
+          "snapshot_ids",
+          "refs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step_no": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "member_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "triggered_by": {
+            "type": "string",
+            "enum": [
+              "member",
+              "plan",
+              "auto"
+            ]
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+          },
+          "item_updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "specialist": {
+                  "type": "string",
+                  "enum": [
+                    "catalogue",
+                    "kitchen",
+                    "inventory_purchasing",
+                    "finance",
+                    "people",
+                    "customers",
+                    "compliance",
+                    "market"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "supported",
+                    "refuted",
+                    "cannot_verify"
+                  ]
+                },
+                "to": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "supported",
+                    "refuted",
+                    "cannot_verify"
+                  ]
+                },
+                "frozen": {
+                  "type": "boolean"
+                },
+                "reopened": {
+                  "type": "boolean"
+                },
+                "snapshot_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  }
+                },
+                "refs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                  }
+                }
+              },
+              "required": [
+                "item_id",
+                "specialist",
+                "from",
+                "to",
+                "frozen",
+                "reopened",
+                "snapshot_ids",
+                "refs"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "tainted": {
+            "type": "boolean"
+          },
+          "narration": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "answer_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "envelope": {
+                    "type": "object",
+                    "properties": {
+                      "answer_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "segments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2000
+                            },
+                            "refs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^(?:snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}))$"
+                              }
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "refs"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "abstained": {
+                        "type": "boolean"
+                      },
+                      "reason_code": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "number_grammar",
+                              "unresolved_ref",
+                              "cross_tenant_ref",
+                              "quote_mismatch",
+                              "missing_ref",
+                              "settlements_missing",
+                              "recipe_missing",
+                              "stale_draft",
+                              "authority_denied",
+                              "cost_price_missing",
+                              "ticket_times_missing",
+                              "count_missing",
+                              "expiry_missing",
+                              "budget_exceeded",
+                              "budget_missing",
+                              "margin_below_floor",
+                              "moq_exceeds_need",
+                              "open_commitment_overlap",
+                              "payment_terms_worse",
+                              "consent_record_missing",
+                              "bank_lines_missing",
+                              "attendance_missing",
+                              "payroll_out_of_scope",
+                              "no_marketing_consent",
+                              "not_a_certificate",
+                              "log_coverage_missing",
+                              "signal_source_missing",
+                              "insufficient_history",
+                              "forecast_stale",
+                              "window_full",
+                              "outlet_paused",
+                              "item_sold_out",
+                              "deal_rejudged",
+                              "coupon_invalid",
+                              "coupon_cap_reached",
+                              "coupon_min_spend",
+                              "change_window_closed",
+                              "coupon_expired",
+                              "coupon_out_of_scope",
+                              "price_above_mrp",
+                              "expired_batch",
+                              "period_closed",
+                              "model_blocked",
+                              "preview_total_changed",
+                              "buyer_identity_required",
+                              "tax_id_missing",
+                              "unknown_tax_class",
+                              "unknown_channel",
+                              "unit_mismatch",
+                              "not_applicable",
+                              "item_unavailable",
+                              "reason_required",
+                              "deal_changed",
+                              "duplicate_invoice",
+                              "guest_cannot_change",
+                              "refund_first",
+                              "order_tendered",
+                              "cash_below_rounding",
+                              "recently_rejected",
+                              "mode_above_ceiling",
+                              "cap_above_platform_budget",
+                              "platform_budget_missing",
+                              "assignee_missing",
+                              "campaign_audience_unscoped",
+                              "specialist_needed"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "answer_id",
+                      "segments",
+                      "abstained"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "signatures": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "const": "investigation.signature.specialist"
+                        },
+                        "specialist": {
+                          "type": "string",
+                          "enum": [
+                            "catalogue",
+                            "kitchen",
+                            "inventory_purchasing",
+                            "finance",
+                            "people",
+                            "customers",
+                            "compliance",
+                            "market"
+                          ]
+                        },
+                        "name_key": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "specialist",
+                        "name_key"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "answer_id",
+                  "envelope",
+                  "signatures"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "step_no",
+          "member_id",
+          "triggered_by",
+          "started_at",
+          "item_updates",
+          "tainted",
+          "narration"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resolved_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ref",
+          "value"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+    }
+  },
+  "required": [
+    "investigation_id",
+    "playbook_id",
+    "params",
+    "outlet_scope",
+    "mode",
+    "status",
+    "stop_reason",
+    "created_by",
+    "steps_done",
+    "max_steps",
+    "checklist",
+    "steps",
+    "resolved_refs",
+    "created_at",
+    "updated_at"
+  ],
+  "additionalProperties": false
+}

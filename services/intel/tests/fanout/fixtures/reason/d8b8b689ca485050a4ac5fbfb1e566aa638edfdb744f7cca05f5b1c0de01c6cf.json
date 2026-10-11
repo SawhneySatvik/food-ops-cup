@@ -8,17 +8,20 @@
      {
       "function_call": {
        "args": {
-        "query": "reviews this week"
+        "from": "2026-09-14",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
        },
-       "name": "search"
+       "name": "read_customers_review_trend"
       }
      }
     ],
     "role": "model"
    },
    "usage_metadata": {
-    "candidates_token_count": 31,
-    "prompt_token_count": 3233
+    "candidates_token_count": 49,
+    "prompt_token_count": 3098
    }
   }
  ],

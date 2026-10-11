@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "investigations.narrate.request",
+  "title": "InvestigationsNarrateRequest",
+  "x-munim-module": "investigations",
+  "type": "object",
+  "properties": {
+    "answer_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "playbook_id": {
+      "type": "string",
+      "enum": [
+        "margin_fall"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "enum": [
+        "catalogue",
+        "kitchen",
+        "inventory_purchasing",
+        "finance",
+        "people",
+        "customers",
+        "compliance",
+        "market"
+      ]
+    },
+    "items": {
+      "minItems": 1,
+      "maxItems": 12,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "specialist": {
+            "type": "string",
+            "enum": [
+              "catalogue",
+              "kitchen",
+              "inventory_purchasing",
+              "finance",
+              "people",
+              "customers",
+              "compliance",
+              "market"
+            ]
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "supported",
+              "refuted",
+              "cannot_verify"
+            ]
+          },
+          "cells": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                },
+                "column": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                }
+              },
+              "required": [
+                "ref",
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "item_id",
+          "specialist",
+          "verdict",
+          "cells",
+          "template"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "answer_id",
+    "question",
+    "playbook_id",
+    "owner",
+    "items"
+  ],
+  "additionalProperties": false
+}

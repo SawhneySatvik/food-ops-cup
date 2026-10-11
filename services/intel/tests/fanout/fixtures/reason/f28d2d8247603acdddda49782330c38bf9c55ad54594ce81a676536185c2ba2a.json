@@ -8,12 +8,8 @@
      {
       "function_call": {
        "args": {
-        "abstain": null,
-        "segments": [
-         {
-          "text": "Ratings averaged {S1.r0.avg_rating_x100} against a recent mean of {S1.r0.mean_8w_x100}."
-         }
-        ]
+        "abstain": "insufficient_history",
+        "segments": []
        },
        "name": "report"
       }
@@ -22,10 +18,10 @@
     "role": "model"
    },
    "usage_metadata": {
-    "candidates_token_count": 60,
-    "prompt_token_count": 3384
+    "candidates_token_count": 37,
+    "prompt_token_count": 3091
    }
   }
  ],
- "step": 1
+ "step": 0
 }

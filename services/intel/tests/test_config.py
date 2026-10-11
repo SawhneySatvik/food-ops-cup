@@ -111,3 +111,13 @@ def test_mode_defaults_to_recorded_and_refuses_unknown_values(tmp_path: Path) ->
 def test_no_service_secret_fails_closed(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match="no service secret"):
         load_config(env={}, run_dir=tmp_path).service_secret()
+
+
+def test_suppliers_sim_url_defaults_as_the_makefile_and_is_never_read_from_env_file(tmp_path: Path) -> None:
+    assert load_config(env={}, run_dir=tmp_path).suppliers_sim_public_url == "http://127.0.0.1:8090"
+    assert load_config(env={"SUPPLIERS_SIM_PORT": "9090"}, run_dir=tmp_path).suppliers_sim_public_url == "http://127.0.0.1:9090"
+    sim = "https://sim.example"
+    assert load_config(env={"SUPPLIERS_SIM_PUBLIC_URL": sim}, run_dir=tmp_path).suppliers_sim_public_url == sim
+    founder = tmp_path / "founder.env"
+    founder.write_text(f"SUPPLIERS_SIM_PUBLIC_URL={sim}\n")
+    assert load_config(env={}, env_file=founder, run_dir=tmp_path).suppliers_sim_public_url == "http://127.0.0.1:8090"

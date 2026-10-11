@@ -29,7 +29,7 @@ from google.adk.tools.base_tool import BaseTool
 from pydantic import ValidationError
 
 from munim_intel.config import Config, ConfigError
-from munim_intel.context.assembler import AGENT_NAME, CORE_RULES, Assembler, skill_block
+from munim_intel.context.assembler import AGENT_NAME, Assembler
 from munim_intel.contracts_gen.models import (
     AnswerEnvelope,
     InternalAnswersRequest,
@@ -47,9 +47,8 @@ from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER, InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
 from munim_intel.runtime.state import RunState
-from munim_intel.skills import SkillSpec
 from munim_intel.skills.loader import PackToolset
-from munim_intel.tools.answer import ALWAYS, SubmitAnswerTool
+from munim_intel.tools.answer import SubmitAnswerTool
 from munim_intel.tools.handles import HandleTable
 from munim_intel.trace.buffer import TraceBuffer
 
@@ -110,27 +109,12 @@ async def route(ctx: RunContext, question: str, frame: InternalRunFrameResponse,
     return answer_or_fallback(ROUTE_INTENT, result) or "explain", result.band
 
 
-def output_contract(skills: list[SkillSpec]) -> str:
-    """Block 2 for the Manager: abstain is folded into submit_answer (the assembler's text names an `abstain` tool)."""
-    codes = list(dict.fromkeys([c for s in skills for c in s.refusal_codes] + list(ALWAYS)))
-    return (
-        "Output contract:\n"
-        "- Finish by calling submit_answer once with short segments; every number in a segment is a cell handle in braces.\n"
-        f"- To abstain, call submit_answer with no segments and abstain set to one reason code: {', '.join(codes)}."
-    )
-
-
-class ManagerAssembler(Assembler):
-    def system(self) -> str:
-        return "\n\n".join([CORE_RULES, output_contract(self.toolset.skills), skill_block(self.toolset.skills)])
-
-
 @dataclass(frozen=True)
 class Prepared:
     state: RunState
     handles: HandleTable
     toolset: PackToolset
-    assembler: ManagerAssembler
+    assembler: Assembler
     submit: SubmitAnswerTool
     fan_out: FanOutTool | None = None
 
@@ -161,7 +145,7 @@ def prepare(
     )
     if b.skill is not None:
         toolset.load(b.skill)
-    assembler = ManagerAssembler("orchestrator", state, handles, toolset, frame, ctx.trigger, thread=req.thread)
+    assembler = Assembler("orchestrator", state, handles, toolset, frame, ctx.trigger, thread=req.thread)
     return Prepared(state, handles, toolset, assembler, submit, fan_out)
 
 

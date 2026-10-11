@@ -112,7 +112,9 @@
                 "mode_above_ceiling",
                 "cap_above_platform_budget",
                 "platform_budget_missing",
-                "assignee_missing"
+                "assignee_missing",
+                "campaign_audience_unscoped",
+                "specialist_needed"
               ]
             },
             {

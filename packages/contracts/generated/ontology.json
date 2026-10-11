@@ -9171,6 +9171,16 @@
           "name": "created_at",
           "type": "timestamp with time zone",
           "not_null": true
+        },
+        {
+          "name": "source_chunk_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "spans",
+          "type": "jsonb",
+          "not_null": false
         }
       ]
     },
@@ -12174,6 +12184,13 @@
         "to_cols": "{tenant_id,id,kind}"
       },
       {
+        "name": "supplier_quote_source_chunk_fk",
+        "from": "intel.supplier_quote",
+        "to": "intel.chunk",
+        "from_cols": "{tenant_id,source_chunk_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
         "name": "supplier_quote_tenant_id_fkey",
         "from": "intel.supplier_quote",
         "to": "core.tenant",
@@ -14921,7 +14938,7 @@
     },
     {
       "id": "finance.settlement_vs_orders",
-      "version": 2,
+      "version": 3,
       "min_role": "advisor",
       "agent_exposed": true,
       "tool": "read_finance_settlement_vs_orders",
@@ -19365,8 +19382,8 @@
     {
       "command_type": "catalogue.coupon.set.v1",
       "contract": "proposal.catalogue.coupon.set.v1",
-      "tool": "propose_catalogue_coupon_set",
-      "agent_exposed": true,
+      "tool": null,
+      "agent_exposed": false,
       "stages": [
         "preview",
         "approve",
@@ -19382,122 +19399,7 @@
         "scope": "tenant",
         "max_amount_minor": null
       },
-      "model_schema": {
-        "type": "object",
-        "properties": {
-          "coupon_id": {
-            "type": "string",
-            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
-          },
-          "code": {
-            "type": "string",
-            "description": "Text matching ^[A-Z0-9][A-Z0-9-]{2,31}$."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "percent",
-              "amount"
-            ]
-          },
-          "value_bp": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "value_minor": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "currency": {
-            "type": "string",
-            "description": "Text matching ^[A-Z]{3}$."
-          },
-          "min_spend_minor": {
-            "type": "string",
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "global_cap": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "per_customer_cap": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "requires_customer": {
-            "type": "boolean"
-          },
-          "outlet_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
-            },
-            "maxItems": 100
-          },
-          "valid_from": {
-            "type": "string",
-            "description": "An ISO-8601 date-time with an offset, e.g. YYYY-MM-DDThh:mm:ss+05:30."
-          },
-          "valid_to": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "An ISO-8601 date-time with an offset, e.g. YYYY-MM-DDThh:mm:ss+05:30."
-          },
-          "active": {
-            "type": "boolean"
-          },
-          "based_on": {
-            "type": "array",
-            "description": "Handles of the snapshot cells this proposal assumes, e.g. S1.r0.<column>; re-checked when a person approves.",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "maxItems": 50
-          },
-          "finding": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the finding this proposal answers, e.g. F1, or null."
-          }
-        },
-        "required": [
-          "coupon_id",
-          "code",
-          "kind",
-          "value_bp",
-          "value_minor",
-          "currency",
-          "min_spend_minor",
-          "global_cap",
-          "per_customer_cap",
-          "requires_customer",
-          "outlet_ids",
-          "valid_from",
-          "valid_to",
-          "active",
-          "based_on",
-          "finding"
-        ],
-        "additionalProperties": false
-      },
+      "model_schema": null,
       "leaves": [
         {
           "path": "/coupon_id",
@@ -20000,8 +19902,8 @@
     {
       "command_type": "customers.campaign.create.v1",
       "contract": "proposal.customers.campaign.create.v1",
-      "tool": "propose_customers_campaign_create",
-      "agent_exposed": true,
+      "tool": null,
+      "agent_exposed": false,
       "stages": [
         "preview",
         "approve",
@@ -20017,121 +19919,7 @@
         "scope": "tenant",
         "max_amount_minor": null
       },
-      "model_schema": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Text, at least 1 characters, at most 200 characters."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "email",
-              "sms"
-            ]
-          },
-          "outlet_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
-            },
-            "maxItems": 50
-          },
-          "segment_snapshot_id": {
-            "type": "string",
-            "description": "Handle of a snapshot minted in this run, e.g. S1."
-          },
-          "audience_count": {
-            "type": "string",
-            "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-          },
-          "message_key": {
-            "type": "string",
-            "description": "Text matching ^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$."
-          },
-          "placeholders": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "key": {
-                  "type": "string",
-                  "description": "Text matching ^[a-z][a-z0-9_]{0,39}$."
-                },
-                "value": {
-                  "type": "string",
-                  "description": "Handle of the snapshot cell holding this value, e.g. S1.r0.<column> (or a document handle D<n>). Never type the value."
-                }
-              },
-              "required": [
-                "key",
-                "value"
-              ],
-              "additionalProperties": false
-            },
-            "maxItems": 20
-          },
-          "coupon_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
-          },
-          "send_at": {
-            "type": "string",
-            "description": "An ISO-8601 date-time with an offset, e.g. YYYY-MM-DDThh:mm:ss+05:30."
-          },
-          "window_from": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "An ISO-8601 date-time with an offset, e.g. YYYY-MM-DDThh:mm:ss+05:30."
-          },
-          "window_to": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "An ISO-8601 date-time with an offset, e.g. YYYY-MM-DDThh:mm:ss+05:30."
-          },
-          "based_on": {
-            "type": "array",
-            "description": "Handles of the snapshot cells this proposal assumes, e.g. S1.r0.<column>; re-checked when a person approves.",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "maxItems": 50
-          },
-          "finding": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Handle of the finding this proposal answers, e.g. F1, or null."
-          }
-        },
-        "required": [
-          "name",
-          "channel",
-          "outlet_ids",
-          "segment_snapshot_id",
-          "audience_count",
-          "message_key",
-          "placeholders",
-          "coupon_id",
-          "send_at",
-          "window_from",
-          "window_to",
-          "based_on",
-          "finding"
-        ],
-        "additionalProperties": false
-      },
+      "model_schema": null,
       "leaves": [
         {
           "path": "/campaign_id",
@@ -22115,10 +21903,7 @@
         "customers.coupon_current"
       ],
       "templates_pending": [],
-      "draftables": [
-        "customers.campaign.create.v1",
-        "catalogue.coupon.set.v1"
-      ]
+      "draftables": []
     },
     {
       "id": "compliance",
@@ -22168,7 +21953,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "9fbb646d0ab77056c3a2fa56ce6f341f57714893c92aac0d1b84d277e6fa1c25",
+      "sha256": "35e2273fe8e8a61f6259e5bc8640db65e8e1b689683289b0ef0135d039925922",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -22193,6 +21978,7 @@
         "db/migrations/0021_mc1bc_pack_templates_history_kinds.sql": "a2b8cbf0a15fbb75e508e3551364c1c3e1938c1304ef7f1bce790267e4e9eba2",
         "db/migrations/0022_mc1d_guard_binding_f8_asof.sql": "6a373c5154b07961fd3258f16158983a539b9f282189830e7f6a8cc5055b5034",
         "db/migrations/0023_mc1e_template_versions.sql": "b469db215ee0110933bc416f4d39f3656af9e88f3fb5c4062a4322a17e6d69cc",
+        "db/migrations/0024_w32_review_fixes.sql": "542c06a388851d28213590315aadc943a746042d367792dc2429e29a14ad8d9e",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -22208,13 +21994,14 @@
         "packages/contracts/src/imports/index.ts": "c22e8da9180dbe12f5d2d567e05476350adcdcd4b23ede076f2f08733956ee0c",
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "b0a29fed9fa29f8e9b3f862619c71d5b803f82a9c917aab2e5d49523c97ffb74",
-        "packages/contracts/src/intel/specialists.ts": "7fc07468501f0fb7b339c8509927efabc139a8e0357e895244452e3a047aa505",
-        "packages/contracts/src/internal/index.ts": "47f326a2b7d0df264fdeb375a651608cbc3e1e0b03288b1b6e5ec63994cab5ca",
+        "packages/contracts/src/intel/specialists.ts": "c9950f7680acf28e9f026fc4bae836f21b7f7bf74553257f3be14bf0a7d03d28",
+        "packages/contracts/src/internal/index.ts": "2c525acabfb897b229e5b7aad88287c289735146b220639cabfeae11616ec4d2",
         "packages/contracts/src/inventory/index.ts": "f143368409ece4afea8ee531d71e866191aea6291e933d54047866dbd6812241",
+        "packages/contracts/src/investigations/index.ts": "a535f8d7ec8d757fe39d8b0b5478cfe81bb0c1d7ec44acd21a151112501d9fad",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
         "packages/contracts/src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
-        "packages/contracts/src/ontology/actions.ts": "874ecce61f244650158b9d65868801aeed12d76c88956ff69fd49f85f95bd05b",
+        "packages/contracts/src/ontology/actions.ts": "666b9527395a3a41d3117b1fec21549de22d7a2064d780089254403b42e5007f",
         "packages/contracts/src/ontology/lint.ts": "6bf298e6a9773960c53936e6aff4396e4a5d0af6f80cb278bffd7bb565d26005",
         "packages/contracts/src/ontology/stamp.ts": "9ceb542b08ee8c73f39d6f66e290193dfa081412d295b8a0ceddac8dec117c2e",
         "packages/contracts/src/ontology/transform.ts": "8124bc743d70aa8fbd0ee41f29b2ef8d0be4010ae323935588dde85237709cd5",
@@ -22236,7 +22023,7 @@
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
         "packages/contracts/src/shared/primitives.ts": "97b9d196f7f5354c5924e12475ab6f2c7fa79b109e8ce3fb3ab961167bdf7de2",
-        "packages/contracts/src/shared/reason-codes.ts": "8a83d813e3608300a0130b9968564d1bbb1eaf48b1a7e923b788134cea3457bd",
+        "packages/contracts/src/shared/reason-codes.ts": "d96c8b94f1571826045191e6b5a930e7bbbced1907135fc35763c3c4d1d798af",
         "packages/contracts/src/shared/refs.ts": "1ca3960ba3c317b909b6dfddf6c73ac16b4d7afd1acbccae8a8405c6ca1c006c",
         "packages/contracts/src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
         "packages/contracts/src/shared/run-token.ts": "e9fc4127e1b7ffdc0271908f3992903e4b6204e46e7432b99a134ce94297054f",
@@ -22248,6 +22035,6 @@
         "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
       }
     },
-    "body_sha256": "fc4623f4f02c1fb23be72ffaf278779bbfb3d4032d97c86f45f4612f7aba25f1"
+    "body_sha256": "96a27547de7bcede341ae3202d656402da448b8a489d357ce40995e35fc19b69"
   }
 }

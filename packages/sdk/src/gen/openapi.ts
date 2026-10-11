@@ -1376,6 +1376,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/investigations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open an investigation (Step mode) for a playbook over the caller's outlet scope; the client's id is its idempotency key */
+        post: operations["createInvestigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/investigations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An investigation with its checklist, steps and narrations (404 outside the caller's outlet scope) */
+        get: operations["getInvestigation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/investigations/{id}:continue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run exactly the named next step: mint, judge in code, store, narrate */
+        post: operations["continueInvestigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kitchen/board": {
         parameters: {
             query?: never;
@@ -6096,6 +6147,25 @@ export interface components {
                     [key: string]: boolean | number | string;
                 };
                 trace_event_id: components["schemas"]["Uuid7"] | null;
+                source_chunk_id: components["schemas"]["Uuid7"];
+                spans: {
+                    unit_price_minor: [
+                        number,
+                        number
+                    ];
+                    qty_milli: [
+                        number,
+                        number
+                    ];
+                    min_order_qty_milli: [
+                        number,
+                        number
+                    ] | null;
+                    payment_days: [
+                        number,
+                        number
+                    ] | null;
+                };
             }[];
         };
         /** InternalGraphQueryRequest */
@@ -6331,6 +6401,128 @@ export interface components {
                 par_qty_milli: number;
                 updated_at: components["schemas"]["IsoDatetime"];
             }[];
+        };
+        /** V1InvestigationCreateRequest */
+        V1InvestigationCreateRequest: {
+            investigation_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            playbook_id: "margin_fall";
+            params: {
+                /** Format: date */
+                period_month: string;
+                /** Format: date */
+                compare_month: string;
+            };
+            outlet_scope?: components["schemas"]["Uuid7"][] | "*"[];
+        };
+        /** V1InvestigationContinueRequest */
+        V1InvestigationContinueRequest: {
+            step_no: number;
+        };
+        /** V1Investigation */
+        V1Investigation: {
+            investigation_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            playbook_id: "margin_fall";
+            params: {
+                /** Format: date */
+                period_month: string;
+                /** Format: date */
+                compare_month: string;
+            };
+            outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
+            /** @enum {string} */
+            mode: "step" | "plan" | "auto";
+            /** @enum {string} */
+            status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted";
+            stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
+            created_by: components["schemas"]["Uuid7"];
+            steps_done: number;
+            max_steps: number;
+            checklist: {
+                item_id: string;
+                label_key: string;
+                /** @enum {string} */
+                specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                signature: {
+                    /** @constant */
+                    key: "investigation.signature.specialist";
+                    /** @enum {string} */
+                    specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                    name_key: string;
+                };
+                /** @enum {string} */
+                status: "pending" | "supported" | "refuted" | "cannot_verify";
+                frozen: boolean;
+                snapshot_ids: components["schemas"]["Uuid7"][];
+                refs: string[];
+            }[];
+            steps: {
+                step_no: number;
+                member_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                triggered_by: "member" | "plan" | "auto";
+                started_at: components["schemas"]["IsoDatetime"];
+                item_updates: {
+                    item_id: string;
+                    /** @enum {string} */
+                    specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                    /** @enum {string} */
+                    from: "pending" | "supported" | "refuted" | "cannot_verify";
+                    /** @enum {string} */
+                    to: "pending" | "supported" | "refuted" | "cannot_verify";
+                    frozen: boolean;
+                    reopened: boolean;
+                    snapshot_ids: components["schemas"]["Uuid7"][];
+                    refs: string[];
+                }[];
+                tainted: boolean;
+                narration: {
+                    answer_id: components["schemas"]["Uuid7"];
+                    envelope: components["schemas"]["AnswerEnvelope"];
+                    signatures: {
+                        /** @constant */
+                        key: "investigation.signature.specialist";
+                        /** @enum {string} */
+                        specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                        name_key: string;
+                    }[];
+                } | null;
+            }[];
+            resolved_refs: {
+                ref: components["schemas"]["Ref"];
+                value: string | number | boolean | null;
+            }[];
+            created_at: components["schemas"]["IsoDatetime"];
+            updated_at: components["schemas"]["IsoDatetime"];
+        };
+        /** InvestigationsNarrateRequest */
+        InvestigationsNarrateRequest: {
+            answer_id: components["schemas"]["Uuid7"];
+            question: string;
+            /** @enum {string} */
+            playbook_id: "margin_fall";
+            /** @enum {string} */
+            owner: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+            items: {
+                item_id: string;
+                /** @enum {string} */
+                specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                /** @enum {string} */
+                verdict: "pending" | "supported" | "refuted" | "cannot_verify";
+                cells: {
+                    ref: string;
+                    column: string;
+                }[];
+                template: string;
+            }[];
+        };
+        /** InvestigationsNarrateResponse */
+        InvestigationsNarrateResponse: {
+            answer_id: components["schemas"]["Uuid7"];
+            tainted: boolean;
+            /** @enum {string} */
+            source: "model" | "template";
         };
         /** KitchenTicketAdvanceV1 */
         KitchenTicketAdvanceV1: {
@@ -7771,7 +7963,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -15623,6 +15815,231 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["V1InvestigationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Investigation"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Investigation"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    continueInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["V1InvestigationContinueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Investigation"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

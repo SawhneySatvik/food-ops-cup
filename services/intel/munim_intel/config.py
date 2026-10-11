@@ -55,6 +55,10 @@ class Config:
         self.port: int = intel.port
         core = (env.get("MUNIM_CORE_URL") or "").strip()
         self.core_url = core or f"http://127.0.0.1:{(env.get('PORT') or '8787').strip()}"
+        # The one origin a negotiation may reach (negotiate/port.py A2aSuppliers); defaults as the Makefile does.
+        # Not a secret, so never read from `.env`.
+        sim = (env.get("SUPPLIERS_SIM_PUBLIC_URL") or "").strip()
+        self.suppliers_sim_public_url = sim or f"http://127.0.0.1:{(env.get('SUPPLIERS_SIM_PORT') or '8090').strip()}"
 
     def _register(self, label: str, value: str) -> None:
         if len(value) >= 4 and (label, value) not in self._secrets:

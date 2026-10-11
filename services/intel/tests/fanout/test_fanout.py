@@ -198,7 +198,10 @@ def test_a_branch_declares_its_skills_read_tools_and_report_only(pack: str) -> N
     print(f"branch:{pack}: {len(declared)} tools")
     assert declared == sorted(["report", *own_tools(pack, propose=False)])
     assert not [t for t in declared if t.startswith("propose_") or t in ("request_quotes", "load_skill", "fan_out", "submit_answer")]
-    assert [t for t in own_tools(pack, propose=True) if t.startswith("propose_")], "paired: the same skill can propose"
+    # Paired: the same skill proposes its DRAFTABLES; by hand, customers has none (R-B S1-B / S1-D ruling, 11 Oct).
+    proposes = [t for t in own_tools(pack, propose=True) if t.startswith("propose_")]
+    assert len(proposes) == len(load_skill(pack).draftables), "paired: the same skill can propose"
+    assert bool(proposes) == (pack != "customers")
 
 
 # -- gate 5: a branch that reads a planted injection taints the orchestrator --------------------------------------------
