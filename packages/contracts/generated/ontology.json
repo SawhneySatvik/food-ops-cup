@@ -13081,6 +13081,1165 @@
       "optional": []
     },
     {
+      "id": "compliance.asset_costs",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_compliance_asset_costs",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "asset_id",
+          "type": "uuid"
+        },
+        {
+          "name": "repairs_under_amc_minor",
+          "type": "integer",
+          "numeric_source": "core.maintenance.cost_minor"
+        },
+        {
+          "name": "amc_overlap_days",
+          "type": "integer",
+          "numeric_source": [
+            "core.amc.valid_from",
+            "core.amc.valid_to"
+          ]
+        },
+        {
+          "name": "amc_overlap_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.amc.valid_from",
+            "core.amc.valid_to",
+            "core.amc.cost_minor"
+          ]
+        },
+        {
+          "name": "amc_waste_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.maintenance.cost_minor",
+            "core.amc.valid_from",
+            "core.amc.valid_to",
+            "core.amc.cost_minor"
+          ]
+        },
+        {
+          "name": "preventive_overdue_days",
+          "type": "integer",
+          "numeric_source": "core.maintenance.due_on"
+        },
+        {
+          "name": "last_preventive_cost_minor",
+          "type": "integer",
+          "numeric_source": "core.maintenance.cost_minor"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "compliance.energy_per_order",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_compliance_energy_per_order",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "months"
+        ],
+        "properties": {
+          "months": {
+            "type": "integer",
+            "maximum": 24,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "month_on",
+          "type": "date"
+        },
+        {
+          "name": "utility_minor",
+          "type": "integer",
+          "numeric_source": "core.expense.amount_minor"
+        },
+        {
+          "name": "orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "per_order_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.expense.amount_minor",
+            "count:core.order"
+          ]
+        },
+        {
+          "name": "median_per_order_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.expense.amount_minor",
+            "count:core.order"
+          ]
+        },
+        {
+          "name": "energy_excess_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.expense.amount_minor",
+            "count:core.order"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "months",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "compliance.licence_calendar",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_compliance_licence_calendar",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "as_of",
+          "required_kinds"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "required_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "maxItems": 20,
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "outlet_id",
+          "type": "uuid"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "licence_id",
+          "type": "uuid"
+        },
+        {
+          "name": "valid_to",
+          "type": "date"
+        },
+        {
+          "name": "days_left",
+          "type": "integer",
+          "numeric_source": "core.licence.valid_to"
+        },
+        {
+          "name": "missing",
+          "type": "boolean"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "required_kinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Text matching ^[a-z][a-z0-9_]*$."
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "as_of",
+          "required_kinds",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "compliance.log_coverage",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_compliance_log_coverage",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "checklist_id",
+          "type": "uuid"
+        },
+        {
+          "name": "expected_runs",
+          "type": "integer",
+          "numeric_source": "core.checklist.frequency"
+        },
+        {
+          "name": "done_runs",
+          "type": "integer",
+          "numeric_source": "count:core.checklist_run"
+        },
+        {
+          "name": "coverage_bp",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.checklist_run",
+            "core.checklist.frequency",
+            "count:core.temp_log",
+            "count:core.asset"
+          ]
+        },
+        {
+          "name": "temp_expected",
+          "type": "integer",
+          "numeric_source": "count:core.asset"
+        },
+        {
+          "name": "temp_logged",
+          "type": "integer",
+          "numeric_source": "count:core.temp_log"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "compliance.temp_excursions",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_compliance_temp_excursions",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "asset_id",
+          "type": "uuid"
+        },
+        {
+          "name": "logged_on",
+          "type": "date"
+        },
+        {
+          "name": "readings",
+          "type": "integer",
+          "numeric_source": "count:core.temp_log"
+        },
+        {
+          "name": "out_of_range",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.temp_log",
+            "core.temp_log.reading_milli_c",
+            "core.asset.safe_min_milli_c",
+            "core.asset.safe_max_milli_c"
+          ]
+        },
+        {
+          "name": "max_milli_c",
+          "type": "integer",
+          "numeric_source": "core.temp_log.reading_milli_c"
+        },
+        {
+          "name": "temp_waste_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.churn_segments",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_churn_segments",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "as_of"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "customer_id",
+          "type": "uuid"
+        },
+        {
+          "name": "orders_90d",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "median_gap_days",
+          "type": "integer",
+          "numeric_source": "core.order.business_date"
+        },
+        {
+          "name": "days_since_last",
+          "type": "integer",
+          "numeric_source": "core.order.business_date"
+        },
+        {
+          "name": "monthly_spend_minor",
+          "type": "integer",
+          "numeric_source": "core.order.total_minor"
+        },
+        {
+          "name": "segment",
+          "type": "text"
+        },
+        {
+          "name": "at_risk_count",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.order.business_date"
+          ]
+        },
+        {
+          "name": "regular_count",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.order.business_date"
+          ]
+        },
+        {
+          "name": "at_risk_spend_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.order.total_minor",
+            "core.order.business_date"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "as_of",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.consented_audience",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_consented_audience",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "segment_snapshot_id"
+        ],
+        "properties": {
+          "segment_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "audience",
+          "type": "integer",
+          "numeric_source": "count:core.customer"
+        },
+        {
+          "name": "consented",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.customer",
+            "core.customer.consent"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "segment_snapshot_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "segment_snapshot_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/segment_snapshot_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.coupon_current",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_coupon_current",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "coupon_id"
+        ],
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "value_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon.value_minor"
+        },
+        {
+          "name": "value_bp",
+          "type": "integer",
+          "numeric_source": "core.coupon.value_bp"
+        },
+        {
+          "name": "per_customer_cap",
+          "type": "integer",
+          "numeric_source": "core.coupon.per_customer_cap"
+        },
+        {
+          "name": "global_cap",
+          "type": "integer",
+          "numeric_source": "core.coupon.global_cap"
+        },
+        {
+          "name": "min_spend_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon.min_spend_minor"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "coupon_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/coupon_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.coupon_daily",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_coupon_daily",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "coupon_id",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "used_on",
+          "type": "date"
+        },
+        {
+          "name": "uses",
+          "type": "integer",
+          "numeric_source": "count:core.coupon_use"
+        },
+        {
+          "name": "median_uses",
+          "type": "integer",
+          "numeric_source": "count:core.coupon_use"
+        },
+        {
+          "name": "first_time_uses",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.coupon_use",
+            "count:core.order"
+          ]
+        },
+        {
+          "name": "discount_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon_use.discount_minor"
+        },
+        {
+          "name": "excess_discount_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon_use.discount_minor"
+        },
+        {
+          "name": "in_campaign_window",
+          "type": "boolean"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "coupon_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "coupon_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/coupon_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.coupon_leakage",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_coupon_leakage",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "coupon_id",
+          "type": "uuid"
+        },
+        {
+          "name": "uses",
+          "type": "integer",
+          "numeric_source": "count:core.coupon_use"
+        },
+        {
+          "name": "discount_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon_use.discount_minor"
+        },
+        {
+          "name": "cap_evasion_uses",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.coupon_use",
+            "core.coupon.per_customer_cap"
+          ]
+        },
+        {
+          "name": "cap_evasion_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.coupon_use.discount_minor",
+            "core.coupon.per_customer_cap"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "customers.review_trend",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_review_trend",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "iso_week",
+          "type": "text"
+        },
+        {
+          "name": "reviews",
+          "type": "integer",
+          "numeric_source": "count:core.review"
+        },
+        {
+          "name": "avg_rating_x100",
+          "type": "integer",
+          "numeric_source": "core.review.rating"
+        },
+        {
+          "name": "mean_8w_x100",
+          "type": "integer",
+          "numeric_source": "core.review.rating"
+        },
+        {
+          "name": "late_tickets",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.kitchen_ticket",
+            "core.kitchen_ticket.ready_at",
+            "core.kitchen_ticket.due_at"
+          ]
+        },
+        {
+          "name": "late_change_bp",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.kitchen_ticket",
+            "core.kitchen_ticket.ready_at",
+            "core.kitchen_ticket.due_at"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "customers.staff_coupon_use",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_customers_staff_coupon_use",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "week_start"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "coupon_id",
+          "type": "uuid"
+        },
+        {
+          "name": "member_id",
+          "type": "uuid"
+        },
+        {
+          "name": "uses",
+          "type": "integer",
+          "numeric_source": "count:core.coupon_use"
+        },
+        {
+          "name": "cash_uses",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.coupon_use",
+            "count:core.tender"
+          ]
+        },
+        {
+          "name": "discount_minor",
+          "type": "integer",
+          "numeric_source": "core.coupon_use.discount_minor"
+        },
+        {
+          "name": "outlet_median_uses",
+          "type": "integer",
+          "numeric_source": "count:core.coupon_use"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "week_start": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "week_start",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
       "id": "finance.close_status",
       "version": 1,
       "min_role": "advisor",
@@ -13971,6 +15130,435 @@
       "optional": []
     },
     {
+      "id": "forecast.accuracy",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_forecast_accuracy",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "method",
+          "type": "text"
+        },
+        {
+          "name": "actual_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        },
+        {
+          "name": "forecast_qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.qty_milli"
+        },
+        {
+          "name": "wape_bp",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.order_line.qty_milli"
+          ]
+        },
+        {
+          "name": "bias_bp",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.order_line.qty_milli"
+          ]
+        },
+        {
+          "name": "days",
+          "type": "integer",
+          "numeric_source": "count:intel.forecast_point"
+        },
+        {
+          "name": "over_forecast_cost_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.order_line.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor",
+            "core.supplier_price.unit_price_minor"
+          ]
+        },
+        {
+          "name": "under_forecast_sales_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.order_line.qty_milli",
+            "core.price.amount_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "forecast.freshness",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_forecast_freshness",
+      "params_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "outlet_id",
+          "type": "uuid"
+        },
+        {
+          "name": "trained_through",
+          "type": "date"
+        },
+        {
+          "name": "points",
+          "type": "integer",
+          "numeric_source": "count:intel.forecast_point"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "forecast.points",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_forecast_points",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to",
+          "item_id"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "item_id",
+          "type": "uuid"
+        },
+        {
+          "name": "business_on",
+          "type": "date"
+        },
+        {
+          "name": "slot_start",
+          "type": "text"
+        },
+        {
+          "name": "qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.qty_milli"
+        },
+        {
+          "name": "lo_qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.lo_qty_milli"
+        },
+        {
+          "name": "hi_qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.hi_qty_milli"
+        },
+        {
+          "name": "method",
+          "type": "text"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "item_id",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/item_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "forecast.sales_history",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "item_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "business_on",
+          "type": "date"
+        },
+        {
+          "name": "qty_milli",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        },
+        {
+          "name": "closed",
+          "type": "boolean"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/item_id",
+          "kind": "entity",
+          "nullable": false
+        },
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "forecast.slot_profile",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "weeks",
+          "slot_minutes"
+        ],
+        "properties": {
+          "weeks": {
+            "type": "integer",
+            "maximum": 26,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "slot_minutes": {
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "weekday",
+          "type": "integer",
+          "numeric_source": "core.order.business_date"
+        },
+        {
+          "name": "slot_start",
+          "type": "text"
+        },
+        {
+          "name": "share_bp",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
       "id": "intel.agent_track_record",
       "version": 1,
       "min_role": "manager",
@@ -14233,6 +15821,2373 @@
       "optional": []
     },
     {
+      "id": "inventory.dead_stock",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_dead_stock",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 730,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "on_hand_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_movement.qty_milli"
+        },
+        {
+          "name": "value_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        },
+        {
+          "name": "last_sold_at",
+          "type": "timestamptz"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "days",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.expiry_risk",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_expiry_risk",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 365,
+            "minimum": 0
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "batch_id",
+          "type": "uuid"
+        },
+        {
+          "name": "expiry_on",
+          "type": "date"
+        },
+        {
+          "name": "days_to_expiry",
+          "type": "integer",
+          "numeric_source": "core.batch.expires_on"
+        },
+        {
+          "name": "is_sku",
+          "type": "boolean"
+        },
+        {
+          "name": "remaining_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_movement.qty_milli"
+        },
+        {
+          "name": "use_before_expiry_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.qty_milli"
+          ]
+        },
+        {
+          "name": "at_risk_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.qty_milli"
+          ]
+        },
+        {
+          "name": "at_risk_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "days",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.shortfall",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_shortfall",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "lead_days"
+        ],
+        "properties": {
+          "lead_days": {
+            "type": "integer",
+            "maximum": 30,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "need_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli"
+          ]
+        },
+        {
+          "name": "proposed_min_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli"
+          ]
+        },
+        {
+          "name": "proposed_par_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli"
+          ]
+        },
+        {
+          "name": "on_hand_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_movement.qty_milli"
+        },
+        {
+          "name": "open_po_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "core.po_line.qty_milli",
+            "core.grn_line.qty_milli"
+          ]
+        },
+        {
+          "name": "shortfall_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.qty_milli",
+            "core.po_line.qty_milli",
+            "core.grn_line.qty_milli"
+          ]
+        },
+        {
+          "name": "stockout_on",
+          "type": "date"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "lead_days": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "lead_days",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.shrinkage",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_shrinkage",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "count_id"
+        ],
+        "properties": {
+          "count_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "expected_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_count_line.expected_qty_milli"
+        },
+        {
+          "name": "counted_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_count_line.counted_qty_milli"
+        },
+        {
+          "name": "loss_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_count_line.expected_qty_milli",
+            "core.stock_count_line.counted_qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        },
+        {
+          "name": "counted_value_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_count_line.counted_qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "count_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "count_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/count_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "inventory.waste_week",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_inventory_waste_week",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "week_start"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "waste_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        },
+        {
+          "name": "median_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        },
+        {
+          "name": "excess_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "week_start": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "week_start",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "kitchen.prep_need",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_kitchen_prep_need",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "business_date"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "business_date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "forecast_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli"
+          ]
+        },
+        {
+          "name": "on_hand_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.stock_movement.qty_milli"
+        },
+        {
+          "name": "par_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.reorder_level.par_qty_milli"
+        },
+        {
+          "name": "prep_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.qty_milli"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "business_date": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "business_date",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "kitchen.remakes_overprep",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_kitchen_remakes_overprep",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "week_start"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "station",
+          "type": "text"
+        },
+        {
+          "name": "remakes",
+          "type": "integer",
+          "numeric_source": "count:core.void"
+        },
+        {
+          "name": "remake_minor",
+          "type": "integer",
+          "numeric_source": "core.void.amount_minor"
+        },
+        {
+          "name": "orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "overprep_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        },
+        {
+          "name": "median_overprep_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "week_start": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "week_start",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "kitchen.ticket_coverage",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_kitchen_ticket_coverage",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "tickets",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        },
+        {
+          "name": "timed_tickets",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        },
+        {
+          "name": "coverage_bp",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "kitchen.ticket_drift",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_kitchen_ticket_drift",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "week_start"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "station",
+          "type": "text"
+        },
+        {
+          "name": "slot_start",
+          "type": "text"
+        },
+        {
+          "name": "tickets_now",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        },
+        {
+          "name": "p80_now_sec",
+          "type": "integer",
+          "numeric_source": [
+            "core.kitchen_ticket.accepted_at",
+            "core.kitchen_ticket.ready_at"
+          ]
+        },
+        {
+          "name": "p80_base_sec",
+          "type": "integer",
+          "numeric_source": [
+            "core.kitchen_ticket.accepted_at",
+            "core.kitchen_ticket.ready_at"
+          ]
+        },
+        {
+          "name": "drift_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.kitchen_ticket.accepted_at",
+            "core.kitchen_ticket.ready_at"
+          ]
+        },
+        {
+          "name": "load_ratio_bp",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        },
+        {
+          "name": "late_loss_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.refund.amount_minor",
+            "core.order.total_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "week_start": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "week_start",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "kitchen.ticket_times",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_kitchen_ticket_times",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "station",
+          "type": "text"
+        },
+        {
+          "name": "item_id",
+          "type": "uuid"
+        },
+        {
+          "name": "slot_start",
+          "type": "text"
+        },
+        {
+          "name": "tickets",
+          "type": "integer",
+          "numeric_source": "count:core.kitchen_ticket"
+        },
+        {
+          "name": "p50_sec",
+          "type": "integer",
+          "numeric_source": [
+            "core.kitchen_ticket.accepted_at",
+            "core.kitchen_ticket.ready_at"
+          ]
+        },
+        {
+          "name": "p80_sec",
+          "type": "integer",
+          "numeric_source": [
+            "core.kitchen_ticket.accepted_at",
+            "core.kitchen_ticket.ready_at"
+          ]
+        },
+        {
+          "name": "late_tickets",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.kitchen_ticket",
+            "core.kitchen_ticket.ready_at",
+            "core.kitchen_ticket.due_at"
+          ]
+        },
+        {
+          "name": "configured_prep_sec",
+          "type": "integer",
+          "numeric_source": "core.prep_time.prep_sec"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.competitor_gap",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_competitor_gap",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 365,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "item_id",
+          "type": "uuid"
+        },
+        {
+          "name": "our_price_minor",
+          "type": "integer",
+          "numeric_source": "core.price.amount_minor"
+        },
+        {
+          "name": "competitor_price_minor",
+          "type": "integer",
+          "numeric_source": "core.market_signal.value_minor"
+        },
+        {
+          "name": "observations",
+          "type": "integer",
+          "numeric_source": "count:core.market_signal"
+        },
+        {
+          "name": "gap_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.price.amount_minor",
+            "core.market_signal.value_minor"
+          ]
+        },
+        {
+          "name": "monthly_units",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        },
+        {
+          "name": "units_rank",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        },
+        {
+          "name": "units_change_bp",
+          "type": "integer",
+          "numeric_source": "core.order_line.qty_milli"
+        },
+        {
+          "name": "gap_exposure_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.price.amount_minor",
+            "core.market_signal.value_minor",
+            "core.order_line.qty_milli"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "days",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.goal_baseline",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_goal_baseline",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "metric",
+          "months"
+        ],
+        "properties": {
+          "metric": {
+            "enum": [
+              "net_sales",
+              "orders"
+            ],
+            "type": "string"
+          },
+          "months": {
+            "type": "integer",
+            "maximum": 24,
+            "minimum": 1
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "last_month_value",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        },
+        {
+          "name": "best_month_value",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "net_sales",
+              "orders"
+            ]
+          },
+          "months": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "metric",
+          "months",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.goal_progress",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_goal_progress",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "goal_id"
+        ],
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "target_value",
+          "type": "integer",
+          "numeric_source": "core.goal.target_value"
+        },
+        {
+          "name": "actual_value",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        },
+        {
+          "name": "elapsed_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.goal.period_from",
+            "core.goal.due_on"
+          ]
+        },
+        {
+          "name": "pace_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.goal.target_value",
+            "core.goal.period_from",
+            "core.goal.due_on",
+            "count:core.order",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        },
+        {
+          "name": "projected_miss_value",
+          "type": "integer",
+          "numeric_source": [
+            "core.goal.target_value",
+            "core.goal.period_from",
+            "core.goal.due_on",
+            "count:core.order",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "goal_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/goal_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.signal_uplift",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_signal_uplift",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "kind",
+          "label",
+          "lookback_days"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "weather",
+              "festival",
+              "holiday",
+              "local_event",
+              "other"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "lookback_days": {
+            "type": "integer",
+            "maximum": 730,
+            "minimum": 7
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "label",
+          "type": "text"
+        },
+        {
+          "name": "occurrences",
+          "type": "integer",
+          "numeric_source": "count:core.market_signal"
+        },
+        {
+          "name": "signal_day_orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "baseline_orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "uplift_bp",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "count:core.market_signal"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "weather",
+              "festival",
+              "holiday",
+              "local_event",
+              "other"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "lookback_days": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "outlet_id",
+          "lookback_days",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.upcoming",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_market_upcoming",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 60,
+            "minimum": 0
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "on_date",
+          "type": "date"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "label",
+          "type": "text"
+        },
+        {
+          "name": "value_milli",
+          "type": "integer",
+          "numeric_source": "core.market_signal.value_milli"
+        },
+        {
+          "name": "hist_uplift_bp",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "count:core.market_signal"
+          ]
+        },
+        {
+          "name": "occurrences",
+          "type": "integer",
+          "numeric_source": "count:core.market_signal"
+        },
+        {
+          "name": "forecast_orders",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.qty_milli"
+        },
+        {
+          "name": "baseline_orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "baseline_sales_minor",
+          "type": "integer",
+          "numeric_source": "core.order.total_minor"
+        },
+        {
+          "name": "expected_extra_sales_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.order.total_minor",
+            "count:core.order",
+            "count:core.market_signal"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "days",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "market.viability",
+      "version": 1,
+      "min_role": "advisor",
+      "agent_exposed": true,
+      "tool": "read_market_viability",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "viability_case_id"
+        ],
+        "properties": {
+          "viability_case_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "rent_minor",
+          "type": "integer",
+          "numeric_source": "core.viability_case.rent_minor"
+        },
+        {
+          "name": "capex_minor",
+          "type": "integer",
+          "numeric_source": "core.viability_case.capex_minor"
+        },
+        {
+          "name": "avg_ticket_minor",
+          "type": "integer",
+          "numeric_source": "core.viability_case.avg_ticket_minor"
+        },
+        {
+          "name": "expected_daily_orders",
+          "type": "integer",
+          "numeric_source": "core.viability_case.expected_daily_orders"
+        },
+        {
+          "name": "comparable_margin_bp",
+          "type": "integer",
+          "numeric_source": "core.posting.amount_minor"
+        },
+        {
+          "name": "closed_months",
+          "type": "integer",
+          "numeric_source": "count:core.period_close"
+        },
+        {
+          "name": "breakeven_daily_orders",
+          "type": "integer",
+          "numeric_source": [
+            "core.viability_case.rent_minor",
+            "core.viability_case.avg_ticket_minor",
+            "core.posting.amount_minor"
+          ]
+        },
+        {
+          "name": "payback_months",
+          "type": "integer",
+          "numeric_source": [
+            "core.viability_case.capex_minor",
+            "core.viability_case.rent_minor",
+            "core.viability_case.avg_ticket_minor",
+            "core.viability_case.expected_daily_orders",
+            "core.posting.amount_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "viability_case_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "viability_case_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/viability_case_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.advances_open",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_people_advances_open",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "staff_id",
+          "type": "uuid"
+        },
+        {
+          "name": "outstanding_minor",
+          "type": "integer",
+          "numeric_source": "core.advance.amount_minor"
+        },
+        {
+          "name": "days_since_given",
+          "type": "integer",
+          "numeric_source": "core.advance.on_date"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.attendance_coverage",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_people_attendance_coverage",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "rostered_shifts",
+          "type": "integer",
+          "numeric_source": "count:core.roster_shift"
+        },
+        {
+          "name": "attended_shifts",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.roster_shift",
+            "count:core.attendance"
+          ]
+        },
+        {
+          "name": "coverage_bp",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.roster_shift",
+            "count:core.attendance"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.labour_pct",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_people_labour_pct",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "iso_week",
+          "type": "text"
+        },
+        {
+          "name": "labour_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        },
+        {
+          "name": "net_sales_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        },
+        {
+          "name": "labour_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        },
+        {
+          "name": "target_bp",
+          "type": "integer",
+          "numeric_source": "core.business_policy.labour_target_bp"
+        },
+        {
+          "name": "excess_labour_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor",
+            "core.business_policy.labour_target_bp",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.labour_vs_demand",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_people_labour_vs_demand",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to",
+          "slot_minutes"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "slot_minutes": {
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "business_on",
+          "type": "date"
+        },
+        {
+          "name": "slot_start",
+          "type": "text"
+        },
+        {
+          "name": "attended_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at"
+          ]
+        },
+        {
+          "name": "rostered_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at"
+          ]
+        },
+        {
+          "name": "orders",
+          "type": "integer",
+          "numeric_source": "count:core.order"
+        },
+        {
+          "name": "forecast_orders",
+          "type": "integer",
+          "numeric_source": "intel.forecast_point.qty_milli"
+        },
+        {
+          "name": "needed_min",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at"
+          ]
+        },
+        {
+          "name": "excess_cost_minor",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "slot_minutes": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "slot_minutes",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.overtime_drift",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_people_overtime_drift",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "staff_id",
+          "type": "uuid"
+        },
+        {
+          "name": "iso_week",
+          "type": "text"
+        },
+        {
+          "name": "rostered_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at"
+          ]
+        },
+        {
+          "name": "attended_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at"
+          ]
+        },
+        {
+          "name": "extra_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at",
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at"
+          ]
+        },
+        {
+          "name": "extra_cost_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at",
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.staff.ot_multiplier_bp",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "people.payroll_lines",
+      "version": 1,
+      "min_role": "advisor",
+      "agent_exposed": true,
+      "tool": "read_people_payroll_lines",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "period_month"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "period_month": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "staff_id",
+          "type": "uuid"
+        },
+        {
+          "name": "base_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        },
+        {
+          "name": "overtime_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at",
+            "core.staff.ot_multiplier_bp",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        },
+        {
+          "name": "advance_recovery_minor",
+          "type": "integer",
+          "numeric_source": "core.advance.amount_minor"
+        },
+        {
+          "name": "tips_minor",
+          "type": "integer",
+          "numeric_source": "core.tip_pool_share.amount_minor"
+        },
+        {
+          "name": "net_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at",
+            "core.roster_shift.starts_at",
+            "core.roster_shift.ends_at",
+            "core.staff.ot_multiplier_bp",
+            "core.advance.amount_minor",
+            "core.tip_pool_share.amount_minor",
+            "core.staff.wage_rate_minor",
+            "core.staff.monthly_salary_minor",
+            "core.staff.contract_min_per_month"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "period_month": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "outlet_id",
+          "period_month",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
       "id": "platform.spend_by_tenant",
       "version": 1,
       "min_role": "operator",
@@ -14272,6 +18227,411 @@
       ],
       "model_schema": null,
       "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "purchasing.deal_inputs",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "quote_id"
+        ],
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "quote_total_minor",
+          "type": "integer",
+          "numeric_source": [
+            "intel.supplier_quote.unit_price_minor",
+            "intel.supplier_quote.qty_milli"
+          ]
+        },
+        {
+          "name": "quote_payment_days",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.payment_days"
+        },
+        {
+          "name": "budget_left_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.budget.amount_minor",
+            "core.purchase_order.total_minor"
+          ]
+        },
+        {
+          "name": "open_commit_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "core.po_line.qty_milli",
+            "core.grn_line.qty_milli"
+          ]
+        },
+        {
+          "name": "need_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli"
+          ]
+        },
+        {
+          "name": "use_in_shelf_life_qty_milli",
+          "type": "integer",
+          "numeric_source": [
+            "intel.forecast_point.qty_milli",
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.ingredient.shelf_life_days"
+          ]
+        },
+        {
+          "name": "margin_at_quote_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.recipe_line.qty_milli",
+            "core.recipe_line.waste_pct_bp",
+            "core.recipe_version.yield_qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor",
+            "intel.supplier_quote.unit_price_minor",
+            "core.order_line.qty_milli",
+            "core.order_line.unit_price_minor",
+            "core.order_line.line_discount_minor",
+            "core.order_line.tax_minor"
+          ]
+        },
+        {
+          "name": "margin_floor_bp",
+          "type": "integer",
+          "numeric_source": "core.business_policy.margin_floor_bp"
+        },
+        {
+          "name": "min_payment_days",
+          "type": "integer",
+          "numeric_source": "core.business_policy.min_payment_days"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/quote_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "purchasing.invoice_duplicates",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "supplier_invoice_id"
+        ],
+        "properties": {
+          "supplier_invoice_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "twin_invoice_id",
+          "type": "uuid"
+        },
+        {
+          "name": "total_minor",
+          "type": "integer",
+          "numeric_source": "core.supplier_invoice.total_minor"
+        },
+        {
+          "name": "days_apart",
+          "type": "integer",
+          "numeric_source": "core.supplier_invoice.invoice_date"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/supplier_invoice_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "purchasing.invoice_vs_po",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_purchasing_invoice_vs_po",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "supplier_invoice_id"
+        ],
+        "properties": {
+          "supplier_invoice_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "line_id",
+          "type": "uuid"
+        },
+        {
+          "name": "po_price_minor",
+          "type": "integer",
+          "numeric_source": "core.po_line.unit_price_minor"
+        },
+        {
+          "name": "invoice_price_minor",
+          "type": "integer",
+          "numeric_source": "core.supplier_invoice_line.unit_price_minor"
+        },
+        {
+          "name": "invoice_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.supplier_invoice_line.qty_milli"
+        },
+        {
+          "name": "received_qty_milli",
+          "type": "integer",
+          "numeric_source": "core.grn_line.qty_milli"
+        },
+        {
+          "name": "overbilled_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.supplier_invoice_line.unit_price_minor",
+            "core.supplier_invoice_line.qty_milli",
+            "core.po_line.unit_price_minor",
+            "core.grn_line.qty_milli"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "supplier_invoice_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "supplier_invoice_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/supplier_invoice_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "purchasing.price_creep",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_purchasing_price_creep",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "as_of"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "supplier_id",
+          "type": "uuid"
+        },
+        {
+          "name": "ingredient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "baseline_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.supplier_price.unit_price_minor",
+            "core.supplier_invoice_line.unit_price_minor"
+          ]
+        },
+        {
+          "name": "latest_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.supplier_price.unit_price_minor",
+            "core.supplier_invoice_line.unit_price_minor"
+          ]
+        },
+        {
+          "name": "creep_bp",
+          "type": "integer",
+          "numeric_source": [
+            "core.supplier_price.unit_price_minor",
+            "core.supplier_invoice_line.unit_price_minor"
+          ]
+        },
+        {
+          "name": "observations",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.supplier_price",
+            "count:core.supplier_invoice_line"
+          ]
+        },
+        {
+          "name": "creep_impact_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.supplier_price.unit_price_minor",
+            "core.supplier_invoice_line.unit_price_minor",
+            "core.supplier_invoice_line.qty_milli"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "as_of",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [],
+      "optional": []
+    },
+    {
+      "id": "purchasing.quote_compare",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_purchasing_quote_compare",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "negotiation_run_id"
+        ],
+        "properties": {
+          "negotiation_run_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "quote_id",
+          "type": "uuid"
+        },
+        {
+          "name": "supplier_id",
+          "type": "uuid"
+        },
+        {
+          "name": "round",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.round"
+        },
+        {
+          "name": "unit_price_minor",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.unit_price_minor"
+        },
+        {
+          "name": "qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.qty_milli"
+        },
+        {
+          "name": "min_order_qty_milli",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.min_order_qty_milli"
+        },
+        {
+          "name": "payment_days",
+          "type": "integer",
+          "numeric_source": "intel.supplier_quote.payment_days"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "negotiation_run_id": {
+            "type": "string",
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "negotiation_run_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/negotiation_run_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
       "optional": []
     }
   ],
@@ -16869,14 +21229,14 @@
     {
       "id": "kitchen",
       "kind": "specialist",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "kitchen.ticket_times",
         "kitchen.ticket_drift",
         "kitchen.remakes_overprep",
         "kitchen.prep_need",
         "kitchen.ticket_coverage"
       ],
+      "templates_pending": [],
       "draftables": [
         "kitchen.prep_time.set.v1",
         "kitchen.prep_list.create.v1"
@@ -16886,9 +21246,7 @@
       "id": "inventory_purchasing",
       "kind": "specialist",
       "templates": [
-        "inventory.below_reorder"
-      ],
-      "templates_pending": [
+        "inventory.below_reorder",
         "inventory.shortfall",
         "inventory.waste_week",
         "inventory.expiry_risk",
@@ -16898,6 +21256,7 @@
         "purchasing.invoice_vs_po",
         "purchasing.quote_compare"
       ],
+      "templates_pending": [],
       "draftables": [
         "purchasing.po.create.v1",
         "purchasing.invoice.dispute.v1",
@@ -16929,8 +21288,7 @@
     {
       "id": "people",
       "kind": "specialist",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "people.labour_vs_demand",
         "people.overtime_drift",
         "people.labour_pct",
@@ -16938,6 +21296,7 @@
         "people.advances_open",
         "people.payroll_lines"
       ],
+      "templates_pending": [],
       "draftables": [
         "people.roster.create.v1",
         "people.payroll_draft.create.v1"
@@ -16946,8 +21305,7 @@
     {
       "id": "customers",
       "kind": "specialist",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "customers.coupon_leakage",
         "customers.staff_coupon_use",
         "customers.coupon_daily",
@@ -16956,6 +21314,7 @@
         "customers.consented_audience",
         "customers.coupon_current"
       ],
+      "templates_pending": [],
       "draftables": [
         "customers.campaign.create.v1",
         "catalogue.coupon.set.v1"
@@ -16964,14 +21323,14 @@
     {
       "id": "compliance",
       "kind": "specialist",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "compliance.licence_calendar",
         "compliance.log_coverage",
         "compliance.temp_excursions",
         "compliance.asset_costs",
         "compliance.energy_per_order"
       ],
+      "templates_pending": [],
       "draftables": [
         "goals.task.create.v1",
         "compliance.maintenance.schedule.v1"
@@ -16980,8 +21339,7 @@
     {
       "id": "market",
       "kind": "specialist",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "market.signal_uplift",
         "market.upcoming",
         "market.competitor_gap",
@@ -16989,6 +21347,7 @@
         "market.goal_progress",
         "market.goal_baseline"
       ],
+      "templates_pending": [],
       "draftables": [
         "goals.goal.create.v1",
         "goals.task.create.v1"
@@ -16997,18 +21356,18 @@
     {
       "id": "forecast",
       "kind": "service",
-      "templates": [],
-      "templates_pending": [
+      "templates": [
         "forecast.points",
         "forecast.accuracy",
         "forecast.freshness"
       ],
+      "templates_pending": [],
       "draftables": []
     }
   ],
   "stamp": {
     "inputs": {
-      "sha256": "0f1b64421b6a1b2f8b36e020a2a7867e57419da3a123f243bb07bab0f4a3ddb1",
+      "sha256": "6c0fcb0bd9d0787775678c73422e10d0cac780691b3546d67d4b96baf51e81ce",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -17030,8 +21389,9 @@
         "db/migrations/0018_history_imports.sql": "04f03b23adc78a92e5ccf9e7252d6a81564a32c7d62731b6bcf51d4e9c220bce",
         "db/migrations/0019_mc1a_templates_outlet_rls.sql": "c16ae27b28b62f651474ab3c1cd2c969fde95034b138c536a3c40fa57db088c0",
         "db/migrations/0020_mc23_threads_policy_investigations.sql": "de3a04ef4f9c95630d6a88afeb6bd01eff374ca4f147354befa76a20934f98ae",
+        "db/migrations/0021_mc1bc_pack_templates_history_kinds.sql": "a2b8cbf0a15fbb75e508e3551364c1c3e1938c1304ef7f1bce790267e4e9eba2",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
-        "packages/contracts/scripts/ontology.ts": "5468907c41975c1e5b923236f25d5150c6b3c035719c643b806def3ffe15acea",
+        "packages/contracts/scripts/ontology.ts": "a3e615664f854e4264e095c32122895e97d4777e9bf3f88740e75679f33004ca",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
         "packages/contracts/src/ai_policy/index.ts": "c500bc3c8a46b6bc4f170d8c84bc6faf1a3a92bf6ecc21f261623cafd538c4c3",
         "packages/contracts/src/approvals/index.ts": "86364e8ea930198acc9231f52fa40dc37360d13b0bbfe4523737a2624923accd",
@@ -17083,6 +21443,6 @@
         "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
       }
     },
-    "body_sha256": "9e750e652ba6d7ba07f3300c11f54180dbc38dc35aa56db60295911dc67508fa"
+    "body_sha256": "1b7179250c3e244aac0e33ce75d7522651c4732b63abc5ae8bd7106fb9b5ad3c"
   }
 }

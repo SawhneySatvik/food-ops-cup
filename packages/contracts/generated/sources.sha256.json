@@ -1,10 +1,10 @@
 {
   "sources": {
-    "sha256": "222c079c4eb4e69d38a3044768d46700b2ffd6fb6b4535d842fd207024abf930",
+    "sha256": "4a33a8bbc095ee5bc272079cab226e8961f0dce7a995afc2337edc6f03d1680c",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "7ef211308a14666fb9e14238d265da0c390d5f3a9d346eb76b888959119f9c8c",
-      "scripts/ontology.ts": "5468907c41975c1e5b923236f25d5150c6b3c035719c643b806def3ffe15acea",
+      "scripts/ontology.ts": "a3e615664f854e4264e095c32122895e97d4777e9bf3f88740e75679f33004ca",
       "scripts/roundtrip.py": "14c26d1bb9909b16e30d4734865a99f4602faa74b2425c2baae3cfcb4339c9cd",
       "scripts/stamp.ts": "84ed395baf206e86a017463a5addca56cf6d84b821acd05ff5b0736a4b2bcf1d",
       "scripts/verify_models.py": "aff14e424e6c439be52b6042d271b30c9e347eac6a48fe3269b7e79c8fadcba1",

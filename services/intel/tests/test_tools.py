@@ -18,8 +18,9 @@ from munim_intel.tools import TOOLS, ToolFactory
 from munim_intel.tools.generated import ProposeTool, ReadTemplateTool, build_every_tool
 from munim_intel.tools.handles import HandleTable
 
-#: tenant, run and actor never reach a model as parameters (ADR-014 §5.6). `negotiation_run_id` is tool-filled.
-FORBIDDEN = re.compile(r"tenant|(^|_)run_id$|(^|_)actor($|_)")
+#: tenant, run and actor never reach a model as parameters (ADR-014 §5.6). Same rule as the generator's FORBIDDEN_PARAM:
+#: `run_id` exactly, so `negotiation_run_id` (purchasing.quote_compare's ordinary id param) passes.
+FORBIDDEN = re.compile(r"tenant|^run_id$|actor")
 
 CTX = RunContext(
     run_id="01920000-0000-7000-8000-000000000001",
@@ -67,14 +68,17 @@ def scan(tools: dict[str, ToolFactory], generated: list[BaseTool] | None = None)
 
 def expected_generated() -> int:
     """Independent count: MANIFEST.d proposal lines minus the two import-only drafts (ADR-014 §5.1), plus the
-    db/tests/manifest.ts TEMPLATES list minus the operator template (platform.spend_by_tenant) and the core-consumed
-    `intel.*` templates (0020: track record, budget left, cost estimate — never model tools)."""
+    db/tests/manifest.ts TEMPLATES list (63) minus the operator template (platform.spend_by_tenant), the core-consumed
+    `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1 not-agent-exposed
+    templates (hand list below): 63 - 1 - 3 - 4 = 55 reads, + 20 proposals = 75."""
     lines = [n for f in (REPO / "packages/contracts/MANIFEST.d").glob("*.txt") for n in f.read_text().split()]
     proposals = [n for n in lines if n.startswith("proposal.")]
-    listed = re.search(r"export const TEMPLATES = \[(.*?)\];", (REPO / "db/tests/manifest.ts").read_text(), re.S)
+    listed = re.search(r"export const TEMPLATES = \[(.*?)\]\.sort\(\);", (REPO / "db/tests/manifest.ts").read_text(), re.S)
     assert listed is not None
     templates = re.findall(r'"([a-z_.]+)"', listed.group(1))
-    exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.")]
+    not_exposed = {"forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"}
+    exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.") and t not in not_exposed]
+    assert (len(templates), len(exposed)) == (63, 55)
     return (len(proposals) - 2) + len(exposed)
 
 

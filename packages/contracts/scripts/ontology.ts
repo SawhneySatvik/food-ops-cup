@@ -29,7 +29,12 @@ const LINEAGE = [
   { from: "core.audit_log", to: "core.decision", via: "decision_id" },
 ];
 /** Template params a model may never pass (T-040: a tenant param is refused by core too). */
-const FORBIDDEN_PARAM = /tenant|(^|_)run_id$|actor/;
+// The run itself, the tenant and the actor are never model parameters. A reference to another run by role (e.g.
+// purchasing.quote_compare's negotiation_run_id, 0021) is an ordinary id param: the model passes it as a handle, never a uuid.
+const FORBIDDEN_PARAM = /tenant|^run_id$|actor/;
+// ADR-014 §5.1: pack templates that are inputs to deterministic code (forecast engine, deal review, duplicate check),
+// never a model tool. Same hand list as packages/contracts/test/specialists.test.ts.
+const NOT_AGENT_EXPOSED_TEMPLATES = ["forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"];
 const step = (m: string) => console.log(`ontology: ${m}`);
 const fail = (m: string): never => {
   throw new Error(`ontology: ${m}`);
@@ -103,7 +108,7 @@ try {
     if (bad.length) fail(`template ${t.id} has forbidden or reserved params ${bad.join(", ")}`);
     // `intel.*` templates (track record, budget left, cost estimate; 0020) are core-consumed — desk, run-frame, plan
     // preview — never a model tool.
-    const agent_exposed = t.min_role !== "operator" && !t.id.startsWith("intel.");
+    const agent_exposed = t.min_role !== "operator" && !t.id.startsWith("intel.") && !NOT_AGENT_EXPOSED_TEMPLATES.includes(t.id);
     const m = toModelSchema(t.params_schema, {}, { numbers: true });
     const props = { ...(m.schema.properties as Json), ...READ_EXTRA };
     const schema = { type: "object", properties: props, required: Object.keys(props), additionalProperties: false };

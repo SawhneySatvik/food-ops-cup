@@ -44,17 +44,27 @@ SUPPLIER = "01920000-0000-7000-8000-00000000b001"
 OUTLET = "01920000-0000-7000-8000-00000000b002"
 INGREDIENT = "01920000-0000-7000-8000-00000000b003"
 FINDING = "01920000-0000-7000-8000-00000000c001"
-# ADR-014 §5.1 / pack md §3 + §6, by hand: reads that exist today (catalogue 6, finance 8 incl. margin_bridge, inventory 1) + proposes.
+# Per-specialist toolset size = agent-exposed templates + draftables, by hand from the pack md §3 tables (ADR-014 §5.1;
+# no `forecast.*` input-only, no `purchasing.deal_inputs` / `invoice_duplicates` review-only) and the registry draftables:
+#   catalogue 6 reads (catalogue.md §3) + 3 proposes = 9
+#   finance 7 reads (finance.md §3) + margin_bridge (registry) = 8, + 3 proposes = 11
+#   inventory_purchasing 11 reads (inventory-purchasing.md §3) - 2 review-only = 9, + 5 proposes = 14
+#   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · customers 7 + 2 = 9 · compliance 5 + 2 = 7 · market 6 + 2 = 8
+# Every one is <= 20 (F3). Reads over all specialists = 6+8+9+5+6+7+5+6 = 52, plus forecast's 3 exposed (points, accuracy,
+# freshness; forecast.md §3 lists 5 minus the 2 input-only) = 55.
 TOOLSET_SIZE = {
     "catalogue": 9,
     "finance": 11,
-    "inventory_purchasing": 6,
-    "kitchen": 2,
-    "people": 2,
-    "customers": 2,
-    "compliance": 2,
-    "market": 2,
+    "inventory_purchasing": 14,
+    "kitchen": 7,
+    "people": 8,
+    "customers": 9,
+    "compliance": 7,
+    "market": 8,
 }
+#: Every model tool: 20 proposals + 55 agent-exposed templates (db/tests/manifest.ts TEMPLATES 63 - 1 platform operator
+#: - 3 intel.* - 4 ADR-014 §5.1 not-agent-exposed = 55).
+EVERY_TOOL = 75
 
 
 def snapshot(template: str, columns: list[dict[str, Any]], rows: list[dict[str, Any]], sid: str = SNAP_ID) -> dict[str, Any]:
@@ -415,7 +425,7 @@ def test_adk_converts_every_generated_declaration_unchanged() -> None:
     req.append_tools(tools)
     assert req.config.tools is not None
     decls = [d for tl in req.config.tools for d in (getattr(tl, "function_declarations", None) or [])]
-    assert [d.name for d in decls] == [t.name for t in tools] and len(decls) == 35
+    assert [d.name for d in decls] == [t.name for t in tools] and len(decls) == EVERY_TOOL
     sent = json.loads(req.config.model_dump_json(exclude_none=True))
     for t, d in zip(tools, decls, strict=True):
         assert isinstance(t, ReadTemplateTool | ProposeTool)
@@ -444,6 +454,7 @@ LITERALS: dict[str, str] = {
     "name": "Festive regulars",
     "note": "Spoiled on arrival",
     "channel_kind": "counter",
+    "required_kinds": "fssai",
 }
 CELLS = snapshot(
     "fixture.cells",
@@ -483,7 +494,7 @@ def synth(schema: dict[str, Any], path: str, kinds: dict[str, str]) -> Any:
         return "2026-10-12"
     if desc.startswith("An ISO-8601 date-time"):
         return "2026-10-12T09:00:00+05:30"
-    return LITERALS[path.rsplit("/", 1)[-1]]
+    return LITERALS[re.sub(r"/\d+$", "", path).rsplit("/", 1)[-1]]  # array items take their array's name
 
 
 def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
@@ -519,7 +530,7 @@ def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
     print(
         f"zod: {len(drafts)} draft bodies, {len(mints)} mint bodies; failing {[i for i in result['drafts'] if i]} {[i for i in result['snapshots'] if i]}"
     )
-    assert (len(drafts), len(mints)) == (20, 15)
+    assert (len(drafts), len(mints)) == (20, EVERY_TOOL - 20)
     assert result == {"drafts": [[] for _ in drafts], "snapshots": [[] for _ in mints]}
     # the refusal side: a bare number where a Ref belongs is refused by the same check
     bad = json.loads(json.dumps(drafts[0]))
