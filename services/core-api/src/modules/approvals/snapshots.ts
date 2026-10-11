@@ -25,7 +25,8 @@ export interface LoadedSnapshot {
 
 // Template min_role ladder (0019, settles W2-R8): staff < manager < advisor (read-only finance, R27) < owner; judge has
 // owner rights in its demo tenant (03-arch §6); operator templates are operator-only.
-const RANK: Record<string, number> = { staff: 1, manager: 2, advisor: 3, owner: 4, judge: 4, operator: 5 };
+export const TEMPLATE_RANK: Record<string, number> = { staff: 1, manager: 2, advisor: 3, owner: 4, judge: 4, operator: 5 };
+const RANK = TEMPLATE_RANK;
 
 export function visibleTo(s: LoadedSnapshot, m: Member): boolean {
   if ((RANK[m.role] ?? 0) < (RANK[s.min_role] ?? 99)) return false;

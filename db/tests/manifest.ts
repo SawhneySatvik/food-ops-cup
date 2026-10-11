@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0020 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0021 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -23,6 +23,7 @@ export const MIGRATIONS = [
   "0018_history_imports",
   "0019_mc1a_templates_outlet_rls",
   "0020_mc23_threads_policy_investigations",
+  "0021_mc1bc_pack_templates_history_kinds",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -292,7 +293,18 @@ export const TEMPLATES = [
   "finance.settlement_vs_orders", "finance.tender_vs_bank", "finance.unapproved_deductions",
   "intel.agent_track_record", "intel.ai_budget_left", "intel.investigation_cost_estimate",
   "inventory.below_reorder", "platform.spend_by_tenant",
-];
+  // 0021 (M-C1bc): the remaining packs' §3 tables, typed by hand from the pack docs (template-spec.ts parses the same docs).
+  "compliance.asset_costs", "compliance.energy_per_order", "compliance.licence_calendar", "compliance.log_coverage", "compliance.temp_excursions",
+  "customers.churn_segments", "customers.consented_audience", "customers.coupon_current", "customers.coupon_daily", "customers.coupon_leakage",
+  "customers.review_trend", "customers.staff_coupon_use",
+  "forecast.accuracy", "forecast.freshness", "forecast.points", "forecast.sales_history", "forecast.slot_profile",
+  "inventory.dead_stock", "inventory.expiry_risk", "inventory.shortfall", "inventory.shrinkage", "inventory.waste_week",
+  "kitchen.prep_need", "kitchen.remakes_overprep", "kitchen.ticket_coverage", "kitchen.ticket_drift", "kitchen.ticket_times",
+  "market.competitor_gap", "market.goal_baseline", "market.goal_progress", "market.signal_uplift", "market.upcoming", "market.viability",
+  "people.advances_open", "people.attendance_coverage", "people.labour_pct", "people.labour_vs_demand", "people.overtime_drift",
+  "people.payroll_lines",
+  "purchasing.deal_inputs", "purchasing.invoice_duplicates", "purchasing.invoice_vs_po", "purchasing.price_creep", "purchasing.quote_compare",
+].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read
  *  postings through their journal entry (tests/templates.test.ts). */
@@ -335,4 +347,7 @@ export const INTEL_NUMERIC_ALLOW = [
   // operator's monthly AI limit (intel.ai_budget_left, F11 O-2: a platform ledger row, not an intel value).
   "count:intel.trace_event",
   "platform.llm_budget.limit_minor",
+  // 0021, widened by hand: forecast.freshness counts a run's points per outlet and forecast.accuracy counts its days
+  // (row counts of the forecast service's output, never a model-typed value; R25).
+  "count:intel.forecast_point",
 ];

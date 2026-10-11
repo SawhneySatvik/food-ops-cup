@@ -341,6 +341,16 @@
       "source_state": "s.id = nullif(current_setting('app.customer_id', true), '')::uuid AND NOT s.is_guest AND s.idp_sub IS NOT NULL AND s.erased_at IS NULL AND s.merged_into IS NULL AND current_user = 'munim_crosstenant'",
       "seeded_in": "0017",
       "implemented_by": "0017 core.customer_claim_guest_token() (m-5, R41)"
+    },
+    {
+      "rule_id": "inventory.count_adjust",
+      "source_table": "core.stock_count",
+      "target_tables": [
+        "core.stock_movement"
+      ],
+      "source_state": "s.status = 'submitted'",
+      "seeded_in": "0021",
+      "implemented_by": "T-093 core imports (stock_count_v1 commit, write_derived group); live counts may adopt it (inventory)"
     }
   ]
 }

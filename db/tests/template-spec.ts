@@ -36,10 +36,12 @@ export function packTemplates(pack: string): TemplateSpec[] {
   const out: TemplateSpec[] = [];
   for (const line of text.slice(start, end).split("\n")) {
     const cells = line.split("|").map((c) => c.trim());
-    // | `id` | purpose | params | columns | → ["", id, purpose, params, columns, ""]
-    if (cells.length !== 6 || !/^`[a-z_]+\.[a-z_]+`$/.test(cells[1]!)) continue;
+    // | `id` | purpose | params | columns | → ["", id, purpose, params, columns, ""]. The id cell may carry a remark after
+    // the id (people.md: "`people.payroll_lines` (IN)" — a pack-scope note, not part of the id).
+    if (cells.length !== 6 || !/^`[a-z_]+\.[a-z_]+`( \([^()]*\))?$/.test(cells[1]!)) continue;
     const id = ticks(cells[1]!)[0]!;
-    const params = ticks(cells[3]!).map((p) => p.replace(/\?$/, ""));
+    // `name?` = optional (nullable) and `name[]` = an array param (compliance.md: `required_kinds[]`): the name is bare.
+    const params = ticks(cells[3]!).map((p) => p.replace(/\?$/, "").replace(/\[\]$/, ""));
     const columns: string[] = [];
     for (const seg of stripParens(cells[4]!).split(";")) {
       const named = seg.includes("←") ? seg.slice(0, seg.indexOf("←")) : seg;
@@ -72,11 +74,23 @@ export function mc1aTemplates(): TemplateSpec[] {
   return [...packTemplates("catalogue"), ...packTemplates("finance"), bridgeSpec()];
 }
 
+/** M-C1bc (0021): the remaining packs' §3 tables (BOARD W3 M-C1b + M-C1c). */
+export const MC1BC_PACKS = ["kitchen", "inventory-purchasing", "forecast", "people", "customers-growth", "compliance-assets", "market-strategy"] as const;
+/** inventory.below_reorder is in inventory-purchasing §3 but is the 0005 template (v1, not the pack's columns): M-C1bc
+ *  adds the pack's other ids ("inventory_purchasing (10 new)", BOARD). Hand-kept, with its reason in 0021's header. */
+export const MC1BC_NOT_NEW = ["inventory.below_reorder"];
+export function mc1bcTemplates(): TemplateSpec[] {
+  return MC1BC_PACKS.flatMap((p) => packTemplates(p));
+}
+
 // node db/tests/template-spec.ts → prints what it parsed (the gate's expected values, for a person to read).
 if (import.meta.filename === process.argv[1]) {
   const all = mc1aTemplates();
   for (const t of all) console.log(`${t.id} (${t.source}) params=[${t.params.join(", ")}] columns=[${t.columns.join(", ")}]`);
   const b = bridgeSpec();
   console.log(`bridge components: ${b.components.join(", ")} + Σ ${b.sumRow}`);
-  console.log(`${all.length} template ids`);
+  console.log(`${all.length} template ids (M-C1a)`);
+  const bc = mc1bcTemplates();
+  for (const t of bc) console.log(`${t.id} (${t.source}) params=[${t.params.join(", ")}] columns=[${t.columns.join(", ")}]`);
+  console.log(`${bc.length} template ids (M-C1bc), ${bc.length - MC1BC_NOT_NEW.length} new`);
 }

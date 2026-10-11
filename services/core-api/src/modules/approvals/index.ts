@@ -15,7 +15,7 @@ import type { Member } from "./snapshots.ts";
 
 export { registerDraftHandler } from "./handlers.ts";
 // The snapshot and payload readers other modules use (evidence, findings, inbox — T-040), through this index only.
-export { bindNamedParams, type Cell, cellOf, loadSnapshots, type Member, runTemplate, snapIdOf } from "./snapshots.ts";
+export { bindNamedParams, type Cell, cellOf, loadSnapshots, type Member, runTemplate, snapIdOf, TEMPLATE_RANK } from "./snapshots.ts";
 export { resolvedRefs, snapshotIdsOf } from "./payload.ts";
 export { getDraft } from "./read.ts";
 

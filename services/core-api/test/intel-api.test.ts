@@ -391,6 +391,11 @@ describe("(8) the public reads: ≥ 1 fixture row each, 0 rows of another outlet
     expect([s.row_count, s.minted_by_member_id, s.run_id, s.outlet_scope]).toEqual([2, A.manager, null, [A.outlets[0]]]);
     expect(s.rows.every((r) => r.outlet_id === A.outlets[0])).toBe(true);
     expect((await mgr("/v1/snapshots", { template_id: "inventory.below_reorder", params: { outlet_id: A.outlets[1] } })).status).toBe(422);
+    // One min_role ladder (staff < manager < advisor < owner): a manager cannot mint an advisor-level finance template;
+    // the owner can (M-C1bc finding: a second ladder in evidence/mint.ts ranked advisor = staff).
+    const pnl = { template_id: "finance.pnl", params: { period_month: "2026-09-01", group_by: "outlet" } };
+    expect((await mgr("/v1/snapshots", pnl)).status).toBe(404);
+    expect((await asMember(A, A.ownerSub, "/v1/snapshots", pnl)).status).toBe(201);
   });
 
   it("GET /v1/runs, GET /v1/runs?finding=, GET /v1/runs/{id}", async () => {

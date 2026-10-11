@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (20 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (21 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -30,7 +30,9 @@ never re-stamped, re-approval re-opens the payable, the guest-token claim merges
 follows a re-price), 0018 history imports (R44 b, c: the `pos_bills` / `waste_log` kinds, what an approved import writes,
 `core.write_derived`), 0019 M-C1a (outlet RLS on the outlet-data tables, the advisor rung, `numeric_source` lists, the
 fourteen catalogue/finance templates), 0020 M-C23 (specialist threads, the AI policy books, investigations with modes, the
-standing grant behind Auto and the `auto_step` run trigger, three intel templates) — gates see 19 applied.
+standing grant behind Auto and the `auto_step` run trigger, three intel templates), 0021 M-C1bc + T-093 (the remaining packs'
+44 templates; the `shift_log` / `stock_count` history kinds, what an approved import writes for them, `inventory.count_adjust`)
+— gates see 20 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -240,7 +242,7 @@ second post (no `reverses_id`) is still 23505.
   `app.source_ref = 'core.order:<this row's order_id>'`, that order `placed`/`accepted` — whichever guard branch admitted the
   write (another order's coupon use under the same source → MB001). Write it inside the same `underRule('orders.reprice',
   'core.order:<id>')` block as the header and lines: `UPDATE core.coupon_use SET discount_minor = $2 WHERE id = $1`.
-- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0021` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
+- **Red-proof:** `db/tests/redproof-0017.sh` plants a `0022` per item (renumbered as later files landed) and requires `tests/w2fixcycle2.test.ts` to exit
   non-zero naming that item's tests (the plant is removed after each run).
 
 **History imports (0018, R44 b, c) — shapes other lanes code against.**
@@ -270,7 +272,7 @@ second post (no `reverses_id`) is still 23505.
   (409 `period_closed`, nothing written) when a month closed after the preview.
 - **Labelled synthetic.** Every imported row's origin is the decision of an `imports.run.commit.v1` draft (whose payload names the
   run); a history order's `pricing_snapshot` carries `{source, synthetic: true, import_run_id}`; derived rows point at those rows.
-- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0021` per item (renumbered as later files landed) and requires
+- **Red-proof:** `db/tests/redproof-0018.sh` plants a `0022` per item (renumbered as later files landed) and requires
   `tests/history.test.ts` to exit non-zero naming that item's tests. `redproof-0017.sh` likewise.
 
 **M-C1a (0019) — shapes other lanes code against.**
@@ -385,6 +387,77 @@ restrictive `customer_scope` / `guest_scope` (deny) policies; `intel_ro` cannot 
 - **Gates:** `tests/mc23.test.ts`; the manifest (+7 tables, +2 books, +1 svc INSERT table, +1 view, +3 templates);
   `tests/redproof-0020.sh` (each gate red with a non-zero exit). `tests/gates.ts` intel-cannot-write now requires the refusal
   to name the table (or its schema) — a write past the table privilege that fails inside a trigger no longer counts.
+
+**M-C1bc + T-093 (0021) — shapes other lanes code against.**
+- **History kinds (T-093).** `core.document.kind`, `core.import_format.kind` and `core.import_run.kind` also admit `shift_log`
+  (parser `shift_log_v1`) and `stock_count` (parser `stock_count_v1`; `import_run.parser` matches `^[a-z][a-z0-9_]*_v[0-9]+$`).
+  The file layouts and the parsers are core-api's (T-093 core imports). Nothing else about a run changes: parse → preview →
+  draft → approval → commit under the approver's decision (0014 import_run rules).
+- **Binding.** `imports.run.commit.v1` (draft-only: an own command → MB001) now also lists `core.shift`, `core.stock_count`,
+  `core.stock_count_line`. Still not `core.stock_movement` (a plain movement under the decision → MB008): a count's adjustment
+  is the derivation below. The full list: `bank_line, expense, order, order_line, refund, review, settlement, settlement_line,
+  shift, stock_count, stock_count_line, supplier_invoice, supplier_invoice_line, tender, void, waste_log`. book_scope: shift and
+  count by their own `outlet_id`, a count line through its count — every row must lie inside the approver's outlet scope.
+- **What a committed `shift_log` row writes (one row per closed drawer session):** `INSERT INTO core.shift (tenant_id, id,
+  outlet_id, device_id, status, opened_by, opened_at, float_minor, currency, closed_by, closed_at, counted_cash_minor,
+  expected_cash_minor, variance_minor)` with `status = 'closed'` in that one INSERT (the 0004 CHECK: closed ⇔ closed_by,
+  closed_at, counted, expected and variance all set; `variance = counted − expected`; float, counted and expected ≥ 0;
+  currency = the tenant's, MB003). `opened_by` / `closed_by` are core.member ids (the file names people core resolves; the lane
+  decides whether an unknown name quarantines or falls back to the approver). `device_id` NULL = a device-less drawer.
+  **No tender-to-shift link is written:** `core.tender.shift_id` stays insert-only (0015; munim_core has no UPDATE on it), so a
+  history shift reaches its tenders by drawer and time window exactly as orders' `expectedCash` does for a live shift
+  (outlet, `device_id IS NOT DISTINCT FROM`, `opened_at ≤ tender.at ≤ closed_at`, cash tenders − cash refunds). Expected cash
+  is core's (computed from the committed tenders in the window, so the shift log commits after the bills of its days); the
+  file's tenders by shift are a control total only — compared, quarantined on mismatch, never written as money.
+- **What a committed `stock_count` row set writes:** the count `INSERT INTO core.stock_count (tenant_id, id, outlet_id,
+  counted_by, counted_at, status)` with `status = 'submitted'` (inserting it submitted is allowed: status transitions are
+  judged on UPDATE only), its lines `INSERT INTO core.stock_count_line (tenant_id, id, stock_count_id, ingredient_id, batch_id,
+  expected_qty_milli, counted_qty_milli ≥ 0, unit = the ingredient's base unit)` with `expected_qty_milli` = core's on-hand
+  at `counted_at` (Σ movements with `at ≤ counted_at`; the batch's own for a batch line, as inventory's countSubmit), then one
+  `core.write_derived` group per count: `{rule: 'inventory.count_adjust', source_ref: 'core.stock_count:<id>', stock_movement:
+  [{id, outlet_id, ingredient_id, batch_id, qty_milli = counted − expected (skip 0: the movement CHECK refuses qty 0), unit,
+  kind: 'count_adjust', at: counted_at, unit_cost_per_1000_minor: null, currency: null, expired_sale_override_id: null}]}`
+  (write_derived stamps `ref_type`/`ref_id` from the group). Rows dated in a closed month or on/after the outlet's business
+  date today are core's quarantine reasons (`period_closed`, `date_not_past`), as for the 0018 kinds.
+- **`inventory.count_adjust`** (`core.stock_count → core.stock_movement`, source state `s.status = 'submitted'`): an open or
+  cancelled count adjusts nothing (MB001 as a derivation alone; MB008 inside an import decision, which does not bind
+  movements). Live counts (`inventory.count.submit.v1`, which lists stock_movement itself) may keep their own-command write or
+  adopt the rule. The guard judges the source row only, not that the written movement belongs to it (kind, outlet,
+  ingredient): the W2 carry-over that M-C1d generalises — a person-approved count is still the only way in.
+- **Templates (44).** kitchen `ticket_times, ticket_drift, remakes_overprep, prep_need, ticket_coverage`; inventory/purchasing
+  `shortfall, waste_week, expiry_risk, shrinkage, dead_stock, price_creep, invoice_vs_po, invoice_duplicates, quote_compare,
+  deal_inputs`; forecast `sales_history, slot_profile, points, accuracy, freshness`; people `labour_vs_demand, overtime_drift,
+  labour_pct, attendance_coverage, advances_open, payroll_lines`; customers `coupon_leakage, staff_coupon_use, coupon_daily,
+  churn_segments, review_trend, consented_audience, coupon_current`; compliance `licence_calendar, log_coverage,
+  temp_excursions, asset_costs, energy_per_order`; market `signal_uplift, upcoming, competitor_gap, viability, goal_progress,
+  goal_baseline`. Columns and params exactly the pack §3 tables (`SELECT id, params_schema, columns, min_role FROM
+  evidence.snapshot_template`); every named param must be supplied; `outlet_id` is nullable everywhere (null = every outlet in
+  the minter's scope) and only narrows. `min_role` manager, except `people.payroll_lines` and `market.viability` = advisor.
+  The formula behind each (an INFERENCE where the pack gives none) is the comment above its INSERT in 0021. Notable:
+  money is valued at the outlet's last receipt cost (pack §2; `unit_cost_per_1000_minor`, so value = qty_milli × per1000 ÷
+  1,000,000); forecast reads take the latest `intel.forecast_run` with visible points and only that run's own `method`
+  (every run stores both methods' points); `forecast.accuracy` is live (points vs completed order lines), never the run's
+  own wape/bias; overtime / payroll / coverage follow core-api's people module exactly; Σ rows are the last row with ids NULL
+  (`ticket_drift.late_loss_minor`, `remakes_overprep`'s outlet-week row, `shrinkage`, `invoice_vs_po`, `churn_segments`,
+  `log_coverage`'s temperature row). Templates without a date param (`shortfall`, `expiry_risk`, `dead_stock`,
+  `advances_open`, `slot_profile`, `upcoming`, `competitor_gap`, `energy_per_order`, `goal_*`, `deal_inputs`) read "today"
+  as each outlet's business date now.
+- **Scope.** Tables without an outlet column are read through their outlet-bearing parent: `coupon_use → order`, `advance →
+  staff`, `stock_count_line → stock_count`, `grn_line → goods_received`, `supplier_quote → intel.run`
+  (`tests/mc1bc.test.ts` gates it, as templates.test.ts gates postings). Templates that list outlets narrow `core.outlet`
+  (tenant-visible) to the minter's outlets themselves (licence_calendar, log_coverage, sales_history, the market ones);
+  `consented_audience` counts a segment snapshot only when the minter covers the snapshot's scope; `deal_inputs` reads only
+  the outlets of the quote's run that the minter covers. Tenant-level by nature: `price_creep`, `invoice_vs_po`,
+  `invoice_duplicates`, `coupon_current`, `viability`.
+- **Not done here.** `inventory.below_reorder` stays the 0005 v1 (no params; columns `outlet_id, ingredient_id,
+  ingredient_name, on_hand_milli, min_qty_milli, par_qty_milli`): a pack-shaped v2 would be the version core-api mints and its
+  required `outlet_id` would refuse every existing `params: {}` caller — a decision for the orchestrator. `INTEL_NUMERIC_ALLOW`
+  gains `count:intel.forecast_point` (by hand).
+- **Gates:** `tests/mc1bc.test.ts` (ids vs the parsed packs and the BOARD's per-pack counts, columns and params, manager scope
+  with its hand lists, child reads, T-093); `tests/books.test.ts` (numeric sources, TEMPLATES by hand); `node
+  db/tests/templates-worlds.ts` (columns on restaurant_group and store, and the plants each pack surfaces — hand list
+  KEY_CHECKS); `db/tests/redproof-0021.sh`. `tests/template-spec.ts` now also accepts an id cell with a remark ("`id` (IN)") and
+  an array param (`name[]`).
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

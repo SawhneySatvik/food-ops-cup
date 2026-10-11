@@ -8,10 +8,12 @@ import type { Snapshot } from "@munim/contracts";
 import { canonicalJson, sha256Hex, uuidv7 } from "../../commit/index.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { OutletScope, Queryable } from "../../runtoken/index.ts";
-import { bindNamedParams, runTemplate } from "../approvals/index.ts";
+import { TEMPLATE_RANK, bindNamedParams, runTemplate } from "../approvals/index.ts";
 
 /** INFERENCE (as approvals/snapshots.ts): advisor reads at staff level, judge has owner rights in its demo tenant. */
-const RANK: Record<string, number> = { staff: 1, advisor: 1, manager: 2, owner: 3, judge: 3 };
+// One ladder for every min_role check (0019): staff < manager < advisor < owner. A second copy here ranked advisor =
+// staff, letting staff and managers mint advisor-level finance and payroll templates (M-C1bc finding).
+const RANK = TEMPLATE_RANK;
 
 export type Minter =
   | { kind: "run"; run_id: string; scope: OutletScope }
