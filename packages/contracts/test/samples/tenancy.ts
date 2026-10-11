@@ -10,6 +10,7 @@ export const SAMPLES: Record<string, unknown> = {
   "tenancy.onboard.v1": { tenant_id: u(1), owner_member_id: u(7), outlet_id: u(2), owner_name: "Meena (synthetic)", business_name: "Meena's Kitchens (synthetic)", kind: "restaurant", country_code: "IN", outlet: { name: "Indiranagar", address: "12 Example Road, Bengaluru (synthetic)", tz: "Asia/Kolkata", hours: { opens: "09:00", closes: "22:00" }, tax_ids: { FSSAI: "12345678901234" } } },
   "tenancy.outlet.update.v1": { outlet_id: u(2), accepting_orders: "busy", busy_extra_min: 10, pickup_slot_min: 15, upi_vpa: "meenas@okbank", business_day_cutoff: "04:00", hours: { opens: "10:00", closes: "23:00" } },
   "tenancy.tenant.update.v1": { name: "Meena's Kitchens", home_tz: "Asia/Kolkata", complete_onboarding: true },
+  "tenancy.policy.set.v1": { outlet_id: null, valid_from: "2026-11-01", labour_target_bp: 3000, target_margin_bp: 6500 },
   "tenancy.member.bind.v1": { member_id: u(8) },
   "tenancy.member.role.set.v1": { member_id: u(8), role: "manager", outlet_ids: [u(2)] },
   "tenancy.member.deactivate.v1": { member_id: u(8) },

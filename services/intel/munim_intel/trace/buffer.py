@@ -34,7 +34,9 @@ BATCH_CAP = 500
 #: Flush during the run every this many unsent events (04 §7).
 FLUSH_EVERY = 50
 
-LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$")
+# Same pattern as packages/contracts/src/shared/trace.ts: a bare number of 4+ digits ("450000", "4500.50") is not a label (R25);
+# short counts ("round", "claims" in negotiate / ingest traces) stay legitimate.
+LABEL = re.compile(r"^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$")
 
 Payload = dict[str, str | list[str]]
 Sink = Callable[[InternalTracesBatchRequest], Awaitable[object]]

@@ -18,7 +18,7 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import {
   bindHandler, brandCreateHandler, channelCreateHandler, demoHandler, deviceRegisterHandler, inviteHandler, onboardHandler,
-  outletCreateHandler, outletUpdateHandler, tenantUpdateHandler, deactivateHandler, roleSetHandler,
+  outletCreateHandler, outletUpdateHandler, policySetHandler, tenantUpdateHandler, deactivateHandler, roleSetHandler,
 } from "./commands.ts";
 import { createKey, listKeys, revokeKey } from "./storefront-keys.ts";
 import { outletScopeOf } from "@munim/core-domain/authority";
@@ -184,6 +184,7 @@ export const router = new Hono<AppEnv>()
     memberCommand(c, (m) => outletUpdateHandler(m), 200, (e) => {
       if ((e.payload as { outlet_id?: unknown }).outlet_id !== c.req.param("action")!.slice(0, -":update".length)) throw new ApiError("invalid_payload");
     }))
+  .post("/v1/policy", requireMember, (c) => memberCommand(c, () => policySetHandler))
   .post("/v1/brands", requireMember, (c) => memberCommand(c, () => brandCreateHandler))
   .post("/v1/channels", requireMember, (c) => memberCommand(c, () => channelCreateHandler))
   .post("/v1/devices", requireMember, (c) => memberCommand(c, (m) => deviceRegisterHandler(m)))

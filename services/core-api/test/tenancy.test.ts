@@ -501,6 +501,41 @@ describe("brands, channels", () => {
   });
 });
 
+describe("tenancy.policy.set.v1: the owner's labour and margin targets (a person's own, audited command)", () => {
+  it("owner sets targets as a new dated version (old closed, loyalty carried); a replay is one row; manager 403, same-day 409, bad bp 422", async () => {
+    const a = await onboard();
+    const mgr = uuidv7(), subM = `mgr-${uuidv7()}`;
+    expect((await call("POST", "/v1/members:invite", a.token, env("tenancy.member.invite.v1", { member_id: mgr, name: "Invited Manager", email: "polmgr@example.test", role: "manager", outlet_ids: [a.outlet] }), a.tenant)).status).toBe(200);
+    expect((await call("POST", "/v1/members:bind", tok(subM, "polmgr@example.test"), env("tenancy.member.bind.v1", { member_id: mgr }), a.tenant)).status).toBe(200);
+    const set = (token: string, payload: Record<string, unknown>, key?: string) => call("POST", "/v1/policy", token, env("tenancy.policy.set.v1", payload, key), a.tenant);
+    const base = { outlet_id: null, valid_from: "2099-01-01", labour_target_bp: 3000, target_margin_bp: 6500 };
+    const rows = () => db.admin(`SELECT valid_from::text vf, valid_to::text vt, labour_target_bp l, target_margin_bp m, loyalty_earn_per_minor::int e FROM core.business_policy WHERE tenant_id = $1 AND outlet_id IS NULL ORDER BY valid_from`, [a.tenant]).then((r) => r.rows);
+    // refusals first: a manager is not the owner; the new version must start after the one in force; basis points are 0..10000; one target at least
+    expect((await set(tok(subM, "polmgr@example.test"), base)).status).toBe(403);
+    expect((await set(a.token, { ...base, valid_from: "2000-01-01" })).status).toBe(409);
+    expect((await set(a.token, { ...base, labour_target_bp: 10001 })).status).toBe(422);
+    expect((await set(a.token, { outlet_id: null, valid_from: "2099-01-01" })).status).toBe(422);
+    expect(await rows()).toHaveLength(1);
+    // accept: the owner; the same envelope again replays (one new row, X-Munim-Replayed)
+    const body = env("tenancy.policy.set.v1", base);
+    const first = await call("POST", "/v1/policy", a.token, body, a.tenant);
+    const second = await call("POST", "/v1/policy", a.token, body, a.tenant);
+    expect([first.status, second.status]).toEqual([200, 200]);
+    expect(second.headers.get("X-Munim-Replayed")).toBe("true");
+    const after = await rows();
+    expect(after).toHaveLength(2);
+    expect(after[0]).toMatchObject({ vt: "2099-01-01", l: null, m: null, e: 1000 });
+    expect(after[1]).toMatchObject({ vf: "2099-01-01", vt: null, l: 3000, m: 6500, e: 1000 });
+    // a second version setting one target carries the other over
+    expect((await set(a.token, { outlet_id: null, valid_from: "2099-02-01", labour_target_bp: 2800 })).status).toBe(200);
+    expect((await rows()).at(-1)).toMatchObject({ vf: "2099-02-01", l: 2800, m: 6500 });
+    expect((await set(a.token, { outlet_id: null, valid_from: "2099-03-01", target_margin_bp: 7000 })).status).toBe(200);
+    expect((await rows()).at(-1)).toMatchObject({ vf: "2099-03-01", l: 2800, m: 7000 });
+    // audited under the owner: one entry per row touched
+    expect(await count(`SELECT count(*) n FROM core.audit_log WHERE tenant_id = $1 AND action = 'tenancy.policy.set.v1' AND actor->>'id' = $2`, [a.tenant, a.owner])).toBe(6);
+  });
+});
+
 describe("demo.session.start.v1 (operator)", () => {
   it("an operator starts an ephemeral judge on a fresh demo tenant; a member token cannot", async () => {
     const op = uuidv7(), opSub = `op-${uuidv7()}`;

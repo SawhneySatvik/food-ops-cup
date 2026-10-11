@@ -1,7 +1,7 @@
 // Tenancy setup commands (02-schema §2.1). Field names follow the core.* columns. Currency, FY start,
 // tax rules and time zones come from the tenant's country pack, never from a request (R21, R30).
 import { z } from "zod";
-import { CountryCode, CurrencyCode, Email, IanaZone, IsoDateTime, LocalTime, MemberRole, NonEmpty, Uuid7 } from "../shared/primitives.ts";
+import { BasisPoints, CountryCode, CurrencyCode, Email, IanaZone, IsoDate, IsoDateTime, LocalTime, MemberRole, NonEmpty, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
 import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
@@ -99,6 +99,18 @@ export const TenancyOnboardV1 = z.strictObject({
     tax_ids: TaxIds,
   }),
 });
+
+/** The owner's targets the packs judge against (core.business_policy). A policy is versioned by validity: this opens a new version from
+ *  `valid_from` (which must be after the version it replaces) and closes the old one; fields not given carry over. `outlet_id` null =
+ *  the tenant-wide policy; an outlet id = that outlet's override. */
+export const TenancyPolicySetV1 = z
+  .strictObject({
+    outlet_id: Uuid7.nullable(),
+    valid_from: IsoDate,
+    labour_target_bp: BasisPoints.optional(),
+    target_margin_bp: BasisPoints.optional(),
+  })
+  .refine((p) => p.labour_target_bp !== undefined || p.target_margin_bp !== undefined, "set at least one target");
 
 export const AcceptingOrders = z.enum(["open", "busy", "paused"]);
 const Minutes = (max: number, min = 0) => z.int().min(min).max(max);
@@ -243,6 +255,7 @@ export const SCHEMAS = {
   "tenancy.onboard.v1": TenancyOnboardV1,
   "tenancy.outlet.update.v1": TenancyOutletUpdateV1,
   "tenancy.tenant.update.v1": TenancyTenantUpdateV1,
+  "tenancy.policy.set.v1": TenancyPolicySetV1,
   "tenancy.member.bind.v1": TenancyMemberBindV1,
   "tenancy.member.role.set.v1": TenancyMemberRoleSetV1,
   "tenancy.member.deactivate.v1": TenancyMemberDeactivateV1,
@@ -281,6 +294,7 @@ export const ROUTES: readonly Route[] = [
   { surface: "public", method: "post", path: "/v1/devices", operationId: "registerDevice", summary: "tenancy.device.register.v1 — register a POS or KDS device (owner; manager of that outlet)", auth: "member", command: "tenancy.device.register.v1", response: "command-result", status: 200, conflict: true },
   { surface: "public", method: "post", path: "/v1/members:invite", operationId: "inviteMember", summary: "tenancy.member.invite.v1 — invite a member by email (owner)", auth: "member", command: "tenancy.member.invite.v1", response: "command-result", status: 200, conflict: true },
   { surface: "public", method: "post", path: "/v1/tenant:update", operationId: "updateTenant", summary: "tenancy.tenant.update.v1 — business settings; country is locked after onboarding (R30)", auth: "member", command: "tenancy.tenant.update.v1", response: "command-result", status: 200, conflict: true },
+  { surface: "public", method: "post", path: "/v1/policy", operationId: "setBusinessPolicy", summary: "tenancy.policy.set.v1 — the owner's labour and margin targets, as a new dated version (owner)", auth: "member", command: "tenancy.policy.set.v1", response: "command-result", status: 200, conflict: true },
   { surface: "public", method: "post", path: "/platform/v1/demo-sessions", operationId: "startDemoSession", summary: "demo.session.start.v1 — operator starts an ephemeral judge session on a fresh demo tenant", auth: "operator", command: "demo.session.start.v1", response: "command-result", status: 201, conflict: true },
   { surface: "public", method: "post", path: "/v1/storefront-keys", operationId: "createStorefrontKey", summary: "Create a storefront key; the raw key is returned once (owner)", auth: "member", request: "tenancy.storefront-key.create", response: "tenancy.storefront-key.created", status: 201, conflict: true },
   { surface: "public", method: "get", path: "/v1/storefront-keys", operationId: "listStorefrontKeys", summary: "Storefront keys (no key material)", auth: "member", response: "tenancy.storefront-key.list", status: 200 },

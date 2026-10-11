@@ -3,15 +3,21 @@
 // verb on these paths. A title or message body is ingested, untrusted text: it leaves as a JSON string and is never
 // HTML (gotcha 15); the screens render it as text. Conversations carry an outlet policy (NULL outlet = tenant-wide).
 //   GET /v1/conversations?outlet=&kind=&limit=&cursor= · GET /v1/conversations/{id}/messages?limit=&cursor=  (oldest first)
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { requireMember } from "../../auth/resolve.ts";
 import { ApiError } from "../../lib/errors.ts";
 import { cursorOf, ID, inScope, limitOf, memberOf, methodGuard, optEnum, optUuid, page, readAs } from "../../lib/reads.ts";
 import type { AppEnv } from "../../lib/types.ts";
 
+// Conversations are not for staff (W3 close ruling) until W4 decides message masking; managers and above read them.
+function notStaff(c: Context<AppEnv>): void {
+  if (memberOf(c).role === "staff") throw new ApiError("forbidden", "authority_denied");
+}
+
 export const readRoutes = methodGuard(
   new Hono<AppEnv>()
     .get("/v1/conversations", requireMember, async (c) => {
+      notStaff(c);
       const outlet = optUuid(c, "outlet");
       if (outlet !== null) inScope(memberOf(c), outlet);
       const kind = optEnum(c, "kind", ["handover", "supplier", "customer", "imported_chat", "other"] as const);
@@ -26,6 +32,7 @@ export const readRoutes = methodGuard(
       })), 200);
     })
     .get(`/v1/conversations/:id{${ID}}/messages`, requireMember, async (c) => {
+      notStaff(c);
       const limit = limitOf(c, 100, 500);
       const cursor = cursorOf(c);
       const out = await readAs(c, async (db) => {

@@ -4,7 +4,7 @@
 import type { CommandEnvelope } from "@munim/contracts";
 import {
   DemoSessionStartV1, TenancyBrandCreateV1, TenancyChannelCreateV1, TenancyDeviceRegisterV1, TenancyMemberBindV1, TenancyMemberDeactivateV1,
-  TenancyMemberInviteV1, TenancyMemberRoleSetV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyTenantUpdateV1,
+  TenancyMemberInviteV1, TenancyMemberRoleSetV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyPolicySetV1, TenancyTenantUpdateV1,
 } from "@munim/contracts/tenancy";
 import type { Principal } from "../../auth/resolve.ts";
 import type { AuditEntry, CommandHandler } from "../../commit/index.ts";
@@ -26,6 +26,7 @@ export const TYPES = {
   outletCreate: "tenancy.outlet.create.v1",
   outletUpdate: "tenancy.outlet.update.v1",
   tenantUpdate: "tenancy.tenant.update.v1",
+  policySet: "tenancy.policy.set.v1",
   brandCreate: "tenancy.brand.create.v1",
   channelCreate: "tenancy.channel.create.v1",
   deviceRegister: "tenancy.device.register.v1",
@@ -197,6 +198,41 @@ export const tenantUpdateHandler: CommandHandler = {
     if (p.complete_onboarding) sets.push("onboarded_at = coalesce(onboarded_at, now())");
     if (sets.length) await c.query(`UPDATE core.tenant SET ${sets.join(", ")} WHERE tenant_id = $1`, args);
     return { entityId: t, audit: [{ entity: "core.tenant", entityId: t, after: p }] };
+  },
+};
+
+/** tenancy.policy.set.v1 — a new dated version of the business policy (owner; the authority row and the book guard decide who). The
+ *  version in force for the scope is closed at the new `valid_from`, the new one carries every column not set over from it. */
+export const policySetHandler: CommandHandler = {
+  type: TYPES.policySet,
+  async run(c, cmd) {
+    const p = payload(TenancyPolicySetV1, cmd);
+    if (p.outlet_id) await assertOutlets(c, [p.outlet_id]);
+    const cur = (await c.query<Record<string, any>>(
+      `SELECT id, valid_from::text AS valid_from, target_margin_bp, margin_floor_bp, labour_target_bp, min_payment_days, loyalty_earn_per_minor, loyalty_point_value_minor
+         FROM core.business_policy WHERE outlet_id IS NOT DISTINCT FROM $1 AND valid_to IS NULL FOR UPDATE`, [p.outlet_id])).rows[0];
+    if (cur && cur.valid_from >= p.valid_from) throw new ApiError("conflict");
+    const next = {
+      target_margin_bp: p.target_margin_bp ?? cur?.target_margin_bp ?? null, margin_floor_bp: cur?.margin_floor_bp ?? null,
+      labour_target_bp: p.labour_target_bp ?? cur?.labour_target_bp ?? null, min_payment_days: cur?.min_payment_days ?? null,
+      loyalty_earn_per_minor: cur?.loyalty_earn_per_minor ?? 1000, loyalty_point_value_minor: cur?.loyalty_point_value_minor ?? 10,
+    };
+    if (next.margin_floor_bp !== null && next.target_margin_bp !== null && next.margin_floor_bp > next.target_margin_bp) throw new ApiError("invalid_payload");
+    const id = uuidv7();
+    if (cur) await c.query(`UPDATE core.business_policy SET valid_to = $2 WHERE id = $1`, [cur.id, p.valid_from]);
+    await c.query(
+      `INSERT INTO core.business_policy (tenant_id, id, outlet_id, target_margin_bp, margin_floor_bp, labour_target_bp, min_payment_days, loyalty_earn_per_minor,
+                                         loyalty_point_value_minor, valid_from, created_by)
+       VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, $7, $8, $9, current_setting('app.member_id')::uuid)`,
+      [id, p.outlet_id, next.target_margin_bp, next.margin_floor_bp, next.labour_target_bp, next.min_payment_days, next.loyalty_earn_per_minor,
+        next.loyalty_point_value_minor, p.valid_from]);
+    return {
+      entityId: id,
+      audit: [
+        ...(cur ? [{ entity: "core.business_policy", entityId: cur.id, before: { valid_to: null }, after: { valid_to: p.valid_from } }] : []),
+        { entity: "core.business_policy", entityId: id, after: { outlet_id: p.outlet_id, valid_from: p.valid_from, labour_target_bp: next.labour_target_bp, target_margin_bp: next.target_margin_bp } },
+      ],
+    };
   },
 };
 

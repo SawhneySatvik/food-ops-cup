@@ -70,6 +70,7 @@ export const readRoutes = methodGuard(
         counted_cash_minor: int(s.counted_cash_minor), expected_cash_minor: int(s.expected_cash_minor), variance_minor: int(s.variance_minor),
       })), 200);
     })
+    // `date` is the outlet's BUSINESS date (local less the cutoff), as orders.pickup_window.generate.v1 interprets it: a 01:00 slot belongs to the day before.
     .get("/v1/pickup-windows", requireMember, async (c) => {
       const outlet = optUuid(c, "outlet");
       const date = optDate(c, "date");
@@ -80,7 +81,7 @@ export const readRoutes = methodGuard(
       const rows = await readAs(c, async (db) => (await db.query<Record<string, any>>(
         `SELECT w.id, w.outlet_id, w.starts_at, w.ends_at, w.capacity_orders, w.booked
            FROM core.pickup_window w JOIN core.outlet ou ON ou.tenant_id = w.tenant_id AND ou.id = w.outlet_id
-          WHERE w.outlet_id = $1 AND (w.starts_at AT TIME ZONE ou.tz)::date = $2::date AND ($3::uuid IS NULL OR (w.starts_at, w.id) > (SELECT x.starts_at, x.id FROM core.pickup_window x WHERE x.id = $3))
+          WHERE w.outlet_id = $1 AND ((w.starts_at AT TIME ZONE ou.tz) - ou.business_day_cutoff)::date = $2::date AND ($3::uuid IS NULL OR (w.starts_at, w.id) > (SELECT x.starts_at, x.id FROM core.pickup_window x WHERE x.id = $3))
           ORDER BY w.starts_at, w.id LIMIT $4`, [outlet, date, cursor, limit + 1])).rows);
       return c.json(page(rows, limit, (w) => ({
         pickup_window_id: w.id, outlet_id: w.outlet_id, starts_at: w.starts_at.toISOString(), ends_at: w.ends_at.toISOString(),

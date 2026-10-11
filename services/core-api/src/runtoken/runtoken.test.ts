@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { uuidv7 } from "../commit/canonical.ts";
 import { provisionTenant, svcTx, testKeys, type Tenant } from "../commit/testkit.ts";
 import { ensureDevRunTokenKeys, loadRunTokenKeys } from "./keys.ts";
-import { endRun, mintRunToken, signJwt, verifyRunToken, type RunTokenDeps } from "./index.ts";
+import { endRun, mintRunToken, signJwt, ttlSeconds, verifyRunToken, type RunTokenDeps } from "./index.ts";
 
 let db: TestDb;
 let A: Tenant;
@@ -55,6 +55,15 @@ describe("run tokens", () => {
     expect(await verifyRunToken(deps, token)).toEqual({ ok: true, claims });
     const event = await mintA();
     expect(event.claims.exp - event.claims.iat).toBe(7200); // the pair: another trigger keeps its own TTL
+  });
+
+  test("brief and auto_step get 2 h, watch_sweep too; ask 15 min and ingest 30 min stay their own (every trigger asserted, hand values)", async () => {
+    const hand = { ask: 900, ingest: 1800, event: 7200, watch_sweep: 7200, brief: 7200, auto_step: 7200 } as const;
+    for (const [trigger, seconds] of Object.entries(hand)) expect(ttlSeconds(trigger as keyof typeof hand), trigger).toBe(seconds);
+    // minted, not just computed: a brief token expires 2 h after it is issued
+    const brief = await mintRunToken(deps, { tenantId: A.tenant, outletScope: ["*"], trigger: "brief", actor: "brief" });
+    expect(brief.claims.exp - brief.claims.iat).toBe(7200);
+    expect(await verifyRunToken(deps, brief.token)).toEqual({ ok: true, claims: brief.claims });
   });
 
   test("forged → refused: other key, tampered payload, alg swap, garbage; control: the same claims under the real key → accepted", async () => {

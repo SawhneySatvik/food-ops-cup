@@ -25,7 +25,9 @@ export const TraceKind = z.enum(TRACE_KINDS);
 
 /** One token of at most 200 characters, no whitespace: the same pattern as intel's `check_payload` (trace/buffer.py), so
  *  core refuses a prose payload even if a caller skipped intel's check (defence in depth, rule 8). */
-const Label = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$/);
+/** A bare number of 4+ digits (or digits and dots: "450000", "4500.50") is refused: a figure must come from a snapshot cell, never ride in a
+ *  trace (R25). Short counts ("round" 1, "claims" 3 in intel's negotiate / ingest traces) are legitimate labels, hence the 4-char floor. */
+const Label = z.string().regex(/^(?![0-9][0-9.]{3,}$)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$/);
 export const TracePayload = z.record(z.string().regex(/^[a-z_][a-z0-9_]*$/), z.union([Label, z.array(Label)]));
 
 /** Deal-review verdict. The review is deterministic (SQL + rules); `fail` and `cannot_verify` name the

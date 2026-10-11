@@ -7,6 +7,7 @@ tenancy.device.register.v1
 tenancy.onboard.v1
 tenancy.outlet.update.v1
 tenancy.tenant.update.v1
+tenancy.policy.set.v1
 tenancy.member.bind.v1
 tenancy.member.role.set.v1
 tenancy.member.deactivate.v1
