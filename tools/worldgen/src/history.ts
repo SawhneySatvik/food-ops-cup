@@ -144,6 +144,7 @@ export class Plan {
           if (rng.chance(0.07)) lines[rng.int(0, lines.length - 1)]!.discBp = 1000;
           const h = rng.next();
           const hour = cfg.hours ? rng.int(...cfg.hours) : h < 0.4 ? rng.int(12, 14) : h < 0.85 ? rng.int(19, 22) : rng.int(10, 23);
+          // Refund reasons are the packs' slugs: `late` is the one kitchen.ticket_drift counts (packs/kitchen.md §2, K1).
           const wantsRefund = !voidIt && rng.chance(0.015);
           const p: PBill = {
             no: `${cfg.prefix}${oi + 1}-${d.replaceAll("-", "")}-${String(i + 1).padStart(3, "0")}`, date: d,
@@ -152,7 +153,7 @@ export class Plan {
             ...(!aggregator && !voidIt && cfg.phones.length > 0 && rng.chance(0.35) ? { phone: rng.pick(cfg.phones) } : {}),
             ...(voidIt ? { voidReason: rng.pick(["customer_left", "wrong_order", "duplicate_punch"]) } : {}),
             ...(wantsRefund ? { refund: { minor: rng.chance(0.5) ? ("full" as const) : ("half" as const), mode: rng.pick(["cash", "card", "upi"] as const),
-              reason: aggregator ? "late_delivery" : rng.pick(["customer_complaint", "late_delivery", "wrong_item"]), date: addDays(d, rng.int(0, 2)) } } : {}),
+              reason: aggregator ? "late" : rng.pick(["customer_complaint", "late", "wrong_item"]), date: addDays(d, rng.int(0, 2)) } } : {}),
           };
           out.push(finish(p, rng));
         }
@@ -162,14 +163,15 @@ export class Plan {
     for (const p of cfg.planted) if (p.date < first || p.date > last) throw new Error(`history: planted bill ${p.no} on ${p.date} is outside the timeline`);
     this.bills = out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.outlet - b.outlet));
 
-    // Waste: baseline logs on the baseline pairs, then the planted rows.
+    // Waste: baseline logs on the baseline pairs, then the planted rows. Baseline waste is spoilage and breakage, never overprep: kitchen.overprep
+    // judges an outlet's whole week, so a baseline overprep log would ride along in a planted week's impact (RG-K7). Three slots keep the draw.
     const w: Waste[] = [];
     for (let d = first; d <= last; d = addDays(d, 1)) {
       const rng = new Prng(c.seed, c.world, "waste", cfg.prefix, d);
       for (const pair of cfg.waste) {
         if (!rng.chance(0.18)) continue;
         w.push({ date: d, time: `${rng.int(20, 22)}:${String(rng.int(0, 59)).padStart(2, "0")}`, outlet: pair.outlet, ing: pair.ing,
-          qtyMilli: rng.int(...pair.qtyMilli), reason: rng.pick(["overprep", "expired", "damaged"] as const) });
+          qtyMilli: rng.int(...pair.qtyMilli), reason: rng.pick(["damaged", "expired", "damaged"] as const) });
       }
     }
     for (const x of cfg.plantedWaste) if (x.date < first || x.date > last) throw new Error(`history: planted waste on ${x.date} is outside the timeline`);
@@ -189,10 +191,10 @@ export class Plan {
     return Math.ceil(milli * 1.1);
   }
 
-  /** Aggregator bills of one outlet and channel inside [from, to] (a payout cycle): the lines its statement lists. */
-  aggregatorBills(outletIdx: number, channel: string, from: string, to: string): Array<{ no: string; date: string; gross: number }> {
+  /** Aggregator bills of one outlet and channel inside [from, to] (a payout cycle): the lines its statement lists, with the bill's tax. */
+  aggregatorBills(outletIdx: number, channel: string, from: string, to: string): Array<{ no: string; date: string; gross: number; tax: number }> {
     return this.bills.filter((b) => !b.voided && b.outlet === outletIdx && b.channel === channel && b.date >= from && b.date <= to)
-      .map((b) => ({ no: b.no, date: b.date, gross: b.total }));
+      .map((b) => ({ no: b.no, date: b.date, gross: b.total, tax: b.lines.reduce((a, l) => a + l.tax, 0) }));
   }
 
   /** What an outlet's customers paid by UPI on one date (completed bills only): the bank credits a statement would list. */

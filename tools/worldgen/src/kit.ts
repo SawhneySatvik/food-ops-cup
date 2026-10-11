@@ -362,12 +362,18 @@ export async function coupon(c: Ctx, key: string, code: string, o: { bp: number;
 
 // ---- people with logins -----------------------------------------------------------------------------------------
 
-/** Invites a member as the owner; the invitee's first sign-in (their own persona token) binds it. */
-export async function person(c: Ctx, persona: string, name: string, role: "manager" | "staff", outletIds: string[]) {
+/** Invites a member as the owner. An invited member is active before signing in (a manager the compliance tasks can name). */
+export async function invite(c: Ctx, persona: string, name: string, role: "manager" | "staff", outletIds: string[]) {
   const id = c.api.id(`member:${persona}`);
   await c.api.cmd("owner", "/v1/members:invite", "tenancy.member.invite.v1", `invite:${persona}`, {
     member_id: id, name, email: personaEmail(c, persona), role, outlet_ids: outletIds,
   });
+  return id;
+}
+
+/** Invites a member who then signs in: the invitee's first sign-in (their own persona token, so the world's meta lists it) binds it. */
+export async function person(c: Ctx, persona: string, name: string, role: "manager" | "staff", outletIds: string[]) {
+  const id = await invite(c, persona, name, role, outletIds);
   await c.api.cmd(persona, "/v1/members:bind", "tenancy.member.bind.v1", `bind:${persona}`, { member_id: id });
   return id;
 }
@@ -437,7 +443,9 @@ export interface HistorySpec {
   /** Baseline statements, one file per weekly cycle, listing the history bills of that outlet and channel (the planted window's own
    *  statements are written by the world). `bills` is the history plan's aggregator bills for a cycle. */
   payouts: Array<{
-    layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number; bills: (from: string, to: string) => Array<{ no: string; date: string; gross: number }>;
+    layout: Layout; prefix: string; outlet: OutletInfo; commissionBp: number; bills: (from: string, to: string) => Array<{ no: string; date: string; gross: number; tax: number }>;
+    /** The operator collects the order's tax and withholds it from the payout (IN aggregators, Sec 9(5): packs/finance.md §2); false where the merchant collects (AU). */
+    withholdsTax: boolean;
     /** Cycle numbers (1 = the newest) uploaded but left unapproved: a statement the owner has not approved yet (a missing settlement, F7). */
     hold?: readonly number[];
     /** Extra lines of one cycle (an ad fee inside the cap, F8). */
@@ -460,7 +468,7 @@ export async function history(c: Ctx, spec: HistorySpec): Promise<void> {
       const w = i + 1;
       const meta = { ref: `${p.prefix}-H${w}`, outlet: p.outlet.name, from: D(7 * w + 13), to: D(7 * w + 7), paidOn: D(7 * w + 5) };
       const lines: PayoutLine[] = p.bills(meta.from, meta.to).map((b) => ({
-        kind: "order", orderRef: b.no, orderDate: b.date, gross: b.gross, commission: Math.round((b.gross * p.commissionBp) / 10000), ad: 0, promo: 0, tax: 0,
+        kind: "order", orderRef: b.no, orderDate: b.date, gross: b.gross, commission: Math.round((b.gross * p.commissionBp) / 10000), ad: 0, promo: 0, tax: p.withholdsTax ? b.tax : 0,
       }));
       if (lines.length > 0) lines.push(...(p.extra?.(w, meta) ?? []));
       return { meta, lines, w };
