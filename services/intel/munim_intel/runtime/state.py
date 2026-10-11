@@ -1,8 +1,10 @@
-"""RunState: the one per-run object every Runner of a run shares — the Manager's and each branch's (ADR-014 §6.3).
+"""RunState: the per-context run object a Runner carries — the Manager's, and one per fan-out branch (ADR-014 §6.3;
+T-053 deviation: a branch's own RunState keeps §3.4's per-branch caps over the run's shared HandleTable and TraceBuffer).
 
 It holds the budget, the taint flag, the handle table and the TraceBuffer. Taint lives here and nowhere else
 (review B1): a flag in one Runner's session state would let a branch that read untrusted text hand prose to an
-untainted Manager that can propose. Branches get the same RunState object, so a tainted branch taints the run.
+untainted Manager that can propose. A branch's taint reaches the Manager's RunState through `BranchReport.tainted`,
+which the plugin ORs into the run when fan_out returns; a branch starts tainted when the run already is.
 
 The actor of the code running now is a ContextVar, not a field: branches run as concurrent tasks and each task
 carries its own copy, so a branch's traces say `branch:<pack>` while the Manager's say `manager` (ADK's agent name

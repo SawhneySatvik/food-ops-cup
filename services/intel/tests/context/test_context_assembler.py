@@ -16,6 +16,7 @@ older untainted turn may still be cited by the rolling summary, by its refs only
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import math
 import sys
@@ -24,6 +25,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any, ClassVar
 
+import httpx
 import pytest
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
@@ -34,12 +36,14 @@ from google.genai import types
 from munim_intel.config import load_config
 from munim_intel.context.assembler import AGENT_NAME, Assembler, ChecklistItem, FindingHint, Investigation, RunKind, StepSummary
 from munim_intel.context.expand import CANNOT_VERIFY, expand
-from munim_intel.contracts_gen.models import InternalRunFrameResponse, ThreadsBlock
+from munim_intel.contracts_gen.models import InternalRunFrameResponse, ThreadsBlock, ThreadsIntelAskRequest
 from munim_intel.llm.recorded import RecordedLlm, projection, request_key
+from munim_intel.manager.ask import Prepared, prepare
+from munim_intel.manager.paths import PATHS, bind
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.runtime.runner import run_agent
-from munim_intel.runtime.state import RunState
+from munim_intel.runtime.state import PACKS, RunState
 from munim_intel.skills import load_skill
 from munim_intel.skills.loader import LoadSkillTool, PackToolset, SkillLoadRefused
 from munim_intel.tools.generated import ReadTemplateTool, digest, uuid7
@@ -368,6 +372,87 @@ def test_a_mid_run_load_skill_binds_on_the_next_model_step() -> None:
     assert set(a.state.tool_pack) == set(finance_tools()) and set(a.state.tool_pack.values()) == {"finance"}
 
 
+# -- gate 2, the Manager's context (T-088b): block 2 built from the folded abstain; the same prefix across tenants -----
+
+#: ADR-014 §5.1 (hand): every skill may abstain with these beside its own refusal codes.
+ALWAYS_CODES = ("missing_ref", "insufficient_history")
+MANAGER_SCRIPT = [
+    LlmResponse(
+        content=types.Content(
+            role="model",
+            parts=[types.Part(function_call=types.FunctionCall(name="submit_answer", args={"segments": [], "abstain": "missing_ref"}))],
+        )
+    )
+]
+
+
+def _core(request: httpx.Request) -> httpx.Response:
+    """core's internal API for a run that only writes traces."""
+    assert request.url.path.endswith("/traces:batch"), request.url.path
+    n = len(json.loads(request.content)["events"])
+    return httpx.Response(201, json={"inserted": n, "last_seq": n})
+
+
+def manager_context(ctx: RunContext, frame: InternalRunFrameResponse, intent: str, addressed: str) -> Prepared:
+    """The Manager's context exactly as answer_ask builds it: prepare() over the path binding, the thread excerpt in."""
+    client = InternalClient(ctx, base_url="http://core.test", service_secret="t088b-secret", transport=httpx.MockTransport(_core))
+    req = ThreadsIntelAskRequest.model_validate(
+        {"answer_id": _id(80), "question": QUESTION, "addressed_to": addressed, "thread": thread().model_dump(mode="json")}
+    )
+    return prepare(ctx, req, frame, client, bind(PATHS[intent], addressed))
+
+
+@pytest.mark.parametrize("intent", ["explain", "draft_request"])
+@pytest.mark.parametrize("pack", PACKS)
+def test_block_2_is_built_from_the_folded_abstain_and_the_manager_needs_no_override(pack: str, intent: str) -> None:
+    """The base Assembler's block 2 names submit_answer's own codes — the skill's (its skill.py) then ALWAYS — and is
+    byte-identical to what the Manager's assembler says, so its system() override is redundant."""
+    p = manager_context(CTX_A, FRAME_A, intent, pack)
+    base = Assembler.system(p.assembler)
+    assert base == p.assembler.system()
+    codes = list(dict.fromkeys([*importlib.import_module(f"munim_intel.skills.{pack}.skill").REFUSAL_CODES, *ALWAYS_CODES]))
+    assert f"- To abstain, call submit_answer with no segments and abstain set to one reason code: {', '.join(codes)}." in base
+    assert "call abstain" not in base
+
+
+def test_paired_a_context_without_submit_answer_keeps_the_separate_abstain_text() -> None:
+    text = kit(CTX_A, FRAME_A, skills=("finance",)).system()
+    assert "- To abstain, call abstain with one reason code: missing_ref, consent_record_missing" in text
+
+
+async def run_manager(ctx: RunContext, frame: InternalRunFrameResponse, intent: str, model: BaseLlm) -> Prepared:
+    p = manager_context(ctx, frame, intent, "finance")
+    agent = LlmAgent(
+        name=AGENT_NAME["orchestrator"],
+        model=model,
+        instruction=p.assembler.instruction,
+        tools=[p.toolset],
+        before_model_callback=p.assembler.before_model,
+    )
+    cfg = load_config(env={}, run_dir=Path(tempfile.mkdtemp()))
+    await run_agent(agent, ctx, QUESTION, cfg, state=p.state, actor="specialist:finance")
+    return p
+
+
+@pytest.mark.parametrize("intent", ["explain", "draft_request"])
+def test_two_tenants_get_a_byte_identical_prefix_through_block_4_in_the_managers_context(intent: str) -> None:
+    CapturingLlm.seen = []
+    for ctx, frame in ((CTX_A, FRAME_A), (CTX_B, FRAME_B)):
+        p = asyncio.run(run_manager(ctx, frame, intent, CapturingLlm()))
+        assert p.submit.envelope is not None, "the recorded step reached submit_answer"
+    assert len(CapturingLlm.seen) == 2
+    a, b = CapturingLlm.seen
+    assert a["system"] == b["system"], "blocks 1–3 differ across tenants"
+    assert "Skill finance:" in a["system"] and "call submit_answer with no segments and abstain set to" in a["system"]
+    assert declarations(a) == declarations(b) and a["order"] == b["order"] and a["order"][0] == "submit_answer"
+    propose = [n for n in a["order"] if n.startswith("propose_")]
+    assert bool(propose) == (intent == "draft_request"), propose
+    assert "Indiranagar Kitchen" in json.dumps(a["contents"]) and "Fitzroy Corner Store" in json.dumps(b["contents"])
+    assert "Thread so far" in json.dumps(a["contents"]) and a["contents"] != b["contents"]
+    for name in ("Indiranagar Kitchen", "Koramangala Cloud", "Fitzroy Corner Store", TENANT_A, TENANT_B):
+        assert name not in a["system"] and name not in declarations(a)
+
+
 # -- gate 3: an unexpanded or forged handle renders "cannot verify" --------------------------------------------------
 
 
@@ -500,6 +585,9 @@ async def record() -> None:
     await run_scenario(CTX_A, FRAME_A, ("finance",), ScriptLlm(steps=[s.model_copy(deep=True) for s in SCRIPTS["prefix"]]))
     await run_scenario(CTX_B, FRAME_B, ("finance",), ScriptLlm(steps=[s.model_copy(deep=True) for s in SCRIPTS["prefix"]]))
     await run_scenario(CTX_A, FRAME_A, (), ScriptLlm(steps=[s.model_copy(deep=True) for s in SCRIPTS["load"]]))
+    for intent in ("explain", "draft_request"):
+        for ctx, frame in ((CTX_A, FRAME_A), (CTX_B, FRAME_B)):
+            await run_manager(ctx, frame, intent, ScriptLlm(steps=[s.model_copy(deep=True) for s in MANAGER_SCRIPT]))
     print(f"recorded {len(list(FIXTURES.glob('*.json')))} fixtures")
 
 

@@ -3,8 +3,9 @@ nothing persisted (no DatabaseSessionService — gotcha 25, R25). Errors leave a
 and no exception chain, so a provider error quoting a key cannot leak through a cause or a traceback.
 
 With a RunState (T-042) the Runner carries a MunimPlugin over it, and the run's traces are flushed in `finally`
-as well: on_run_error_callback sees `Exception` only, so a cancelled run would otherwise lose them. Branch Runners
-of the same run pass the same RunState and their own actor label (`branch:<pack>`).
+as well: on_run_error_callback sees `Exception` only, so a cancelled run would otherwise lose them. A fan-out branch
+Runner (T-053) passes its own RunState — its own budget and taint flag over the run's shared HandleTable and TraceBuffer —
+and its own actor label (`branch:<pack>`); its taint reaches the Manager through `BranchReport.tainted`.
 """
 
 from __future__ import annotations

@@ -95,6 +95,10 @@ def thread(tainted: bool) -> ThreadsBlock:
     )
 
 
+#: The abstention of an unaddressed draft request (contracts reason-codes.ts, T-088b).
+SPECIALIST_NEEDED = "specialist_needed"
+
+
 # -- the in-memory core ----------------------------------------------------------------------------------------------
 
 #: What each template mint returns (synthetic).
@@ -270,6 +274,9 @@ ROUTE: list[tuple[str, str, str, float]] = [
     ("@Compliance can you certify we are audit-ready?", "restaurant", "E", 0.82),
     ("@Kitchen why are tickets slow on Fridays?", "mixed", "B", 0.84),
 ]
+#: Route codes whose unaddressed asks never reach the Manager's model: certification_request (not_a_certificate) and
+#: draft_request (specialist_needed).
+MODEL_FREE = ("D", "E")
 UNSURE = "PLANTED: the router is unsure"
 LOOKUP_FINANCE = "@Finance what did each channel make this month?"
 DISPUTE = "@Finance draft a dispute for the short delivery payout"
@@ -295,7 +302,7 @@ DISPUTE_ARGS = {
     "finding": None,
 }
 SCRIPTS: dict[str, list[LlmResponse]] = {
-    **{q: ABSTAIN for q, _, code, _ in ROUTE if code != "E" and not q.startswith("@")},
+    **{q: ABSTAIN for q, _, code, _ in ROUTE if code not in MODEL_FREE and not q.startswith("@")},
     KITCHEN: ABSTAIN,
     LOOKUP_FINANCE: [
         call("read_finance_pnl", {"group_by": "channel", "period_month": "2026-10-01", "page": 0}),
@@ -309,7 +316,7 @@ SCRIPTS: dict[str, list[LlmResponse]] = {
 }
 #: Each scripted ask: (question, addressed_to, thread taint or None for no thread, scope).
 RUNS: list[tuple[str, str | None, bool | None, str]] = [
-    *[(q, None, None, "restaurant") for q, _, code, _ in ROUTE if code != "E" and not q.startswith("@")],
+    *[(q, None, None, "restaurant") for q, _, code, _ in ROUTE if code not in MODEL_FREE and not q.startswith("@")],
     (LOOKUP_FINANCE, "finance", None, "restaurant"),
     (DISPUTE, "finance", False, "restaurant"),
     (DISPUTE, "finance", True, "restaurant"),

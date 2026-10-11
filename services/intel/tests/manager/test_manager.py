@@ -29,6 +29,7 @@ from manager_kit import (
     LLM_FIXTURES,
     LOOKUP_FINANCE,
     ROUTE,
+    SPECIALIST_NEEDED,
     TS,
     UNSURE,
     Counted,
@@ -66,6 +67,8 @@ HAND_PATHS = {
 HAND_INTENTS = ("lookup", "explain", "investigate", "draft_request", "certification_request", "out_of_scope")
 #: ledger R45 F3.
 TOOL_CAP = 20
+#: By hand: the packs that propose nothing (R-B S1-B / S1-D ruling, 11 Oct: coupon.set and campaign.create unwired).
+NO_DRAFTS = {"customers"}
 
 
 def run(question: str, **kw: Any) -> tuple[dict[str, Any], FakeCore]:
@@ -139,19 +142,34 @@ def test_propose_is_bound_only_on_draft_request_with_one_addressed_skill() -> No
                 assert propose == [], (intent, addressed)
 
 
-def test_unaddressed_draft_request_runs_read_only_and_the_skill_may_be_loaded_by_the_model() -> None:
-    """No code path picks the skill of an unaddressed draft request (spec gap, reported): it binds 0 propose_*."""
-    assert bound("draft_request", None) == ["submit_answer", "load_skill"]
+def test_an_unaddressed_draft_request_abstains_specialist_needed_with_no_manager_model_call() -> None:
+    """DECISIONS 11 Oct (W3.3): no model picks the skill for a draft. Main thread, no @Name → `specialist_needed`."""
+    [question] = [q for q, _, code, _ in ROUTE if code == "D" and not q.startswith("@")]
+    out, core = run(question)
+    [answer] = core.answers
+    assert answer["envelope"] == {"answer_id": vid(80), "segments": [], "abstained": True, "reason_code": SPECIALIST_NEEDED}
+    assert Counted.CALLS["recorded/router"] == 1 and Counted.CALLS["recorded/reason"] == 0
+    assert route_labels(core) == {"intent": "draft_request", "band": "high", "path": "draft"}
+    assert core.minted == [] and core.drafts == [] and not [e for e in core.traces if e["kind"] == "skill_load"]
+    assert out == {"answer_id": vid(80), "tainted": False}
+
+
+def test_paired_an_addressed_draft_request_runs_the_model_with_that_skills_drafts() -> None:
+    out, core = run(DISPUTE, addressed="finance", tainted_thread=False)
+    assert Counted.CALLS["recorded/reason"] >= 1 and len(core.drafts) == 1
+    assert core.answers[0]["envelope"]["reason_code"] is None and route_labels(core)["path"] == "draft"
 
 
 @pytest.mark.parametrize("pack", PACKS)
 def test_every_pack_on_draft_request_binds_its_own_drafts_within_the_cap(pack: str) -> None:
     ont = load_ontology()
-    entry = next(s for s in ont["specialists"] if s["id"] == pack)
     exposed = {a["command_type"]: a["tool"] for a in ont["actions"] if a["agent_exposed"]}
-    expected = {exposed[d] for d in entry["draftables"] if d in exposed}
+    # The skill's own DRAFTABLES, each an agent-exposed action (customers has none: R-B S1-B / S1-D).
+    draftables = load_skill(pack).draftables
+    assert all(d in exposed for d in draftables), pack
+    expected = {exposed[d] for d in draftables}
     tools = bound("draft_request", pack)
-    assert {t for t in tools if t.startswith("propose_")} == expected and expected
+    assert {t for t in tools if t.startswith("propose_")} == expected and bool(expected) == (pack not in NO_DRAFTS)
     assert len(tools) <= TOOL_CAP and tools[0] == "submit_answer" and "load_skill" not in tools
 
 

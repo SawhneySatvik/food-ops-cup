@@ -4,10 +4,10 @@
    {
     "parts": [
      {
-      "text": "Run frame: country pack IN version 3; currency INR; trigger ask.\n- outlet Indiranagar Kitchen (restaurant), business date 2026-10-10 in Asia/Kolkata\n- outlet Koramangala Cloud (cloud_kitchen), business date 2026-10-10 in Asia/Kolkata"
+      "text": "Run frame: country pack IN version 3; currency INR; trigger ask.\n- outlet Corner Mart Main (store), business date 2026-10-10 in Asia/Kolkata"
      },
      {
-      "text": "Draft a purchase order for next week's paneer"
+      "text": "How did the store do in September?"
      }
     ],
     "role": "user"

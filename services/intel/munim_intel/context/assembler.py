@@ -41,6 +41,7 @@ from munim_intel.contracts_gen.models import InternalRunFrameResponse, ThreadsBl
 from munim_intel.runtime.state import RunState
 from munim_intel.skills import SkillSpec
 from munim_intel.skills.loader import PackToolset
+from munim_intel.tools.answer import SubmitAnswerTool
 from munim_intel.tools.handles import HandleTable
 
 RunKind = Literal["orchestrator", "branch"]
@@ -117,9 +118,18 @@ def _fit(head: str, lines: Sequence[str], cap: int, *, keep: Literal["first", "l
     return "\n".join([head, *kept]) if kept else ""
 
 
-def output_contract(kind: RunKind, skills: Sequence[SkillSpec]) -> str:
-    """Block 2: how the run ends, and the reason codes it may abstain with (the loaded skills' plus the validator's)."""
+def output_contract(kind: RunKind, skills: Sequence[SkillSpec], folded: SubmitAnswerTool | None = None) -> str:
+    """Block 2: how the run ends, and the reason codes it may abstain with. `folded`: the bound submit_answer, which
+    takes the abstention itself (T-082b); its codes are read from its own enum (the loaded skills' plus ALWAYS), so the
+    text names exactly what the tool accepts. Otherwise: the loaded skills' codes plus the validator's."""
     finish = "report" if kind == "branch" else "submit_answer"
+    if folded is not None:
+        folded_codes = [c for c in folded.schema()["properties"]["abstain"]["enum"] if c is not None]
+        return (
+            "Output contract:\n"
+            f"- Finish by calling {finish} once with short segments; every number in a segment is a cell handle in braces.\n"
+            f"- To abstain, call {finish} with no segments and abstain set to one reason code: {', '.join(folded_codes)}."
+        )
     codes = ["missing_ref"]
     for s in skills:
         codes += [c for c in s.refusal_codes if c not in codes]
@@ -239,7 +249,7 @@ def compact(req: LlmRequest, keep_model_turns: int) -> None:
 
 @dataclass
 class Assembler:
-    """One per context (the Manager's, or one branch's), over the run's shared RunState and HandleTable."""
+    """One per context (the Manager's, or one branch's), over that context's RunState and the run's shared HandleTable."""
 
     kind: RunKind
     state: RunState
@@ -263,8 +273,9 @@ class Assembler:
         return CALL_CAPS[self.kind]
 
     def system(self) -> str:
-        """Blocks 1–3: the run kind and the loaded skills, nothing of the tenant."""
-        return "\n\n".join([CORE_RULES, output_contract(self.kind, self.toolset.skills), skill_block(self.toolset.skills)])
+        """Blocks 1–3: the run kind, the loaded skills and the bound finish tool, nothing of the tenant."""
+        folded = next((t for t in self.toolset.tools if isinstance(t, SubmitAnswerTool)), None)
+        return "\n\n".join([CORE_RULES, output_contract(self.kind, self.toolset.skills, folded), skill_block(self.toolset.skills)])
 
     def instruction(self, _: ReadonlyContext) -> str:
         return self.system()

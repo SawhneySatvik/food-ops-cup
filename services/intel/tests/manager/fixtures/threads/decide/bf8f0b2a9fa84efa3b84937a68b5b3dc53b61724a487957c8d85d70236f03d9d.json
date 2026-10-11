@@ -1,0 +1,70 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "{\"country\":\"IN\",\"outlet_kinds\":[\"store\"],\"question\":\"What did labour cost in September?\"}"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/router",
+  "output": [
+   {
+    "enum": [
+     "A",
+     "B",
+     "C",
+     "D",
+     "E",
+     "F"
+    ],
+    "type": "STRING"
+   },
+   null,
+   "text/x.enum"
+  ],
+  "system": "You route a restaurant or shop owner's question inside a back-office system. Pick the one path that fits.\nlookup: read back figures or a list that already exist (sales, stock, who is on shift).\nexplain: say why something happened or what a finding means, in one pass.\ninvestigate: dig into a cause step by step across several areas or periods.\ndraft_request: asks the system to prepare a change or action for a person to approve (order stock, set a price, make a roster, dispute a payout).\ncertification_request: asks the system to certify, guarantee, attest or sign off that books, tax or compliance are correct.\nout_of_scope: not about this business, its data or its operations.\nA leading @Name addresses a team member; route by what is asked, not by who is addressed.\n\nAnswer with exactly one code.\nA = lookup\nB = explain\nC = investigate\nD = draft_request\nE = certification_request\nF = out_of_scope",
+  "tools": []
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "A"
+     }
+    ],
+    "role": "model"
+   },
+   "logprobs_result": {
+    "chosen_candidates": [
+     {
+      "log_probability": -0.10536051565782628,
+      "token": "A"
+     }
+    ],
+    "top_candidates": [
+     {
+      "candidates": [
+       {
+        "log_probability": -0.10536051565782628,
+        "token": "A"
+       },
+       {
+        "log_probability": -2.813410716760037,
+        "token": "B"
+       },
+       {
+        "log_probability": -3.218875824868201,
+        "token": "C"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

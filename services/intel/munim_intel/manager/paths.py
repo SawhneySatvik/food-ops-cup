@@ -5,14 +5,16 @@ it; intel receives `addressed_to`) picks the skill: that specialist's skill is l
 `load_skill` — and the answer is that specialist's ("Finance · via Manager", composed by core).
 
   lookup / explain / out_of_scope   answer        the Manager with `load_skill` (≤ 2 skills), or the addressed skill
-  investigate                       fan_out       single agent until T-053 adds `fan_out` (F5: ≤ 4 read-only branches)
-  draft_request                     draft         exactly one skill, loaded in code, with its `propose_*` tools
+  investigate                       fan_out       unaddressed: `fan_out` binds (F5, T-053: ≤ 4 read-only branches);
+                                                  addressed: the named specialist alone, single agent
+  draft_request                     draft         exactly one skill, loaded in code, with its `propose_*` tools;
+                                                  unaddressed → abstain `specialist_needed`, no Manager model call
   certification_request             certificate   abstain `not_a_certificate`, no model call
   (DM abstained / low band)         → explain     §4.3's fallback
 
 Draft binding (§5.1): `propose_*` only on `draft_request`, only with exactly one skill loaded in code. Unaddressed, no
-code path picks that skill (`route.intent` does not pick packs, and `load_skill` is not bound on `draft_request`), so an
-unaddressed draft request runs read-only (0 `propose_*`) — reported to the orchestrator as a spec gap. A tainted run
+code path picks that skill (`route.intent` does not pick packs) and no model may (DECISIONS 11 Oct, W3.3), so an
+unaddressed draft request abstains `specialist_needed` and the console offers the specialists to @mention. A tainted run
 keeps its `propose_*` tools bound and the plugin refuses each call (§5.3: "Drafts are unavailable after reading
 untrusted text in this run"), so the refusal is a traced, gated call rather than an unknown tool.
 """
@@ -77,4 +79,6 @@ def bind(path: Path, addressed_to: str | None) -> Binding:
         return Binding(path, None, loadable=False, propose=False, abstain=path.abstain)
     if addressed_to is not None:
         return Binding(path, addressed_to, loadable=False, propose=path.propose)
+    if path.propose:
+        return Binding(path, None, loadable=False, propose=False, abstain="specialist_needed")
     return Binding(path, None, loadable=True, propose=False)
