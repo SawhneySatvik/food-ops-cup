@@ -1,0 +1,213 @@
+// Investigations in Step mode, core half (ledger R45 F1, F10; ADR-014 §7.2–§7.5; T-083). Mount name: `investigations`.
+//   POST /v1/investigations                {investigation_id, playbook_id, params, outlet_scope?} → 201 view
+//   GET  /v1/investigations/{id}           → view (404 outside the caller's outlet scope)
+//   POST /v1/investigations/{id}:continue  {step_no} → 200 view after exactly that step
+// The rows are operational (0020), written in the member's own request as munim_core; no book is touched, so no
+// command log: the client's investigation id and step number are the idempotency keys (a replay answers the current
+// view with `X-Munim-Replayed: true`). A step is decided in one transaction (step.ts); then core mints an `ask` run
+// (actor = the member, scope = the investigation's) and asks intel to narrate the step's items (NarratePort, one L1
+// call, no tools). Whatever intel did, core then stores its own template narration under the same answer id through
+// the internal answers path — a no-op when intel already stored one — so a down, slow or over-budget intel leaves a
+// template summary and the status is computed either way (rule 11). The answer is linked to the step once (0020).
+// Signatures ("{Specialist}") are composed here from the playbook; intel's payload has no field for them.
+import { AnswerEnvelope, anyRefTokens, parseRef, REPLAYED_HEADER } from "@munim/contracts";
+import { ContinueInvestigationRequest, CreateInvestigationRequest, NarrateResponse } from "@munim/contracts/investigations";
+import { PLAYBOOKS } from "@munim/core-domain/investigations";
+import { Hono, type Context } from "hono";
+import { contextOf, requireMember } from "../../auth/resolve.ts";
+import { uuidv7 } from "../../commit/index.ts";
+import type { Run } from "../../internal/auth.ts";
+import { writeAnswer } from "../../internal/writes.ts";
+import { withContext } from "../../lib/db.ts";
+import { ApiError } from "../../lib/errors.ts";
+import type { AppEnv, Deps } from "../../lib/types.ts";
+import { endRun, mintRunTokenIn, type OutletScope, type Queryable, type RunTokenKeys } from "../../runtoken/index.ts";
+import { cellOf, loadSnapshots, type Member } from "../approvals/index.ts";
+import { type ChecklistEntry, freshChecklist, INVESTIGATION_COLS, type InvestigationRow, type ItemUpdate, runStep, type StepResult, templateSegments } from "./step.ts";
+
+export { createHttpNarratePort, type HttpNarratePortOptions, NARRATE_TIMEOUT_MS } from "./narrateport.ts";
+
+/** core → intel `/investigate:narrate` with the step's run token; resolves to intel's JSON body (validated here). */
+export type NarratePort = (runToken: string, body: unknown) => Promise<unknown>;
+export interface InvestigationsConfig { keys: RunTokenKeys; narrate: NarratePort | null }
+
+const configs = new WeakMap<Deps, InvestigationsConfig>();
+/** Wires narration into one composed app, keyed by that Deps object (as configureThreads). Unconfigured, steps are
+ *  still decided and stored; they carry no narration. */
+export function configureInvestigations(deps: Deps, cfg: InvestigationsConfig): void {
+  configs.set(deps, cfg);
+}
+
+const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+function member(c: Context<AppEnv>): Member {
+  const p = c.var.principal;
+  if (p.kind !== "member") throw new ApiError("forbidden");
+  return p;
+}
+
+const svc = <T>(deps: Deps, tenantId: string, scope: OutletScope, fn: (q: Queryable) => Promise<T>) =>
+  withContext(deps.pools.svc, { tenant_id: tenantId, outlet_ids: scope[0] === "*" ? "*" : scope, role: "service" }, fn);
+
+const signature = (specialist: string) => ({ key: "investigation.signature.specialist" as const, specialist, name_key: `specialist.${specialist}.name` });
+const covers = (viewer: "*" | readonly string[], scope: readonly string[]) =>
+  viewer === "*" || (scope[0] !== "*" && scope.every((o) => viewer.includes(o)));
+const sameParams = (a: Record<string, unknown>, b: Record<string, unknown>) =>
+  Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
+
+interface StepRow {
+  step_no: number; member_id: string; triggered_by: "member" | "plan" | "auto"; started_at: Date; item_updates: ItemUpdate[];
+  tainted: boolean; summary_answer_id: string | null; envelope: unknown;
+}
+
+/** The investigation as this member may see it, or null (RLS: outside their scope → 404). */
+export async function investigationView(q: Queryable, m: Member, id: string) {
+  const r = await q.query<InvestigationRow & { stop_reason: string | null; created_at: Date; updated_at: Date }>(
+    `SELECT ${INVESTIGATION_COLS} FROM core.investigation i WHERE i.id = $1`, [id]);
+  const inv = r.rows[0];
+  if (!inv) return null;
+  const pb = PLAYBOOKS[inv.playbook_id]!;
+  const steps = await q.query<StepRow>(
+    `SELECT s.step_no, s.member_id, s.triggered_by, s.started_at, s.item_updates, s.tainted, s.summary_answer_id, a.envelope
+       FROM core.investigation_step s LEFT JOIN intel.answer a ON a.tenant_id = s.tenant_id AND a.id = s.summary_answer_id
+      WHERE s.investigation_id = $1 ORDER BY s.step_no`, [id]);
+  const stepViews = steps.rows.map((s) => {
+    const env = s.envelope ? AnswerEnvelope.parse(s.envelope) : null;
+    // Segment i narrates the i-th update that cited cells (step.ts narrates exactly those, in order).
+    const narrated = s.item_updates.filter((u) => u.refs.length > 0);
+    return {
+      step_no: s.step_no, member_id: s.member_id, triggered_by: s.triggered_by, started_at: s.started_at.toISOString(),
+      item_updates: s.item_updates, tainted: s.tainted,
+      narration: env && s.summary_answer_id
+        ? { answer_id: s.summary_answer_id, envelope: env, signatures: env.abstained ? [] : narrated.map((u) => signature(u.specialist)) }
+        : null,
+    };
+  });
+  const byId = new Map(pb.items.map((i) => [i.item_id, i]));
+  const checklist = inv.checklist.map((c: ChecklistEntry) => ({
+    item_id: c.item_id, label_key: byId.get(c.item_id)!.label_key, specialist: c.specialist, signature: signature(c.specialist),
+    status: c.status, frozen: c.frozen, snapshot_ids: c.snapshot_ids, refs: c.refs,
+  }));
+  const refs = new Set<string>([...checklist.flatMap((c) => c.refs), ...stepViews.flatMap((s) => s.item_updates.flatMap((u) => u.refs))]);
+  for (const s of stepViews) for (const seg of s.narration?.envelope.segments ?? []) for (const t of seg.text.matchAll(anyRefTokens())) refs.add(t[0]);
+  const snapIds = [...refs].map((x) => parseRef(x)).flatMap((p) => (p?.kind === "snap" ? [p.snapshot_id] : []));
+  const snaps = await loadSnapshots(q, snapIds, m);
+  const resolved = [...refs].flatMap((ref) => {
+    const cell = cellOf(ref, snaps);
+    return cell ? [{ ref, value: cell.value }] : [];
+  });
+  return {
+    investigation_id: inv.id, playbook_id: inv.playbook_id, params: inv.params, outlet_scope: inv.outlet_scope, mode: inv.mode,
+    status: inv.status, stop_reason: inv.stop_reason, created_by: inv.created_by, steps_done: inv.steps_done, max_steps: inv.max_steps,
+    checklist, steps: stepViews, resolved_refs: resolved, created_at: inv.created_at.toISOString(), updated_at: inv.updated_at.toISOString(),
+  };
+}
+
+/** Narrates a committed step (ADR-014 §7.2 step 5). Never throws for intel's sake: a failed port leaves the template. */
+async function narrateStep(deps: Deps, m: Member, id: string, stepNo: number, step: StepResult): Promise<void> {
+  const cfg = configs.get(deps);
+  if (!cfg || step.narrate.length === 0) return;
+  const answerId = uuidv7();
+  const question = `investigation ${step.playbook.playbook_id} step`;
+  const template = templateSegments(step.narrate);
+  const { token, claims } = await svc(deps, m.tenant_id, step.scope, (q) =>
+    mintRunTokenIn(q, cfg.keys, { tenantId: m.tenant_id, outletScope: step.scope, trigger: "ask", actor: m.member_id }));
+  const run: Run = { tenantId: m.tenant_id, runId: claims.run_id, scope: step.scope, actor: m.member_id, trigger: "ask" };
+  let tainted = false;
+  try {
+    if (cfg.narrate) {
+      try {
+        const out = NarrateResponse.safeParse(await cfg.narrate(token, {
+          answer_id: answerId, question, playbook_id: step.playbook.playbook_id, owner: step.playbook.owner,
+          items: step.narrate.map((n, i) => ({
+            item_id: n.item.item_id, specialist: n.item.specialist, verdict: n.status,
+            cells: n.cells.map((c) => ({ ref: `⟨snap:${c.snapshot_id}·${c.row}·${c.column}⟩`, column: c.column })),
+            template: template[i]!.text,
+          })),
+        }));
+        if (out.success && out.data.answer_id === answerId) tainted = out.data.tainted;
+      } catch (e) {
+        deps.log(`investigations: narration fell back to the template (${(e as Error).name})`);
+      }
+    }
+    // A no-op when intel stored its answer under this id; otherwise core's template is the narration.
+    await svc(deps, m.tenant_id, step.scope, (q) =>
+      writeAnswer(q, run, { question, envelope: { answer_id: answerId, segments: template, abstained: false, reason_code: null } }));
+  } finally {
+    await endRun({ svc: (s, fn) => svc(deps, s.tenantId, s.outletScope, fn) }, m.tenant_id, claims.run_id);
+  }
+  await withContext(deps.pools.core, contextOf(m), async (q) => {
+    const a = await q.query<{ envelope: unknown }>(`SELECT envelope FROM intel.answer WHERE id = $1 AND run_id = $2 AND question = $3`, [answerId, claims.run_id, question]);
+    if (!a.rows[0]) return;
+    // Signatures go to segments by position (investigationView): an answer with another segment count is not linked.
+    const env = AnswerEnvelope.parse(a.rows[0].envelope);
+    if (!env.abstained && env.segments.length !== step.narrate.length) return;
+    await q.query(`UPDATE core.investigation_step SET run_id = $3, summary_answer_id = $4, tainted = $5 WHERE investigation_id = $1 AND step_no = $2`,
+      [id, stepNo, claims.run_id, answerId, tainted]);
+  });
+}
+
+/** One step end to end — decided and stored in one transaction, then narrated — as the `:continue` route runs it.
+ *  T-089a's plan runner calls this once per step with `trigger = "plan"` inside the approving member's request. */
+export async function continueInvestigation(deps: Deps, m: Member, id: string, stepNo: number, trigger: "member" | "plan" = "member"): Promise<{ replayed: boolean }> {
+  const step = await withContext(deps.pools.core, contextOf(m), (q) => runStep(q, m, id, stepNo, trigger));
+  if (!step.replayed) await narrateStep(deps, m, id, stepNo, step);
+  return { replayed: step.replayed };
+}
+
+async function body(c: Context<AppEnv>): Promise<unknown> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  if (raw === undefined) throw new ApiError("bad_request");
+  return raw;
+}
+
+export const router = new Hono<AppEnv>()
+  .post("/v1/investigations", requireMember, async (c) => {
+    const m = member(c);
+    const req = CreateInvestigationRequest.safeParse(await body(c));
+    if (!req.success) throw new ApiError("invalid_payload");
+    const { investigation_id: id, playbook_id, params } = req.data;
+    if (m.outlet_ids !== "*" && m.outlet_ids.length === 0) throw new ApiError("forbidden");
+    const scope = req.data.outlet_scope ?? (m.outlet_ids === "*" ? ["*"] : m.outlet_ids);
+    // Wider than the creator's own scope: not theirs to see (review M7, as an outlet-scoped GET).
+    if (!covers(m.outlet_ids, scope)) throw new ApiError("not_found");
+    const out = await withContext(c.var.deps.pools.core, contextOf(m), async (q) => {
+      const prior = await q.query<{ playbook_id: string; params: Record<string, unknown>; outlet_scope: string[]; created_by: string }>(
+        `SELECT playbook_id, params, outlet_scope::text[] AS outlet_scope, created_by FROM core.investigation WHERE id = $1`, [id]);
+      const p = prior.rows[0];
+      if (p) {
+        const same = p.created_by === m.member_id && p.playbook_id === playbook_id && sameParams(p.params, params)
+          && p.outlet_scope.length === scope.length && p.outlet_scope.every((o, i) => o === scope[i]);
+        if (!same) throw new ApiError("idempotency_conflict");
+        return { replayed: true, view: (await investigationView(q, m, id))! };
+      }
+      try {
+        await q.query(
+          `INSERT INTO core.investigation (tenant_id, id, playbook_id, params, outlet_scope, created_by, checklist) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [m.tenant_id, id, playbook_id, JSON.stringify(params), scope, m.member_id, JSON.stringify(freshChecklist(PLAYBOOKS[playbook_id]!))]);
+      } catch (e) {
+        // The id is taken by an investigation this member cannot see.
+        if ((e as { code?: unknown }).code === "23505") throw new ApiError("idempotency_conflict");
+        throw e;
+      }
+      return { replayed: false, view: (await investigationView(q, m, id))! };
+    });
+    return c.json(out.view, 201, out.replayed ? { [REPLAYED_HEADER]: "true" } : {});
+  })
+  .get(`/v1/investigations/:id{${ID}}`, requireMember, async (c) => {
+    const m = member(c);
+    const view = await withContext(c.var.deps.pools.core, contextOf(m), (q) => investigationView(q, m, c.req.param("id")));
+    if (!view) throw new ApiError("not_found");
+    return c.json(view, 200);
+  })
+  .post(`/v1/investigations/:action{${ID}:continue}`, requireMember, async (c) => {
+    const m = member(c);
+    const id = c.req.param("action")!.slice(0, -":continue".length);
+    const req = ContinueInvestigationRequest.safeParse(await body(c));
+    if (!req.success) throw new ApiError("invalid_payload");
+    const deps = c.var.deps;
+    const step = await continueInvestigation(deps, m, id, req.data.step_no);
+    const view = await withContext(deps.pools.core, contextOf(m), (q) => investigationView(q, m, id));
+    if (!view) throw new ApiError("not_found");
+    return c.json(view, 200, step.replayed ? { [REPLAYED_HEADER]: "true" } : {});
+  });

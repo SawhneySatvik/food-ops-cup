@@ -1,0 +1,34 @@
+{
+ "request": {
+  "contents": [
+   {
+    "parts": [
+     {
+      "text": "Playbook: margin_fall\nItems:\n- data_complete (verdict: cannot_verify); cells: {C1} open_count, {C2} open_count, {C3} open_count, {C4} open_count, {C5} open_count, {C6} open_count\n- supplier_price (verdict: supported); cells: {C7} delta_minor, {C8} share_bp\n- waste (verdict: supported); cells: {C9} delta_minor, {C10} share_bp\n- deals (verdict: supported); cells: {C11} delta_minor, {C12} share_bp\n- labour (verdict: refuted); cells: {C13} delta_minor, {C14} share_bp\n- volume_mix (verdict: refuted); cells: {C15} delta_minor, {C16} share_bp, {C17} delta_minor, {C18} share_bp"
+     }
+    ],
+    "role": "user"
+   }
+  ],
+  "model": "recorded/narrate",
+  "output": [
+   null,
+   null,
+   null
+  ],
+  "system": "You narrate one step of an investigation into a change in a restaurant or shop's margin. The verdicts are already decided; do not change or question them. For each item you are given, write exactly one line in the form item_id: sentence. Each sentence states the item's verdict in plain English and cites at least one of that item's cell handles, written in curly braces exactly as given. Never write a digit, a number word, a percent sign, a currency amount or a date yourself, and never name a supplier, customer or person. Reply with the lines only.\n\nYou are an agent. Your internal name is \"narrate\".",
+  "tools": []
+ },
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "text": "data_complete: This item cannot be checked from the books yet {C1}.\nsupplier_price: The evidence supports this item {C7}.\nwaste: The evidence supports this item {C9}.\ndeals: The evidence supports this item {C11}.\nlabour: Labour moved by 0 rupees {C13}.\nvolume_mix: The evidence does not support this item {C15}."
+     }
+    ],
+    "role": "model"
+   }
+  }
+ ]
+}

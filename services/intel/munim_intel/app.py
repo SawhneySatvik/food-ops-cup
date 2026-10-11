@@ -7,6 +7,8 @@
 /brief        core-worker fan-out: token verified, acknowledged (T-054)
 /ask          core's AskPort (T-088a; T-082b): one Manager ask under an `ask` run token → {answer_id, tainted}; the answer
               is stored through core's internal API under core's answer id, before this returns
+/investigate:narrate  core's NarratePort (T-083): one investigation step's narration under an `ask` run token → {answer_id,
+              tainted, source}; at most one L1 call with no tools; the answer is stored under core's answer id first
 /smoke        one trivial recorded ADK run through the echo tool: RunContext end to end
 
 Bodies are parsed by hand, so no framework validation error ever echoes a request back. Every refusal of a
@@ -30,8 +32,9 @@ from google.adk.models import BaseLlm
 from pydantic import ValidationError
 
 from munim_intel.config import Config, ConfigError
-from munim_intel.contracts_gen.models import Cloudevent, ThreadsIntelAskRequest
+from munim_intel.contracts_gen.models import Cloudevent, InvestigationsNarrateRequest, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
+from munim_intel.investigate import narrate_step
 from munim_intel.llm import llm_for_role
 from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
@@ -62,6 +65,7 @@ def create_app(
     core_transport: httpx.AsyncBaseTransport | None = None,
     frame_source: FrameSource | None = None,
     ask_models: ModelsFactory | None = None,
+    narrate_llm: Callable[[InternalClient], Awaitable[BaseLlm]] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="munim-intel", docs_url=None, redoc_url=None, openapi_url=None)
     keys: dict[str, Ed25519PublicKey] = {}
@@ -69,6 +73,10 @@ def create_app(
     frame_of = frame_source or core_frame_source(cfg, core_transport)
     # T-082b: the route.intent decision model and the Manager's model; a test may pass recorded ones of its own.
     models_of = ask_models or default_models(cfg)
+
+    # T-083: the investigation narration model (`narrate` role); a test may pass a recorded one of its own.
+    async def narrate_model(client: InternalClient) -> BaseLlm:
+        return await (narrate_llm(client) if narrate_llm else llm_for_role("narrate", cfg, client))
 
     # Read lazily: core-api creates the key and the secret on its first start, which may follow intel's.
     def public_key() -> Ed25519PublicKey:
@@ -195,6 +203,35 @@ def create_app(
         except (CoreError, httpx.HTTPError, ProviderUnavailable) as e:
             # Nothing usable was stored: core answers its member 503 and writes no turn.
             log.error("intel: ask run %s failed: %s", ctx.run_id, type(e).__name__)
+            return _error(502, "internal")
+        finally:
+            await client.aclose()
+        return JSONResponse(out.model_dump(mode="json"))
+
+    @app.post("/investigate:narrate")
+    async def investigate_narrate(request: Request) -> Response:
+        ctx = run_context(request)
+        # Only an ask token (core mints one per step, actor = the member) buys a narration.
+        if ctx.trigger != "ask":
+            return _error(401, "unauthenticated")
+        try:
+            req = InvestigationsNarrateRequest.model_validate(await json_body(request))
+        except ValidationError:
+            return _error(400, "bad_request")
+        frame = await fetch_run_frame(ctx, cfg, core_transport)
+        client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
+        try:
+            llm: BaseLlm | None = None
+            if frame is not None and frame.narration == "model":
+                try:
+                    llm = await narrate_model(client)
+                except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
+                    # Rule 11: the step keeps its template narration.
+                    log.warning("intel: narrate run %s by template: %s", ctx.run_id, type(e).__name__)
+            out = await narrate_step(ctx, req, frame, client, cfg, llm)
+        except (CoreError, httpx.HTTPError) as e:
+            # Nothing usable was stored: core stores its template under the same answer id.
+            log.error("intel: narrate run %s failed: %s", ctx.run_id, type(e).__name__)
             return _error(502, "internal")
         finally:
             await client.aclose()

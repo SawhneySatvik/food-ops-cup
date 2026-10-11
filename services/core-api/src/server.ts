@@ -15,6 +15,7 @@ import { setIdpMode } from "./health/index.ts";
 import { configureInternal } from "./internal/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
+import { configureInvestigations, createHttpNarratePort } from "./modules/investigations/index.ts";
 import { configureThreads, createHttpAskPort } from "./modules/threads/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
 import { loadRunTokenKeys, type RunTokenKeys, type SvcTx } from "./runtoken/index.ts";
@@ -79,6 +80,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   configureInternal(deps, { serviceSecret: w.serviceSecret, keys });
   // T-082b: `POST /v1/ask` calls intel's `/ask` synchronously (a test may re-configure the port on the same deps).
   configureThreads(deps, { keys, intel: createHttpAskPort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
+  configureInvestigations(deps, { keys, narrate: createHttpNarratePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
   return {
     app, deps, publish, svc, keys,
     async close() {

@@ -1,0 +1,5 @@
+v1.investigation.create.request
+v1.investigation.continue.request
+v1.investigation
+investigations.narrate.request
+investigations.narrate.response
