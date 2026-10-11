@@ -2,8 +2,11 @@
 
 Run only by `make smoke-live` (MUNIM_MODEL_MODE=live). Never part of `make check` / `make test`, which stay recorded.
 Cost cap: at most ONE call per provider per role per run, <= 64 output tokens, planned count printed first and
-hard-failed above providers x roles. Keys come only through munim_intel.config; errors print as class name + code,
-never message text (provider errors can echo request details).
+hard-failed above providers x roles (+ 1 per keyed Gemini: the router's one unscored retry). Keys come only through
+munim_intel.config; errors print as class name + code, never message text (provider errors can echo request details).
+
+The router cell is the real DecisionModel (LlmMimic, route.intent, one draft-like question): on Gemini it asks for
+logprobs and, if they are rejected, retries once without them (T-081 dm-1), so it costs up to 2 calls.
 """
 
 from __future__ import annotations
@@ -23,8 +26,11 @@ from google.genai import types
 
 from munim_intel.config import Config, load_repo_config
 from munim_intel.contracts_gen.models import PlatformModelRoles
+from munim_intel.decide.mimic import LlmMimic
+from munim_intel.decide.questions import ROUTE_INTENT
 from munim_intel.llm import ModelRoleName
 from munim_intel.llm.providers import PROVIDERS, ProviderUnavailable, build_live_llm, refuse_retired
+from munim_intel.runtime.context import RunContext
 
 INTEL = Path(__file__).resolve().parents[2]
 REPO = INTEL.parents[1]
@@ -33,6 +39,17 @@ PROMPT = "Reply with the single word: ok"
 MAX_OUT = 64
 # ADK's OpenAILlm exposes no logprobs request field, so the OpenAI-compatible providers cannot be probed through it.
 LOGPROBS_ROLE = "router"
+DM_QUESTION = "Order 20 kg of onions from our usual supplier"
+#: decide() never reads the context (egress is the state alone); placeholder ids, never verified.
+DM_CTX = RunContext(
+    "01920000-0000-7000-8000-0000000000e1",
+    "01920000-0000-7000-8000-0000000000f1",
+    ("*",),
+    "ask",
+    "01920000-0000-7000-8000-0000000000d1",
+    4_102_444_800,
+    "not-a-token",
+)
 
 
 @dataclass
@@ -44,6 +61,13 @@ class Cell:
     completion: int | None = None
     cached: int | None = None
     logprobs: bool | None = None
+    #: Provider calls this cell cost (the router: 2 when logprobs were rejected and retried without).
+    calls: int = 1
+
+
+def worst_calls(provider: str, role: str) -> int:
+    """Planned calls for one cell: the Gemini router may retry once (LlmMimic requests logprobs only on Gemini)."""
+    return 2 if provider == "gemini" and role == LOGPROBS_ROLE else 1
 
 
 @dataclass
@@ -104,13 +128,25 @@ async def live_call(provider: str, role: str, model_id: str, cfg: Config) -> Cel
         }
     )
     llm = build_live_llm(row, cfg)
-    want_lp = provider == "gemini" and role == LOGPROBS_ROLE
+    if role == LOGPROBS_ROLE:
+        [d] = await LlmMimic(llm).decide(
+            DM_CTX, {"question": DM_QUESTION, "outlet_kinds": ("restaurant",), "country": "IN"}, [ROUTE_INTENT]
+        )
+        detail = f"route.intent={d.answer or '-'} band={d.band} calls={d.model_calls}" + (f" abstained={d.reason}" if d.abstained else "")
+        # A provider failure (adapter_error: the call, or the call and its one retry, failed) or an out-of-enum answer is a
+        # failed cell; below_threshold is a model judgement, not a smoke failure.
+        return Cell(
+            "failed" if d.reason in ("adapter_error", "decision_invalid") else "ok",
+            detail,
+            d.latency_ms,
+            d.input_tokens,
+            logprobs=d.probs_bp is not None,
+            calls=d.model_calls,
+        )
     req = LlmRequest(
         model=model_id,
         contents=[types.Content(role="user", parts=[types.Part(text=PROMPT)])],
-        config=types.GenerateContentConfig(
-            max_output_tokens=MAX_OUT, response_logprobs=True if want_lp else None, logprobs=1 if want_lp else None
-        ),
+        config=types.GenerateContentConfig(max_output_tokens=MAX_OUT),
     )
     last: LlmResponse | None = None
     async for resp in llm.generate_content_async(req, stream=False):
@@ -119,7 +155,6 @@ async def live_call(provider: str, role: str, model_id: str, cfg: Config) -> Cel
     if last is None or last.error_code:
         return Cell("failed", f"LlmResponse error_code={getattr(last, 'error_code', None)}", ms)
     u = last.usage_metadata
-    lp = (last.logprobs_result is not None or last.avg_logprobs is not None) if want_lp else None
     return Cell(
         "ok",
         "",
@@ -127,7 +162,6 @@ async def live_call(provider: str, role: str, model_id: str, cfg: Config) -> Cel
         u.prompt_token_count if u else None,
         u.candidates_token_count if u else None,
         u.cached_content_token_count if u else None,
-        lp,
     )
 
 
@@ -149,19 +183,20 @@ async def run_matrix(cfg: Config, caller: Caller = live_call) -> Outcome:
                     out.cells[(provider, role)] = Cell("failed", err(e))
                     continue
                 plan.append((provider, role, ids[role]))
-    out.planned = len(plan)
-    cap = sum(1 for p, v in PROVIDERS.items() if v.key_name and cfg.provider_key(v.key_name)) * len(ROLES)
-    print(f"PLAN: {out.planned} live call(s); cap providers-with-key x roles = {cap}")
+    out.planned = sum(worst_calls(p, r) for p, r, _ in plan)
+    keyed = [p for p, v in PROVIDERS.items() if v.key_name and cfg.provider_key(v.key_name)]
+    cap = len(keyed) * len(ROLES) + ("gemini" in keyed)
+    print(f"PLAN: {out.planned} live call(s) at most; cap providers-with-key x roles + gemini router retry = {cap}")
     if out.planned > cap:
         raise SystemExit(f"FAIL: planned calls {out.planned} exceed cap {cap}")
     for provider, role, mid in plan:
-        out.made += 1
         try:
             out.cells[(provider, role)] = await caller(provider, role, mid, cfg)
         except ProviderUnavailable as e:
             out.cells[(provider, role)] = Cell("skipped", err(e))
         except Exception as e:  # noqa: BLE001 - any provider failure is reported by class + code only
             out.cells[(provider, role)] = Cell("failed", err(e), None)
+        out.made += out.cells[(provider, role)].calls
     return out
 
 
@@ -222,7 +257,8 @@ def token_table(out: Outcome) -> tuple[list[str], list[str]]:
             c = out.cells.get(("gemini", src[0][5:]))
             if c and c.status == "ok":
                 lines.append(
-                    f"{label:<42} | measured (tiny call, gemini/router): prompt={c.prompt} completion={c.completion} cached={c.cached}"
+                    f"{label:<42} | measured (route.intent via LlmMimic, gemini/router, {c.calls} call(s), {c.detail}): "
+                    f"prompt={c.prompt} completion={c.completion if c.completion is not None else 'not reported'}"
                 )
             else:
                 lines.append(f"{label:<42} | measured: unavailable (no ok gemini router call this run)")
@@ -251,7 +287,12 @@ def report(out: Outcome) -> int:
     for provider in PROVIDERS:
         c = out.cells.get((provider, LOGPROBS_ROLE))
         if provider == "gemini" and c and c.status == "ok":
-            print(f"{provider:<11} {'supported' if c.logprobs else 'unsupported (response carried no logprobs)'}")
+            if c.logprobs:
+                print(f"{provider:<11} supported")
+            elif c.calls == 2:
+                print(f"{provider:<11} unsupported (logprobs request rejected; retried once without: {c.detail})")
+            else:
+                print(f"{provider:<11} unsupported (response carried no logprobs: {c.detail})")
         elif provider == "gemini":
             ids = model_ids(provider)
             twin = any(

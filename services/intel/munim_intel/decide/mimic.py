@@ -6,8 +6,15 @@ nothing else — the RunContext is never read for content). Constraint per provi
 - Gemini (and the recorded replay of it): `text/x.enum` with a STRING enum of the codes, `response_logprobs` on.
 - OpenAI-compatible (OpenRouter, NVIDIA via ADK `OpenAILlm`): strict `json_schema` `{"answer": enum}`. FACT
   (installed ADK 2.11 `integrations/openai/_openai_llm.py`): OpenAILlm neither requests nor returns logprobs, so
-  this path always yields `probs_bp = None` → band low → abstained `no_probabilities` → the caller's fallback.
-  This is the documented fallback; whether Gemini returns logprobs for the router model is UNVERIFIED (T-059 probes).
+  this path always yields `probs_bp = None`.
+
+No probabilities. FACT (T-059 smoke, dm-1 probe, 11 Oct): Gemini answers 400 (`ClientError`) to a logprobs request on
+both approved ids (`gemini-3.5-flash-lite`, `gemini-3.8-flash`) and accepts the same enum request without them. So a
+400 on a logprobs request is retried ONCE without logprobs under the same enum, when the question accepts an unscored
+answer (`use_unscored`, route.intent only); otherwise it abstains `no_probabilities` with no retry (the answer would be
+discarded anyway). An answer that simply carries no logprobs (OpenAILlm, or a provider that drops them) is not
+retried — a second call would return the same nothing. Either way: band `unscored` if the question accepts it, else
+band low → abstained `no_probabilities` → the caller's fallback.
 
 `RecordedDecision` is this adapter over a RecordedLlm whose fixtures live in `decide/fixtures/`, so every gate runs
 the real request builder, constraint, code mapping and logprob renormalisation.
@@ -26,6 +33,7 @@ from google.adk.models import BaseLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from google.genai.errors import ClientError
 
 from munim_intel.config import Config
 from munim_intel.decide.port import DecisionQuestion, DecisionResult, DecisionState, egress_payload, finish
@@ -44,8 +52,9 @@ def codes_for(q: DecisionQuestion) -> dict[str, str]:
     return {CODES[i]: o for i, o in enumerate(q.options)}
 
 
-def build_request(llm: BaseLlm, q: DecisionQuestion, state: DecisionState) -> LlmRequest:
-    """The whole request. `egress_payload` runs first and raises EgressRefused before anything is built."""
+def build_request(llm: BaseLlm, q: DecisionQuestion, state: DecisionState, logprobs: bool = True) -> LlmRequest:
+    """The whole request. `egress_payload` runs first and raises EgressRefused before anything is built. `logprobs`
+    False: the same request and constraint without asking for probabilities (the retry after a rejection)."""
     payload = egress_payload(q, state)
     codes = codes_for(q)
     system = q.instructions + "\n\nAnswer with exactly one code.\n" + "\n".join(f"{c} = {o}" for c, o in codes.items())
@@ -67,8 +76,8 @@ def build_request(llm: BaseLlm, q: DecisionQuestion, state: DecisionState) -> Ll
             temperature=0,
             response_mime_type="text/x.enum",
             response_schema=types.Schema(type=types.Type.STRING, enum=list(codes)),
-            response_logprobs=True,
-            logprobs=min(len(codes), TOP_K),
+            response_logprobs=True if logprobs else None,
+            logprobs=min(len(codes), TOP_K) if logprobs else None,
         )
     text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return LlmRequest(model=llm.model, contents=[types.Content(role="user", parts=[types.Part(text=text)])], config=config)
@@ -128,26 +137,48 @@ class LlmMimic:
     async def decide(self, ctx: RunContext, state: DecisionState, qs: Sequence[DecisionQuestion]) -> list[DecisionResult]:
         # Every request is built (and its egress checked) before the first call: one bad question refuses them all.
         requests = [(q, build_request(self._llm, q, state)) for q in qs]
-        return [await self._ask(q, req) for q, req in requests]
+        return [await self._ask(q, state, req) for q, req in requests]
 
-    async def _ask(self, q: DecisionQuestion, req: LlmRequest) -> DecisionResult:
-        started = time.monotonic()
-        codes = codes_for(q)
+    async def _call(self, req: LlmRequest) -> tuple[LlmResponse | None, bool]:
+        """(the final response or None, whether the provider rejected a request that asked for logprobs)."""
         last: LlmResponse | None = None
         try:
             async for resp in self._llm.generate_content_async(req, stream=False):
                 if not resp.partial:
                     last = resp
+        except ClientError as e:  # a 429 is a ClientError too: only a 400 on a logprobs request is a rejection
+            return None, e.code == 400 and bool(req.config.response_logprobs)
         except Exception:  # noqa: BLE001 — a provider failure is an abstain (rule 11); its text never leaves here
-            last = None
+            return None, False
+        return last, False
+
+    async def _ask(self, q: DecisionQuestion, state: DecisionState, req: LlmRequest) -> DecisionResult:
+        started = time.monotonic()
+        codes = codes_for(q)
+        calls = 1
+        last, rejected = await self._call(req)
+        if rejected and q.use_unscored:
+            calls = 2
+            last, _ = await self._call(build_request(self._llm, q, state, logprobs=False))
         ms = int((time.monotonic() - started) * 1000)
         tokens = (last.usage_metadata.prompt_token_count or 0) if last is not None and last.usage_metadata else 0
 
-        def done(answer: str | None, probs: Mapping[str, int] | None, error: bool = False) -> DecisionResult:
+        def done(answer: str | None, probs: Mapping[str, int] | None, error: bool = False, unscorable: bool = False) -> DecisionResult:
             return finish(
-                q, answer, probs, adapter=self._adapter, model_id=self._llm.model, input_tokens=tokens, latency_ms=ms, error=error
+                q,
+                answer,
+                probs,
+                adapter=self._adapter,
+                model_id=self._llm.model,
+                input_tokens=tokens,
+                latency_ms=ms,
+                error=error,
+                unscorable=unscorable,
+                model_calls=calls,
             )
 
+        if rejected and not q.use_unscored:
+            return done(None, None, unscorable=True)
         if last is None or last.error_code is not None:
             return done(None, None, error=True)
         code = parse_answer(last)

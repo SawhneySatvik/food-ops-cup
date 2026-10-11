@@ -13,7 +13,9 @@ from munim_intel.runtime.context import RunContext
 
 Kind = Literal["choice", "score", "predicate"]
 KINDS: tuple[Kind, ...] = ("choice", "score", "predicate")
-Band = Literal["low", "medium", "high"]
+#: `unscored`: the provider gave an answer but no probabilities, and the question accepts that (T-081 / T-059: the
+#: approved Gemini ids reject logprobs). It is a label like the others, never a figure.
+Band = Literal["low", "medium", "high", "unscored"]
 AbstainReason = Literal["below_threshold", "decision_invalid", "no_probabilities", "adapter_error"]
 
 #: A request carries only strings. The values a caller puts here are the ONLY data that may leave the process.
@@ -51,6 +53,9 @@ class DecisionQuestion:
     value_patterns: Mapping[str, str] = field(default_factory=dict)
     #: The import kind for `map.columns` (one question per kind, so every answer set is finite and fixed in code).
     variant: str | None = None
+    #: Act on an answer that came without probabilities (band `unscored`) instead of abstaining `no_probabilities`.
+    #: Only for a question whose every option leads somewhere bounded and fail-safe (route.intent); default: abstain.
+    use_unscored: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in KINDS:
@@ -86,6 +91,8 @@ class DecisionResult:
     model_id: str
     input_tokens: int
     latency_ms: int
+    #: Provider calls this result cost: 2 when a request with logprobs was rejected and retried without (budget).
+    model_calls: int = 1
 
 
 class DecisionModel(Protocol):
@@ -146,9 +153,13 @@ def finish(
     input_tokens: int,
     latency_ms: int,
     error: bool = False,
+    unscorable: bool = False,
+    model_calls: int = 1,
 ) -> DecisionResult:
     """Re-validate an adapter's raw output (§4.2): the answer must be an option and the probabilities a full
-    distribution over the options; anything else is `decision_invalid`. No probabilities → band low → abstained."""
+    distribution over the options; anything else is `decision_invalid`. No probabilities → band `unscored` when the
+    question accepts it, else band low → abstained `no_probabilities` (also when `unscorable`: the provider refused
+    probabilities and no answer was asked for)."""
 
     def result(answer: str | None, probs: Mapping[str, int] | None, band: Band, reason: AbstainReason | None) -> DecisionResult:
         return DecisionResult(
@@ -162,14 +173,17 @@ def finish(
             model_id=model_id,
             input_tokens=input_tokens,
             latency_ms=latency_ms,
+            model_calls=model_calls,
         )
 
     if error:
         return result(None, None, "low", "adapter_error")
+    if unscorable:
+        return result(None, None, "low", "no_probabilities")
     if not isinstance(raw_answer, str) or raw_answer not in q.options:
         return result(None, None, "low", "decision_invalid")
     if probs_bp is None:
-        return result(None, None, "low", "no_probabilities")
+        return result(raw_answer, None, "unscored", None) if q.use_unscored else result(None, None, "low", "no_probabilities")
     if set(probs_bp) != set(q.options) or any(not isinstance(v, int) or v < 0 for v in probs_bp.values()):
         return result(None, None, "low", "decision_invalid")
     if abs(sum(probs_bp.values()) - 10_000) > 1:

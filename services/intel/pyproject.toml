@@ -55,7 +55,7 @@ include = [
   "tests/trace/test_trace_core_roundtrip.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
   "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
-  "tests/fixtures/smoke_once.py",
+  "tests/fixtures/smoke_once.py", "tests/live/*.py",
 ]
 
 [tool.ruff.lint]
@@ -87,7 +87,7 @@ files = [
   "tests/trace/test_trace_core_roundtrip.py",
   "tests/conftest.py", "tests/test_app.py", "tests/test_config.py", "tests/test_internal_client.py", "tests/test_lockfile.py",
   "tests/test_models.py", "tests/test_recorded.py", "tests/test_runtoken.py", "tests/test_smoke.py", "tests/test_tools.py",
-  "tests/fixtures/smoke_once.py",
+  "tests/fixtures/smoke_once.py", "tests/live",
 ]
 mypy_path = "tests"
 plugins = ["pydantic.mypy"]

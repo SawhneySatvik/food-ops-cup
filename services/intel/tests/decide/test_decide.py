@@ -20,19 +20,22 @@ from google.adk.models import BaseLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from google.genai.errors import ClientError
 from google.genai.models import AsyncModels
 from openai.resources.chat.completions import AsyncCompletions
 from openai.types.chat import ChatCompletion
 
 from munim_intel.config import load_config
-from munim_intel.contracts_gen.models import PlatformModelRoleRow, PlatformModelRoles
+from munim_intel.contracts_gen.models import InternalRunFrameResponse, PlatformModelRoleRow, PlatformModelRoles
 from munim_intel.decide.mimic import FIXTURES_DIR, LlmMimic, recorded_decision, router_decision_model
 from munim_intel.decide.port import DecisionQuestion, DecisionResult, DecisionState, EgressRefused, answer_or_fallback
 from munim_intel.decide.questions import IMPORT_FIELDS, MAP_COLUMNS, QUESTIONS, ROUTE_INTENT
 from munim_intel.llm.providers import build_live_llm
+from munim_intel.manager.ask import route
+from munim_intel.manager.paths import DRAFT, PATHS, bind
 from munim_intel.runtime.context import RunContext
 
-from .make_fixtures import PLANTED_LOW, PLANTED_NO_LOGPROBS, PLANTED_OUT_OF_ENUM, POS_BILLS_HEADERS
+from .make_fixtures import PLANTED_LOW, PLANTED_MAP_NO_LOGPROBS, PLANTED_NO_LOGPROBS, PLANTED_OUT_OF_ENUM, POS_BILLS_HEADERS
 
 REPO = Path(__file__).resolve().parents[4]
 TENANT = "01920000-0000-7000-8000-0000000000f1"
@@ -120,10 +123,22 @@ def test_out_of_enum_answer_is_decision_invalid_then_fallback() -> None:
     assert answer_or_fallback(ROUTE_INTENT, ok) == "lookup"
 
 
-def test_no_logprobs_is_band_low_then_fallback() -> None:
+def test_no_logprobs_is_unscored_for_route_intent_and_abstains_for_map_columns() -> None:
+    """T-081 dm-1 (supersedes "no logprobs → band low" for route.intent): an answer without probabilities is used,
+    band `unscored`, only by a question that opts in; map.columns still abstains `no_probabilities` (paired refusal)."""
     r = ask(ROUTE_INTENT, route_state(PLANTED_NO_LOGPROBS))
-    assert (r.abstained, r.reason, r.band, r.probs_bp) == (True, "no_probabilities", "low", None)
-    assert answer_or_fallback(ROUTE_INTENT, r) == "explain"
+    assert (r.abstained, r.reason, r.band, r.probs_bp, r.answer, r.model_calls) == (False, None, "unscored", None, "lookup", 1)
+    assert answer_or_fallback(ROUTE_INTENT, r) == "lookup"
+    q = MAP_COLUMNS["pos_bills"]
+    m = ask(q, {"header": PLANTED_MAP_NO_LOGPROBS, "headers": POS_BILLS_HEADERS})
+    assert (m.abstained, m.reason, m.band, m.probs_bp, m.answer) == (True, "no_probabilities", "low", None, None)
+    assert answer_or_fallback(q, m) is None
+
+
+def test_only_route_intent_accepts_an_unscored_answer() -> None:
+    # By hand (dm-1 brief): route.intent's every path is bounded and fails safe; nothing else may act unscored.
+    assert {q.key for q in QUESTIONS if q.use_unscored} == {"route.intent"}
+    assert all(not q.use_unscored for q in MAP_COLUMNS.values())
 
 
 def test_below_threshold_is_abstained() -> None:
@@ -142,10 +157,11 @@ def test_probabilities_sum_to_10000_on_every_recorded_result() -> None:
     results = [ask(ROUTE_INTENT, route_state(q)) for q, _ in LABELLED]
     results += [ask(ROUTE_INTENT, route_state(q)) for q in (PLANTED_OUT_OF_ENUM, PLANTED_NO_LOGPROBS, PLANTED_LOW)]
     results += [ask(MAP_COLUMNS["pos_bills"], {"header": h, "headers": POS_BILLS_HEADERS}) for h in POS_BILLS_HEADERS]
-    # Every committed fixture is exercised above (24 labelled + 3 planted + 8 headers, counted by hand).
-    assert len(list(FIXTURES_DIR.glob("*.json"))) == len(results) == 35
+    results += [ask(MAP_COLUMNS["pos_bills"], {"header": PLANTED_MAP_NO_LOGPROBS, "headers": POS_BILLS_HEADERS})]
+    # Every committed fixture is exercised above (24 labelled + 3 planted + 8 headers + 1 planted header, by hand).
+    assert len(list(FIXTURES_DIR.glob("*.json"))) == len(results) == 36
     with_probs = [r for r in results if r.probs_bp is not None]
-    # 24 labelled + 7 mapped headers carry probabilities (hand count); the 4 abstained results carry none.
+    # 24 labelled + 7 mapped headers carry probabilities (hand count); the 3 abstained and 1 unscored results carry none.
     assert len(with_probs) == 31
     for r in with_probs:
         assert r.probs_bp is not None
@@ -321,7 +337,9 @@ def test_gemini_wire_is_enum_with_logprobs(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_openai_compatible_wire_is_strict_enum_without_logprobs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """FACT (installed ADK OpenAILlm): no logprobs on this path → band low → fallback. The wire is captured at the SDK."""
+    """FACT (installed ADK OpenAILlm): no logprobs on this path. The same policy as Gemini's unscored retry (gate d):
+    route.intent acts on the answer, band `unscored`; map.columns abstains `no_probabilities`. No retry: one call each.
+    The wire is captured at the SDK."""
     calls: list[dict[str, Any]] = []
 
     async def create(self: Any, **kwargs: Any) -> ChatCompletion:
@@ -332,7 +350,7 @@ def test_openai_compatible_wire_is_strict_enum_without_logprobs(monkeypatch: pyt
                 "object": "chat.completion",
                 "created": 0,
                 "model": kwargs["model"],
-                "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": '{"answer":"B"}'}}],
+                "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": '{"answer":"D"}'}}],
             }
         )
 
@@ -351,8 +369,118 @@ def test_openai_compatible_wire_is_strict_enum_without_logprobs(monkeypatch: pyt
         "country",
     }
     assert "logprobs" not in kw and TENANT not in json.dumps(kw, default=str)
-    assert (r.abstained, r.reason, r.band) == (True, "no_probabilities", "low")
+    assert (r.abstained, r.reason, r.band, r.answer, r.probs_bp, r.model_calls) == (False, None, "unscored", "draft_request", None, 1)
+    assert answer_or_fallback(ROUTE_INTENT, r) == "draft_request"
+    # Paired refusal: map.columns on the same path (D = the 4th pos_bills field, `outlet`) abstains, and is not retried.
+    q = MAP_COLUMNS["pos_bills"]
+    [m] = asyncio.run(LlmMimic(llm).decide(CTX, {"header": "Outlet Name", "headers": POS_BILLS_HEADERS}, [q]))
+    assert (m.abstained, m.reason, m.band, m.model_calls) == (True, "no_probabilities", "low", 1)
+    assert answer_or_fallback(q, m) is None and len(calls) == 2
+
+
+# ----------------------------------------------------------- logprobs rejected → one unscored retry (T-081 dm-1)
+
+#: A run frame with only what route.intent's egress reads (outlet kinds, country).
+FRAME = InternalRunFrameResponse.model_validate(
+    {
+        "pack": {"code": "IN", "version": 3},
+        "currency": "INR",
+        "severity_ladder": {"critical_minor_gte": 5_000_000, "high_minor_gte": 1_000_000, "medium_minor_gte": 100_000},
+        "detectors": {},
+        "outlets": [
+            {
+                "id": "01920000-0000-7000-8000-0000000000a1",
+                "name": "Indiranagar Kitchen",
+                "kind": "restaurant",
+                "tz": "Asia/Kolkata",
+                "business_date": "2026-10-10",
+            }
+        ],
+        "budget": None,
+        "narration": "model",
+        "licence_kinds": [],
+        "payroll_scope": "drafts",
+    }
+)
+
+
+def gemini_rejecting_logprobs(monkeypatch: pytest.MonkeyPatch, answer: str, status: int = 400) -> list[types.GenerateContentConfig]:
+    """Scripts the genai SDK as T-059 and the dm-1 probe measured it: a request with logprobs raises ClientError(status);
+    the same request without them answers `answer` (no logprobs). Raised below ADK's Gemini class, so ADK's own error
+    handling is in the path (it re-raises ClientError). RecordedLlm cannot replay this: its key ignores the logprobs
+    flag, so the retry would hit the rejected request's fixture."""
+    seen: list[types.GenerateContentConfig] = []
+
+    async def generate_content(
+        self: Any, *, model: str, contents: Any, config: types.GenerateContentConfig
+    ) -> types.GenerateContentResponse:
+        seen.append(config)
+        if config.response_logprobs:
+            raise ClientError(status, {"error": {"code": status, "message": "recorded rejection", "status": "INVALID_ARGUMENT"}})
+        return types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(content=types.Content(role="model", parts=[types.Part(text=answer)]), finish_reason=types.FinishReason.STOP)
+            ],
+            usage_metadata=types.GenerateContentResponseUsageMetadata(prompt_token_count=247),
+        )
+
+    monkeypatch.setattr(AsyncModels, "generate_content", generate_content)
+    return seen
+
+
+def test_a_rejected_logprobs_request_is_retried_once_and_routes_draft_request_unscored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gate (a): 400 on the logprobs request, ok retry → draft_request, band unscored, the draft path (which still
+    needs an @specialist: unaddressed it abstains specialist_needed with no model call)."""
+    seen = gemini_rejecting_logprobs(monkeypatch, "D")
+    dm = live_router()
+    [r] = asyncio.run(dm.decide(CTX, route_state("Order 20 kg of onions from our usual supplier"), [ROUTE_INTENT]))
+    assert (r.abstained, r.reason, r.answer, r.band, r.probs_bp, r.model_calls, r.input_tokens) == (
+        False,
+        None,
+        "draft_request",
+        "unscored",
+        None,
+        2,
+        247,
+    )
+    first, retry = seen
+    assert (first.response_logprobs, first.logprobs) == (True, 6) and (retry.response_logprobs, retry.logprobs) == (None, None)
+    # The same constraint and prompt on the retry: only the logprobs request differs.
+    assert retry.model_dump(exclude={"response_logprobs", "logprobs"}) == first.model_dump(exclude={"response_logprobs", "logprobs"})
+    # Through the Manager's own router (manager/ask.py) and path table: the route trace labels intent, band and path.
+    seen.clear()
+    intent, band = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, dm))
+    assert (intent, band, len(seen)) == ("draft_request", "unscored", 2)
+    assert PATHS[intent] is DRAFT
+    assert bind(PATHS[intent], None).abstain == "specialist_needed"
+    assert bind(PATHS[intent], "inventory_purchasing").propose is True
+
+
+def test_map_columns_with_logprobs_rejected_abstains_without_a_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gate (b): map.columns cannot use an unscored answer, so the rejection abstains no_probabilities at once."""
+    seen = gemini_rejecting_logprobs(monkeypatch, "L")
+    q = MAP_COLUMNS["pos_bills"]
+    [r] = asyncio.run(live_router().decide(CTX, {"header": "Qty", "headers": POS_BILLS_HEADERS}, [q]))
+    assert (r.abstained, r.reason, r.band, r.answer, r.model_calls) == (True, "no_probabilities", "low", None, 1)
+    assert answer_or_fallback(q, r) is None and len(seen) == 1
+
+
+def test_the_retry_happens_at_most_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gate (c): a retry that fails too ends adapter_error after exactly two calls; a 429 (ADK's
+    _ResourceExhaustedError is a ClientError) is not a logprobs rejection and is never retried."""
+    seen = gemini_rejecting_logprobs(monkeypatch, "D")
+
+    async def always_400(self: Any, *, model: str, contents: Any, config: types.GenerateContentConfig) -> Any:
+        seen.append(config)
+        raise ClientError(400, {"error": {"code": 400, "message": "recorded rejection", "status": "INVALID_ARGUMENT"}})
+
+    monkeypatch.setattr(AsyncModels, "generate_content", always_400)
+    [r] = asyncio.run(live_router().decide(CTX, route_state("Order 20 kg of onions"), [ROUTE_INTENT]))
+    assert (r.abstained, r.reason, r.model_calls, len(seen)) == (True, "adapter_error", 2, 2)
     assert answer_or_fallback(ROUTE_INTENT, r) == "explain"
+    seen = gemini_rejecting_logprobs(monkeypatch, "D", status=429)
+    [r] = asyncio.run(live_router().decide(CTX, route_state("Order 20 kg of onions"), [ROUTE_INTENT]))
+    assert (r.abstained, r.reason, r.model_calls, len(seen)) == (True, "adapter_error", 1, 1)
 
 
 def test_live_mode_uses_the_router_role_only() -> None:

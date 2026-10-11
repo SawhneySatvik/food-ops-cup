@@ -62,6 +62,8 @@ ROUTE: list[tuple[str, str, float]] = [
 PLANTED_OUT_OF_ENUM = "PLANTED: the model answers a code outside the enum"
 PLANTED_NO_LOGPROBS = "PLANTED: the provider returns no logprobs"
 PLANTED_LOW = "PLANTED: the model is unsure"
+#: map.columns twin of PLANTED_NO_LOGPROBS (T-081 dm-1): map.columns does not accept an unscored answer.
+PLANTED_MAP_NO_LOGPROBS = "PLANTED: no logprobs for this header"
 
 POS_BILLS_HEADERS = ("Bill No", "Bill Date", "Outlet Name", "Item Code", "Qty", "Rate", "Line Amount", "Remarks")
 # header -> (code, p). Codes index MAP_COLUMNS["pos_bills"].options (bill_no = A … currency = Y, ignore = Z).
@@ -119,6 +121,7 @@ def main() -> None:
     q = MAP_COLUMNS["pos_bills"]
     for header, code, p in MAP:
         write(q, {"header": header, "headers": POS_BILLS_HEADERS}, response(code, p, others(code, "ABZ")))
+    write(q, {"header": PLANTED_MAP_NO_LOGPROBS, "headers": POS_BILLS_HEADERS}, response("L", None, ("A", "B")))
 
 
 if __name__ == "__main__":

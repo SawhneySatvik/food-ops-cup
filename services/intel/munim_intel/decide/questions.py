@@ -32,6 +32,10 @@ ROUTE_INTENT = DecisionQuestion(
     # §4.3: below threshold the orchestrator treats the question as `explain` and loads a skill (R8 default).
     fallback="explain",
     value_patterns={"outlet_kinds": "restaurant|cloud_kitchen|store", "country": "[A-Z]{2}"},
+    # T-059 measured the approved Gemini ids rejecting logprobs (400), so without this every ask routed to `explain`.
+    # Every path is bounded and fails safe on a wrong pick: a draft still needs an @specialist (`specialist_needed`)
+    # and a person's approval, certification abstains, fan-out branches are read-only (manager/paths.py).
+    use_unscored=True,
 )
 
 #: core-api `modules/imports/formats.ts` FIELDS, in file order (the field names only; types and required-ness stay in core).
