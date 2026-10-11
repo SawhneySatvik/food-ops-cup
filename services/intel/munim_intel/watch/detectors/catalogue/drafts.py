@@ -1,5 +1,6 @@
 """Menu & Pricing draft mappings (packs/catalogue.md §6): a detection → a draftable, by code, every numeric leaf a
-canonical ref to the §6 cell. Proposals only — a named person approves before a price, recipe or deal changes (R16).
+canonical ref to the §6 cell and a date leaf (a deal's end) a date code chose from core's business date. Proposals
+only — a named person approves before a price, recipe or deal changes (R16).
 
 Two of the three need cells the detection's own row does not hold:
   price.set from a cost drift      amount ← `dish_margin.suggested_price_minor` (another template)
@@ -127,11 +128,15 @@ FOLLOW_MARGIN = FollowUp(
     "catalogue.dish_margin",
     lambda d: {"outlet_id": d.outlet.id, "channel_kind": None, "from": d.params["since"], "to": d.outlet.business_date.isoformat()},
 )
-#: C2: the gap item's current recipe at the outlet (today: `as_of` null).
+#: C2: the gap item's current recipe at the outlet on its business date (run-frame; never core's clock).
 FOLLOW_RECIPE = FollowUp(
     "recipe",
     "catalogue.recipe_current",
-    lambda d: {"item_id": d.row["item_id"], "outlet_id": d.outlet.id, "as_of": None} if _text(d.row, "item_id") else None,
+    lambda d: (
+        {"item_id": d.row["item_id"], "outlet_id": d.outlet.id, "as_of": d.outlet.business_date.isoformat()}
+        if _text(d.row, "item_id")
+        else None
+    ),
 )
 
 

@@ -63,6 +63,7 @@ def prep_time(d: Detection) -> Proposal:
 SPEC = register(
     DetectorSpec(
         id="kitchen.prep_time_gap",
+        thresholds=("abs_gap_sec_gte", "tickets_gte", "window_days"),
         pack="kitchen",
         template="kitchen.ticket_times",
         finding_type="kitchen.prep_time_gap",

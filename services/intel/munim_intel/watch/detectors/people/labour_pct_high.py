@@ -38,11 +38,14 @@ def select(rows: Sequence[Row], _: Window, t: Thresholds, ladder: Ladder) -> lis
     hits = []
     for j in range(n - 1, len(rows)):
         run = rows[j - n + 1 : j + 1]
-        if all(fires(r, t) for r in run) and all(
-            start_of(str(b["iso_week"])) - start_of(str(a["iso_week"])) == timedelta(weeks=1) for a, b in zip(run, run[1:], strict=False)
-        ):
+        if all(fires(r, t) for r in run) and all(consecutive(a, b) for a, b in zip(run, run[1:], strict=False)):
             hits.append(Hit(j, j, severity(rows[j], t, ladder)))
     return hits
+
+
+def consecutive(a: Row, b: Row) -> bool:
+    first, then = start_of(str(a["iso_week"])), start_of(str(b["iso_week"]))
+    return first is not None and then is not None and then - first == timedelta(weeks=1)
 
 
 def dedupe(row: Row, w: Window) -> str:
@@ -52,6 +55,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="people.labour_pct_high",
+        thresholds=("consecutive_weeks",),
         pack="people",
         template="people.labour_pct",
         finding_type="people.labour_pct_high",
@@ -61,8 +65,8 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Labour cost was {labour_bp} basis points of net sales this week against a target of {target_bp}, "
-            "and the week before was over target too: {excess_labour_minor} above the target this week."
+            "Labour cost in week {iso_week} was {labour_bp} basis points of net sales against a target of {target_bp}, "
+            "and the week before was over target too: {excess_labour_minor} above the target that week."
         ),
         select=select,
     )

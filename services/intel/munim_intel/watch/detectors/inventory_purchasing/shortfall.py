@@ -21,7 +21,12 @@ from munim_intel.mapping import Detection, Proposal
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
-    return [Window({"outlet_id": outlet.id, "lead_days": t["lead_days"], "as_of": None}, outlet.business_date.isoformat())]
+    return [
+        Window(
+            {"outlet_id": outlet.id, "lead_days": t["lead_days"], "as_of": outlet.business_date.isoformat()},
+            outlet.business_date.isoformat(),
+        )
+    ]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -62,6 +67,7 @@ def reorder_level(d: Detection) -> Proposal:
 SPEC = register(
     DetectorSpec(
         id="inventory.shortfall",
+        thresholds=("lead_days", "shortfall_qty_milli_gt"),
         pack="inventory_purchasing",
         template="inventory.shortfall",
         finding_type="inventory.shortfall",

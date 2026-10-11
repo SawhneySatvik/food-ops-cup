@@ -49,6 +49,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="kitchen.remakes",
+        thresholds=("remake_minor_gte", "remake_share_bp_gte"),
         pack="kitchen",
         template="kitchen.remakes_overprep",
         finding_type="kitchen.remakes",
@@ -57,7 +58,7 @@ SPEC = register(
         fires=fires,
         severity=severity,
         dedupe=dedupe,
-        narration="Dishes from this station were remade {remakes} times this week, writing off {remake_minor}.",
+        narration="Dishes from this station were remade {remakes} times in a week, writing off {remake_minor}.",
         watches=frozenset({VOID_RECORDED}),
         outlet_kinds=KITCHENS,
         select=select,

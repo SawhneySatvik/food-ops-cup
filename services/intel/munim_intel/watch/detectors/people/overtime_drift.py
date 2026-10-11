@@ -4,6 +4,9 @@ Template `people.overtime_drift` **version 2** (migration 0023 P1) over the last
 outlet-local, ending today: one Σ row per staff member first (`iso_week` NULL, the member's window totals), then one row
 per member and week (attended minutes beyond rostered ones, costed at the overtime multiplier). The rule: the Σ row's
 `extra_min` ≥ `extra_min_gte` (600) and the last week's `extra_min` > the first week's — drift, not one long week.
+The last week is the current one, so it is partial until Sunday: the comparison is per day (the last week's minutes
+over its days so far against the first week's over seven), so a sweep early in the week does not read a short week
+as no drift.
 Worked-as-rostered long shifts have no extra minutes (P7). The finding sits on the member's last-week row (its dedupe
 week and narration), and its impact is the member's Σ `extra_cost_minor` — pack §5's "4-week Σ row", a cell core
 minted, never a sum intel adds up. Severity L on that cell. Dedupe `<outlet>:<staff>:<iso_week>`. No draft (pack §6
@@ -36,7 +39,9 @@ def severity(row: Row, _: Thresholds, ladder: Ladder) -> Severity:
 
 
 def select(rows: Sequence[Row], w: Window, t: Thresholds, ladder: Ladder) -> list[Hit]:
-    first, last = label(date.fromisoformat(w.params["from"])), label(date.fromisoformat(w.params["to"]))
+    today = date.fromisoformat(w.params["to"])
+    first, last = label(date.fromisoformat(w.params["from"])), label(today)
+    days_so_far = today.weekday() + 1
     sigma: dict[str, int] = {}
     weeks: dict[str, dict[str, int]] = {}
     for i, r in enumerate(rows):
@@ -52,7 +57,8 @@ def select(rows: Sequence[Row], w: Window, t: Thresholds, ladder: Ladder) -> lis
         week = weeks.get(staff, {})
         total = num(rows[s], "extra_min")
         extra = {wk: num(rows[i], "extra_min") or 0 for wk, i in week.items()}
-        if last in week and total is not None and total >= t["extra_min_gte"] and extra[last] > extra.get(first, 0):
+        # last ÷ days_so_far > first ÷ 7, in integers.
+        if last in week and total is not None and total >= t["extra_min_gte"] and extra[last] * 7 > extra.get(first, 0) * days_so_far:
             hits.append(Hit(week[last], s, severity(rows[s], t, ladder)))
     return sorted(hits, key=lambda h: h.row)
 
@@ -64,6 +70,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="people.overtime_drift",
+        thresholds=("extra_min_gte", "window_weeks"),
         pack="people",
         template="people.overtime_drift",
         finding_type="people.overtime_drift",
@@ -73,7 +80,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Shifts have run past the roster over the last few weeks and the overrun is growing: this week {extra_min} minutes "
+            "Shifts have run past the roster over the last few weeks and the overrun is growing: in week {iso_week}, {extra_min} minutes "
             "beyond the {rostered_min} rostered; over the whole window the extra time cost {extra_cost_minor} at the overtime rate."
         ),
         select=select,

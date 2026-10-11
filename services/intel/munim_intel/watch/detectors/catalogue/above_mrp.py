@@ -39,6 +39,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="catalogue.above_mrp",
+        thresholds=("price_over_mrp_minor_gt",),
         pack="catalogue",
         template="catalogue.sku_price_check",
         finding_type="catalogue.above_mrp",

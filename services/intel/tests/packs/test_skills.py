@@ -39,6 +39,11 @@ def registry() -> dict[str, dict[str, Any]]:
     return {s["id"]: s for s in json.loads(out.stdout)["specialists"] if s["kind"] == "specialist"}
 
 
+def tool_name(command_type: str) -> str:
+    """The generated propose tool's name for a command type (tests/tools/test_generated.py names them the same way)."""
+    return "propose_" + re.sub(r"\.v[1-9][0-9]*$", "", command_type).replace(".", "_")
+
+
 def number_words() -> list[str]:
     data = json.loads((REPO / "packages/contracts/src/shared/grammar/number-words.json").read_text("utf8"))
     words: list[str] = [*data["english_cardinals"], *data["english_magnitude_plurals"]]
@@ -62,9 +67,12 @@ def test_each_skill_binds_only_its_registry_tools_within_the_cap_and_cites_witho
     prose = s.instructions_md
     typed = [w for w in number_words() if re.search(rf"\b{re.escape(w)}\b", prose, flags=re.I)]
     print(f"{pack}: {len(prose)} chars, {len(reads)} reads, {len(drafting)} with proposals, number words {typed}")
+    proposals = sorted(t.name for t in drafting if t.name.startswith("propose_"))
     assert s.pack == pack
-    assert set(s.read_templates) == set(entry["templates"]) and set(s.draftables) == set(entry["draftables"])
+    # A skill may propose fewer than its registry draftables (customers keeps the campaign out, R-B S1-D), never others.
+    assert set(s.read_templates) == set(entry["templates"]) and set(s.draftables) <= set(entry["draftables"])
     assert len(drafting) <= TOOL_CAP and not any(t.name.startswith("propose_") for t in reads)
-    assert len(drafting) - len(reads) == len(entry["draftables"]), "every proposal tool is one of its own registry draftables"
+    assert proposals == sorted(tool_name(d) for d in s.draftables), "the bound proposal tools are exactly the skill's draftables"
+    assert len(drafting) - len(reads) == len(s.draftables) and {t.name for t in reads} <= {t.name for t in drafting}
     assert 0 < len(prose) <= CHAR_CAP and re.findall(r"\d", prose) == [] and typed == []
     assert s.refusal_codes and set(s.refusal_codes) <= set(get_args(ReasonCode.model_fields["root"].annotation))

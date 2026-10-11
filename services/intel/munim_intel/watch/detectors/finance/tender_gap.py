@@ -13,6 +13,8 @@ Fires on a week's Σ row with `gap_days` ≥ the pack's `gap_days_gte` (3 of the
 `shift_member_id` and their voids reach the pack's `critical_voids_vs_median_bp_gte` (2×) of the Σ row's
 `outlet_median_voids` — which 0023 already states as the per-day median × `gap_days`, so Σ voids × 10,000 ≥ bp × that
 cell compares a week's gap days with as many median days (multiplying by `gap_days` again would count the days twice).
+The critical clause needs a median above 0 and at least one void (R-B S2-B): against a median of 0 any count, even 0,
+is "twice the median", which would make every one-cashier week critical.
 Dedupe `<outlet>:<method>:<iso_week>`. Names shifts, never motives.
 """
 
@@ -34,10 +36,17 @@ def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
     return [Window({"outlet_id": outlet.id, "method": m, "from": first.isoformat(), "to": day.isoformat()}, m) for m in METHODS]
 
 
+def week_of(row: Row) -> date | None:
+    """The Σ row's week (day rows carry business_on instead); a cell that is not an ISO date is no week."""
+    try:
+        return date.fromisoformat(str(row["week_start"])) if isinstance(row.get("week_start"), str) else None
+    except ValueError:
+        return None
+
+
 def fires(row: Row, t: Thresholds) -> bool:
     days = num(row, "gap_days")
-    # Only a week's Σ row has a week_start (day rows carry business_on instead).
-    return isinstance(row.get("week_start"), str) and days is not None and days >= t["gap_days_gte"]
+    return week_of(row) is not None and days is not None and days >= t["gap_days_gte"]
 
 
 def severity(row: Row, t: Thresholds, ladder: Ladder) -> Severity:
@@ -46,6 +55,8 @@ def severity(row: Row, t: Thresholds, ladder: Ladder) -> Severity:
         isinstance(row.get("shift_member_id"), str)
         and voids is not None
         and median is not None
+        and median > 0
+        and voids > 0
         and voids * 10_000 >= t["critical_voids_vs_median_bp_gte"] * median
     ):
         return "critical"
@@ -53,12 +64,14 @@ def severity(row: Row, t: Thresholds, ladder: Ladder) -> Severity:
 
 
 def dedupe(row: Row, w: Window) -> str:
-    return f"{w.params['outlet_id']}:{w.key}:{iso_week(date.fromisoformat(str(row['week_start'])))}"
+    week = week_of(row)  # `fires` admits only rows with a week
+    return f"{w.params['outlet_id']}:{w.key}:{iso_week(week) if week is not None else 'none'}"
 
 
 SPEC = register(
     DetectorSpec(
         id="finance.tender_gap",
+        thresholds=("critical_voids_vs_median_bp_gte", "gap_days_gte"),
         pack="finance",
         template="finance.tender_vs_bank",
         finding_type="cash_control.tender_gap",
@@ -68,8 +81,8 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Counter payments recorded this week were not all credited by the bank: {gap_minor} missing over {gap_days} days, "
-            "{tendered_minor} recorded against {credited_minor} credited, with {voids} voided bills on those days."
+            "Counter payments recorded in the week of {week_start} were not all credited by the bank: {gap_minor} missing over "
+            "{gap_days} days, {tendered_minor} recorded against {credited_minor} credited, with {voids} voided bills on those days."
         ),
     )
 )

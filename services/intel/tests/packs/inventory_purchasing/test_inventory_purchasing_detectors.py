@@ -523,7 +523,7 @@ def test_a_sweep_lists_invoices_and_counts_then_mints_one_id_keyed_template_per_
 
 def test_window_params_are_exactly_the_templates_params() -> None:
     """Pack §3 params by hand (the templates refuse any other key: additionalProperties false)."""
-    # 0022: shortfall, expiry_risk and dead_stock v2 take a nullable `as_of` (null = today); the two list templates
+    # 0022: shortfall, expiry_risk and dead_stock v2 take `as_of` (passed: the run-frame business date); the two list templates
     # feed the id-keyed ones.
     want = {
         "inventory.shortfall": {"outlet_id", "lead_days", "as_of"},

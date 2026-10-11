@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import re
 import sys
+from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,27 @@ def test_overtime_drift_needs_600_minutes_in_four_weeks_and_a_growing_last_week(
         0,
         "extra_cost_minor",
     )
+
+
+def test_overtime_drift_compares_a_partial_last_week_per_day() -> None:
+    """Swept on Monday 12 Oct (W42 has one day so far): 45 extra minutes that Monday against W39's 100 over seven days is
+    a higher daily rate (45 × 7 = 315 > 100 × 1), so it fires; 14 minutes (98 ≤ 100) does not. A whole-week comparison
+    (45 > 100?) would miss every drift until the week's end."""
+    monday = replace(frame("IN"), outlets=(replace(frame("IN").outlets[0], business_date=date(2026, 10, 12)),))
+    got = []
+    for last in (45, 14):
+        rows = [sigma(STAFF, 600, 0), ot(STAFF, "2026-W39", 100, 0), ot(STAFF, "2026-W40", 300, 0), ot(STAFF, "2026-W41", 155, 0),
+                ot(STAFF, "2026-W42", last, 0)]  # fmt: skip
+
+        def serve(t: str, p: dict[str, Any], rows: list[dict[str, Any]] = rows) -> list[dict[str, Any]]:
+            return rows if t == "people.overtime_drift" and (p["from"], p["to"]) == ("2026-09-21", "2026-10-12") else []
+
+        core = FakeCore(serve)
+        asyncio.run(
+            WatchRun(CTX, core, monday, CFG).run({"people": [s for s in detectors_for(None)["people"] if s.id == "people.overtime_drift"]})
+        )
+        got.append([x["dedupe_key"] for x in found(core, "people.overtime_drift")])
+    assert got == [[f"people.overtime_drift:{OUTLET}:{STAFF}:2026-w42"], []]
 
 
 def test_overtime_drift_one_minute_short_finds_nothing() -> None:

@@ -19,7 +19,7 @@ MONTHS = 2
 
 
 def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
-    return [Window({"outlet_id": outlet.id, "months": MONTHS, "as_of": None}, outlet.id)]
+    return [Window({"outlet_id": outlet.id, "months": MONTHS, "as_of": outlet.business_date.isoformat()}, outlet.id)]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -40,6 +40,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="compliance.energy_drift",
+        thresholds=("per_order_vs_median_bp_gte",),
         pack="compliance",
         template="compliance.energy_per_order",
         finding_type="compliance.energy_drift",
@@ -49,7 +50,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Utility cost per order this month is {per_order_minor} against a usual {median_per_order_minor} over "
+            "Utility cost per order in the month of {month_on} is {per_order_minor} against a usual {median_per_order_minor} over "
             "{orders} orders: {energy_excess_minor} above the usual level. This is a drift signal, not an equipment diagnosis."
         ),
     )

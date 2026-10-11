@@ -9,7 +9,8 @@ Draft (pack §6): `purchasing.invoice.dispute.v1`, basis `overbilled`, one line 
 the same snapshot (`Detection.rows`).
 
 Enumeration: `DRIVER` lists the tenant's invoices dated in the last `window_days` (`purchasing.invoices`, migration 0022),
-one window per invoice.
+one window per invoice. Both templates are tenant-level, so the detector runs once per run and its dispute is
+tenant-wide (`outlet_ids` [], owner-approved; R-B S2-C) rather than filed under whichever outlet a sweep visited first.
 """
 
 from __future__ import annotations
@@ -75,6 +76,7 @@ def mapping(d: Detection) -> Proposal | None:
 
 SPEC = DetectorSpec(
     id="purchasing.overbilled",
+    thresholds=("overbilled_minor_gte", "window_days"),
     pack="inventory_purchasing",
     template="purchasing.invoice_vs_po",
     finding_type="purchasing.overbilled",
@@ -88,6 +90,7 @@ SPEC = DetectorSpec(
     ),
     driver=DRIVER,
     mapping=mapping,
+    tenant_level=True,
 )
 
 register(SPEC)

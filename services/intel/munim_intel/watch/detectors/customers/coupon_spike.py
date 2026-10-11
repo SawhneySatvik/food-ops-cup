@@ -2,8 +2,8 @@
 
 Its template `customers.coupon_daily` takes a required `coupon_id`, so the coupons come from a driver:
 `customers.coupon_leakage` lists the coupons used over the same 28 business days that `coupon_daily` reads (the
-template's own span), one window per coupon. Both templates are tenant-level (no outlet param): each outlet in scope
-mints the same rows, and the `<coupon>:<date>` key merges the copies into one finding.
+template's own span), one window per coupon. Both templates are tenant-level (no outlet param), so the detector runs
+once per run (`tenant_level`, R-B S2-C).
 
 A day fires when all four of these hold:
 - `uses` ≥ `uses_gte` (20);
@@ -62,6 +62,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="customers.coupon_spike",
+        thresholds=("first_time_share_bp_gte", "uses_gte", "uses_vs_median_bp_gte"),
         pack="customers",
         template="customers.coupon_daily",
         finding_type="customers.coupon_spike",
@@ -75,5 +76,6 @@ SPEC = register(
             "outside any campaign: {excess_discount_minor} more discount than on a usual day."
         ),
         driver=Driver("customers.coupon_leakage", coupons_used, "coupon_id", window),
+        tenant_level=True,
     )
 )

@@ -7,6 +7,7 @@ C3 `deal_loss` is history-only (detector-map.json pack_cases C3), so its gate is
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -236,9 +237,17 @@ def test_windows_come_from_the_pack_thresholds() -> None:
     assert (w.params["from"], w.params["to"]) == ("2026-09-27", "2026-10-10")
     (w,) = cost_drift.SPEC.windows(outlet, t["catalogue.cost_drift"])
     assert (AS_OF - date.fromisoformat(w.params["since"])).days == t["catalogue.cost_drift"]["lookback_days"]
-    # A pack without the lookback mints nothing (never a guessed window): the detector stays silent, not wrong.
+    # A pack without the lookback mints nothing (never a guessed window) and says so: the pipeline abstains the detector
+    # with no_pack_thresholds (R-B S2-A), where a silent [] used to look like "no finding". Paired: with the key it mints.
+    f = frame("IN")
     no_key = {k: v for k, v in t["catalogue.cost_drift"].items() if k != "lookback_days"}
-    assert cost_drift.SPEC.windows(outlet, no_key) == []
+    for pack_t, minted, abstains in (
+        (no_key, 0, [{"detector": "catalogue.cost_drift", "reason": "no_pack_thresholds"}]),
+        (t["catalogue.cost_drift"], 1, []),
+    ):
+        core = FakeCore({})
+        run(core, replace(f, detectors={**f.detectors, "catalogue.cost_drift": pack_t}), "catalogue", [cost_drift.SPEC])
+        assert (len(core.minted), [x["payload"] for x in core.traces if x["kind"] == "abstain"]) == (minted, abstains)
 
 
 # -- dedupe and narration ----------------------------------------------------------------------------------------------

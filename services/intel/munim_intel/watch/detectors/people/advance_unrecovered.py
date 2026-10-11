@@ -13,7 +13,7 @@ from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity,
 
 
 def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
-    return [Window({"outlet_id": outlet.id, "as_of": None}, outlet.business_date.isoformat()[:7])]
+    return [Window({"outlet_id": outlet.id, "as_of": outlet.business_date.isoformat()}, outlet.business_date.isoformat()[:7])]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -34,6 +34,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="people.advance_unrecovered",
+        thresholds=("days_since_given_gt", "outstanding_minor_gte"),
         pack="people",
         template="people.advances_open",
         finding_type="people.advance_unrecovered",

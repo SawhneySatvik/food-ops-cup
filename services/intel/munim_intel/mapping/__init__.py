@@ -1,7 +1,8 @@
 """DraftMapping (ADR-014 §3.3, §5.5, §5.7): a detection → the specialist's draftable, by code. No model, no handles:
-the mapping holds the snapshot id and places canonical refs (`⟨snap:<id>·<row>·<col>⟩`) at every numeric leaf, the
-literal uuid of an id cell at every id leaf, and pack data (currency) at the rest. Core validates and stores the
-draft as `proposed`; a named person approves it before anything changes (R16).
+the mapping holds the snapshot id, and every leaf of the draft is a canonical ref (`⟨snap:<id>·<row>·<col>⟩`), the
+literal uuid of an id cell, pack data (currency, an i18n key), or a date code chose from core's business date (a task's
+due day, a deal's end) — never a figure intel computed. Core validates and stores the draft as `proposed`; a named
+person approves it before anything changes (R16).
 
 Draft id (review M6): UUIDv7 whose time is the finding's and whose random bits are sha256(finding id ‖ command type ‖
 target ids). Not the run id and not snapshot ids, so a re-detection in a later run — which merges into the same open
@@ -45,7 +46,8 @@ class Minted:
 class Detection:
     """What a mapping may read: the firing row and where it sits, the outlet it was minted for, the pack's currency;
     the window's params and every row of the same snapshot (a dispute claims each line of a Σ detection); the id core
-    gave the finding; and the follow-up snapshots by name."""
+    gave the finding; the follow-up snapshots by name; and the detector's pack thresholds (a line rule a dispute
+    re-applies to pick the lines its Σ counted)."""
 
     snapshot_id: str
     row_index: int
@@ -56,6 +58,7 @@ class Detection:
     rows: Sequence[Row] = ()
     finding_id: str | None = None
     follow: Mapping[str, Minted] = field(default_factory=dict)
+    thresholds: Mapping[str, int] = field(default_factory=dict)
 
     def ref(self, column: str) -> str:
         return snap_ref(self.snapshot_id, self.row_index, column)

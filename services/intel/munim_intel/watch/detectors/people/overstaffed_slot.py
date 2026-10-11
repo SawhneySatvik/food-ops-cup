@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 
 from munim_intel.detect import DetectorSpec, Hit, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
+from munim_intel.watch.detectors.people.weeks import day_of
 
 #: The template's slot length (its `slot_minutes` param: 15, 30 or 60). Hourly: the pack judges staffing per slot, and
 #: a shift is planned in hours.
@@ -46,8 +47,8 @@ def severity(row: Row, _: Thresholds, ladder: Ladder) -> Severity:
 def select(rows: Sequence[Row], _: Window, t: Thresholds, ladder: Ladder) -> list[Hit]:
     groups: dict[tuple[int, str], list[int]] = {}
     for i, r in enumerate(rows):
-        if isinstance(r.get("business_on"), str) and isinstance(r.get("slot_start"), str):
-            day = date.fromisoformat(str(r["business_on"]))
+        day = day_of(r.get("business_on"))
+        if day is not None and isinstance(r.get("slot_start"), str):
             groups.setdefault((day.weekday(), str(r["slot_start"])), []).append(i)
     hits = []
     for idx in groups.values():
@@ -66,6 +67,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="people.overstaffed_slot",
+        thresholds=("attended_vs_needed_bp_gte", "slots_gte", "slots_window"),
         pack="people",
         template="people.labour_vs_demand",
         finding_type="people.overstaffed_slot",

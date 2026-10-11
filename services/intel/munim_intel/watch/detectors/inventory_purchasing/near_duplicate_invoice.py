@@ -8,7 +8,7 @@ of the pair: each invoice of a pair lists the other, and both listings are one p
 No draft: pack §6 claims `total_claimed_minor` ← `total_minor`, but `purchasing.invoice.dispute.v1` has no total field
 and needs ≥ 1 line `{invoice_line_id, claimed_minor}`, which this template's row does not carry (T-046 report).
 Enumeration: the same invoice listing as `purchasing.overbilled` (`purchasing.invoices` over the last `window_days`,
-migration 0022), one window per invoice.
+migration 0022), one window per invoice; tenant-level, once per run (R-B S2-C).
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ def dedupe(row: Row, w: Window) -> str:
 
 SPEC = DetectorSpec(
     id="purchasing.near_duplicate_invoice",
+    thresholds=("days_apart_lte", "window_days"),
     pack="inventory_purchasing",
     template="purchasing.invoice_duplicates",
     finding_type="purchasing.near_duplicate_invoice",
@@ -53,6 +54,7 @@ SPEC = DetectorSpec(
         "invoice number that differs only in punctuation, dated {days_apart} days apart."
     ),
     driver=Driver("purchasing.invoices", invoices_listed, "supplier_invoice_id", lambda i, _o, _t: window(i)),
+    tenant_level=True,
 )
 
 register(SPEC)

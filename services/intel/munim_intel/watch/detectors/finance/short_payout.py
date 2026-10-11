@@ -10,13 +10,18 @@ total — so overpaid or rounding-level lines never net a short payout down, and
 Fires on a settlement's Σ row when `short_minor` ≥ the pack's `short_minor_gte` (IN ₹200, AU A$5). Severity L on the
 settlement's Σ (the pack's "monthly Σ" spans settlements, which one row cannot see). Dedupe
 `<outlet>:<settlement>` (pack `<settlement>`, per outlet — T-040 note a).
-Draft: `finance.dispute.draft.v1`, basis `short_payout`, no lines (the lines sit in other rows), total ← `short_minor`.
+Draft (pack §6): `finance.dispute.draft.v1`, basis `short_payout`, total ← the Σ row's `short_minor`, and one line per
+settlement line the Σ counted, `{settlement_line_id, claimed_minor ← that line's short_minor}` (R-B S1-C), so core's
+open-dispute check holds each line once. The mapping re-applies the template's line rule (`line_short_minor_gte`,
+`line_short_bp_gte`, pack §4) to the settlement's line rows and drafts only when those lines' cells add up to the Σ
+cell exactly — core refuses lines that do not sum to the total, and a mismatch means the rule here and the template's
+differ, so no draft is better than one that fails at approval.
 """
 
 from __future__ import annotations
 
 from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
-from munim_intel.mapping import Detection, Proposal
+from munim_intel.mapping import Detection, Proposal, snap_ref
 from munim_intel.watch.detectors.finance.periods import month_end, month_starts
 
 #: The months a run looks at, as finance.unapproved_ad_fee: the current business month and the two before it.
@@ -49,21 +54,41 @@ def dedupe(row: Row, w: Window) -> str:
     return f"{w.params['outlet_id']}:{row['settlement_id']}"
 
 
-def dispute(d: Detection) -> Proposal:
+def counts(row: Row, t: Thresholds) -> bool:
+    """The template's line rule (0023 F1 / 0024 F5): short > 0 and short ≥ max(line minimum, ⌈expected × bp ÷ 10,000⌉)."""
+    short, expected = num(row, "short_minor"), num(row, "expected_net_minor")
+    if short is None or expected is None:
+        return False
+    return short > 0 and short >= max(t["line_short_minor_gte"], -(-expected * t["line_short_bp_gte"] // 10_000))
+
+
+def dispute(d: Detection) -> Proposal | None:
     channel = str(d.row["channel_id"])  # `fires` admits only Σ rows whose channel_id is a uuid string
+    settlement = str(d.row["settlement_id"])
+    picked = [
+        (i, r)
+        for i, r in enumerate(d.rows)
+        if r.get("settlement_id") == settlement and isinstance(r.get("settlement_line_id"), str) and counts(r, d.thresholds)
+    ]
+    if not picked or sum(num(r, "short_minor") or 0 for _, r in picked) != num(d.row, "short_minor"):
+        return None
+    lines = [
+        {"settlement_line_id": r["settlement_line_id"], "order_id": None, "claimed_minor": snap_ref(d.snapshot_id, i, "short_minor")}
+        for i, r in picked
+    ]
     total = d.ref("short_minor")
     return Proposal(
         command_type="finance.dispute.draft.v1",
         payload={
             "channel_id": channel,
             "basis": "short_payout",
-            "lines": [],
+            "lines": lines,
             "total_claimed_minor": total,
             "currency": d.currency,
             "break_ids": [],
         },
-        based_on=[total],
-        targets=[channel, str(d.row["settlement_id"])],
+        based_on=[total, *(str(x["claimed_minor"]) for x in lines)],
+        targets=[channel, settlement],
         minted=["dispute_id"],
     )
 
@@ -71,6 +96,7 @@ def dispute(d: Detection) -> Proposal:
 SPEC = register(
     DetectorSpec(
         id="finance.short_payout",
+        thresholds=("line_short_bp_gte", "line_short_minor_gte", "short_minor_gte"),
         pack="finance",
         template="finance.settlement_vs_orders",
         finding_type="reconciliation_break.short_payout",

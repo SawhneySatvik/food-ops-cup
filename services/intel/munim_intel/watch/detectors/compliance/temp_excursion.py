@@ -41,6 +41,7 @@ def dedupe(row: Row, _: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="compliance.temp_excursion",
+        thresholds=("out_of_range_gte",),
         pack="compliance",
         template="compliance.temp_excursions",
         finding_type="compliance.temp_excursion",
@@ -50,7 +51,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "This asset read outside its safe range {out_of_range} times out of {readings} readings on this day, peaking at "
+            "This asset read outside its safe range {out_of_range} times out of {readings} readings on {logged_on}, peaking at "
             "{max_milli_c}; stock binned for temperature at the outlet that day was worth {temp_waste_minor}."
         ),
     )

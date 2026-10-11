@@ -70,6 +70,7 @@ def dispute(d: Detection) -> Proposal:
 SPEC = register(
     DetectorSpec(
         id="finance.unapproved_ad_fee",
+        thresholds=("unapproved_minor_gte",),
         pack="finance",
         template="finance.unapproved_deductions",
         finding_type="reconciliation_break.unapproved_ad_fee",

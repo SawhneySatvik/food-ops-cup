@@ -1,8 +1,9 @@
 """Customers & Growth specialist detectors (packs/customers-growth.md §4; T-049).
 
-§6 drafts: coupon cap evasion tightens the coupon (`catalogue.coupon.set.v1` from `coupon_current` v2, 0023 C1). The
-win-back campaign stays unwired (DECISIONS 11 Oct, W3.2 integration): `consented_audience` must count the at-risk
-segment only, per channel consent, before an approved campaign can be trusted not to reach customers outside the finding.
+§6 drafts: none wired. The coupon.set tightening is unwired (R-B S1-A: it changed nothing core executes; see
+coupon_cap_evasion). The win-back campaign stays unwired (DECISIONS 11 Oct, W3.2 integration): `consented_audience` must
+count the at-risk segment only, per channel consent, before an approved campaign can be trusted not to reach customers
+outside the finding; core refuses an intel campaign draft meanwhile (`campaign_audience_unscoped`).
 """
 
 from munim_intel.watch.detectors.customers import coupon_cap_evasion as coupon_cap_evasion

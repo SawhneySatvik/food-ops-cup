@@ -20,7 +20,7 @@ from munim_intel.detect import DetectorSpec, Driver, Ladder, OutletFrame, Row, S
 
 def windows_for(goal_ids: Iterable[str], today: date) -> list[Window]:
     year, week, _ = today.isocalendar()
-    return [Window({"goal_id": g, "as_of": None}, f"{g}:{year}-w{week:02d}") for g in goal_ids]
+    return [Window({"goal_id": g, "as_of": today.isoformat()}, f"{g}:{year}-w{week:02d}") for g in goal_ids]
 
 
 def windows(_outlet: OutletFrame, _t: Thresholds) -> list[Window]:
@@ -51,6 +51,7 @@ def dedupe(_row: Row, w: Window) -> str:
 
 SPEC = DetectorSpec(
     id="market.goal_off_track",
+    thresholds=("elapsed_bp_gte", "high_elapsed_bp_gte", "pace_bp_lt"),
     pack="market",
     template="market.goal_progress",
     finding_type="market.goal_off_track",

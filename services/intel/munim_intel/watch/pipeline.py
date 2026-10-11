@@ -14,6 +14,15 @@ uuid); its mapping reads the window params, every row of the snapshot and the st
 follow-up snapshots minted after the finding (`DetectorSpec.follow_ups`); a mapping may refuse with a contracts reason
 code (`Abstain`, traced by code); a finding the contract refuses is traced `invalid_finding` and the run goes on.
 
+Containment (R-B S2-A): a detector, window, finding or mapping that raises is traced `detector_error` with the
+exception's type name only (never its message) and the sweep goes on with the next one; a `TraceLabelError` still ends
+the run (it exists to fail a run rather than ship text). A pack whose `detectors.<id>.thresholds` lacks a key the
+detector declares abstains that detector with `no_pack_thresholds` before anything is minted.
+
+Tenant-level detectors (`DetectorSpec.tenant_level`, R-B S2-C) mint once per run, with the in-scope outlet whose
+business date is latest (the first such in frame order), only in a run over every outlet (`not_applicable` otherwise:
+core refuses a tenant-wide draft from a scoped run); their drafts are tenant-wide (`outlet_ids` []).
+
 Ids (§5.5): a finding id is fresh per run (sha256 of run id ‖ dedupe key), because core returns an existing id's
 stored row before it merges; a re-detection in a later run is a new id that core merges into the open finding of the
 same dedupe key and answers with that finding's id. Every later step uses the id core returned.
@@ -54,7 +63,7 @@ from munim_intel.runtime.runner import RunFailed
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.tools.generated import run_start_ms, uuid7
 from munim_intel.tools.handles import HandleTable
-from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.buffer import TraceBuffer, TraceLabelError
 from munim_intel.watch.frame import Frame
 
 log = logging.getLogger("munim_intel.watch")
@@ -127,7 +136,12 @@ class WatchRun:
                     continue
                 self.report.packs[pack] = "ran"
                 for spec in specs:
-                    await self._detector(spec)
+                    try:
+                        await self._detector(spec)
+                    except TraceLabelError:
+                        raise
+                    except Exception as e:  # noqa: BLE001 — one detector's defect never ends the sweep (S2-A)
+                        await self._failed(spec, "detector", e)
         finally:
             try:
                 await self.state.traces.flush()
@@ -135,24 +149,51 @@ class WatchRun:
                 log.error("intel: watch run %s could not flush traces: %s", self.ctx.run_id, type(e).__name__)
         return self.report
 
+    async def _failed(self, spec: DetectorSpec, where: str, e: Exception) -> None:
+        self.report.errors += 1
+        await self.trace("error", spec.pack, {"where": where, "detector": spec.id, "error": "detector_error", "type": type(e).__name__})
+
     async def _detector(self, spec: DetectorSpec) -> None:
-        thresholds = self.frame.detectors.get(spec.id)
-        if thresholds is None:
-            # The tenant's pack has no thresholds for it: nothing to compare against, so it does not run.
+        pack_thresholds = self.frame.detectors.get(spec.id)
+        if pack_thresholds is None or any(k not in pack_thresholds for k in spec.thresholds):
+            # The tenant's pack lacks a threshold it reads: nothing to compare against, so it does not run.
             await self.trace("abstain", spec.pack, {"detector": spec.id, "reason": "no_pack_thresholds"})
             return
-        for outlet in self.frame.in_scope(self.ctx):
-            if outlet.kind not in spec.outlet_kinds:
+        thresholds = {k: pack_thresholds[k] for k in spec.thresholds}
+        outlets = [o for o in self.frame.in_scope(self.ctx) if o.kind in spec.outlet_kinds]
+        if spec.tenant_level:
+            if self.ctx.outlet_scope != ("*",):
+                await self.trace("abstain", spec.pack, {"detector": spec.id, "reason": "not_applicable"})
+                return
+            outlets = [max(outlets, key=lambda o: o.business_date)] if outlets else []
+        for outlet in outlets:
+            try:
+                windows = list(spec.windows(outlet, thresholds))
+                if spec.driver is not None:
+                    windows += await self._enumerate(spec, spec.driver, outlet, thresholds)
+            except TraceLabelError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                await self._failed(spec, "windows", e)
                 continue
-            windows = list(spec.windows(outlet, thresholds))
-            if spec.driver is not None:
-                windows += await self._enumerate(spec, spec.driver, outlet, thresholds)
             for window in windows:
-                body = await self._mint(spec, "mint", spec.template, window.params)
-                if body is None:
+                try:
+                    body = await self._mint(spec, "mint", spec.template, window.params)
+                    if body is None:
+                        continue
+                    hits = spec.hits(body["rows"], window, thresholds, self.frame.ladder, outlet)
+                except TraceLabelError:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    await self._failed(spec, "hits", e)
                     continue
-                for hit in spec.hits(body["rows"], window, thresholds, self.frame.ladder, outlet):
-                    await self._finding(spec, outlet, window, body, hit)
+                for hit in hits:
+                    try:
+                        await self._finding(spec, outlet, window, body, hit, thresholds)
+                    except TraceLabelError:
+                        raise
+                    except Exception as e:  # noqa: BLE001
+                        await self._failed(spec, "finding", e)
 
     async def _mint(self, spec: DetectorSpec, where: str, template: str, params: dict[str, Any]) -> dict[str, Any] | None:
         try:
@@ -177,11 +218,13 @@ class WatchRun:
                 ids.append(v)
         return [driver.window(i, outlet, thresholds) for i in ids]
 
-    async def _finding(self, spec: DetectorSpec, outlet: OutletFrame, window: Window, snap: dict[str, Any], hit: Hit) -> None:
+    async def _finding(
+        self, spec: DetectorSpec, outlet: OutletFrame, window: Window, snap: dict[str, Any], hit: Hit, thresholds: Thresholds
+    ) -> None:
         i = hit.row
         row = snap["rows"][i]
         sid = snap["snapshot_id"]
-        dedupe = f"{spec.id}:{spec.dedupe(row, window)}"
+        dedupe = f"{spec.id}:{hit.key if hit.key is not None else spec.dedupe(row, window)}"
         severity = hit.severity
         base = {
             "pack": spec.pack,
@@ -191,7 +234,7 @@ class WatchRun:
             "dedupe_key": dedupe,
         }
         envelope = {
-            "segments": template_segments(spec, sid, i, hit.impact_row),
+            "segments": template_segments(spec, sid, i, hit.impact_row, spec.narration_of(row)),
             "impact_ref": snap_ref(sid, hit.impact_row, spec.impact_column),
             "abstained": False,
         }
@@ -208,10 +251,15 @@ class WatchRun:
         if self.llm is not None and severity in NARRATE_AT and res.outcome == "stored":
             await self._narrate(self.llm, spec, severity, snap, hit, base, envelope, dedupe)
         if spec.mapping is not None:
-            d = Detection(sid, i, row, outlet, self.frame.currency, dict(window.params), snap["rows"], finding_id)
-            follow = await self._follow_ups(spec, d)
-            if follow is not None:
-                await self._draft(spec, spec.mapping, replace(d, follow=follow), finding_id)
+            d = Detection(sid, i, row, outlet, self.frame.currency, dict(window.params), snap["rows"], finding_id, thresholds=thresholds)
+            try:
+                follow = await self._follow_ups(spec, d)
+                if follow is not None:
+                    await self._draft(spec, spec.mapping, replace(d, follow=follow), finding_id)
+            except TraceLabelError:
+                raise
+            except Exception as e:  # noqa: BLE001 — a mapping's defect costs its draft, never the finding or the sweep
+                await self._failed(spec, "mapping", e)
 
     async def _follow_ups(self, spec: DetectorSpec, d: Detection) -> dict[str, Minted] | None:
         """The mapping's extra snapshots by name; None when one could not be minted (no draft: a mapping never guesses
@@ -293,6 +341,8 @@ class WatchRun:
             self.report.drafts["abstained"] += 1
             await self.trace("abstain", spec.pack, {"detector": spec.id, "reason": reason})
             return
+        if spec.tenant_level and proposal.outlet_ids is None:
+            proposal = replace(proposal, outlet_ids=[])
         try:
             req = InternalDraftsRequest.model_validate(draft_body(spec.pack, finding_id, d, proposal))
         except ValidationError:

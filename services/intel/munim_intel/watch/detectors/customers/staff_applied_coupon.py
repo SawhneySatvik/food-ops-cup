@@ -48,6 +48,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="customers.staff_applied_coupon",
+        thresholds=("high_cash_share_bp_gt", "uses_gte", "uses_vs_outlet_median_bp_gte"),
         pack="customers",
         template="customers.staff_coupon_use",
         finding_type="customers.staff_applied_coupon",
@@ -57,7 +58,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "A staff member applied this coupon to {uses} orders with no customer on them this week, {cash_uses} of them "
+            "A staff member applied this coupon to {uses} orders with no customer on them in a week, {cash_uses} of them "
             "paid in cash, against a typical {outlet_median_uses} for a member: {discount_minor} in discounts."
         ),
     )

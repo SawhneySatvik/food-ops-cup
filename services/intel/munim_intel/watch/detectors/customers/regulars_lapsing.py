@@ -39,6 +39,7 @@ def dedupe(_: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="customers.regulars_lapsing",
+        thresholds=("at_risk_count_gte", "at_risk_share_bp_gte"),
         pack="customers",
         template="customers.churn_segments",
         finding_type="customers.regulars_lapsing",

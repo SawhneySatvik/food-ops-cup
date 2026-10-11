@@ -21,11 +21,8 @@ from munim_intel.watch.detectors.catalogue.drafts import FOLLOW_MARGIN, price_dr
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
-    if "lookback_days" not in t:
-        # A pack without the lookback (before the orchestrator merges it) has nothing to mint: no window, no guess.
-        return []
     since = outlet.business_date - timedelta(days=t["lookback_days"])
-    return [Window({"outlet_id": outlet.id, "since": since.isoformat(), "as_of": None}, outlet.id)]
+    return [Window({"outlet_id": outlet.id, "since": since.isoformat(), "as_of": outlet.business_date.isoformat()}, outlet.id)]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -51,6 +48,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="catalogue.cost_drift",
+        thresholds=("cost_change_bp_gte", "cost_increase_minor_gte", "lookback_days"),
         pack="catalogue",
         template="catalogue.cost_drift",
         finding_type="catalogue.cost_drift",

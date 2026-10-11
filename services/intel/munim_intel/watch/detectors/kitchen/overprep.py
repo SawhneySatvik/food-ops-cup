@@ -38,6 +38,7 @@ def dedupe(_: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="kitchen.overprep",
+        thresholds=("overprep_minor_gte", "overprep_vs_median_bp_gte"),
         pack="kitchen",
         template="kitchen.remakes_overprep",
         finding_type="kitchen.overprep",
@@ -47,7 +48,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Food prepared and thrown away as over-prep this week came to {overprep_minor}, "
+            "Food prepared and thrown away as over-prep in a week came to {overprep_minor}, "
             "against a usual week of {median_overprep_minor}."
         ),
         watches=frozenset({MOVEMENT_RECORDED}),

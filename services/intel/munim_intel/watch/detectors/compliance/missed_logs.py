@@ -57,6 +57,7 @@ def fix_logs(d: Detection) -> Proposal | Abstain:
 SPEC = register(
     DetectorSpec(
         id="compliance.missed_logs",
+        thresholds=("coverage_bp_lt", "high_coverage_bp_lt", "window_days"),
         pack="compliance",
         template="compliance.log_coverage",
         finding_type="compliance.missed_logs",

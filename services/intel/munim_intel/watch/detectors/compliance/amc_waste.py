@@ -36,6 +36,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="compliance.amc_waste",
+        thresholds=("amc_waste_minor_gte", "window_days"),
         pack="compliance",
         template="compliance.asset_costs",
         finding_type="compliance.amc_waste",

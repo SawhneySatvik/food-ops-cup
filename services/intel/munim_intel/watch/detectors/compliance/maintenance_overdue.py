@@ -64,6 +64,7 @@ def schedule(d: Detection) -> Proposal:
 SPEC = register(
     DetectorSpec(
         id="compliance.maintenance_overdue",
+        thresholds=("preventive_overdue_days_gt",),
         pack="compliance",
         template="compliance.asset_costs",
         finding_type="compliance.maintenance_overdue",

@@ -25,7 +25,7 @@ _NOT_KEY = re.compile(r"[^a-z0-9_]+")
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
-    return [Window({"outlet_id": outlet.id, "days": t["days_ahead_lte"], "as_of": None}, outlet.id)]
+    return [Window({"outlet_id": outlet.id, "days": t["days_ahead_lte"], "as_of": outlet.business_date.isoformat()}, outlet.id)]
 
 
 def unreflected(row: Row, t: Thresholds) -> bool:
@@ -63,6 +63,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="market.event_ahead",
+        thresholds=("abs_uplift_bp_gte", "days_ahead_lte", "occurrences_gte", "unreflected_band_bp"),
         pack="market",
         template="market.upcoming",
         finding_type="market.event_ahead",

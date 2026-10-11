@@ -87,11 +87,13 @@ class Window:
 
 @dataclass(frozen=True)
 class Hit:
-    """One detection: the row that fired, the row holding its impact cell (the same row, or a Σ row), and its severity."""
+    """One detection: the row that fired, the row holding its impact cell (the same row, or a Σ row), and its severity.
+    `key`: the dedupe-key suffix when it needs rows other than the firing one (a set of orders); None → `spec.dedupe`."""
 
     row: int
     impact_row: int
     severity: Severity
+    key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -144,6 +146,18 @@ class DetectorSpec:
     driver: Driver | None = None
     #: Snapshots the mapping needs beyond the detection's own, minted after the finding is stored (see FollowUp).
     follow_ups: tuple[FollowUp, ...] = ()
+    #: The `detectors.<id>.thresholds` keys the detector reads (R-B S2-A). A pack missing one abstains the detector with
+    #: `no_pack_thresholds` before anything is minted, and the detector is handed only these keys, so reading another is
+    #: an error the sweep traces, never a silent default.
+    thresholds: tuple[str, ...] = ()
+    #: The template is tenant-wide (no outlet param): minted once per run, not once per outlet, and its drafts are
+    #: tenant-wide (`outlet_ids` [], owner-approved) — R-B S2-C. Runs only in a run over every outlet.
+    tenant_level: bool = False
+    #: A row whose narration differs (a licence that is missing has no date to cite): (row) -> the narration; None → `narration`.
+    narration_for: Callable[[Row], str] | None = None
+
+    def narration_of(self, row: Row) -> str:
+        return self.narration if self.narration_for is None else self.narration_for(row)
 
     def hits(self, rows: Sequence[Row], w: Window, t: Thresholds, ladder: Ladder, outlet: OutletFrame) -> list[Hit]:
         if self.select is not None:

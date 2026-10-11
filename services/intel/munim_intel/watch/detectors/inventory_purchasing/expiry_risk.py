@@ -17,7 +17,7 @@ from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity,
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
     days = max(t["days_to_expiry_lte"], t["sku_days_to_expiry_lte"])
-    return [Window({"outlet_id": outlet.id, "days": days, "as_of": None}, outlet.id)]
+    return [Window({"outlet_id": outlet.id, "days": days, "as_of": outlet.business_date.isoformat()}, outlet.id)]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -39,6 +39,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="inventory.expiry_risk",
+        thresholds=("at_risk_minor_gte", "days_to_expiry_lte", "sku_days_to_expiry_lte"),
         pack="inventory_purchasing",
         template="inventory.expiry_risk",
         finding_type="inventory.expiry_risk",

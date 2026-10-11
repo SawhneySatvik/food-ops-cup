@@ -48,6 +48,7 @@ def dedupe(_row: Row, w: Window) -> str:
 
 SPEC = DetectorSpec(
     id="inventory.shrinkage",
+    thresholds=("loss_minor_gte", "loss_share_bp_gte", "window_days"),
     pack="inventory_purchasing",
     template="inventory.shrinkage",
     finding_type="inventory.shrinkage",

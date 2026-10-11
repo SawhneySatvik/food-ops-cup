@@ -48,6 +48,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="inventory.waste_spike",
+        thresholds=("excess_minor_gte", "waste_vs_median_bp_gte"),
         pack="inventory_purchasing",
         template="inventory.waste_week",
         finding_type="inventory.waste_spike",

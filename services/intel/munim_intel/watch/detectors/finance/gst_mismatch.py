@@ -39,6 +39,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="finance.gst_mismatch",
+        thresholds=("abs_diff_minor_gte",),
         pack="finance",
         template="finance.gst_check",
         finding_type="tax.gst_mismatch",

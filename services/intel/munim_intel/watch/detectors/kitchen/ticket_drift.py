@@ -52,6 +52,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="kitchen.ticket_drift",
+        thresholds=("drift_bp_gte", "load_ratio_bp_lt", "medium_p80_gap_sec_gte", "tickets_now_gte"),
         pack="kitchen",
         template="kitchen.ticket_drift",
         finding_type="kitchen.ticket_drift",
@@ -62,7 +63,7 @@ SPEC = register(
         dedupe=dedupe,
         narration=(
             "Slow tickets at this station in this slot now take {p80_now_sec} seconds against {p80_base_sec} in the weeks "
-            "before, on a similar load; late refunds and cancellations this week came to {late_loss_minor}."
+            "before, on a similar load; late refunds and cancellations that week came to {late_loss_minor}."
         ),
         watches=frozenset({TICKET_ADVANCED}),
         outlet_kinds=KITCHENS,

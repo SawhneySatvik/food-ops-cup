@@ -13,8 +13,6 @@ from munim_intel.watch.detectors.catalogue.windows import rolling
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
-    if "window_days" not in t:
-        return []  # see cost_drift: no window without the pack's key
     w = rolling(outlet, t["window_days"])
     return [Window(w.params, outlet.id)]
 
@@ -35,6 +33,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="catalogue.below_cost",
+        thresholds=("below_cost_minor_gt", "window_days"),
         pack="catalogue",
         template="catalogue.sku_price_check",
         finding_type="catalogue.below_cost",

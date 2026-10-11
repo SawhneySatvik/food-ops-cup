@@ -12,7 +12,9 @@ from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity,
 
 
 def windows(outlet: OutletFrame, t: Thresholds) -> list[Window]:
-    return [Window({"outlet_id": outlet.id, "days": t["days"], "as_of": None}, outlet.business_date.isoformat()[:7])]
+    return [
+        Window({"outlet_id": outlet.id, "days": t["days"], "as_of": outlet.business_date.isoformat()}, outlet.business_date.isoformat()[:7])
+    ]
 
 
 def fires(row: Row, t: Thresholds) -> bool:
@@ -31,6 +33,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="inventory.dead_stock",
+        thresholds=("days", "medium_value_minor_gte", "value_minor_gte"),
         pack="inventory_purchasing",
         template="inventory.dead_stock",
         finding_type="inventory.dead_stock",

@@ -16,20 +16,23 @@ from munim_intel.mapping import Abstain, Detection, Proposal
 TASK = "goals.task.create.v1"
 
 
-def task(d: Detection, title_key: str, measure: str, due_on: date) -> Proposal | Abstain:
+def task(d: Detection, title_key: str, measure: str, due_on: date, *, tenant_wide: bool = False) -> Proposal | Abstain:
+    """`tenant_wide`: a business-wide task (a business-held licence) — no outlet, `outlet_ids` [], owner-approved."""
     manager = d.row.get("manager_member_id")
     if not isinstance(manager, str):
         return Abstain("assignee_missing")
+    outlet = None if tenant_wide else d.outlet.id
     return Proposal(
         command_type=TASK,
         payload={
-            "outlet_id": d.outlet.id,
+            "outlet_id": outlet,
             "title_key": title_key,
             "assignee_member_id": manager,
             "due_on": due_on.isoformat(),
             "finding_id": d.finding_id,
         },
         based_on=[d.ref("manager_member_id"), d.ref(measure)],
-        targets=[d.outlet.id, manager],
+        targets=[manager] if outlet is None else [outlet, manager],
         minted=["task_id"],
+        outlet_ids=[] if tenant_wide else None,
     )

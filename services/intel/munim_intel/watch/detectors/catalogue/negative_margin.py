@@ -51,6 +51,7 @@ def draft(d: Detection) -> Proposal | None:
 SPEC = register(
     DetectorSpec(
         id="catalogue.negative_margin",
+        thresholds=("high_units_rank_lte", "margin_minor_lt", "units_sold_gte", "window_days"),
         pack="catalogue",
         template="catalogue.dish_margin",
         finding_type="catalogue.negative_margin",

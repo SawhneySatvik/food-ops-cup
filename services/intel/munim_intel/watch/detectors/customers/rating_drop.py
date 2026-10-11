@@ -41,6 +41,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="customers.rating_drop",
+        thresholds=("high_late_change_bp_gte", "rating_drop_x100_gte", "reviews_gte"),
         pack="customers",
         template="customers.review_trend",
         finding_type="customers.rating_drop",
@@ -50,7 +51,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "This week's {reviews} reviews average {avg_rating_x100} against {mean_8w_x100} over the weeks before; "
+            "The {reviews} reviews of week {iso_week} average {avg_rating_x100} against {mean_8w_x100} over the weeks before; "
             "late kitchen tickets that week moved by {late_change_bp} against their usual level."
         ),
     )

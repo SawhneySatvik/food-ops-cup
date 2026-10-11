@@ -128,7 +128,11 @@ def test_m2_competitor_undercut_on_a_fixture_with_hand_values() -> None:
     (f,) = core.findings
     assert f.dedupe_key == f"market.competitor_undercut:{OUTLET}:{ITEM}:2026-10"
     assert f.envelope.impact_ref is not None and f.envelope.impact_ref.root.endswith("·gap_exposure_minor⟩")
-    assert core.minted[0].model_dump(mode="json")["params"] == {"outlet_id": OUTLET, "days": 30, "as_of": None}  # 0022 v2: null = today
+    assert core.minted[0].model_dump(mode="json")["params"] == {
+        "outlet_id": OUTLET,
+        "days": 30,
+        "as_of": "2026-10-10",
+    }  # the run-frame date, never core's clock
 
 
 def progress(target: int, actual: int, elapsed_bp: int, pace_bp: int, miss: int) -> dict[str, Any]:
@@ -165,7 +169,7 @@ def test_m3_goal_off_track_on_a_fixture_with_hand_values() -> None:
     assert f.envelope.impact_ref is not None and f.envelope.impact_ref.root.endswith("·projected_miss_value⟩")
     assert [(m.template_id, m.model_dump(mode="json")["params"]) for m in core.minted] == [
         ("market.goals", {"outlet_id": OUTLET}),
-        ("market.goal_progress", {"goal_id": GOAL, "as_of": None}),
+        ("market.goal_progress", {"goal_id": GOAL, "as_of": "2026-10-10"}),
     ]
 
 

@@ -7,6 +7,7 @@
 //   {"op":"frame","world","narration"}                  → the tenant's pack document + outlets, as run-frame would give
 //   {"op":"id","world","key"}                           → worldgen's seed id for a key (e.g. "outlet:1")
 //   {"op":"approve_held","world","filename"}            → the owner approves the held import of that file: {"status"}
+//   {"op":"approve_draft","world","draft_id","command_type"} → the owner approves that draft as proposed: {"status","body"}
 //   {"op":"sql","q","params"}                           → rows ([] for a multi-statement script), as the cluster superuser
 //   {"op":"stop"}
 //   node services/intel/tests/packs/finance/finance_stack.mts <days> <world>...
@@ -102,6 +103,14 @@ async function main() {
           draft_id: draft, command_type: "imports.run.commit.v1", edited_payload: null, reason: null,
         }, { params: { id: draft } });
         return { status: out.status };
+      }
+      if (m.op === "approve_draft") {
+        // R-B S1-C pairing: the owner approves an intel dispute draft through core's own route (never SQL).
+        const draft = m.draft_id as string;
+        const out = await apis[m.world as string]!.cmd("owner", "/v1/drafts/{id}:approve", "drafts.approve.v1", `fintel:approve:${draft}`, {
+          draft_id: draft, command_type: m.command_type as string, edited_payload: null, reason: null,
+        }, { params: { id: draft }, expect: [200, 201, 409, 422] });
+        return { status: out.status, body: out.body };
       }
       if (m.op === "id") return idOf(DEFAULT_SEED, m.world as string, m.key as string);
       if (m.op === "sql") {

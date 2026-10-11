@@ -41,6 +41,7 @@ def dedupe(row: Row, w: Window) -> str:
 SPEC = register(
     DetectorSpec(
         id="catalogue.deal_loss",
+        thresholds=("deal_loss_minor_gt", "orders_gte", "window_days"),
         pack="catalogue",
         template="catalogue.deal_cost",
         finding_type="catalogue.deal_loss",
