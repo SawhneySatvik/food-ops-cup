@@ -70,8 +70,8 @@ def expected_generated() -> int:
     """Independent count: MANIFEST.d proposal lines (23 after 0022) minus the five not-agent-exposed drafts (the two
     import-only ones, ADR-014 §5.1, the purchasing.invoice.record workflow draftable, and coupon.set and campaign.create
     by the R-B S1-B / S1-D ruling), plus the
-    db/tests/manifest.ts TEMPLATES list (94 entries after 0025: 83 after 0022, 15 of them "@2" rows, plus 0023's nine "@2"
-    rows, 0024's one "@3" row and 0025's one "@2" row; 68 distinct ids) minus the
+    db/tests/manifest.ts TEMPLATES list (96 entries after 0026: 83 after 0022, 15 of them "@2" rows, plus 0023's nine "@2"
+    rows, 0024's one "@3" row, 0025's one "@2" row and 0026's one "@2" and one "@3" row; 68 distinct ids) minus the
     operator template (platform.spend_by_tenant), the
     core-consumed `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1
     not-agent-exposed templates (hand list below): 68 - 1 - 3 - 4 = 60 reads, + (23 - 5) = 18 proposals = 78."""
@@ -83,10 +83,10 @@ def expected_generated() -> int:
     templates = sorted({e.split("@")[0] for e in entries})  # the tools bind the latest version of each id
     not_exposed = {"forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"}
     exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.") and t not in not_exposed]
-    # Cross-check literals: 94 entries - 25 "@2" rows (0025: investigation_cost_estimate v2) - 1 "@3" row (0024) = 68 ids;
-    # 68 - 8 = 60 reads; 23 proposal lines - 5 = 18.
-    assert (len(entries), len(templates), len(exposed), len(proposals)) == (94, 68, 60, 23)
-    assert len([e for e in entries if e.endswith("@2")]) == 25
+    # Cross-check literals: 96 entries - 26 "@2" rows (0025: investigation_cost_estimate v2; 0026: labour_vs_demand v2)
+    # - 2 "@3" rows (0024: settlement_vs_orders; 0026: deal_inputs) = 68 ids; 68 - 8 = 60 reads; 23 proposal lines - 5 = 18.
+    assert (len(entries), len(templates), len(exposed), len(proposals)) == (96, 68, 60, 23)
+    assert len([e for e in entries if e.endswith("@2")]) == 26
     return (len(proposals) - 5) + len(exposed)
 
 

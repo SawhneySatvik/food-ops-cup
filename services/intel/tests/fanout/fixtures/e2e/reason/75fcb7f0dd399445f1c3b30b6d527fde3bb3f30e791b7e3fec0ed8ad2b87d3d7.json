@@ -11,63 +11,6 @@
      }
     ],
     "role": "user"
-   },
-   {
-    "parts": [
-     {
-      "args": {
-       "from": "2026-10-04",
-       "outlet_id": null,
-       "page": 0,
-       "to": "2026-10-10"
-      },
-      "call": "read_people_labour_pct"
-     }
-    ],
-    "role": "model"
-   },
-   {
-    "parts": [
-     {
-      "data": {
-       "columns": [
-        "iso_week",
-        "labour_minor",
-        "net_sales_minor",
-        "labour_bp",
-        "target_bp",
-        "excess_labour_minor"
-       ],
-       "handle": "S2",
-       "next_page": null,
-       "row_count": 2,
-       "rows": [
-        {
-         "excess_labour_minor": 0,
-         "iso_week": "2026-W40",
-         "labour_bp": 1083,
-         "labour_minor": 361000,
-         "net_sales_minor": 3332200,
-         "row": "S2.r0",
-         "target_bp": null
-        },
-        {
-         "excess_labour_minor": 0,
-         "iso_week": "2026-W41",
-         "labour_bp": 1245,
-         "labour_minor": 1901000,
-         "net_sales_minor": 15267000,
-         "row": "S2.r1",
-         "target_bp": null
-        }
-       ],
-       "template_id": "people.labour_pct",
-       "truncated": false
-      },
-      "response": "read_people_labour_pct"
-     }
-    ],
-    "role": "user"
    }
   ],
   "model": "recorded/reason",
@@ -182,7 +125,7 @@
     }
    },
    {
-    "description": "Read snapshot template people.labour_vs_demand (columns: business_on, slot_start, attended_min, rostered_min, orders, forecast_orders, needed_min, excess_cost_minor). Returns a handle S<n> and up to 50 rows a page; cite a cell as {S<n>.r<i>.<column>} and pass id cells by their handle, never by value.",
+    "description": "Read snapshot template people.labour_vs_demand (columns: business_on, slot_start, attended_min, rostered_min, orders, forecast_orders, needed_min, excess_cost_minor, outlet_id, weekday, excess_min). Returns a handle S<n> and up to 50 rows a page; cite a cell as {S<n>.r<i>.<column>} and pass id cells by their handle, never by value.",
     "name": "read_people_labour_vs_demand",
     "parameters_json_schema": {
      "additionalProperties": false,
@@ -340,14 +283,12 @@
      {
       "function_call": {
        "args": {
-        "abstain": null,
-        "segments": [
-         {
-          "text": "Labour was {S2.r0.labour_bp} of sales against a target of {S2.r0.target_bp}."
-         }
-        ]
+        "from": "2026-10-04",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
        },
-       "name": "report"
+       "name": "read_people_labour_pct"
       }
      }
     ],

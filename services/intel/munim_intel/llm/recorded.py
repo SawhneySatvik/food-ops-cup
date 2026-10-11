@@ -23,6 +23,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel
 
+from munim_intel.trace.price import Price
+
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "recorded"
 
 _UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -102,6 +104,8 @@ class RecordedLlm(BaseLlm):
 
     model: str = "recorded"
     fixtures_dir: Path = FIXTURES_DIR
+    #: None → its spend rows are charged 0 (R47 D1: recorded mode has no operator price); a test may set one.
+    price: Price | None = None
     #: Fixture replays in this process (ADK may copy the instance, so the count is per class).
     calls: ClassVar[int] = 0
 

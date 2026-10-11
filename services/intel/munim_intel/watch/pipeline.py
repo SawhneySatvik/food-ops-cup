@@ -73,6 +73,12 @@ log = logging.getLogger("munim_intel.watch")
 #: findings; the "≤ 10 per tenant per day" cap needs a core-side count (reported, not built here).
 MAX_NARRATIONS = 10
 
+#: core's snapshot row cap (02-schema "minting": caps 500 rows; `runTemplate`'s LIMIT). Core does not say when it cut a
+#: snapshot, so a snapshot AT the cap may be missing its last rows — and templates put Σ rows first and order by day, so
+#: the cut drops the newest days. A detector never judges part of a window: it abstains `row_cap` (traced, no finding).
+#: Stopgap until core marks truncation itself.
+ROW_CAP = 500
+
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
@@ -185,6 +191,9 @@ class WatchRun:
                 try:
                     body = await self._mint(spec, "mint", spec.template, window.params)
                     if body is None:
+                        continue
+                    if body["row_count"] >= ROW_CAP:
+                        await self.trace("abstain", spec.pack, {"detector": spec.id, "reason": "row_cap"})
                         continue
                     hits = spec.hits(body["rows"], window, thresholds, self.frame.ladder, outlet)
                 except TraceLabelError:

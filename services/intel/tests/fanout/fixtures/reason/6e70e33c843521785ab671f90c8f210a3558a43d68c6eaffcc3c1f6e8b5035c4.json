@@ -1,0 +1,29 @@
+{
+ "agent": "munim_branch",
+ "pack": "people",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "from": "2026-10-04",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
+       },
+       "name": "read_people_labour_pct"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 48,
+    "prompt_token_count": 2975
+   }
+  }
+ ],
+ "step": 0
+}

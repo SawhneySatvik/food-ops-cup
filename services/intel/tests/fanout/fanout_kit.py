@@ -85,6 +85,7 @@ def frame(scope: str = "restaurant") -> InternalRunFrameResponse:
             "narration": "model",
             "licence_kinds": [],
             "payroll_scope": "drafts",
+            "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
         }
     )
 

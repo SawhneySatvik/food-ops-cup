@@ -125,4 +125,5 @@ async def quarantined_llm(role: Literal["extract", "vision"], cfg: Config, roles
     """The `extract` or `vision` role. Recorded mode replays this package's fixtures."""
     if cfg.model_mode == "recorded":
         return RecordedLlm(model=f"recorded/{role}", fixtures_dir=FIXTURES_DIR)
-    return await llm_for_role(role, cfg, roles)
+    # Extraction posts no spend rows today (reported, R47 D1): no currency to match; a role with no price is still refused.
+    return await llm_for_role(role, cfg, roles, currency=None)

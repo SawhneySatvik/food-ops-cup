@@ -11,7 +11,21 @@ from typing import Any
 
 import httpx
 
-from kit import NOT_SIMULATED, OUTLET, PUBLIC, SUPPLIER_IDS, TENANT, WORLD, FakeCore, StubChooser, build_app, llm, load_data, suppliers
+from kit import (
+    DEFAULT_POLICY,
+    NOT_SIMULATED,
+    OUTLET,
+    PUBLIC,
+    SUPPLIER_IDS,
+    TENANT,
+    WORLD,
+    FakeCore,
+    StubChooser,
+    build_app,
+    llm,
+    load_data,
+    suppliers,
+)
 from kit import no_fixture_misses as no_fixture_misses  # autouse: a missing recorded fixture fails the test
 from munim_intel.negotiate.port import A2aSuppliers, NotSimulated, Supplier, simulated_suppliers
 from munim_intel.negotiate.run import negotiate, negotiation_budget, rfq_from
@@ -45,7 +59,7 @@ def _negotiate(
 
     async def go() -> tuple[str | None, int, int, int]:
         core = FakeCore(WORLD["deal_inputs"], run_id=CTX.run_id)
-        state = RunState(traces=TraceBuffer(core.write_traces), budget=negotiation_budget(len(supplier_list)))
+        state = RunState(traces=TraceBuffer(core.write_traces), budget=negotiation_budget(len(supplier_list), DEFAULT_POLICY))
         w = WORLD["rfq"]
         rfq = rfq_from(core.shortfall().model_dump(mode="json"), 0, core.last_price().model_dump(mode="json"), 0, "latest_minor",
                        item_name=w["item_name"], unit=w["unit"], currency=w["currency"], minor_unit=w["minor_unit"],
@@ -56,7 +70,7 @@ def _negotiate(
             code = None
             try:
                 await negotiate(CTX, rfq, supplier_list, port=port, core=core, chooser=StubChooser(lambda _r, _l: None),
-                                extract_llm=llm("extract"), state=state)  # fmt: skip
+                                extract_llm=llm("extract"), state=state, policy=DEFAULT_POLICY)  # fmt: skip
             except NotSimulated as e:
                 code = e.code
         a2a = [e for e in state.traces.events if e.kind.startswith("a2a_")]

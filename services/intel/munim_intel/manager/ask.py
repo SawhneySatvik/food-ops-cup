@@ -8,7 +8,8 @@ No signature text ever leaves intel: core composes "{Specialist} · via Manager"
   2. AI off or the month's budget spent (run-frame `narration` ≠ model, the typed kill switch) → abstain model_blocked,
      no model call (rule 11: degrade, never error). The models are resolved only after these two exits (R-E 2-A): a role
      that cannot be built (no key, a retired id, model roles unreadable) is model_blocked too, never a 502;
-  3. route.intent → path (paths.py); `certification_request` → abstain not_a_certificate, no model call;
+  3. route.intent → path (paths.py); `certification_request` → abstain not_a_certificate, no model call; an unscored
+     unaddressed `investigate` is answered by the Manager alone, its envelope offering follow_up `dig_deeper` (R47 D5);
   4. otherwise one Manager LlmAgent (`munim`) over the T-082a assembler and PackToolset, ending in submit_answer.
 Every exit stores an answer: a run that ends without a submission (budget fallback, the assembler's cap, a provider
 error) stores an abstention, `missing_ref` — the generic "cannot verify" (§5.3).
@@ -45,9 +46,9 @@ from munim_intel.decide.mimic import router_decision_model
 from munim_intel.decide.port import Band, DecisionModel, DecisionState, EgressRefused, answer_or_fallback
 from munim_intel.decide.questions import ROUTE_INTENT
 from munim_intel.fanout.tool import Branches, FanOutTool, orchestrator_budget
-from munim_intel.llm import llm_for_role, provider_of
-from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused
-from munim_intel.manager.paths import FAN_OUT, PATHS, Binding, bind, not_applicable
+from munim_intel.llm import cause, llm_for_role, price_of, provider_of
+from munim_intel.llm.providers import PriceRefused, ProviderUnavailable, RetiredModelRefused
+from munim_intel.manager.paths import FAN_OUT, Binding, bind, not_applicable, path_for
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
@@ -71,12 +72,15 @@ class Models:
     reason: BaseLlm
 
 
-ModelsFactory = Callable[[InternalClient], Awaitable[Models]]
+#: (client, the run's spend currency) -> the models, each priced in that currency (R47 D1).
+ModelsFactory = Callable[[InternalClient, str], Awaitable[Models]]
 
 
 def default_models(cfg: Config) -> ModelsFactory:
-    async def build(client: InternalClient) -> Models:
-        return Models(await router_decision_model(cfg, client), await llm_for_role("reason", cfg, client))
+    async def build(client: InternalClient, currency: str) -> Models:
+        return Models(
+            await router_decision_model(cfg, client, currency=currency), await llm_for_role("reason", cfg, client, currency=currency)
+        )
 
     return build
 
@@ -117,7 +121,7 @@ async def route(
         return "explain", "low"
     if spend is not None:
         for usage in result.call_usage:
-            spend.add("router", result.provider, result.model_id, usage)
+            spend.add("router", result.provider, result.model_id, usage, result.price)
     return answer_or_fallback(ROUTE_INTENT, result) or "explain", result.band
 
 
@@ -184,11 +188,11 @@ async def answer_ask(
     thread_tainted = req.thread is not None and req.thread.tainted
     spend = SpendBuffer(client.write_spend, spend_currency(frame))
 
-    async def early(code: str, labels: dict[str, str | list[str]]) -> ThreadsIntelAskResponse:
+    async def early(code: str, labels: dict[str, str | list[str]], price: str | None = None) -> ThreadsIntelAskResponse:
         traces = TraceBuffer(client.write_traces)
         if labels:
             await traces.append("route", actor, labels)
-        await traces.append("abstain", actor, {"reason": code})
+        await traces.append("abstain", actor, {"reason": code} if price is None else {"reason": code, "price": price})
         await traces.flush()
         await spend.flush()
         return await _store(client, req, abstained(req, code), thread_tainted)
@@ -199,18 +203,22 @@ async def answer_ask(
         return await early("model_blocked", {})
     if not isinstance(models, Models):
         try:
-            models = await models(client)
+            models = await models(client, spend.currency)
         except (ProviderUnavailable, RetiredModelRefused, CoreError, httpx.HTTPError) as e:
-            # Rule 11: a model that cannot be built is AI unavailable for this ask — an abstention, never a 502.
-            log.warning("intel: ask run %s has no model: %s", ctx.run_id, type(e).__name__)
-            return await early("model_blocked", {})
+            # Rule 11: a model that cannot be built is AI unavailable for this ask — an abstention, never a 502. A price
+            # refusal (R47 D1) names its code on the abstain trace.
+            log.warning("intel: ask run %s has no model: %s", ctx.run_id, cause(e))
+            return await early("model_blocked", {}, e.code if isinstance(e, PriceRefused) else None)
     intent, band = await route(ctx, req.question, frame, models.decide, spend)
-    b = bind(PATHS[intent], req.addressed_to)
+    path, follow_up = path_for(intent, band, req.addressed_to, bool(req.deep))
+    b = bind(path, req.addressed_to)
     labels: dict[str, str | list[str]] = {"intent": intent, "band": band, "path": b.path.name}
+    if follow_up is not None:
+        labels["follow_up"] = follow_up
     if b.abstain is not None:
         return await early(b.abstain, labels)
 
-    meter = Meter(spend, "reason", provider_of(models.reason), models.reason.model)
+    meter = Meter(spend, "reason", provider_of(models.reason), models.reason.model, price_of(models.reason))
     p = prepare(ctx, req, frame, client, b, Branches(models.reason, cfg), meter)
     await p.state.traces.append("route", actor, labels)
     if b.skill is not None:
@@ -228,5 +236,7 @@ async def answer_ask(
         # Rule 11: the ask degrades to "cannot verify"; the failure's class name only, never its text.
         log.warning("intel: ask run %s failed: %s", ctx.run_id, e.kind)
     envelope = p.submit.envelope or abstained(req, NO_ANSWER)
+    if follow_up is not None:
+        envelope = envelope.model_copy(update={"follow_up": follow_up})
     await spend.flush()
     return await _store(client, req, envelope, p.state.tainted)

@@ -24,6 +24,7 @@ from munim_intel.decide.mimic import LlmMimic
 from munim_intel.decide.questions import ROUTE_INTENT
 from munim_intel.llm import llm_for_role
 from munim_intel.llm.providers import (
+    PriceRefused,
     ProviderUnavailable,
     RetiredModelRefused,
     TimedGemini,
@@ -34,6 +35,7 @@ from munim_intel.llm.providers import (
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.runner import RunFailed, run_agent
+from munim_intel.trace.price import Price
 
 
 def vid(n: int) -> str:
@@ -43,7 +45,15 @@ def vid(n: int) -> str:
 ROLES_0015 = Path(__file__).resolve().parents[1] / "fixtures" / "model_roles_0015.json"
 
 
-def row(provider: str, model_id: str, role: str = "router") -> PlatformModelRoleRow:
+#: R47 D1: the operator's price columns (0026). Unset = all three null.
+UNPRICED = {"input_price_per_mtok_minor": None, "output_price_per_mtok_minor": None, "price_currency": None}
+
+
+def priced(i: int, o: int, currency: str) -> dict[str, Any]:
+    return {"input_price_per_mtok_minor": i, "output_price_per_mtok_minor": o, "price_currency": currency}
+
+
+def row(provider: str, model_id: str, role: str = "router", price: dict[str, Any] = UNPRICED) -> PlatformModelRoleRow:
     return PlatformModelRoleRow.model_validate(
         {
             "role": role,
@@ -52,8 +62,15 @@ def row(provider: str, model_id: str, role: str = "router") -> PlatformModelRole
             "location": None,
             "probed_at": None,
             "updated_at": "2026-10-10T00:00:00Z",
+            **price,
         }
     )
+
+
+def roles_0015(price: dict[str, Any] = UNPRICED) -> PlatformModelRoles:
+    """0015's seeded roles as 0026 leaves them (every role unpriced), or each given `price`."""
+    rows = json.loads(ROLES_0015.read_text())["items"]
+    return PlatformModelRoles.model_validate({"items": [{**r, **price} for r in rows]})
 
 
 class Roles:
@@ -99,20 +116,66 @@ def test_openai_is_skipped_loudly_without_a_key_name(cfg: Config) -> None:
 
 def test_recorded_mode_never_asks_for_a_provider(cfg: Config) -> None:
     roles = Roles(None)
-    llm = asyncio.run(llm_for_role("router", cfg, roles))
+    llm = asyncio.run(llm_for_role("router", cfg, roles, currency="INR"))
     assert isinstance(llm, RecordedLlm) and llm.model == "recorded/router"
     assert roles.calls == 0
+    assert llm.price is None, "R47 D1: a replay has no operator price (charged 0)"
 
 
 def test_live_mode_reads_the_role_from_core(tmp_path: Path) -> None:
     live = load_config(env={"MUNIM_MODEL_MODE": "live", "MUNIM_RUN_DIR": str(tmp_path), "GEMINI_API_KEY": GEMINI_KEY})
-    roles = Roles(PlatformModelRoles.model_validate(json.loads(ROLES_0015.read_text())))
-    reason = asyncio.run(llm_for_role("reason", live, roles))
+    roles = Roles(roles_0015(priced(13_500, 67_500, "INR")))
+    reason = asyncio.run(llm_for_role("reason", live, roles, currency="INR"))
     assert isinstance(reason, Gemini) and reason.model == "gemini-3.8-flash"
     assert roles.calls == 1
-    retired = Roles(PlatformModelRoles(items=[row("gemini", "gemini-2.5-flash", "reason")]))
+    retired = Roles(PlatformModelRoles(items=[row("gemini", "gemini-2.5-flash", "reason", priced(1, 1, "INR"))]))
     with pytest.raises(RetiredModelRefused):
-        asyncio.run(llm_for_role("reason", live, retired))
+        asyncio.run(llm_for_role("reason", live, retired, currency="INR"))
+
+
+# -- R47 D1: operator prices -----------------------------------------------------------------------------------------
+
+
+def _no_builds(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Records every live model built: a refused role must be refused before one exists (so before any call)."""
+    built: list[str] = []
+    real = build_live_llm
+
+    def spy(r: PlatformModelRoleRow, c: Config, price: Price | None = None) -> Any:
+        built.append(r.role)
+        return real(r, c, price)
+
+    monkeypatch.setattr("munim_intel.llm.build_live_llm", spy)
+    return built
+
+
+def test_a_live_role_with_no_price_is_refused_before_any_model_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """R47 D1: 0015's roles as 0026 leaves them (no price) refuse live calls — `price_missing`, an unavailable provider,
+    before a model is built. Paired accept: the same role with a price is built and carries it."""
+    live = load_config(env={"MUNIM_MODEL_MODE": "live", "MUNIM_RUN_DIR": str(tmp_path), "GEMINI_API_KEY": GEMINI_KEY})
+    built = _no_builds(monkeypatch)
+    for role in ("router", "reason", "narrate"):
+        with pytest.raises(PriceRefused) as e:
+            asyncio.run(llm_for_role(role, live, Roles(roles_0015()), currency="INR"))
+        assert e.value.code == "price_missing" and isinstance(e.value, ProviderUnavailable)
+    assert built == []
+    reason = asyncio.run(llm_for_role("reason", live, Roles(roles_0015(priced(13_500, 67_500, "INR"))), currency="INR"))
+    assert built == ["reason"] and isinstance(reason, TimedGemini) and reason.price == Price(13_500, 67_500, "INR")
+
+
+def test_a_price_in_another_currency_than_the_runs_spend_is_refused_never_converted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R47 D1: no FX. A role priced in USD for a run that spends INR is refused (`price_currency_mismatch`) before a model
+    exists; paired accept: the same price for a run that spends USD."""
+    live = load_config(env={"MUNIM_MODEL_MODE": "live", "MUNIM_RUN_DIR": str(tmp_path), "GEMINI_API_KEY": GEMINI_KEY})
+    built = _no_builds(monkeypatch)
+    usd = Roles(roles_0015(priced(30, 250, "USD")))
+    with pytest.raises(PriceRefused) as e:
+        asyncio.run(llm_for_role("router", live, usd, currency="INR"))
+    assert e.value.code == "price_currency_mismatch" and built == []
+    router = asyncio.run(llm_for_role("router", live, usd, currency="USD"))
+    assert built == ["router"] and isinstance(router, TimedGemini) and router.price == Price(30, 250, "USD")
 
 
 # -- live call timeouts (W3 close ruling) ------------------------------------------------------------------------------

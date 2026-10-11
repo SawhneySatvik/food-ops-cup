@@ -1,10 +1,10 @@
 {
   "items": [
-    {"role": "router", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
-    {"role": "extract", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
-    {"role": "narrate", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
-    {"role": "reason", "provider": "gemini", "model_id": "gemini-3.8-flash", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
-    {"role": "vision", "provider": "gemini", "model_id": "gemini-3.8-flash", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
-    {"role": "embed", "provider": "gemini", "model_id": "gemini-embedding-001", "location": "global", "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"}
+    {"role": "router", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
+    {"role": "extract", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
+    {"role": "narrate", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
+    {"role": "reason", "provider": "gemini", "model_id": "gemini-3.8-flash", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
+    {"role": "vision", "provider": "gemini", "model_id": "gemini-3.8-flash", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"},
+    {"role": "embed", "provider": "gemini", "model_id": "gemini-embedding-001", "location": "global", "input_price_per_mtok_minor": null, "output_price_per_mtok_minor": null, "price_currency": null, "probed_at": null, "updated_at": "2026-10-10T00:00:00Z"}
   ]
 }

@@ -79,6 +79,7 @@ def frame(scope: str = "restaurant", narration: str = "model") -> InternalRunFra
             "narration": narration,
             "licence_kinds": [],
             "payroll_scope": "drafts",
+            "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
         }
     )
 
@@ -144,8 +145,10 @@ ROWS: dict[str, list[dict[str, Any]]] = {
 class FakeCore:
     """core's internal API in memory: every request intel sends is kept (raw bodies too, for the signature scan)."""
 
-    def __init__(self, run_frame: InternalRunFrameResponse | None = None) -> None:
+    def __init__(self, run_frame: InternalRunFrameResponse | None = None, model_roles: dict[str, Any] | None = None) -> None:
         self.run_frame = run_frame or frame()
+        #: `platform.model_role` as core serves it (live mode only reads it).
+        self.model_roles = model_roles
         self.minted: list[str] = []
         self.drafts: list[dict[str, Any]] = []
         self.answers: list[dict[str, Any]] = []
@@ -182,6 +185,8 @@ class FakeCore:
         path = request.url.path.removeprefix("/internal/intel/v1/")
         if request.method == "GET" and path == "run-frame":
             return httpx.Response(200, content=self.run_frame.model_dump_json())
+        if request.method == "GET" and path == "model-roles" and self.model_roles is not None:
+            return httpx.Response(200, json=self.model_roles)
         raw = request.content.decode()
         self.bodies.append(raw)
         body = json.loads(raw)
@@ -244,6 +249,7 @@ async def ask(
     tainted_thread: bool | None = None,
     scope: str = "restaurant",
     reason: BaseLlm | None = None,
+    deep: bool | None = None,
 ) -> tuple[ThreadsIntelAskResponse, FakeCore]:
     core = FakeCore(frame(scope))
     req = ThreadsIntelAskRequest.model_validate(
@@ -252,6 +258,7 @@ async def ask(
             "question": question,
             "addressed_to": addressed,
             "thread": None if tainted_thread is None else thread(tainted_thread).model_dump(mode="json"),
+            **({} if deep is None else {"deep": deep}),
         }
     )
     client = core.client()
@@ -291,6 +298,10 @@ KITCHEN = "@Kitchen why are tickets slow on Fridays?"
 PADDED = "  @Finance what did each channel make this month?"
 #: A pasted id: the egress check refuses to send it to the router, so the ask takes the explain fallback (no route fixture).
 EGRESS = f"Why was order {vid(60)} refunded?"
+#: R47 D5: an investigation the router picks without probabilities (band `unscored`: live Gemini rejects logprobs and the
+#: OpenAI-compatible routers return none, T-059) — the Manager answers alone and offers to dig deeper. Not in ROUTE: its
+#: route fixture carries no logprobs.
+UNSCORED_INVESTIGATE = "Look into why our delivery takings dropped this month"
 
 
 def call(name: str, args: dict[str, Any]) -> LlmResponse:
@@ -316,6 +327,11 @@ SCRIPTS: dict[str, list[LlmResponse]] = {
     KITCHEN: ABSTAIN,
     PADDED: ABSTAIN,
     EGRESS: ABSTAIN,
+    UNSCORED_INVESTIGATE: [
+        call("load_skill", {"pack": "finance"}),
+        call("read_finance_pnl", {"group_by": "channel", "period_month": "2026-10-01", "page": 0}),
+        call("submit_answer", {"segments": [{"text": "Net for {S1.r0.key} this month was {S1.r0.net_minor}."}], "abstain": None}),
+    ],
     LOOKUP_FINANCE: [
         call("read_finance_pnl", {"group_by": "channel", "period_month": "2026-10-01", "page": 0}),
         call("submit_answer", {"segments": [{"text": "Net for {S1.r0.key} this month was {S1.r0.net_minor}."}], "abstain": None}),
@@ -335,7 +351,10 @@ RUNS: list[tuple[str, str | None, bool | None, str]] = [
     (KITCHEN, "kitchen", None, "mixed"),
     (PADDED, "finance", None, "restaurant"),
     (EGRESS, None, None, "restaurant"),
+    (UNSCORED_INVESTIGATE, None, None, "restaurant"),
 ]
+#: R47 D5: the same unscored investigation after the member tapped "dig deeper" (`deep`): it binds `fan_out`.
+DEEP_RUNS: list[str] = [UNSCORED_INVESTIGATE]
 
 
 # -- recording -------------------------------------------------------------------------------------------------------
@@ -345,16 +364,16 @@ def _cand(token: str, p: float) -> types.LogprobsResultCandidate:
     return types.LogprobsResultCandidate(token=token, log_probability=math.log(p))
 
 
-def write_route(question: str, scope: str, code: str, p: float) -> None:
-    other = [c for c in "ABCDEF" if c != code][:2]
-    rest = 1 - p
-    top = [_cand(code, p), _cand(other[0], rest * 0.6), _cand(other[1], rest * 0.4)]
-    resp = LlmResponse(
-        content=types.Content(role="model", parts=[types.Part(text=code)]),
-        logprobs_result=types.LogprobsResult(
+def write_route(question: str, scope: str, code: str, p: float | None) -> None:
+    """`p` None: the answer comes with no logprobs (band `unscored`)."""
+    resp = LlmResponse(content=types.Content(role="model", parts=[types.Part(text=code)]))
+    if p is not None:
+        other = [c for c in "ABCDEF" if c != code][:2]
+        rest = 1 - p
+        top = [_cand(code, p), _cand(other[0], rest * 0.6), _cand(other[1], rest * 0.4)]
+        resp.logprobs_result = types.LogprobsResult(
             chosen_candidates=[_cand(code, p)], top_candidates=[types.LogprobsResultTopCandidates(candidates=top)]
-        ),
-    )
+        )
     state: DecisionState = {"question": question, "outlet_kinds": outlet_kinds(frame(scope)), "country": "IN"}
     req = build_request(Counted(model="recorded/router", fixtures_dir=DM_FIXTURES), ROUTE_INTENT, state)
     key, canonical, _ = request_key(req)
@@ -383,9 +402,12 @@ async def record() -> None:
             old.unlink()
     for question, scope, code, p in ROUTE:
         write_route(question, scope, code, p)
+    write_route(UNSCORED_INVESTIGATE, "restaurant", "C", None)
     for question, addressed, tainted, scope in RUNS:
         script = ScriptLlm(steps=[s.model_copy(deep=True) for s in SCRIPTS[question]])
         await ask(question, addressed=addressed, tainted_thread=tainted, scope=scope, reason=script)
+    for question in DEEP_RUNS:
+        await ask(question, reason=ScriptLlm(steps=[s.model_copy(deep=True) for s in SCRIPTS[question]]), deep=True)
     print(f"recorded {len(list(DM_FIXTURES.glob('*.json')))} route and {len(list(LLM_FIXTURES.glob('*.json')))} reason fixtures")
 
 

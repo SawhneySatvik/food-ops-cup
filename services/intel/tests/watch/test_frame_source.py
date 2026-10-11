@@ -33,6 +33,7 @@ BODY: dict[str, Any] = {
         {"code": "shop_only", "holder": "business", "outlet_kinds": ["store"], "unverified": True},
     ],
     "payroll_scope": "drafts",
+    "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
 }
 RUN, TENANT = "01920000-0000-7000-8000-0000000000r1", "01920000-0000-7000-8000-0000000000t1"
 CTX = RunContext(RUN, TENANT, ("*",), "watch_sweep", "watcher:sweep", 0, "tok.en.x")

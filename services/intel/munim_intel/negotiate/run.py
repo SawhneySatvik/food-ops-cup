@@ -64,12 +64,11 @@ class Core(Protocol):
     async def write_draft(self, req: InternalDraftsRequest) -> InternalDraftsResponse: ...
 
 
-def negotiation_budget(suppliers: int, policy: NegotiationPolicy | None = None) -> Budget:
+def negotiation_budget(suppliers: int, policy: NegotiationPolicy) -> Budget:
     """The run's model-call cap: one extraction per reply that carries a quote (each supplier's RFQ reply and one per
-    counter) plus one choice per decision round — 3 × (2 + 1) + 3 = 12 for three suppliers at the default policy. No
+    counter) plus one choice per decision round — 3 × (2 + 1) + 3 = 12 for three suppliers at two counters. No
     model-facing tools run inside a negotiation (the chooser picks a typed move), so no tool calls."""
-    p = policy or NegotiationPolicy()
-    return Budget(max_model_calls=suppliers * (p.max_counters + 1) + p.decision_rounds, max_tool_calls=0)
+    return Budget(max_model_calls=suppliers * (policy.max_counters + 1) + policy.decision_rounds, max_tool_calls=0)
 
 
 @dataclass(frozen=True)
@@ -192,9 +191,9 @@ async def negotiate(
     chooser: Chooser,
     extract_llm: BaseLlm,
     state: RunState,
-    policy: NegotiationPolicy | None = None,
+    policy: NegotiationPolicy,
 ) -> Outcome:
-    policy = policy or NegotiationPolicy()
+    """`policy`: the owner's bounds (`policy_from(run_frame)`, R47 D7) — the same object `negotiation_budget` sized the run with."""
     # Simulated only, before any message or trace (R22; R-C F4): one supplier that fails refuses the whole run.
     for s in suppliers:
         await port.check(s)

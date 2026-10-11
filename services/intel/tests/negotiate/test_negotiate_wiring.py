@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from kit import WORLD, CountingLlm, run_s1, supplier_key
+from kit import DEFAULT_POLICY, WORLD, CountingLlm, run_s1, supplier_key
 from kit import no_fixture_misses as no_fixture_misses  # autouse: a missing recorded fixture fails the test
 from munim_intel.negotiate.policy import NegotiationPolicy
 from munim_intel.negotiate.run import negotiation_budget
@@ -22,18 +22,18 @@ RUN_ID = "0199a000-0000-7000-8000-00000000e0e0"
 
 def test_the_budget_is_twelve_model_calls_for_three_suppliers() -> None:
     # 3 suppliers × (2 counters + the RFQ reply) extractions + 3 decision rounds = 12; one counter: 3 × 2 + 2 = 8.
-    assert negotiation_budget(3).max_model_calls == 12
-    assert negotiation_budget(3, NegotiationPolicy(max_counters=1)).max_model_calls == 8
-    assert negotiation_budget(3).max_tool_calls == 0
+    assert negotiation_budget(3, DEFAULT_POLICY).max_model_calls == 12
+    assert negotiation_budget(3, NegotiationPolicy(9_500, 11_000, max_counters=1)).max_model_calls == 8
+    assert negotiation_budget(3, DEFAULT_POLICY).max_tool_calls == 0
 
 
 def test_a_third_counter_is_refused_at_config() -> None:
     """intel.supplier_quote CHECK (round BETWEEN 1 AND 3): the RFQ round plus at most two counters."""
     with pytest.raises(ValueError):
-        NegotiationPolicy(max_counters=3)
+        NegotiationPolicy(9_500, 11_000, max_counters=3)
     with pytest.raises(ValueError):
-        NegotiationPolicy(max_counters=-1)
-    assert NegotiationPolicy(max_counters=2).decision_rounds == 3
+        NegotiationPolicy(9_500, 11_000, max_counters=-1)
+    assert NegotiationPolicy(9_500, 11_000, max_counters=2).decision_rounds == 3
 
 
 def test_no_trace_carries_a_note_or_reply_text(tmp_path: Path) -> None:
@@ -78,7 +78,7 @@ def test_a_run_inside_that_budget_counters_reviews_and_traces_one_review_per_acc
     at 792) and stays inside the cap. Review traces: steady pass, premium pass, discounter fail moq_exceeds_need — ids
     and codes only (the contract's TraceReviewPayload)."""
     CountingLlm.log.clear()
-    r = asyncio.run(run_s1(tmp_path, max_model_calls=negotiation_budget(3).max_model_calls))
+    r = asyncio.run(run_s1(tmp_path, max_model_calls=negotiation_budget(3, DEFAULT_POLICY).max_model_calls))
     po = r.outcome.draft_request
     assert po is not None
     assert (supplier_key(po["payload"]["supplier_id"]), r.core.cell(po["payload"]["lines"][0]["unit_price_minor"])) == ("steady", 792)

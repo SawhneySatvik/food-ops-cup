@@ -74,7 +74,7 @@ async def test_one_recorded_model_call_words_every_item_and_each_is_signed(tmp_p
     async def spend_sink(req: InternalSpendRequest) -> None:
         spent.extend(req.entries)
 
-    state.meter = Meter(SpendBuffer(spend_sink, "INR"), "narrate", "gemini", "recorded/narrate")
+    state.meter = Meter(SpendBuffer(spend_sink, "INR"), "narrate", "gemini", "recorded/narrate", None)
     llm = Spy(model="recorded/narrate", fixtures_dir=FIXTURES, seen=[])
     sink, src = RecordingSink(), items()
     before = RecordedLlm.calls
@@ -85,7 +85,8 @@ async def test_one_recorded_model_call_words_every_item_and_each_is_signed(tmp_p
     got = texts(sink)
     assert got[0].startswith("Lapsed regulars are the biggest money at risk today ⟨snap:")
     # W3 close ruling (money): the one call is one `narrate` spend row, posted by the run's flush.
-    assert [(e.role, e.currency) for e in spent] == [("narrate", "INR")] and spent[0].amount_minor >= 1
+    # Recorded: no operator price (R47 D1) → 0, but the row and its tokens are posted.
+    assert [(e.role, e.currency, e.amount_minor) for e in spent] == [("narrate", "INR", 0)] and spent[0].input_tokens > 0
     assert got[2].endswith("A draft is ready for your decision. — Finance desk")  # item 3 has the one draft
     assert sum("A draft is ready" in t for t in got) == 1
     assert state.fired  # the plugin saw the call

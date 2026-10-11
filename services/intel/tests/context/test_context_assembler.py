@@ -86,6 +86,7 @@ def run_frame(code: str, currency: str, outlets: list[dict[str, Any]], payroll: 
             "narration": "model",
             "licence_kinds": [],
             "payroll_scope": payroll,
+            "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
         }
     )
 

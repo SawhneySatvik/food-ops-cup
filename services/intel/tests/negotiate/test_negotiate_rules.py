@@ -19,10 +19,24 @@ from a2a.client import A2ACardResolver
 from test_lockfile import lock_violations
 
 from conftest import REPO
-from kit import FIXTURES, KEYS, PUBLIC, SUPPLIER_IDS, WORLD, CountingLlm, Run, StubChooser, build_app, load_data, run_s1, supplier_key
+from kit import (
+    FIXTURES,
+    KEYS,
+    PUBLIC,
+    SUPPLIER_IDS,
+    WORLD,
+    CountingLlm,
+    Run,
+    StubChooser,
+    bounds_frame,
+    build_app,
+    load_data,
+    run_s1,
+    supplier_key,
+)
 from kit import no_fixture_misses as no_fixture_misses  # autouse: a missing recorded fixture fails the test
-from munim_intel.negotiate.policy import NegotiationPolicy
-from munim_intel.negotiate.review import review_quote
+from munim_intel.negotiate.policy import NegotiationPolicy, Options, options, policy_from
+from munim_intel.negotiate.review import best, review_quote
 
 EXPECT = WORLD["expected"]
 #: Hard rule 5, literal (never the code's own constant): cards carry the words, traces the slug (labels have no spaces).
@@ -118,13 +132,27 @@ def test_gate3_every_supplier_label_reads_simulated_supplier(tmp_path: Path) -> 
 
 def test_gate4_planted_accept_above_walk_away_becomes_walk(tmp_path: Path) -> None:
     # Walk-away 10500 bp = 840. Premium: 896 → (counter) 880 → (counter) 864 > 840 with both counters spent: only walk.
-    r = asyncio.run(run_s1(tmp_path, chooser=StubChooser(lambda _r, _l: "accept"), policy=NegotiationPolicy(walk_away_bp=10_500)))
+    r = asyncio.run(run_s1(tmp_path, chooser=StubChooser(lambda _r, _l: "accept"), policy=NegotiationPolicy(9_500, 10_500)))
     above = [d for d in r.outcome.decisions if d.chosen == "accept" and "accept" not in d.allowed and d.default == "walk"]
     kept = [d for d in r.outcome.decisions if d.chosen == "accept" and d.in_set]
     print(f"accept above walk-away -> {[d.move for d in above]}; in-set accepts kept {len(kept)}")
     assert len(above) == 1 and above[0].move == "walk" and not above[0].in_set
     assert supplier_key(above[0].supplier_id) == "premium" and above[0].round == 3
     assert kept and all(d.move == "accept" for d in kept)
+
+
+def test_d7_the_owners_bounds_from_the_run_frame_change_the_allowed_moves() -> None:
+    """Ledger R47 D7: target and walk-away are the owner's, read from core's run-frame, never intel constants. By hand, on a
+    reference of 10,000 and a supplier at 10,800 with no rival below and no counter yet:
+      core's default 9500 / 11000: 10,800 ≤ 11,000 → accept allowed; counter at the target 9,500 → default counter;
+      the owner's 9000 / 10500:    10,800 > 10,500 → accept refused; counter at the target 9,000 → default counter."""
+    default = policy_from(bounds_frame(9_500, 11_000))
+    owner = policy_from(bounds_frame(9_000, 10_500))
+    assert (owner.target_bp, owner.walk_away_bp) == (9_000, 10_500)
+    assert options(default, 10_000, 10_800, [], 0) == Options(("accept", "counter", "walk"), "counter", 9_500, 11_000)
+    assert options(owner, 10_000, 10_800, [], 0) == Options(("counter", "walk"), "counter", 9_000, 10_500)
+    # Paired: at 10,500 the owner's walk-away still admits accept (≤), one minor unit above it does not.
+    assert "accept" in options(owner, 10_000, 10_500, [], 0).allowed and "accept" not in options(owner, 10_000, 10_501, [], 0).allowed
 
 
 def test_gate4_planted_counter_after_max_rounds_becomes_default(tmp_path: Path) -> None:
@@ -205,8 +233,8 @@ def _compare(moq: int, qty: int) -> tuple[dict[str, Any], dict[str, Any]]:
     }
     d = WORLD["deal_inputs"]
     row = {"quote_total_minor": 15_840, "quote_payment_days": 15, "budget_left_minor": d["budget_left_minor"], "open_commit_qty_milli": 0,
-           "need_qty_milli": 20_000, "use_in_shelf_life_qty_milli": 30_000, "margin_at_quote_bp": 6_400, "margin_floor_bp": 6_000,
-           "min_payment_days": 7}  # fmt: skip
+           "need_qty_milli": 20_000, "use_in_shelf_life_qty_milli": 30_000, "margin_at_quote_bp": 6_400, "margin_rule_applies": True,
+           "margin_floor_bp": 6_000, "min_payment_days": 7}  # fmt: skip
     inputs = {"snapshot_id": did, "rows": [row]}
     return compare, inputs
 
@@ -220,6 +248,55 @@ def test_a_po_below_the_suppliers_minimum_order_fails_review() -> None:
     rule = {r.rule: r for r in below.checks}["minimum"]
     assert (rule.verdict, rule.reason_code) == ("fail", "moq_exceeds_need") and not below.passed
     assert met.passed
+
+
+def _shop(
+    margin_bp: int | None, applies: bool, *, total: int = 126_000, floor: int | None = 1_500
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Ledger R47 D3 on the store world's hand values (tools/worldgen/src/worlds/store.ts): Detergent 1 kg is a shelf SKU
+    no recipe uses, selling at 11,000 paise on both channels and last bought at 9,000; ST-S1 (answer key store.json): 10
+    on hand against a minimum of 24 → 14 short, 14 × 9,000 = 126,000. deal_inputs v3 margins it on its own selling price:
+    (11,000 − 9,000) / 11,000 = 1,818 bp. The floor (1,500) and payment terms are this test's own policy: the store world
+    sets no business policy. Need = the 14 short; nothing on order."""
+    sid, did = "0199a000-0000-7000-8000-00000000f011", "0199a000-0000-7000-8000-00000000f012"
+    compare = {
+        "snapshot_id": sid,
+        "rows": [{"quote_id": "q", "supplier_id": "s", "unit_price_minor": 9_000, "qty_milli": 14_000, "min_order_qty_milli": 14_000}],
+    }
+    row = {"quote_total_minor": total, "quote_payment_days": 15, "budget_left_minor": 500_000, "open_commit_qty_milli": 0,
+           "need_qty_milli": 14_000, "use_in_shelf_life_qty_milli": 30_000, "margin_at_quote_bp": margin_bp,
+           "margin_rule_applies": applies, "margin_floor_bp": floor, "min_payment_days": 7}  # fmt: skip
+    return compare, {"snapshot_id": did, "rows": [row]}
+
+
+def _verdicts(compare: dict[str, Any], inputs: dict[str, Any]) -> dict[str, tuple[str, str | None]]:
+    return {c.rule: (c.verdict, c.reason_code) for c in review_quote(compare, 0, inputs).checks}
+
+
+def test_d3_a_shop_item_no_recipe_uses_passes_on_its_selling_price_margin() -> None:
+    """A shop PO can now pass: 1,818 bp from the selling price ≥ the 1,500 floor, every other rule passing → the best
+    quote. Paired refusals: v2's NULL margin for a no-recipe item (still `cost_price_missing` where the rule applies), and
+    the same margin under a 2,000 floor (`margin_below_floor`)."""
+    compare, inputs = _shop(1_818, True)
+    r = review_quote(compare, 0, inputs)
+    assert r.passed and best([r], compare) == r
+    assert _verdicts(*_shop(None, True))["margin"] == ("cannot_verify", "cost_price_missing")
+    compare, inputs = _shop(1_818, True, floor=2_000)
+    assert _verdicts(compare, inputs)["margin"] == ("fail", "margin_below_floor") and not review_quote(compare, 0, inputs).passed
+
+
+def test_d3_an_item_with_no_selling_price_skips_the_margin_rule_and_is_judged_on_the_rest() -> None:
+    """Packaging (no selling price): `margin_rule_applies` false → the margin rule is a pass coded `not_applicable`,
+    citing that cell, and the quote stands on need, budget and minimum order. Paired: the same item over budget
+    (600,000 > 500,000 left) still fails `budget_exceeded` — the skip waves nothing else through."""
+    compare, inputs = _shop(None, False)
+    r = review_quote(compare, 0, inputs)
+    margin = next(c for c in r.checks if c.rule == "margin")
+    assert r.passed and (margin.verdict, margin.reason_code) == ("pass", "not_applicable")
+    assert margin.refs == (f"⟨snap:{inputs['snapshot_id']}·0·margin_rule_applies⟩",)
+    compare, inputs = _shop(None, False, total=600_000)
+    over = review_quote(compare, 0, inputs)
+    assert over.refused is not None and (over.refused.rule, over.refused.reason_code) == ("budget", "budget_exceeded")
 
 
 def test_a_function_call_from_the_extractor_drops_that_reply_and_runs_nothing(tmp_path: Path) -> None:

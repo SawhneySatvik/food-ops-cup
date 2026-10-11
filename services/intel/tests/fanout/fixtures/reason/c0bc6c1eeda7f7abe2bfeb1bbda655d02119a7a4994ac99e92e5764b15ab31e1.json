@@ -8,8 +8,12 @@
      {
       "function_call": {
        "args": {
-        "abstain": "insufficient_history",
-        "segments": []
+        "abstain": null,
+        "segments": [
+         {
+          "text": "Labour was {S3.r0.labour_bp} of sales against a target of {S3.r0.target_bp}."
+         }
+        ]
        },
        "name": "report"
       }
@@ -18,10 +22,10 @@
     "role": "model"
    },
    "usage_metadata": {
-    "candidates_token_count": 37,
-    "prompt_token_count": 2972
+    "candidates_token_count": 57,
+    "prompt_token_count": 3203
    }
   }
  ],
- "step": 0
+ "step": 1
 }

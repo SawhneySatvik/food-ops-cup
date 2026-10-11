@@ -10,18 +10,12 @@ Usage is the provider's own count when it reports one; otherwise (a recorded rep
 input is estimated from the request's size at 3.5 characters a token (ADR-014 §6.1's estimate) and the row is still
 posted: an unreported call is never a free one.
 
-PRICES — UNVERIFIED, FOUNDER QUESTION (money). Neither core, the country packs nor `platform.model_role` holds a model
-price, so the rates below are a documented placeholder table, not a source of truth:
-  - per-token USD list prices from Google Cloud's "Vertex AI / Agent Platform pricing" page, fetched 9 Oct 2026
-    (global endpoint, text): gemini-3.5-flash-lite $0.30 in / $2.50 out per 1M tokens — the first of the two rows the
-    page lists for it (the other is $0.54 / $4.50; which tier applies is UNVERIFIED); gemini-3.8-flash $1.50 / $7.50 per
-    1M, the standard price from 1 Jan 2027 — the page's introductory $0.75 / $3.75 to 31 Dec 2026 is not used, so the cap
-    errs early, never late; gemini-embedding-001 $0.00015 per 1k input read as $0.15 per 1M tokens (unit UNVERIFIED);
-  - a model this table does not know is priced at its highest rate;
-  - USD → the budget currency at a fixed placeholder rate (₹90 and A$1.55 per US$, chosen, not sourced), never a live
-    FX feed; a currency with no rate raises (spend is never unpriced).
-Each call's amount is rounded UP to a whole minor unit (a small call never rounds to zero). Replace this table with an
-operator-set price per role (a `platform.model_role` column, migrator lane) before any real budget relies on it.
+PRICES (ledger R47 D1). The operator sets each role's price on `platform.model_role` (minor units of a currency per 1M input
+and per 1M output tokens, an approved config draft, R24); core serves it with the model roles and `llm_for_role` puts it
+on the model it builds. A live role with no price, or priced in a currency other than the run's spend currency, is
+refused before any call (`llm/__init__.py`): spend is never unpriced and never converted (no FX). A recorded replay
+carries no price and is charged 0 unless a test sets one — its rows are still posted, with their token counts. Each
+call's amount is rounded UP to a whole minor unit (a small priced call never rounds to zero).
 """
 
 from __future__ import annotations
@@ -37,24 +31,8 @@ from google.adk.models.llm_request import LlmRequest
 
 from munim_intel.contracts_gen.models import InternalRunFrameResponse, InternalSpendRequest
 from munim_intel.trace.buffer import uuid7
+from munim_intel.trace.price import Price
 
-#: Nano-USD per token (input, output). UNVERIFIED placeholders; see the module docstring.
-RATES_UNVERIFIED: dict[str, tuple[int, int]] = {
-    "gemini-3.5-flash-lite": (300, 2_500),
-    "gemini-3.8-flash": (1_500, 7_500),
-    "gemini-embedding-001": (150, 0),
-}
-#: A recorded replay stands in for its role's model of record (0015's platform.model_role seed).
-RECORDED_AS = {
-    "recorded/router": "gemini-3.5-flash-lite",
-    "recorded/extract": "gemini-3.5-flash-lite",
-    "recorded/narrate": "gemini-3.5-flash-lite",
-    "recorded/reason": "gemini-3.8-flash",
-    "recorded/vision": "gemini-3.8-flash",
-    "recorded/embed": "gemini-embedding-001",
-}
-#: Minor units of the budget currency per US dollar. UNVERIFIED placeholders (₹90, A$1.55); see the module docstring.
-MINOR_PER_USD_UNVERIFIED = {"INR": 9_000, "AUD": 155}
 #: core's per-call cap (contracts `SpendRequest.entries` max 100).
 BATCH_CAP = 100
 CHARS_PER_TOKEN = 3.5
@@ -68,21 +46,11 @@ class Usage:
     estimated: bool = False
 
 
-def rate(model_id: str) -> tuple[int, int]:
-    known = RATES_UNVERIFIED.get(RECORDED_AS.get(model_id, model_id))
-    if known is not None:
-        return known
-    return max(r[0] for r in RATES_UNVERIFIED.values()), max(r[1] for r in RATES_UNVERIFIED.values())
-
-
-def amount_minor(model_id: str, usage: Usage, currency: str) -> int:
-    """The call's cost in minor units of `currency`, rounded up. An unknown currency raises: spend is never unpriced."""
-    per_usd = MINOR_PER_USD_UNVERIFIED.get(currency)
-    if per_usd is None:
-        raise ValueError(f"no USD rate for currency {currency!r}")
-    rin, rout = rate(model_id)
-    nano_usd = usage.input_tokens * rin + usage.output_tokens * rout
-    return -(-nano_usd * per_usd // 1_000_000_000)
+def amount_minor(usage: Usage, price: Price | None) -> int:
+    """The call's cost in minor units of the price's currency, rounded up. No price (a recorded replay) → 0."""
+    if price is None:
+        return 0
+    return -(-(usage.input_tokens * price.input_per_mtok_minor + usage.output_tokens * price.output_per_mtok_minor) // 1_000_000)
 
 
 def estimate_input_tokens(req: LlmRequest) -> int:
@@ -118,7 +86,7 @@ class SpendBuffer:
     def entries(self) -> list[dict[str, Any]]:
         return list(self._entries)
 
-    def add(self, role: str, provider: str, model_id: str, usage: Usage) -> None:
+    def add(self, role: str, provider: str, model_id: str, usage: Usage, price: Price | None) -> None:
         self._entries.append(
             {
                 "id": uuid7(),
@@ -127,7 +95,7 @@ class SpendBuffer:
                 "model_id": model_id,
                 "input_tokens": usage.input_tokens,
                 "output_tokens": usage.output_tokens,
-                "amount_minor": amount_minor(model_id, usage, self.currency),
+                "amount_minor": amount_minor(usage, price),
                 "currency": self.currency,
             }
         )
@@ -143,12 +111,13 @@ class SpendBuffer:
 
 @dataclass(frozen=True)
 class Meter:
-    """What one context's model calls are charged as: its role, provider and model id, into the run's buffer."""
+    """What one context's model calls are charged as: its role, provider, model id and price, into the run's buffer."""
 
     buffer: SpendBuffer
     role: str
     provider: str
     model_id: str
+    price: Price | None
 
     def record(self, usage: Usage) -> None:
-        self.buffer.add(self.role, self.provider, self.model_id, usage)
+        self.buffer.add(self.role, self.provider, self.model_id, usage, self.price)

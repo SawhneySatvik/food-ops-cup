@@ -40,7 +40,7 @@ from munim_intel.config import Config, ConfigError
 from munim_intel.contracts_gen.models import Cloudevent, InvestigationsNarrateRequest, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
 from munim_intel.investigate import narrate_step
-from munim_intel.llm import llm_for_role, provider_of
+from munim_intel.llm import cause, llm_for_role, price_of, provider_of
 from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
@@ -49,7 +49,7 @@ from munim_intel.runtime.runner import RunFailed
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.smoke import smoke_run
 from munim_intel.trace.buffer import TraceBuffer
-from munim_intel.trace.spend import Meter, SpendBuffer
+from munim_intel.trace.spend import Meter, SpendBuffer, spend_currency
 from munim_intel.watch import sweep
 from munim_intel.watch.frame import Frame, FrameSource, core_frame_source
 from munim_intel.watch.pipeline import Report
@@ -83,8 +83,8 @@ def create_app(
     models_of = ask_models or default_models(cfg)
 
     # T-083: the investigation narration model (`narrate` role); a test may pass a recorded one of its own.
-    async def narrate_model(client: InternalClient) -> BaseLlm:
-        return await (narrate_llm(client) if narrate_llm else llm_for_role("narrate", cfg, client))
+    async def narrate_model(client: InternalClient, currency: str) -> BaseLlm:
+        return await (narrate_llm(client) if narrate_llm else llm_for_role("narrate", cfg, client, currency=currency))
 
     # Read lazily: core-api creates the key and the secret on its first start, which may follow intel's.
     def public_key() -> Ed25519PublicKey:
@@ -168,13 +168,13 @@ def create_app(
             llm: BaseLlm | None = None
             if frame.narration == "model":
                 try:
-                    llm = await llm_for_role("narrate", cfg, client)
+                    llm = await llm_for_role("narrate", cfg, client, currency=frame.spend_currency)
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
                     # Rule 11: AI surfaces degrade to the template, never to an error.
-                    log.warning("intel: run %s narrates by template: %s", ctx.run_id, type(e).__name__)
+                    log.warning("intel: run %s narrates by template: %s", ctx.run_id, cause(e))
             meter = None
             if llm is not None:
-                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model)
+                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model, price_of(llm))
             report = await work(client, frame, llm, meter)
         except (CoreError, httpx.HTTPError) as e:
             log.error("intel: watch run %s failed: %s", ctx.run_id, type(e).__name__)
@@ -206,9 +206,9 @@ def create_app(
             # A frame we cannot get means template wording, not an error (rule 11).
             if frame is not None and frame.narration == "model":
                 try:
-                    llm = await llm_for_role("narrate", cfg, client)
+                    llm = await llm_for_role("narrate", cfg, client, currency=frame.spend_currency)
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
-                    log.warning("intel: brief run %s words by template: %s", ctx.run_id, type(e).__name__)
+                    log.warning("intel: brief run %s words by template: %s", ctx.run_id, cause(e))
             items = [
                 BriefItem(
                     finding_id=i.finding_id.root,
@@ -224,7 +224,7 @@ def create_app(
             # One model call for the whole brief; run_agent flushes the traces and the call's spend row before it returns.
             meter = None
             if llm is not None and frame is not None:
-                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model)
+                meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model, price_of(llm))
             state = RunState(traces=TraceBuffer(client.write_traces), budget=Budget(max_model_calls=1, max_tool_calls=0), meter=meter)
             report = await compile_brief(items, CoreAnswerSink(client), ctx=ctx, llm=llm, cfg=cfg, state=state)
         except (CoreError, httpx.HTTPError) as e:
@@ -283,10 +283,10 @@ def create_app(
             llm: BaseLlm | None = None
             if frame is not None and frame.narration == "model":
                 try:
-                    llm = await narrate_model(client)
+                    llm = await narrate_model(client, spend_currency(frame))
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
                     # Rule 11: the step keeps its template narration.
-                    log.warning("intel: narrate run %s by template: %s", ctx.run_id, type(e).__name__)
+                    log.warning("intel: narrate run %s by template: %s", ctx.run_id, cause(e))
             out = await narrate_step(ctx, req, frame, client, cfg, llm)
         except (CoreError, httpx.HTTPError) as e:
             # Nothing usable was stored: core stores its template under the same answer id.

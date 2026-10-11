@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.price import Price
 from munim_intel.trace.spend import Usage
 
 Kind = Literal["choice", "score", "predicate"]
@@ -99,6 +100,8 @@ class DecisionResult:
     call_usage: tuple[Usage, ...] = ()
     #: The provider the spend rows name (`gemini` for a recorded replay).
     provider: str = "gemini"
+    #: The router role's operator price the spend rows are charged at (R47 D1); None for a replay → 0.
+    price: Price | None = None
 
 
 class DecisionModel(Protocol):
@@ -163,6 +166,7 @@ def finish(
     model_calls: int = 1,
     call_usage: tuple[Usage, ...] = (),
     provider: str = "gemini",
+    price: Price | None = None,
 ) -> DecisionResult:
     """Re-validate an adapter's raw output (§4.2): the answer must be an option and the probabilities a full
     distribution over the options; anything else is `decision_invalid`. No probabilities → band `unscored` when the
@@ -184,6 +188,7 @@ def finish(
             model_calls=model_calls,
             call_usage=call_usage,
             provider=provider,
+            price=price,
         )
 
     if error:

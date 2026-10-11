@@ -123,6 +123,10 @@ async def live_call(provider: str, role: str, model_id: str, cfg: Config) -> Cel
             "provider": provider,
             "model_id": model_id,
             "location": "global",
+            # The smoke probes reachability, not spend: no price (R47 D1); build_live_llm takes none outside a run.
+            "input_price_per_mtok_minor": None,
+            "output_price_per_mtok_minor": None,
+            "price_currency": None,
             "probed_at": None,
             "updated_at": "2026-10-10T00:00:00Z",
         }

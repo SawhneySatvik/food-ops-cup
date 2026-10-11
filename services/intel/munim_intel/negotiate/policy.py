@@ -3,7 +3,8 @@
 Each decision round, for each supplier still open, the rules compute the **allowed move set** and the **default move**;
 the counter price is the rule's (best rival, pack §6), never a model's. A chooser's answer outside the set — or none at
 all (budget, error) — becomes the default. Prices are basis points of the RFQ's reference price (the tenant's last
-supplier price), rounded half-up in integers.
+supplier price), rounded half-up in integers. The target and walk-away are the owner's (ledger R47 D7: business policy,
+served by core's run-frame, which applies the 9500 / 11000 default when the owner set none) — never an intel constant.
 
   accept   allowed when the supplier's latest price ≤ walk-away
   counter  allowed while the supplier has had fewer than `max_counters` counters, the run can still pay to read the
@@ -19,6 +20,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from munim_intel.contracts_gen.models import InternalRunFrameResponse
+
 Move = Literal["accept", "counter", "walk"]
 MOVES: tuple[Move, ...] = ("accept", "counter", "walk")
 
@@ -29,9 +32,9 @@ def bp_of(reference_minor: int, bp: int) -> int:
 
 @dataclass(frozen=True)
 class NegotiationPolicy:
-    #: INFERENCE (the pack names target and walk-away but gives no values): aim 5% under the last price, never above 10% over.
-    target_bp: int = 9_500
-    walk_away_bp: int = 11_000
+    #: The owner's bounds, basis points of the reference price: aim at the target, never pay above the walk-away.
+    target_bp: int
+    walk_away_bp: int
     #: Pack §6: ≤ 2 counter rounds. With the RFQ round, a supplier quotes at most 3 times (quote `round` 1..3).
     max_counters: int = 2
 
@@ -43,6 +46,11 @@ class NegotiationPolicy:
     @property
     def decision_rounds(self) -> int:
         return self.max_counters + 1
+
+
+def policy_from(frame: InternalRunFrameResponse) -> NegotiationPolicy:
+    """The run's business's policy: the owner's bounds as core served them on the run-frame (R47 D7)."""
+    return NegotiationPolicy(target_bp=frame.negotiation.target_bp, walk_away_bp=frame.negotiation.walkaway_bp)
 
 
 @dataclass(frozen=True)

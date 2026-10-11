@@ -33,6 +33,7 @@ from manager_kit import (
     ROUTE,
     SPECIALIST_NEEDED,
     TS,
+    UNSCORED_INVESTIGATE,
     UNSURE,
     Counted,
     FakeCore,
@@ -44,18 +45,20 @@ from manager_kit import (
     vid,
 )
 from munim_intel.app import create_app
-from munim_intel.config import Config
+from munim_intel.config import Config, load_config
 from munim_intel.contracts_gen.models import ThreadsIntelAskRequest
+from munim_intel.decide.mimic import LlmMimic
 from munim_intel.decide.questions import ROUTE_INTENT
-from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused
-from munim_intel.manager.ask import Models, answer_ask, prepare
-from munim_intel.manager.paths import PATHS, bind
+from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused, TimedGemini
+from munim_intel.manager.ask import Models, answer_ask, default_models, prepare
+from munim_intel.manager.paths import PATHS, bind, path_for
 from munim_intel.runtime.state import PACKS
 from munim_intel.skills import load_skill
 from munim_intel.tools.answer import SubmitAnswerTool
 from munim_intel.tools.generated import uuid7
 from munim_intel.tools.handles import HandleTable
 from munim_intel.tools.ontology import load_ontology
+from munim_intel.trace.price import Price
 
 #: ADR-014 §3.3 / 04 §2, by hand: route.intent → path. The low band falls back to explain (§4.3).
 HAND_PATHS = {
@@ -124,6 +127,68 @@ def test_a_question_the_egress_check_refuses_falls_back_to_explain_and_sends_not
     assert Counted.CALLS["recorded/router"] == 0 and len(core.answers) == 1
 
 
+# -- R47 D5: ask before fanning out -----------------------------------------------------------------------------------
+
+#: The scored investigation (ROUTE: code C at 0.83).
+SCORED_INVESTIGATE = "Dig into why our margin fell this month across all outlets"
+
+
+def declared(n: int) -> list[str]:
+    """The tool names the Manager's model was offered on its n-th call."""
+    return sorted(t["name"] for t in Counted.SEEN[n]["tools"])
+
+
+def test_an_unscored_investigate_answers_single_agent_and_offers_to_dig_deeper() -> None:
+    """Ledger R47 D5: route.intent says investigate with no probabilities (band `unscored`) → no `fan_out` on any of the
+    Manager's calls (it loads one skill, reads, answers alone) and the stored answer offers follow_up `dig_deeper`."""
+    out, core = run(UNSCORED_INVESTIGATE)
+    assert route_labels(core) == {"intent": "investigate", "band": "unscored", "path": "answer", "follow_up": "dig_deeper"}
+    assert len(Counted.SEEN) == 3 and all("fan_out" not in declared(n) for n in range(3))
+    assert "read_finance_pnl" in declared(2), "it answered alone, through the skill it loaded"
+    [answer] = core.answers
+    assert answer["envelope"]["abstained"] is False and answer["envelope"]["follow_up"] == "dig_deeper"
+    assert [t["actor"] for t in core.traces if t["kind"] == "subagent_start"] == ["manager"], "the Manager alone, no branch"
+
+
+def test_paired_an_unscored_investigate_the_member_asked_to_dig_deeper_fans_out() -> None:
+    """R47 D5, the offer tapped: the same unscored investigation with the member's `deep` binds `fan_out` (declared on
+    the Manager's first call) and offers nothing more."""
+    out, core = run(UNSCORED_INVESTIGATE, deep=True)
+    assert route_labels(core) == {"intent": "investigate", "band": "unscored", "path": "fan_out"}
+    assert "fan_out" in declared(0)
+    [answer] = core.answers
+    assert answer["envelope"]["follow_up"] is None
+
+
+def test_deep_widens_only_an_unaddressed_investigation() -> None:
+    """By hand from paths.py's table (R47 D5): `deep` changes the path of an unaddressed unscored `investigate` only."""
+    got = {
+        (intent, addressed): path_for(intent, "unscored", addressed, deep=True)
+        for intent in ("lookup", "explain", "investigate", "out_of_scope")
+        for addressed in (None, "finance")
+    }
+    assert {k: (p.name, f) for k, (p, f) in got.items()} == {
+        ("lookup", None): ("answer", None),
+        ("lookup", "finance"): ("answer", None),
+        ("explain", None): ("answer", None),
+        ("explain", "finance"): ("answer", None),
+        ("investigate", None): ("fan_out", None),
+        ("investigate", "finance"): ("fan_out", None),
+        ("out_of_scope", None): ("answer", None),
+        ("out_of_scope", "finance"): ("answer", None),
+    }
+    assert bind(path_for("investigate", "unscored", "finance", deep=True)[0], "finance").skill == "finance"  # still single agent
+
+
+def test_paired_a_scored_investigate_binds_fan_out_and_offers_nothing() -> None:
+    out, core = run(SCORED_INVESTIGATE)
+    labels = route_labels(core)
+    assert (labels["intent"], labels["path"], labels["band"] != "unscored") == ("investigate", "fan_out", True)
+    assert "follow_up" not in labels and "fan_out" in declared(0)
+    [answer] = core.answers
+    assert answer["envelope"]["follow_up"] is None
+
+
 # -- gate 2: propose_* only on draft_request with one skill ----------------------------------------------------------
 
 
@@ -150,7 +215,8 @@ def test_an_unaddressed_draft_request_abstains_specialist_needed_with_no_manager
     [question] = [q for q, _, code, _ in ROUTE if code == "D" and not q.startswith("@")]
     out, core = run(question)
     [answer] = core.answers
-    assert answer["envelope"] == {"answer_id": vid(80), "segments": [], "abstained": True, "reason_code": SPECIALIST_NEEDED}
+    want = {"answer_id": vid(80), "segments": [], "abstained": True, "reason_code": SPECIALIST_NEEDED, "follow_up": None}
+    assert answer["envelope"] == want
     assert Counted.CALLS["recorded/router"] == 1 and Counted.CALLS["recorded/reason"] == 0
     assert route_labels(core) == {"intent": "draft_request", "band": "high", "path": "draft"}
     assert core.minted == [] and core.drafts == [] and not [e for e in core.traces if e["kind"] == "skill_load"]
@@ -192,7 +258,8 @@ def test_the_scripted_draft_run_declares_propose_tools_to_the_model() -> None:
 def test_a_certification_request_abstains_not_a_certificate_with_zero_model_calls(question: str, addressed: str | None) -> None:
     out, core = run(question, addressed=addressed)
     [answer] = core.answers
-    assert answer["envelope"] == {"answer_id": vid(80), "segments": [], "abstained": True, "reason_code": "not_a_certificate"}
+    want = {"answer_id": vid(80), "segments": [], "abstained": True, "reason_code": "not_a_certificate", "follow_up": None}
+    assert answer["envelope"] == want
     assert Counted.CALLS["recorded/reason"] == 0 and Counted.CALLS["recorded/router"] == 1
     assert route_labels(core)["path"] == "certificate" and core.minted == [] and core.drafts == []
 
@@ -289,12 +356,61 @@ def test_ai_off_or_the_budget_spent_abstains_with_no_model_call() -> None:
     assert core.answers[0]["envelope"]["reason_code"] == "model_blocked" and sum(Counted.CALLS.values()) == 0
 
 
+def _roles(price: dict[str, Any]) -> dict[str, Any]:
+    """0015's two roles an ask uses, as core serves them after 0026, with `price` on each (R47 D1)."""
+    base = {"location": "global", "probed_at": None, "updated_at": "2026-10-10T00:00:00Z", **price}
+    return {
+        "items": [
+            {"role": "router", "provider": "gemini", "model_id": "gemini-3.5-flash-lite", **base},
+            {"role": "reason", "provider": "gemini", "model_id": "gemini-3.8-flash", **base},
+        ]
+    }
+
+
+UNPRICED = {"input_price_per_mtok_minor": None, "output_price_per_mtok_minor": None, "price_currency": None}
+
+
+@pytest.mark.parametrize(
+    ("price", "code"),
+    [
+        (UNPRICED, "price_missing"),
+        ({"input_price_per_mtok_minor": 30, "output_price_per_mtok_minor": 250, "price_currency": "USD"}, "price_currency_mismatch"),
+    ],
+)
+def test_live_an_unpriced_or_foreign_priced_role_is_a_model_blocked_abstention_before_any_call(
+    tmp_path: Any, price: dict[str, Any], code: str
+) -> None:
+    """R47 D1 on the ask path, live mode: the router has no operator price, or one in USD while the run spends INR (the
+    frame's currency) → a stored model_blocked abstention, its abstain trace naming the price code, no model built, so
+    no call and no spend row. Paired accept below: the same roles priced in INR build both models with their price."""
+    live = load_config(env={"MUNIM_MODEL_MODE": "live", "MUNIM_RUN_DIR": str(tmp_path), "GEMINI_API_KEY": "gemini-test-key-not-real-0001"})
+    core = FakeCore(model_roles=_roles(price))
+    req = ThreadsIntelAskRequest.model_validate({"answer_id": vid(80), "question": "q", "addressed_to": None, "thread": None})
+    asyncio.run(answer_ask(CTX, req, core.run_frame, core.client(), live, default_models(live)))
+    [answer] = core.answers
+    assert answer["envelope"]["reason_code"] == "model_blocked" and core.spend == []
+    assert [e["payload"] for e in core.traces if e["kind"] == "abstain"] == [{"reason": "model_blocked", "price": code}]
+
+
+def test_paired_live_roles_priced_in_the_runs_currency_build_both_models_with_their_price(tmp_path: Any) -> None:
+    live = load_config(env={"MUNIM_MODEL_MODE": "live", "MUNIM_RUN_DIR": str(tmp_path), "GEMINI_API_KEY": "gemini-test-key-not-real-0001"})
+    inr = {"input_price_per_mtok_minor": 2_700, "output_price_per_mtok_minor": 22_500, "price_currency": "INR"}
+    core = FakeCore(model_roles=_roles(inr))
+
+    async def build() -> Models:
+        return await default_models(live)(core.client(), "INR")
+
+    m = asyncio.run(build())
+    assert isinstance(m.reason, TimedGemini) and m.reason.price == Price(2_700, 22_500, "INR")
+    assert isinstance(m.decide, LlmMimic) and m.decide._llm.price == Price(2_700, 22_500, "INR")  # type: ignore[attr-defined]  # noqa: SLF001
+
+
 def app_client(config: Config, core: FakeCore, m: Models | None = None) -> TestClient:
     return TestClient(create_app(config, core_transport=core.transport, ask_models=_factory(m or models())))
 
 
 def _factory(m: Models) -> Any:
-    async def build(_: object) -> Models:
+    async def build(*_: object) -> Models:
         return m
 
     return build
@@ -324,7 +440,7 @@ def test_a_model_that_cannot_be_built_is_a_model_blocked_abstention_not_a_502(
     model_blocked abstention, 200 — on AI off and on AI on alike. Paired accept: the endpoint test above answers."""
     built: list[str] = []
 
-    async def unbuildable(_: object) -> Models:
+    async def unbuildable(*_: object) -> Models:
         built.append("called")
         raise error
 
@@ -403,6 +519,7 @@ def test_submit_answer_builds_refs_from_the_expansion_and_ends_the_run() -> None
         "segments": [{"text": f"Net was ⟨snap:{snap}·0·net_minor⟩.", "refs": [f"snap:{snap}"]}],
         "abstained": False,
         "reason_code": None,
+        "follow_up": None,
     }
     again, _ = submit(tool, ["Net was {S1.r0.net_minor}."])
     assert "error" in again, "first call wins"

@@ -1,16 +1,20 @@
 """Deterministic deal review and the PO draft (pack inventory-purchasing §6; 04 §6 steps 5–6; ledger R45 F4, R16).
 
-One `purchasing.deal_inputs` snapshot per final quote (minted by core), plus the negotiation's `purchasing.quote_compare`.
-Five rules, each `pass | fail(code, refs) | cannot_verify(code, refs)`; a quote passes when all five pass:
+One `purchasing.deal_inputs` snapshot (version 3, migration 0026) per final quote (minted by core), plus the negotiation's
+`purchasing.quote_compare`. Five rules, each `pass | fail(code, refs) | cannot_verify(code, refs)`; a quote passes when all
+five pass:
 
   1 budget    quote_total_minor > budget_left_minor             → fail budget_exceeded; no budget → cannot_verify budget_missing
-  2 margin    margin_at_quote_bp < margin_floor_bp              → fail margin_below_floor
+  2 margin    margin_at_quote_bp < margin_floor_bp              → fail margin_below_floor; skipped (a pass coded
+              `not_applicable`, citing the cell) when `margin_rule_applies` is false — ledger R47 D3: an item no recipe
+              uses is margined on its own selling price (v3's `margin_at_quote_bp`), and one with no selling price either
+              (packaging) is judged on need, budget and minimum order alone
   3 minimum   quote_compare.min_order_qty_milli > use_in_shelf_life_qty_milli, or > the quote's own qty_milli (the
               PO's quantity: an order below the supplier's minimum)  → fail moq_exceeds_need
   4 overlap   open_commit_qty_milli ≥ need_qty_milli            → fail open_commitment_overlap
   5 payment   quote_payment_days < min_payment_days             → fail payment_terms_worse
 
-A NULL margin is `cannot_verify cost_price_missing` (no priced dish uses the item); a NULL floor or minimum payment term
+A NULL margin where the rule applies is `cannot_verify cost_price_missing`; a NULL floor or minimum payment term
 (no business policy row) is `cannot_verify missing_ref` — the pack names no code for a missing policy (reported). A need
 of 0 (no forecast use of the item at the run's outlets — packaging used by no recipe, or no forecast) is `cannot_verify
 missing_ref` for the overlap rule: "open commitments cover a need of nothing" is not evidence of overlap (R-C F7).
@@ -81,6 +85,17 @@ def review_quote(compare: Mapping[str, Any], row: int, inputs: Mapping[str, Any]
 
     total, left = d["quote_total_minor"], d["budget_left_minor"]
     margin, floor = d["margin_at_quote_bp"], d["margin_floor_bp"]
+    margin_rule = (
+        check(
+            "margin",
+            [i("margin_at_quote_bp"), i("margin_floor_bp")],
+            "cost_price_missing" if margin is None else "missing_ref" if floor is None else None,
+            margin is not None and floor is not None and margin < floor,
+            "margin_below_floor",
+        )
+        if d["margin_rule_applies"]
+        else Check("margin", "pass", "not_applicable", (i("margin_rule_applies"),))
+    )
     moq, shelf = q["min_order_qty_milli"], d["use_in_shelf_life_qty_milli"]
     open_qty, need = d["open_commit_qty_milli"], d["need_qty_milli"]
     days, min_days = d["quote_payment_days"], d["min_payment_days"]
@@ -92,13 +107,7 @@ def review_quote(compare: Mapping[str, Any], row: int, inputs: Mapping[str, Any]
             left is not None and total > left,
             "budget_exceeded",
         ),
-        check(
-            "margin",
-            [i("margin_at_quote_bp"), i("margin_floor_bp")],
-            "cost_price_missing" if margin is None else "missing_ref" if floor is None else None,
-            margin is not None and floor is not None and margin < floor,
-            "margin_below_floor",
-        ),
+        margin_rule,
         check(
             "minimum",
             [c("min_order_qty_milli"), i("use_in_shelf_life_qty_milli"), c("qty_milli")],

@@ -93,7 +93,7 @@ class FakeCore:
         return out
 
 
-TEXT = {"station", "slot_start", "iso_week", "business_on"}
+TEXT = {"station", "slot_start", "iso_week", "business_on", "weekday"}
 
 
 def pack(code: str) -> dict[str, Any]:

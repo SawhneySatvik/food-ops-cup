@@ -37,7 +37,7 @@ from google.genai.errors import ClientError
 
 from munim_intel.config import Config
 from munim_intel.decide.port import DecisionQuestion, DecisionResult, DecisionState, egress_payload, finish
-from munim_intel.llm import ModelRoleSource, llm_for_role, provider_of
+from munim_intel.llm import ModelRoleSource, llm_for_role, price_of, provider_of
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
 from munim_intel.trace.spend import Usage, estimate_input_tokens
@@ -181,6 +181,7 @@ class LlmMimic:
                 model_calls=calls,
                 call_usage=tuple(usage),
                 provider=provider_of(self._llm),
+                price=price_of(self._llm),
             )
 
         if rejected and not q.use_unscored:
@@ -203,11 +204,12 @@ def _usage(req: LlmRequest, resp: LlmResponse | None) -> Usage:
     return Usage(u.prompt_token_count, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0))
 
 
-async def router_decision_model(cfg: Config, roles: ModelRoleSource) -> LlmMimic:
-    """The W3 decision model: the `router` role only (F2). Recorded mode replays `decide/fixtures/`."""
+async def router_decision_model(cfg: Config, roles: ModelRoleSource, *, currency: str) -> LlmMimic:
+    """The W3 decision model: the `router` role only (F2), priced in the run's spend `currency` (R47 D1: refused before
+    any call when the router has no price, or one in another currency). Recorded mode replays `decide/fixtures/`."""
     if cfg.model_mode == "recorded":
         return recorded_decision()
-    return LlmMimic(await llm_for_role("router", cfg, roles))
+    return LlmMimic(await llm_for_role("router", cfg, roles, currency=currency))
 
 
 def recorded_decision(fixtures_dir: Path = FIXTURES_DIR) -> LlmMimic:

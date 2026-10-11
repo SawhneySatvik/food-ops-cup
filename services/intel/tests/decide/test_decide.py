@@ -34,6 +34,7 @@ from munim_intel.llm.providers import build_live_llm
 from munim_intel.manager.ask import route
 from munim_intel.manager.paths import DRAFT, PATHS, bind
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.price import Price
 from munim_intel.trace.spend import SpendBuffer
 
 from .make_fixtures import PLANTED_LOW, PLANTED_MAP_NO_LOGPROBS, PLANTED_NO_LOGPROBS, PLANTED_OUT_OF_ENUM, POS_BILLS_HEADERS
@@ -202,15 +203,23 @@ def sockets(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 def live_router() -> LlmMimic:
     """A real Gemini client (fake key), so a request that got past the builder would try the network."""
     cfg = load_config(env={"GEMINI_API_KEY": "gemini-test-key-not-real-0001"})
-    row = PlatformModelRoleRow(
-        role="router",
-        provider="gemini",
-        model_id="gemini-3.5-flash-lite",
-        location="global",
-        probed_at=None,
-        updated_at="2026-10-10T00:00:00Z",
+    row = PlatformModelRoleRow.model_validate(
+        {
+            "role": "router",
+            "provider": "gemini",
+            "model_id": "gemini-3.5-flash-lite",
+            "location": "global",
+            "probed_at": None,
+            "updated_at": "2026-10-10T00:00:00Z",
+            **ROUTER_PRICE_COLUMNS,
+        }
     )
-    return LlmMimic(build_live_llm(row, cfg))
+    return LlmMimic(build_live_llm(row, cfg, ROUTER_PRICE))
+
+
+#: An operator's router price (R47 D1), typed by hand: ₹27 / ₹225 per 1M tokens, in paise.
+ROUTER_PRICE = Price(2_700, 22_500, "INR")
+ROUTER_PRICE_COLUMNS = {"input_price_per_mtok_minor": 2_700, "output_price_per_mtok_minor": 22_500, "price_currency": "INR"}
 
 
 PLANTS: list[tuple[DecisionQuestion, DecisionState, DecisionState, str]] = [
@@ -402,6 +411,7 @@ FRAME = InternalRunFrameResponse.model_validate(
         "narration": "model",
         "licence_kinds": [],
         "payroll_scope": "drafts",
+        "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
     }
 )
 
@@ -469,6 +479,8 @@ def test_both_calls_of_a_rejected_then_retried_route_are_spend_rows(monkeypatch:
     assert (intent, band, len(seen)) == ("draft_request", "unscored", 2)
     assert [(r["role"], r["provider"], r["model_id"]) for r in rows] == [("router", "gemini", "gemini-3.5-flash-lite")] * 2
     assert rows[0]["input_tokens"] > 0 and rows[1]["input_tokens"] == 247 and all(r["amount_minor"] >= 1 for r in rows)
+    # At the router's price (R47 D1), by hand: the retry's 247 prompt tokens × 2,700 / 1,000,000 = 0.67 → 1 paisa.
+    assert rows[1]["amount_minor"] == 1
 
 
 async def _no_sink(_: object) -> None:
@@ -507,14 +519,16 @@ def test_live_mode_uses_the_router_role_only() -> None:
 
     class Roles:
         async def model_roles(self) -> PlatformModelRoles:
-            return PlatformModelRoles.model_validate(rows)
+            # 0015's roles, each priced (R47 D1: an unpriced live role is refused — tests/test_models.py).
+            return PlatformModelRoles.model_validate({"items": [{**r, **ROUTER_PRICE_COLUMNS} for r in rows["items"]]})
 
     router_model = next(r["model_id"] for r in rows["items"] if r["role"] == "router")
     reason_model = next(r["model_id"] for r in rows["items"] if r["role"] == "reason")
     assert router_model != reason_model
     cfg = load_config(env={"MUNIM_MODEL_MODE": "live", "GEMINI_API_KEY": "gemini-test-key-not-real-0001"})
-    dm = asyncio.run(router_decision_model(cfg, Roles()))
+    dm = asyncio.run(router_decision_model(cfg, Roles(), currency="INR"))
     assert dm._llm.model == router_model  # noqa: SLF001
+    assert dm._llm.price == ROUTER_PRICE  # type: ignore[attr-defined]  # noqa: SLF001
 
 
 # --------------------------------------------------------------------------------- reflection over the registry (§4.4)

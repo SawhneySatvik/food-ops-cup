@@ -36,6 +36,7 @@ from munim_intel.contracts_gen.models import (
     InternalDraftsRequest,
     InternalDraftsResponse,
     InternalQuotesBatchRequest,
+    InternalRunFrameResponse,
     InternalSnapshotsRequest,
     InternalTracesBatchRequest,
     InternalTracesBatchResponse,
@@ -44,7 +45,7 @@ from munim_intel.contracts_gen.models import (
 from munim_intel.llm.recorded import RecordedFixtureMissing, RecordedLlm
 from munim_intel.mapping import SNAP_CLOSE, SNAP_OPEN
 from munim_intel.negotiate.chooser import LlmChooser, Pick, View
-from munim_intel.negotiate.policy import NegotiationPolicy
+from munim_intel.negotiate.policy import NegotiationPolicy, policy_from
 from munim_intel.negotiate.port import A2aSuppliers, Supplier
 from munim_intel.negotiate.run import Outcome, negotiate, rfq_from
 from munim_intel.runtime.context import RunContext
@@ -200,7 +201,7 @@ class FakeCore:
             rows = [{"quote_id": q["id"], **{c: q[c] for c in cols[1:]}} for _, q in order]
             return self._snapshot(req.template_id, p, [(c, "uuid" if c.endswith("_id") else "integer") for c in cols], rows)
         if req.template_id == "purchasing.deal_inputs":
-            # v2 (0022): `as_of` is a required named param.
+            # v2 (0022): `as_of` is a required named param. v3 (0026, R47 D3): `margin_rule_applies`.
             assert set(p) == {"quote_id", "as_of"}
             q = next(q for q in self.quotes if q["id"] == p["quote_id"])
             key = next(k for k, v in SUPPLIER_IDS.items() if v == q["supplier_id"])
@@ -213,10 +214,11 @@ class FakeCore:
                 "need_qty_milli": d["need_qty_milli"],
                 "use_in_shelf_life_qty_milli": d["use_in_shelf_life_qty_milli"],
                 "margin_at_quote_bp": d["margin_at_quote_bp"][key],
+                "margin_rule_applies": d["margin_rule_applies"],
                 "margin_floor_bp": d["margin_floor_bp"],
                 "min_payment_days": d["min_payment_days"],
             }
-            return self._snapshot(req.template_id, p, [(c, "integer") for c in row], [row])
+            return self._snapshot(req.template_id, p, [(c, "boolean" if c == "margin_rule_applies" else "integer") for c in row], [row])
         raise AssertionError(f"unexpected template {req.template_id}")
 
     def cell(self, ref: str) -> Any:
@@ -297,7 +299,7 @@ async def run_s1(
     budget = Budget(max_model_calls=14 if max_model_calls is None else max_model_calls)
     state = RunState(traces=TraceBuffer(core.write_traces), budget=budget)
     c = cfg(tmp)
-    policy = policy or NegotiationPolicy()
+    policy = policy or DEFAULT_POLICY
     if chooser is None:
         chooser = LlmChooser(
             llm("reason", fixtures),
@@ -336,6 +338,28 @@ async def run_s1(
             policy=policy,
         )
     return Run(outcome, core, state, ctx, chooser)
+
+
+def bounds_frame(target_bp: int, walkaway_bp: int) -> InternalRunFrameResponse:
+    """A run-frame as core serves it, carrying the owner's negotiation bounds (R47 D7); the rest is inert here."""
+    return InternalRunFrameResponse.model_validate(
+        {
+            "pack": {"code": "IN", "version": 3},
+            "currency": "INR",
+            "severity_ladder": {"critical_minor_gte": 5_000_000, "high_minor_gte": 1_000_000, "medium_minor_gte": 200_000},
+            "detectors": {},
+            "outlets": [],
+            "budget": None,
+            "narration": "model",
+            "negotiation": {"target_bp": target_bp, "walkaway_bp": walkaway_bp},
+            "licence_kinds": [],
+            "payroll_scope": "drafts",
+        }
+    )
+
+
+#: The bounds core serves when the owner set none (R47 D7: 95% / 110%; contracts tenancy NEGOTIATION_DEFAULTS).
+DEFAULT_POLICY = policy_from(bounds_frame(9_500, 11_000))
 
 
 def supplier_key(supplier_id: str) -> str:

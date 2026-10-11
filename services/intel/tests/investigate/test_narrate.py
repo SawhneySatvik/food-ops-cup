@@ -106,6 +106,7 @@ def frame(narration: str = "model") -> InternalRunFrameResponse:
             "narration": narration,
             "licence_kinds": [],
             "payroll_scope": "drafts",
+            "negotiation": {"target_bp": 9500, "walkaway_bp": 11000},
         }
     )
 
@@ -191,8 +192,10 @@ def test_one_call_no_tools_handles_not_values_and_untainted() -> None:
     assert answer["question"] == QUESTION and answer["envelope"]["abstained"] is False
     assert [seg["refs"] for seg in answer["envelope"]["segments"]] == [[f"snap:{S1}"], [f"snap:{S1}"], [f"snap:{S2}"]]
     assert {e["actor"] for e in core.traces} == {"specialist:finance"}
-    # W3 close ruling (money): the one call is one spend row, `narrate`, in the frame's currency.
-    assert [(e["role"], e["currency"]) for e in core.spend] == [("narrate", "INR")] and core.spend[0]["amount_minor"] >= 1
+    # W3 close ruling (money): the one call is one spend row, `narrate`, in the frame's currency — with its tokens, at 0:
+    # a replay has no operator price (R47 D1; priced arithmetic: tests/trace/test_spend.py).
+    assert [(e["role"], e["currency"], e["amount_minor"]) for e in core.spend] == [("narrate", "INR", 0)]
+    assert core.spend[0]["input_tokens"] > 0
 
 
 @pytest.mark.parametrize(

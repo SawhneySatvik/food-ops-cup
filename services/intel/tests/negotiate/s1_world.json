@@ -3,8 +3,9 @@
   "answer_key": {"source": "tools/worldgen/answer-key/restaurant_group.json", "id": "RG-S1", "short_pc": 20, "unit_cost_minor": 800},
   "rfq": {"item_name": "Takeaway boxes", "unit": "pc", "qty_milli": 20000, "reference_price_minor": 800, "currency": "INR",
           "minor_unit": 2, "needed_by": "2026-10-14"},
+  "_margin_rule_applies": "R47 D3 (deal_inputs v3, 0026): this hand world margins each quote over dishes that use the boxes, so the margin rule applies; tests/negotiate/test_negotiate_rules.py covers items it does not apply to.",
   "deal_inputs": {"budget_left_minor": 500000, "open_commit_qty_milli": 0, "need_qty_milli": 20000, "use_in_shelf_life_qty_milli": 30000,
-                  "margin_floor_bp": 6000, "min_payment_days": 7,
+                  "margin_floor_bp": 6000, "min_payment_days": 7, "margin_rule_applies": true,
                   "margin_at_quote_bp": {"steady": 6400, "discounter": 6500, "premium": 6300}},
   "expected": {
     "_worked": "Personalities (pack §6), reference 800: steady 10200 bp = 816, discounter 9000 bp = 720 (minimum order 3 x 20 = 60 pc in its terms), premium 11200 bp = 896. Policy: target 9500 bp = 760, walk-away 11000 bp = 880, 2 counters. Decision 1: steady counter at best rival 720; discounter has no rival below it and the target 760 is above 720, so no counter -> accept; premium 896 > 880 cannot be accepted -> counter at 720. Replies: steady 10050 bp = 804, premium 11000 bp = 880. Decision 2: counter both at 720. Replies: steady floor 9900 bp = 792, premium 10800 bp = 864. Decision 3: counters spent, both <= 880 -> accept. Review: discounter 60 pc > 30 pc usable before expiry -> moq_exceeds_need; steady 792 x 20 = 15840 <= 500000, margin 6400 >= 6000, open 0 < need 20000, 15 >= 7 days -> pass; premium 864 passes too. Best passing = lowest price = steady at 792.",

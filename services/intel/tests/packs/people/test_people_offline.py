@@ -121,19 +121,37 @@ def test_overtime_drift_ignores_rostered_long_shifts_p7() -> None:
     assert found(sweep(lambda t, _: rows if t == "people.overtime_drift" else []), "people.overtime_drift") == []
 
 
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
 def lvd(day: date, slot: str, attended: int, needed: int | None, excess: int | None) -> dict[str, Any]:
     return {"business_on": day.isoformat(), "slot_start": slot, "attended_min": attended, "rostered_min": attended, "orders": 4,
-            "forecast_orders": None, "needed_min": needed, "excess_cost_minor": excess}  # fmt: skip
+            "forecast_orders": None, "needed_min": needed, "excess_cost_minor": excess, "outlet_id": OUTLET,
+            "weekday": DAYS[day.weekday()]}  # fmt: skip
 
 
 TUESDAYS = [date(2026, 9, 1) + timedelta(weeks=k) for k in range(6)]  # the last six Tuesdays before Sat 10 Oct
 
 
-def p2_rows(over: int, needed: int = 120) -> list[dict[str, Any]]:
-    """Tuesday 15:00 on six Tuesdays: the last `over` staffed at 300 min against `needed` (2.5 ×), the rest at 150."""
+def lvd_sigma(excess: int, slot: str = "15:00", weekday: str = "tue") -> dict[str, Any]:
+    """labour_vs_demand v2's Σ row of one weekday-slot (0026, R47 D6: `business_on` NULL, that weekday-slot's window
+    totals), typed by hand."""
+    return {**lvd(TUESDAYS[0], slot, 0, 0, excess), "business_on": None, "orders": None, "weekday": weekday}
+
+
+#: Σ of the p2_rows(4) Tuesday 15:00 excess cells below, by hand: 4 × 24,000 + 2 × 4,000 = 104,000.
+P2_SIGMA = 104_000
+
+
+def p2_rows(over: int, needed: int = 120, sigma: int = P2_SIGMA) -> list[dict[str, Any]]:
+    """The Σ rows first (Tuesday 12:00 at index 0, Tuesday 15:00 at index 1), then Tuesday 15:00 on six Tuesdays
+    (indexes 2–7): the last `over` staffed at 300 min against `needed` (2.5 ×), the rest at 150."""
     return [
-        lvd(d, "15:00", 300, needed, 24_000) if i >= 6 - over else lvd(d, "15:00", 150, needed, 4_000) for i, d in enumerate(TUESDAYS)
-    ] + [lvd(TUESDAYS[-1], "12:00", 500, 0, 66_000)]  # a zero norm: never a staffing judgement
+        lvd_sigma(66_000, "12:00"),
+        lvd_sigma(sigma),
+        *(lvd(d, "15:00", 300, needed, 24_000) if i >= 6 - over else lvd(d, "15:00", 150, needed, 4_000) for i, d in enumerate(TUESDAYS)),
+        lvd(TUESDAYS[-1], "12:00", 500, 0, 66_000),  # a zero norm: never a staffing judgement
+    ]
 
 
 def serve_for(rows: list[dict[str, Any]]) -> Any:
@@ -145,14 +163,57 @@ def serve_for(rows: list[dict[str, Any]]) -> Any:
 def test_p2_fixture_overstaffed_slot_on_four_of_six_tuesdays() -> None:
     core = sweep(serve_for(p2_rows(4)))
     (f,) = found(core, "people.overstaffed_slot")
-    # Six-day Σ excess = 4 × 24,000 + 2 × 4,000 = 104,000; × 4.3 ÷ 6 = 74,533 → low. Latest qualifying row = 6 Oct (index 5).
-    assert (f["dedupe_key"], f["severity"], f["impact_row"]) == (f"people.overstaffed_slot:{OUTLET}:tue:15:00", "low", 5)
+    # The finding sits on the latest qualifying row (6 Oct, index 7) and its impact is its weekday-slot's Σ row (index 1,
+    # not Tuesday 12:00's at 0): 104,000 × 4.3 ÷ 6 = 74,533 → low (< 200,000).
+    assert (f["dedupe_key"], f["severity"], f["impact_row"]) == (f"people.overstaffed_slot:{OUTLET}:tue:15:00", "low", 1)
+    assert "·7·attended_min⟩" in f["envelope"]["segments"][0]["text"], "the narration cites the latest qualifying row"
     assert found(sweep(serve_for(p2_rows(3))), "people.overstaffed_slot") == []
     # Exactly 1.5 ×: 180 against 120 qualifies (≥); a zero or missing norm never does.
-    at_bar = [lvd(d, "15:00", 180, 120, 12_000) for d in TUESDAYS]
+    at_bar = [lvd_sigma(72_000), *(lvd(d, "15:00", 180, 120, 12_000) for d in TUESDAYS)]
     assert len(found(sweep(serve_for(at_bar)), "people.overstaffed_slot")) == 1
-    no_norm = [lvd(d, "15:00", 900, n, None) for d, n in zip(TUESDAYS, [0, None, 0, None, 0, 0], strict=True)]
+    no_norm = [lvd_sigma(0), *(lvd(d, "15:00", 900, n, None) for d, n in zip(TUESDAYS, [0, None, 0, None, 0, 0], strict=True))]
     assert found(sweep(serve_for(no_norm)), "people.overstaffed_slot") == []
+
+
+def test_p2_severity_is_the_sigma_cell_not_a_sum_of_slot_rows() -> None:
+    """R47 D6: the impact and the ladder read v2's Σ cell. Same slot rows, Σ typed at the medium bar's edge by hand:
+    279,070 × 4.3 ÷ 6 = 200,000.1 → medium (≥ 200,000); 279,069 → 199,999.4 → low."""
+    sev = [found(sweep(serve_for(p2_rows(4, sigma=s))), "people.overstaffed_slot")[0]["severity"] for s in (279_070, 279_069)]
+    assert sev == ["medium", "low"]
+
+
+def test_p2_each_overstaffed_weekday_slot_is_its_own_finding_on_its_own_sigma() -> None:
+    """R47 D6 (RG-P2's shape: Tuesday and Wednesday slots) and pack §4's dedupe `<outlet>:<weekday>:<slot>`: one finding
+    per qualifying weekday-slot, each on that slot's latest qualifying day with that slot's own Σ cell as its impact —
+    never one Σ claimed for another slot. Paired: a v1 snapshot (no Σ rows) with a qualifying slot is an error the sweep
+    traces, and no finding."""
+    wednesdays = [d + timedelta(days=1) for d in TUESDAYS]
+    rows = [*p2_rows(4), lvd_sigma(144_000, "16:00", "wed"), *(lvd(d, "16:00", 300, 120, 24_000) for d in wednesdays)]
+    got = sorted((f["dedupe_key"], f["impact_row"]) for f in found(sweep(serve_for(rows)), "people.overstaffed_slot"))
+    # Indexes by hand: p2_rows(4) is 9 rows (0–8), Wednesday 16:00's Σ row is 9.
+    assert got == [(f"people.overstaffed_slot:{OUTLET}:tue:15:00", 1), (f"people.overstaffed_slot:{OUTLET}:wed:16:00", 9)]
+    core = sweep(serve_for([r for r in rows if r["business_on"] is not None]))
+    assert found(core, "people.overstaffed_slot") == []
+    assert {"detector": "people.overstaffed_slot", "error": "detector_error", "type": "KeyError"}.items() <= next(
+        t["payload"] for t in core.traces if t["kind"] == "error"
+    ).items()
+
+
+def test_p2_a_snapshot_at_cores_500_row_cap_is_not_judged() -> None:
+    """02-schema "minting": core caps a snapshot at 500 rows without saying it cut one, and labour_vs_demand v2 puts its Σ
+    rows first, so a capped window may be missing its newest days. Paired by hand: the p2_rows(4) fixture padded with
+    quiet Monday 09:00 day rows (no need, never firing) to 499 rows still finds the slot; padded to 500 rows (the cap) it
+    abstains `row_cap`, traced, with no finding."""
+    pad = lvd(TUESDAYS[0] - timedelta(days=1), "09:00", 60, None, None)
+    out = {}
+    for n in (499, 500):
+        rows = [*p2_rows(4), *[pad] * (n - len(p2_rows(4)))]
+        core = sweep(serve_for(rows))
+        out[n] = (
+            len(found(core, "people.overstaffed_slot")),
+            [t["payload"] for t in core.traces if t["payload"].get("reason") == "row_cap"],
+        )
+    assert out == {499: (1, []), 500: (0, [{"detector": "people.overstaffed_slot", "reason": "row_cap"}])}
 
 
 def pct(week: str, labour_bp: int, target: int | None, excess: int) -> dict[str, Any]:

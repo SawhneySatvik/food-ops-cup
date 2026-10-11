@@ -3841,6 +3841,14 @@ class Budget(BaseModel):
     level: Literal['ok', 'hard']
 
 
+class Negotiation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    target_bp: Annotated[int, Field(ge=1, le=20000)]
+    walkaway_bp: Annotated[int, Field(ge=1, le=20000)]
+
+
 class LicenceKind(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4506,6 +4514,21 @@ class PlatformModelRole(BaseModel):
     role: Literal['router', 'reason', 'extract', 'narrate', 'vision', 'embed']
     provider: Literal['gemini', 'openai', 'openrouter', 'nvidia']
     model_id: Annotated[str, Field(pattern='^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$')]
+    input_price_per_mtok_minor: Annotated[int | None, Field(ge=0, le=9007199254740991)] = None
+    output_price_per_mtok_minor: Annotated[int | None, Field(ge=0, le=9007199254740991)] = None
+    price_currency: Annotated[str | None, Field(pattern='^[A-Z]{3}$')] = None
+
+
+class InputPricePerMtokMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class OutputPricePerMtokMinor(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class PriceCurrency(RootModel[str]):
+    root: Annotated[str, Field(pattern='^[A-Z]{3}$')]
 
 
 class PlatformConfigDraftApprove(BaseModel):
@@ -4621,6 +4644,7 @@ class AnswerEnvelope(BaseModel):
     segments: list[Segment]
     abstained: bool
     reason_code: ReasonCode | None = None
+    follow_up: Literal['dig_deeper'] | None = None
 
 
 class FindingEnvelope(BaseModel):
@@ -5336,6 +5360,10 @@ class TenancyPolicySetV1(BaseModel):
     ]
     labour_target_bp: Annotated[int | None, Field(ge=0, le=10000)] = None
     target_margin_bp: Annotated[int | None, Field(ge=0, le=10000)] = None
+    margin_floor_bp: Annotated[int | None, Field(ge=0, le=10000)] = None
+    min_payment_days: Annotated[int | None, Field(ge=0, le=365)] = None
+    negotiation_target_bp: Annotated[int | None, Field(ge=1, le=20000)] = None
+    negotiation_walkaway_bp: Annotated[int | None, Field(ge=1, le=20000)] = None
 
 
 class TenancyMemberBindV1(BaseModel):
@@ -5564,6 +5592,7 @@ class V1AskRequest(BaseModel):
     )
     question: Annotated[str, Field(max_length=2000, min_length=1)]
     thread_id: Uuid7 | None = None
+    deep: bool | None = None
 
 
 class Turn(BaseModel):
@@ -5732,6 +5761,7 @@ class ThreadsIntelAskRequest(BaseModel):
     question: Annotated[str, Field(max_length=2000, min_length=1)]
     addressed_to: Literal['catalogue', 'kitchen', 'inventory_purchasing', 'finance', 'people', 'customers', 'compliance', 'market'] | None
     thread: ThreadsBlock | None
+    deep: bool | None = None
 
 
 class ThreadsIntelAskResponse(BaseModel):
@@ -8960,6 +8990,7 @@ class InternalRunFrameResponse(BaseModel):
     outlets: list[Outlet]
     budget: Budget | None
     narration: Literal['model', 'template']
+    negotiation: Negotiation
     licence_kinds: list[LicenceKind]
     payroll_scope: Literal['drafts', 'roster_only']
 
@@ -10788,6 +10819,9 @@ class PlatformModelRoleRow(BaseModel):
     provider: Literal['gemini', 'openai', 'openrouter', 'nvidia']
     model_id: str
     location: str | None
+    input_price_per_mtok_minor: InputPricePerMtokMinor | None
+    output_price_per_mtok_minor: OutputPricePerMtokMinor | None
+    price_currency: PriceCurrency | None
     probed_at: IsoDatetime | None
     updated_at: IsoDatetime
 

@@ -11,7 +11,7 @@
         "abstain": null,
         "segments": [
          {
-          "text": "Labour was {S3.r0.labour_bp} of sales against a target of {S3.r0.target_bp}."
+          "text": "Labour was {S2.r0.labour_bp} of sales against a target of {S2.r0.target_bp}."
          }
         ]
        },
@@ -23,7 +23,7 @@
    },
    "usage_metadata": {
     "candidates_token_count": 57,
-    "prompt_token_count": 3187
+    "prompt_token_count": 3195
    }
   }
  ],

@@ -134,7 +134,8 @@ def test_every_model_call_of_a_fan_out_ask_is_one_spend_row() -> None:
     (fan_out, then the merge); each of its 3 branches 2 (its read, then report) = 9."""
     r = replay("Why was this week bad?")
     assert sorted(e["role"] for e in r.core.spend) == ["reason"] * 8 + ["router"]
-    assert len({e["id"] for e in r.core.spend}) == 9 and all(e["currency"] == "INR" and e["amount_minor"] >= 1 for e in r.core.spend)
+    # A replay has no operator price (R47 D1): each row is charged 0, never skipped (priced: tests/trace/test_spend.py).
+    assert len({e["id"] for e in r.core.spend}) == 9 and all(e["currency"] == "INR" and e["amount_minor"] == 0 for e in r.core.spend)
     # No usage in a recorded reply: each row's input is the request-size estimate, never zero.
     assert all(e["input_tokens"] > 0 for e in r.core.spend)
 

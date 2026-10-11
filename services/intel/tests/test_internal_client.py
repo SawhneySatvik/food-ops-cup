@@ -25,6 +25,9 @@ ROLES = {
             "provider": "gemini",
             "model_id": "gemini-3.5-flash-lite",
             "location": None,
+            "input_price_per_mtok_minor": 2_700,
+            "output_price_per_mtok_minor": 22_500,
+            "price_currency": "INR",
             "probed_at": None,
             "updated_at": "2026-10-10T00:00:00Z",
         }

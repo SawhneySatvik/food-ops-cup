@@ -1,7 +1,8 @@
-"""AI spend rows (W3 close ruling, R-E 1-C; munim_intel/trace/spend.py): one row per provider call, priced from the flagged
-placeholder table and rounded up, posted with the traces — on a failed run too — and never for a reply a callback made up.
+"""AI spend rows (W3 close ruling, R-E 1-C; munim_intel/trace/spend.py): one row per provider call, priced at the role's
+operator price (ledger R47 D1) and rounded up, posted with the traces — on a failed run too — and never for a reply a
+callback made up. A replay with no price is still a row, with its tokens, charged 0.
 
-Expected amounts are worked by hand from the module docstring's stated rates (nano-USD per token × minor units per USD).
+Expected amounts are worked by hand from the prices typed below (minor units per 1M tokens), never from the code.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.runner import RunFailed, run_agent
 from munim_intel.runtime.state import RunState
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.price import Price
 from munim_intel.trace.spend import Meter, SpendBuffer, Usage, amount_minor
 
 CTX = RunContext(
@@ -30,20 +32,20 @@ CTX = RunContext(
 )
 
 
-def test_amounts_by_hand_round_up_and_never_price_at_zero() -> None:
-    # gemini-3.8-flash: 1,500 in / 7,500 out nano-USD a token; INR 9,000 paise a dollar.
-    # 10,000 × 1,500 + 300 × 7,500 = 17,250,000 nUSD → × 9,000 / 1e9 = 155.25 → 156 paise.
-    assert amount_minor("gemini-3.8-flash", Usage(10_000, 300), "INR") == 156
-    # One token on flash-lite: 300 nUSD → 0.0027 paise → rounds UP to 1 (a small call is never free).
-    assert amount_minor("gemini-3.5-flash-lite", Usage(1, 0), "INR") == 1
-    # AUD: 155 cents a dollar. 10,000 × 1,500 nUSD = 0.015 USD → 2.325 cents → 3.
-    assert amount_minor("gemini-3.8-flash", Usage(10_000, 0), "AUD") == 3
-    # A recorded replay is priced as its role's model of record; an unknown model at the table's highest rate.
-    assert amount_minor("recorded/reason", Usage(10_000, 300), "INR") == 156
-    assert amount_minor("some-new-model", Usage(10_000, 300), "INR") == 156
-    assert amount_minor("anything", Usage(0, 0), "INR") == 0  # paired: no tokens, nothing charged
-    with pytest.raises(ValueError):
-        amount_minor("gemini-3.8-flash", Usage(1, 1), "EUR")
+#: An operator's price, typed by hand: ₹135 per 1M input and ₹675 per 1M output tokens, in paise.
+PRICE = Price(13_500, 67_500, "INR")
+
+
+def test_amounts_by_hand_from_the_operator_price_round_up() -> None:
+    # 10,000 × 13,500 + 300 × 67,500 = 135,000,000 + 20,250,000 = 155,250,000 / 1,000,000 = 155.25 → 156 paise.
+    assert amount_minor(Usage(10_000, 300), PRICE) == 156
+    # One input token: 13,500 / 1,000,000 = 0.0135 paise → rounds UP to 1 (a small priced call is never free).
+    assert amount_minor(Usage(1, 0), PRICE) == 1
+    # Another role's price in cents (A$0.50 / A$3.00 per 1M): 10,000 × 50 = 500,000 / 1,000,000 = 0.5 → 1 cent.
+    assert amount_minor(Usage(10_000, 0), Price(50, 300, "AUD")) == 1
+    assert amount_minor(Usage(0, 0), PRICE) == 0  # paired: no tokens, nothing charged
+    # A replay carries no price (R47 D1, recorded mode): 0, however many tokens.
+    assert amount_minor(Usage(10_000, 300), None) == 0
 
 
 class Usaged(BaseLlm):
@@ -63,7 +65,7 @@ class Usaged(BaseLlm):
         yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text="done")]), usage_metadata=usage)
 
 
-def run(mode: str, *, exhausted: bool = False) -> tuple[list[dict[str, Any]], RunState]:
+def run(mode: str, *, exhausted: bool = False, price: Price | None = PRICE) -> tuple[list[dict[str, Any]], RunState]:
     posted: list[dict[str, Any]] = []
 
     async def spend_sink(req: InternalSpendRequest) -> None:
@@ -72,7 +74,8 @@ def run(mode: str, *, exhausted: bool = False) -> tuple[list[dict[str, Any]], Ru
     async def trace_sink(_: Any) -> None:
         return None
 
-    state = RunState(traces=TraceBuffer(trace_sink), meter=Meter(SpendBuffer(spend_sink, "INR"), "reason", "gemini", "gemini-3.8-flash"))
+    meter = Meter(SpendBuffer(spend_sink, "INR"), "reason", "gemini", "gemini-3.8-flash", price)
+    state = RunState(traces=TraceBuffer(trace_sink), meter=meter)
     if exhausted:
         state.budget.model_calls = state.budget.max_model_calls
     agent = LlmAgent(name="munim", model=Usaged(mode=mode), instruction="Say done.")
@@ -94,8 +97,14 @@ def test_a_reported_call_is_one_row_with_the_providers_counts_thinking_billed_as
         1_000,
         150,
     )
-    # 1,000 × 1,500 + 150 × 7,500 = 2,625,000 nUSD → × 9,000 / 1e9 = 23.625 → 24 paise.
+    # 1,000 × 13,500 + 150 × 67,500 = 13,500,000 + 10,125,000 = 23,625,000 / 1,000,000 = 23.625 → 24 paise.
     assert row["amount_minor"] == 24 and row["currency"] == "INR"
+
+
+def test_a_replay_with_no_price_is_still_a_row_with_its_tokens_at_zero() -> None:
+    """R47 D1, recorded mode: no operator price → 0, but the row is posted with the call's counts (the cap still sees it)."""
+    posted, _ = run("usage", price=None)
+    assert [(r["input_tokens"], r["output_tokens"], r["amount_minor"]) for r in posted] == [(1_000, 150, 0)]
 
 
 def test_a_call_with_no_count_is_charged_on_the_request_size_estimate() -> None:
@@ -125,7 +134,7 @@ def test_a_flush_is_idempotent_and_a_refused_flush_keeps_its_rows_for_the_next()
         sent.append([e.id.root for e in req.entries])
 
     buf = SpendBuffer(sink, "INR")
-    buf.add("router", "gemini", "gemini-3.5-flash-lite", Usage(100, 1))
+    buf.add("router", "gemini", "gemini-3.5-flash-lite", Usage(100, 1), PRICE)
     with pytest.raises(RuntimeError):
         asyncio.run(buf.flush())
     asyncio.run(buf.flush())

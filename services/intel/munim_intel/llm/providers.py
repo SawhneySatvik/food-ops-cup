@@ -4,6 +4,8 @@
 Never hand ADK a model *string*: its registry resolves `openai/...` to LiteLlm (banned) and `Gemini()` defaults
 to a gemini-2.5 id. Always an explicit BaseLlm instance with its model id set, checked before and after build.
 
+Every live model carries its role's operator price (ledger R47 D1, `trace/spend.py`), set by `llm_for_role` before any call.
+
 Every live call has a per-role timeout (W3 close ruling; `Config.model_timeouts_s`): the classes below are ADK's own,
 subclassed, so `isinstance(llm, OpenAILlm)` (the DecisionModel's request shape) and `llm.model` hold. Past the timeout
 the call raises TimeoutError, which fails like any provider error: the run's RunFailed (ask → abstention, narration →
@@ -25,6 +27,7 @@ from google.adk.models.llm_response import LlmResponse
 
 from munim_intel.config import Config, ProviderKeyName
 from munim_intel.contracts_gen.models import PlatformModelRoleRow
+from munim_intel.trace.price import Price
 
 # Same rule as platform.model_role's CHECK (0002): any id containing gemini-2.5, any provider, any case.
 _RETIRED = re.compile(r"gemini-2\.5", re.IGNORECASE)
@@ -37,6 +40,24 @@ class RetiredModelRefused(Exception):
 
 class ProviderUnavailable(Exception):
     """A provider that cannot run here (no key). Live callers skip it loudly; it never falls back silently."""
+
+
+class PriceRefused(ProviderUnavailable):
+    """R47 D1: a live role with no operator price (`price_missing`), or priced in another currency than the run's spend
+    (`price_currency_mismatch`; no FX is ever applied). Raised before any call; callers degrade it like any unavailable
+    provider (an ask abstains `model_blocked`, narration falls back to the template)."""
+
+    def __init__(self, code: str, role: str) -> None:
+        super().__init__(f"{role}: {code}")
+        self.code = code
+
+
+def row_price(row: PlatformModelRoleRow) -> Price | None:
+    """The role's operator price, or None when the operator has set none (any of the three columns NULL)."""
+    i, o, c = row.input_price_per_mtok_minor, row.output_price_per_mtok_minor, row.price_currency
+    if i is None or o is None or c is None:
+        return None
+    return Price(i.root, o.root, c.root)
 
 
 @dataclass(frozen=True)
@@ -63,6 +84,7 @@ async def bounded(responses: AsyncGenerator[LlmResponse, None], seconds: float) 
 
 class TimedGemini(Gemini):
     timeout_s: float = 60.0
+    price: Price | None = None
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
         for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
@@ -71,6 +93,7 @@ class TimedGemini(Gemini):
 
 class TimedOpenAILlm(OpenAILlm):
     timeout_s: float = 60.0
+    price: Price | None = None
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
         for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
@@ -82,7 +105,9 @@ def refuse_retired(model_id: str) -> None:
         raise RetiredModelRefused(model_id)
 
 
-def build_live_llm(row: PlatformModelRoleRow, cfg: Config) -> BaseLlm:
+def build_live_llm(row: PlatformModelRoleRow, cfg: Config, price: Price | None = None) -> BaseLlm:
+    """`price`: the role's operator price, which `llm_for_role` (every run's path) always sets; None only for the live
+    provider probe (tests/live), which posts no spend rows."""
     refuse_retired(row.model_id)
     provider = PROVIDERS.get(row.provider)
     if provider is None:
@@ -95,8 +120,8 @@ def build_live_llm(row: PlatformModelRoleRow, cfg: Config) -> BaseLlm:
     timeout_s = cfg.model_timeouts_s[row.role]
     llm: BaseLlm
     if row.provider == "gemini":
-        llm = TimedGemini(model=row.model_id, client_kwargs={"api_key": key}, timeout_s=timeout_s)
+        llm = TimedGemini(model=row.model_id, client_kwargs={"api_key": key}, timeout_s=timeout_s, price=price)
     else:
-        llm = TimedOpenAILlm(model=row.model_id, api_key=key, base_url=provider.base_url, timeout_s=timeout_s)
+        llm = TimedOpenAILlm(model=row.model_id, api_key=key, base_url=provider.base_url, timeout_s=timeout_s, price=price)
     refuse_retired(llm.model)
     return llm
