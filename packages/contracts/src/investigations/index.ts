@@ -1,15 +1,23 @@
-// Investigations in Step mode (ledger R45 F1, F10; ADR-014 §7.2–§7.5; T-083). Core runs the playbook
-// (`@munim/core-domain/investigations`): each `:continue` mints that step's templates as member snapshots in the
+// Investigations in Step and Plan mode (ledger R45 F1, F10; ADR-014 §7.2–§7.5; T-083, T-084b, T-089a). Core runs the
+// playbook (`@munim/core-domain/investigations`): each step mints that step's templates as member snapshots in the
 // investigation's outlet scope, judges every verdict in code, writes the step, then asks intel to narrate it.
-//   POST /v1/investigations                 {investigation_id, playbook_id, params, outlet_scope?} → 201
-//   GET  /v1/investigations/{id}            → the investigation with its steps
-//   POST /v1/investigations/{id}:continue   {step_no} → 200 (runs exactly that step)
+//   POST /v1/investigations                    {investigation_id, playbook_id, params, outlet_scope?, mode?} → 201
+//   GET  /v1/investigations                    ?status=&cursor=&limit= → the caller's visible investigations
+//   GET  /v1/investigations/{id}               → the investigation with its steps (and its plan preview in Plan mode)
+//   POST /v1/investigations/{id}:continue      {step_no} → 200 (runs exactly that step)
+//   POST /v1/investigations/{id}:cancel        {} → 200 (cancelled; any later :continue → 409)
+//   POST /v1/investigations/{id}:approve-plan  {} → 200 after the approved steps ran, inside this request (≤ max_steps)
+// Mode (F10): the creator picks it within their role's ceiling (core.ai_policy, T-090; above it → 403
+// `mode_above_ceiling`). `auto` is T-089b's: refused at create until then. A Plan-mode investigation shows a preview —
+// its checklist items, the specialists involved and the estimated AI cost as a snapshot ref of
+// `intel.investigation_cost_estimate`, labelled "estimate (computed)" — and runs once its creator approves it. The steps
+// stop at `waiting`, an abstained narration, the budget or a scope change (`stop_reason`); a member's `:continue`
+// resumes at `steps_done + 1`. Progress streams on `inbox:<tenant>` as `inbox.investigation` events (ids and status).
 // Idempotency without a command log (0020's rows are operational): the client names the investigation id and the
 // step it means. The same id / step again by the same member is a replay (`X-Munim-Replayed: true`, the current
 // view); another body under that id → 409 `idempotency_conflict`; a step number that is not the next → 409
 // `sequence_gap`. Two concurrent `:continue {step_no: n}` therefore make exactly one step.
 // Visibility is 0020's scope rule: an investigation outside the viewer's outlet scope is 404 (review M7).
-// T-084b adds the list route, `:cancel` and SSE; T-089a adds `mode`.
 import { z } from "zod";
 import { ResolvedRef } from "../approvals/index.ts";
 import { SpecialistId } from "../threads/index.ts";
@@ -21,6 +29,10 @@ import type { Route } from "../shared/routes.ts";
 export const PlaybookId = z.enum(["margin_fall"]);
 export const ItemStatus = z.enum(["pending", "supported", "refuted", "cannot_verify"]);
 export const InvestigationStatus = z.enum(["open", "waiting", "done", "no_driver_found", "cannot_verify", "cancelled", "exhausted"]);
+export const InvestigationMode = z.enum(["step", "plan", "auto"]);
+/** Why a Plan (or Auto) run stopped; null while it runs, or when it ended in a terminal status. `draft` is reserved:
+ *  investigations create no drafts and no draft linking exists in v1 (ADR-014 §7.2), so nothing records it yet. */
+export const StopReason = z.enum(["draft", "abstain", "budget", "scope", "waiting"]);
 
 /** A month is named by its first day. */
 const Month = IsoDate.refine((d) => d.endsWith("-01"), "the first day of a month");
@@ -36,12 +48,18 @@ export const CreateInvestigationRequest = z.strictObject({
   params: MarginFallParams,
   /** Omitted → the creator's whole outlet scope. Must lie inside it (else 404). */
   outlet_scope: OutletScope.optional(),
+  /** Omitted → `step`. Above the creator's role ceiling → 403 `mode_above_ceiling`; `auto` is refused until T-089b. */
+  mode: InvestigationMode.optional(),
 });
 
 export const ContinueInvestigationRequest = z.strictObject({
   /** The step this request means: `steps_done + 1` when sent (its idempotency key). */
   step_no: z.int().min(1).max(10),
 });
+
+/** `:cancel` and `:approve-plan` carry no fields: the investigation id is the key, and both are set once. */
+export const CancelInvestigationRequest = z.strictObject({});
+export const ApprovePlanRequest = z.strictObject({});
 
 /** "{Specialist}" on an item or a narrated segment, composed by core from the playbook (intel never sends it). */
 export const ItemSignature = z.strictObject({
@@ -94,23 +112,55 @@ export const StepView = z.strictObject({
   narration: StepNarration.nullable(),
 });
 
-export const InvestigationView = z.strictObject({
+/** The estimated AI cost of a plan: cells of an `intel.investigation_cost_estimate` snapshot minted for the creator
+ *  when the plan was opened (never a typed number; values in the view's `resolved_refs`). `cannot_verify` (refs null)
+ *  when the template has no row — no narrated step of this playbook has recorded spend yet — or is above the
+ *  creator's role. */
+export const PlanEstimate = z.strictObject({
+  label: z.literal("estimate (computed)"),
+  status: z.enum(["computed", "cannot_verify"]),
+  snapshot_id: Uuid7.nullable(),
+  /** `estimate_minor`: per-step spend history × the checklist items not yet frozen. */
+  estimate_ref: SnapCellRef.nullable(),
+  currency_ref: SnapCellRef.nullable(),
+});
+
+/** What a member approves in Plan mode (F10): the checklist items, the specialists involved, the estimated AI cost. */
+export const PlanPreview = z.strictObject({
+  items: z.array(z.strictObject({ item_id: Slug, label_key: z.string().min(1), specialist: SpecialistId })).min(1),
+  /** Distinct, in checklist order. */
+  specialists: z.array(SpecialistId).min(1),
+  estimate: PlanEstimate,
+  approved_by: Uuid7.nullable(),
+  approved_at: IsoDateTime.nullable(),
+});
+
+/** One investigation in a list: no checklist, steps or values. */
+export const InvestigationItem = z.strictObject({
   investigation_id: Uuid7,
   playbook_id: PlaybookId,
   params: MarginFallParams,
   outlet_scope: OutletScope,
-  mode: z.enum(["step", "plan", "auto"]),
+  mode: InvestigationMode,
   status: InvestigationStatus,
-  stop_reason: z.enum(["draft", "abstain", "budget", "scope", "waiting"]).nullable(),
+  stop_reason: StopReason.nullable(),
   created_by: Uuid7,
   steps_done: z.int().min(0),
   max_steps: z.int().min(1).max(10),
-  checklist: z.array(ChecklistItemView),
-  steps: z.array(StepView),
-  /** Every snapshot-cell ref in the checklist, the steps and the narrations that resolves for this viewer. */
-  resolved_refs: z.array(ResolvedRef),
   created_at: IsoDateTime,
   updated_at: IsoDateTime,
+});
+
+export const InvestigationsListResponse = z.strictObject({ items: z.array(InvestigationItem), next_cursor: z.string().nullable() });
+
+export const InvestigationView = z.strictObject({
+  ...InvestigationItem.shape,
+  checklist: z.array(ChecklistItemView),
+  /** Plan and Auto mode only (null in Step mode). */
+  plan: PlanPreview.nullable(),
+  steps: z.array(StepView),
+  /** Every snapshot-cell ref in the checklist, the steps, the narrations and the plan estimate that resolves for this viewer. */
+  resolved_refs: z.array(ResolvedRef),
 });
 
 /** One item core asks intel to narrate: its verdict, the cells it may cite and core's template sentence. */
@@ -146,7 +196,10 @@ export const NarrateResponse = z.strictObject({
 export const SCHEMAS = {
   "v1.investigation.create.request": CreateInvestigationRequest,
   "v1.investigation.continue.request": ContinueInvestigationRequest,
+  "v1.investigation.cancel.request": CancelInvestigationRequest,
+  "v1.investigation.approve-plan.request": ApprovePlanRequest,
   "v1.investigation": InvestigationView,
+  "v1.investigations.response": InvestigationsListResponse,
   "investigations.narrate.request": NarrateRequest,
   "investigations.narrate.response": NarrateResponse,
 };
@@ -156,8 +209,18 @@ const ID = [{ name: "id", uuid: true }];
 export const ROUTES: readonly Route[] = [
   {
     surface: "public", method: "post", path: "/v1/investigations", operationId: "createInvestigation",
-    summary: "Open an investigation (Step mode) for a playbook over the caller's outlet scope; the client's id is its idempotency key",
+    summary: "Open an investigation (Step or Plan mode, within the role's ceiling) for a playbook over the caller's outlet scope; the client's id is its idempotency key",
     auth: "member", request: "v1.investigation.create.request", response: "v1.investigation", status: 201, conflict: true,
+  },
+  {
+    surface: "public", method: "get", path: "/v1/investigations", operationId: "listInvestigations",
+    summary: "Investigations in the caller's outlet scope, most recently changed first; ?status= one status",
+    auth: "member", response: "v1.investigations.response", status: 200,
+    query: [
+      { name: "status", required: false, schema: { type: "string", enum: [...InvestigationStatus.options] } },
+      { name: "cursor", required: false, schema: { type: "string" } },
+      { name: "limit", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
+    ],
   },
   {
     surface: "public", method: "get", path: "/v1/investigations/{id}", operationId: "getInvestigation",
@@ -168,5 +231,15 @@ export const ROUTES: readonly Route[] = [
     surface: "public", method: "post", path: "/v1/investigations/{id}:continue", operationId: "continueInvestigation",
     summary: "Run exactly the named next step: mint, judge in code, store, narrate",
     auth: "member", request: "v1.investigation.continue.request", response: "v1.investigation", status: 200, pathParams: ID, conflict: true,
+  },
+  {
+    surface: "public", method: "post", path: "/v1/investigations/{id}:cancel", operationId: "cancelInvestigation",
+    summary: "Cancel an open or waiting investigation (its creator); a repeat is a replay, a later :continue is 409",
+    auth: "member", request: "v1.investigation.cancel.request", response: "v1.investigation", status: 200, pathParams: ID, conflict: true,
+  },
+  {
+    surface: "public", method: "post", path: "/v1/investigations/{id}:approve-plan", operationId: "approveInvestigationPlan",
+    summary: "Approve a Plan-mode investigation (its creator, within the role's ceiling) and run its steps inside this request until a stop",
+    auth: "member", request: "v1.investigation.approve-plan.request", response: "v1.investigation", status: 200, pathParams: ID, conflict: true,
   },
 ];

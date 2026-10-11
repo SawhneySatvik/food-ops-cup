@@ -8,7 +8,8 @@
 //      template + params per step — and judge it in code (core-domain `judge`); a supported item freezes;
 //   4. compute the status (§7.4); a candidate `done` first re-judges every item frozen in an earlier step on fresh
 //      snapshots, and a flip reopens that item and keeps the investigation open (review m11);
-//   5. insert the step with its explicit number (0020: gapless, member = the signed-in member) and update the row.
+//   5. insert the step with its explicit number (0020: gapless, member = the signed-in member) and update the row;
+//      a step clears any earlier Plan stop reason (0020: NULL while it runs) and wakes `inbox:<tenant>` at commit.
 // Narration happens after commit (index.ts): the transaction never waits on intel.
 import {
   bindParams, type Cell, evaluable, type ItemStatus, judge, nextStatus, type Playbook, type PlaybookItem, PLAYBOOKS, residualWithin,
@@ -67,6 +68,13 @@ export interface StepResult {
 
 export function freshChecklist(pb: Playbook): ChecklistEntry[] {
   return pb.items.map((i) => ({ item_id: i.item_id, specialist: i.specialist, status: "pending", frozen: false, snapshot_ids: [], refs: [] }));
+}
+
+/** Wakes `inbox:<tenant>` streams when the transaction commits; the payload is ids only (One Guarantee: NOTIFY carries
+ *  ids, every subscriber re-reads under its own RLS context, stream/feed.ts). Every write to core.investigation calls it
+ *  in the writing transaction. */
+export async function notifyInbox(q: Queryable, tenantId: string, id: string): Promise<void> {
+  await q.query(`SELECT pg_notify('munim_inbox', $1)`, [`${tenantId}:${id}`]);
 }
 
 const refsOf = (cells: readonly Cell[]) => cells.map((c) => snapRef(c.snapshot_id, c.row, c.column));
@@ -161,6 +169,8 @@ export async function runStep(q: Queryable, m: Member, id: string, stepNo: numbe
      VALUES ($1, $2, $3, $4, $6, $5)`, [m.tenant_id, id, stepNo, m.member_id, JSON.stringify(updates), trigger]);
   await q.query(`UPDATE core.investigation SET status = $2, checklist = $3, steps_done = $4 WHERE id = $1`,
     [id, status, JSON.stringify(pb.items.map((i) => checklist.get(i.item_id)!)), stepNo]);
+  await q.query(`UPDATE core.investigation SET stop_reason = NULL WHERE id = $1 AND stop_reason IS NOT NULL`, [id]);
+  await notifyInbox(q, m.tenant_id, id);
   return { replayed: false, narrate, scope, playbook: pb };
 }
 

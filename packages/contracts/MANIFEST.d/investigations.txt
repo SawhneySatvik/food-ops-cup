@@ -1,5 +1,8 @@
 v1.investigation.create.request
 v1.investigation.continue.request
+v1.investigation.cancel.request
+v1.investigation.approve-plan.request
 v1.investigation
+v1.investigations.response
 investigations.narrate.request
 investigations.narrate.response

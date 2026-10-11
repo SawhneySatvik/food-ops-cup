@@ -1,17 +1,25 @@
-// Investigations in Step mode, core half (ledger R45 F1, F10; ADR-014 §7.2–§7.5; T-083). Mount name: `investigations`.
-//   POST /v1/investigations                {investigation_id, playbook_id, params, outlet_scope?} → 201 view
-//   GET  /v1/investigations/{id}           → view (404 outside the caller's outlet scope)
-//   POST /v1/investigations/{id}:continue  {step_no} → 200 view after exactly that step
+// Investigations, core half (ledger R45 F1, F10; ADR-014 §7.2–§7.5; T-083 Step, T-084b routes, T-089a Plan). Mount name:
+// `investigations`.
+//   POST /v1/investigations                    {investigation_id, playbook_id, params, outlet_scope?, mode?} → 201 view
+//   GET  /v1/investigations                    ?status=&cursor=&limit= → items in the caller's outlet scope
+//   GET  /v1/investigations/{id}               → view (404 outside the caller's outlet scope)
+//   POST /v1/investigations/{id}:continue      {step_no} → 200 view after exactly that step
+//   POST /v1/investigations/{id}:cancel        {} → 200 view, cancelled (the creator; a repeat replays)
+//   POST /v1/investigations/{id}:approve-plan  {} → 200 view after the plan's steps ran in this request (plan.ts)
 // The rows are operational (0020), written in the member's own request as munim_core; no book is touched, so no
-// command log: the client's investigation id and step number are the idempotency keys (a replay answers the current
-// view with `X-Munim-Replayed: true`). A step is decided in one transaction (step.ts); then core mints an `ask` run
+// command log: the client's investigation id and step number are the idempotency keys, and cancel and plan approval
+// are set once (a replay answers the current view with `X-Munim-Replayed: true`). The mode is checked against the
+// role's ceiling (T-090) at create and at plan approval. Every write to core.investigation wakes `inbox:<tenant>`
+// (stream/feed.ts `inbox.investigation`). A step is decided in one transaction (step.ts); then core mints an `ask` run
 // (actor = the member, scope = the investigation's) and asks intel to narrate the step's items (NarratePort, one L1
 // call, no tools). Whatever intel did, core then stores its own template narration under the same answer id through
 // the internal answers path — a no-op when intel already stored one — so a down, slow or over-budget intel leaves a
 // template summary and the status is computed either way (rule 11). The answer is linked to the step once (0020).
 // Signatures ("{Specialist}") are composed here from the playbook; intel's payload has no field for them.
 import { AnswerEnvelope, anyRefTokens, parseRef, REPLAYED_HEADER } from "@munim/contracts";
-import { ContinueInvestigationRequest, CreateInvestigationRequest, NarrateResponse } from "@munim/contracts/investigations";
+import {
+  ApprovePlanRequest, CancelInvestigationRequest, ContinueInvestigationRequest, CreateInvestigationRequest, InvestigationStatus, NarrateResponse,
+} from "@munim/contracts/investigations";
 import { PLAYBOOKS } from "@munim/core-domain/investigations";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember } from "../../auth/resolve.ts";
@@ -22,8 +30,13 @@ import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv, Deps } from "../../lib/types.ts";
 import { endRun, mintRunTokenIn, type OutletScope, type Queryable, type RunTokenKeys } from "../../runtoken/index.ts";
+import { assertModeAllowed } from "../ai_policy/index.ts";
 import { cellOf, loadSnapshots, type Member } from "../approvals/index.ts";
-import { type ChecklistEntry, freshChecklist, INVESTIGATION_COLS, type InvestigationRow, type ItemUpdate, runStep, type StepResult, templateSegments } from "./step.ts";
+import { CURSOR_SQL, makeCursor, parseCursor, parseLimit } from "../findings/index.ts";
+import { approvePlan, mintEstimate, type PlanRow, planPreview } from "./plan.ts";
+import {
+  type ChecklistEntry, freshChecklist, INVESTIGATION_COLS, type InvestigationRow, type ItemUpdate, notifyInbox, runStep, type StepResult, templateSegments,
+} from "./step.ts";
 
 export { createHttpNarratePort, type HttpNarratePortOptions, NARRATE_TIMEOUT_MS } from "./narrateport.ts";
 
@@ -54,6 +67,14 @@ const covers = (viewer: "*" | readonly string[], scope: readonly string[]) =>
   viewer === "*" || (scope[0] !== "*" && scope.every((o) => viewer.includes(o)));
 const sameParams = (a: Record<string, unknown>, b: Record<string, unknown>) =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
+const actionId = (c: Context<AppEnv>, verb: string) => c.req.param("action")!.slice(0, -verb.length);
+
+type ItemRow = Omit<InvestigationRow, "checklist"> & { stop_reason: string | null; created_at: Date; updated_at: Date };
+const itemView = (inv: ItemRow) => ({
+  investigation_id: inv.id, playbook_id: inv.playbook_id, params: inv.params, outlet_scope: inv.outlet_scope, mode: inv.mode,
+  status: inv.status, stop_reason: inv.stop_reason, created_by: inv.created_by, steps_done: inv.steps_done, max_steps: inv.max_steps,
+  created_at: inv.created_at.toISOString(), updated_at: inv.updated_at.toISOString(),
+});
 
 interface StepRow {
   step_no: number; member_id: string; triggered_by: "member" | "plan" | "auto"; started_at: Date; item_updates: ItemUpdate[];
@@ -62,8 +83,8 @@ interface StepRow {
 
 /** The investigation as this member may see it, or null (RLS: outside their scope → 404). */
 export async function investigationView(q: Queryable, m: Member, id: string) {
-  const r = await q.query<InvestigationRow & { stop_reason: string | null; created_at: Date; updated_at: Date }>(
-    `SELECT ${INVESTIGATION_COLS} FROM core.investigation i WHERE i.id = $1`, [id]);
+  const r = await q.query<InvestigationRow & ItemRow & Omit<PlanRow, "id">>(
+    `SELECT ${INVESTIGATION_COLS}, i.plan_approved_by, i.plan_approved_at FROM core.investigation i WHERE i.id = $1`, [id]);
   const inv = r.rows[0];
   if (!inv) return null;
   const pb = PLAYBOOKS[inv.playbook_id]!;
@@ -88,7 +109,9 @@ export async function investigationView(q: Queryable, m: Member, id: string) {
     item_id: c.item_id, label_key: byId.get(c.item_id)!.label_key, specialist: c.specialist, signature: signature(c.specialist),
     status: c.status, frozen: c.frozen, snapshot_ids: c.snapshot_ids, refs: c.refs,
   }));
+  const plan = inv.mode === "step" ? null : await planPreview(q, m, inv, pb);
   const refs = new Set<string>([...checklist.flatMap((c) => c.refs), ...stepViews.flatMap((s) => s.item_updates.flatMap((u) => u.refs))]);
+  for (const ref of [plan?.estimate.estimate_ref, plan?.estimate.currency_ref]) if (ref) refs.add(ref);
   for (const s of stepViews) for (const seg of s.narration?.envelope.segments ?? []) for (const t of seg.text.matchAll(anyRefTokens())) refs.add(t[0]);
   const snapIds = [...refs].map((x) => parseRef(x)).flatMap((p) => (p?.kind === "snap" ? [p.snapshot_id] : []));
   const snaps = await loadSnapshots(q, snapIds, m);
@@ -96,11 +119,7 @@ export async function investigationView(q: Queryable, m: Member, id: string) {
     const cell = cellOf(ref, snaps);
     return cell ? [{ ref, value: cell.value }] : [];
   });
-  return {
-    investigation_id: inv.id, playbook_id: inv.playbook_id, params: inv.params, outlet_scope: inv.outlet_scope, mode: inv.mode,
-    status: inv.status, stop_reason: inv.stop_reason, created_by: inv.created_by, steps_done: inv.steps_done, max_steps: inv.max_steps,
-    checklist, steps: stepViews, resolved_refs: resolved, created_at: inv.created_at.toISOString(), updated_at: inv.updated_at.toISOString(),
-  };
+  return { ...itemView(inv), checklist, plan, steps: stepViews, resolved_refs: resolved };
 }
 
 /** Narrates a committed step (ADR-014 §7.2 step 5). Never throws for intel's sake: a failed port leaves the template. */
@@ -167,32 +186,59 @@ export const router = new Hono<AppEnv>()
     const req = CreateInvestigationRequest.safeParse(await body(c));
     if (!req.success) throw new ApiError("invalid_payload");
     const { investigation_id: id, playbook_id, params } = req.data;
+    const mode = req.data.mode ?? "step";
     if (m.outlet_ids !== "*" && m.outlet_ids.length === 0) throw new ApiError("forbidden");
     const scope = req.data.outlet_scope ?? (m.outlet_ids === "*" ? ["*"] : m.outlet_ids);
     // Wider than the creator's own scope: not theirs to see (review M7, as an outlet-scoped GET).
     if (!covers(m.outlet_ids, scope)) throw new ApiError("not_found");
     const out = await withContext(c.var.deps.pools.core, contextOf(m), async (q) => {
-      const prior = await q.query<{ playbook_id: string; params: Record<string, unknown>; outlet_scope: string[]; created_by: string }>(
-        `SELECT playbook_id, params, outlet_scope::text[] AS outlet_scope, created_by FROM core.investigation WHERE id = $1`, [id]);
+      // F10: the mode is the creator's pick within their role's ceiling (403 mode_above_ceiling). Auto needs an approved
+      // plan and a standing grant (0020 CHECK, F11 O-1): T-089b's, refused here until then.
+      await assertModeAllowed(q, m, mode);
+      if (mode === "auto") throw new ApiError("invalid_payload");
+      const prior = await q.query<{ playbook_id: string; params: Record<string, unknown>; outlet_scope: string[]; created_by: string; mode: string }>(
+        `SELECT playbook_id, params, outlet_scope::text[] AS outlet_scope, created_by, mode FROM core.investigation WHERE id = $1`, [id]);
       const p = prior.rows[0];
       if (p) {
-        const same = p.created_by === m.member_id && p.playbook_id === playbook_id && sameParams(p.params, params)
+        const same = p.created_by === m.member_id && p.playbook_id === playbook_id && sameParams(p.params, params) && p.mode === mode
           && p.outlet_scope.length === scope.length && p.outlet_scope.every((o, i) => o === scope[i]);
         if (!same) throw new ApiError("idempotency_conflict");
         return { replayed: true, view: (await investigationView(q, m, id))! };
       }
       try {
         await q.query(
-          `INSERT INTO core.investigation (tenant_id, id, playbook_id, params, outlet_scope, created_by, checklist) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [m.tenant_id, id, playbook_id, JSON.stringify(params), scope, m.member_id, JSON.stringify(freshChecklist(PLAYBOOKS[playbook_id]!))]);
+          `INSERT INTO core.investigation (tenant_id, id, playbook_id, params, outlet_scope, created_by, checklist, mode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [m.tenant_id, id, playbook_id, JSON.stringify(params), scope, m.member_id, JSON.stringify(freshChecklist(PLAYBOOKS[playbook_id]!)), mode]);
       } catch (e) {
         // The id is taken by an investigation this member cannot see.
         if ((e as { code?: unknown }).code === "23505") throw new ApiError("idempotency_conflict");
         throw e;
       }
+      if (mode === "plan") await mintEstimate(q, m, id);
+      await notifyInbox(q, m.tenant_id, id);
       return { replayed: false, view: (await investigationView(q, m, id))! };
     });
     return c.json(out.view, 201, out.replayed ? { [REPLAYED_HEADER]: "true" } : {});
+  })
+  .get("/v1/investigations", requireMember, async (c) => {
+    const m = member(c);
+    const q = c.req.query();
+    const limit = parseLimit(q.limit);
+    const after = parseCursor(q.cursor);
+    if (limit === null || (q.cursor !== undefined && !after) || (q.status !== undefined && !InvestigationStatus.safeParse(q.status).success)) {
+      throw new ApiError("bad_request");
+    }
+    // RLS (0020 scope rule) leaves exactly the investigations this member's outlet scope covers.
+    return c.json(await withContext(c.var.deps.pools.core, contextOf(m), async (db) => {
+      const r = await db.query<ItemRow & { cursor: string }>(
+        `SELECT ${INVESTIGATION_COLS}, ${CURSOR_SQL("i")} AS cursor FROM core.investigation i
+          WHERE ($1::text IS NULL OR i.status = $1)
+            AND ($2::timestamptz IS NULL OR (i.updated_at, i.id) < ($2::timestamptz, $3::uuid))
+          ORDER BY i.updated_at DESC, i.id DESC LIMIT $4`,
+        [q.status ?? null, after?.[0] ?? null, after?.[1] ?? null, limit + 1]);
+      const page = r.rows.slice(0, limit);
+      return { items: page.map(itemView), next_cursor: r.rows.length > limit ? makeCursor(page.at(-1)!.cursor) : null };
+    }), 200);
   })
   .get(`/v1/investigations/:id{${ID}}`, requireMember, async (c) => {
     const m = member(c);
@@ -210,4 +256,37 @@ export const router = new Hono<AppEnv>()
     const view = await withContext(deps.pools.core, contextOf(m), (q) => investigationView(q, m, id));
     if (!view) throw new ApiError("not_found");
     return c.json(view, 200, step.replayed ? { [REPLAYED_HEADER]: "true" } : {});
+  })
+  .post(`/v1/investigations/:action{${ID}:cancel}`, requireMember, async (c) => {
+    const m = member(c);
+    const id = actionId(c, ":cancel");
+    if (!CancelInvestigationRequest.safeParse(await body(c)).success) throw new ApiError("invalid_payload");
+    // The creator cancels their own open or waiting investigation (ADR-014 §7.4); already cancelled is a replay. The
+    // row lock orders it against a step in flight: that step commits first, or sees `cancelled` and refuses (409).
+    const out = await withContext(c.var.deps.pools.core, contextOf(m), async (q) => {
+      const r = await q.query<{ created_by: string; status: string }>(`SELECT created_by, status FROM core.investigation WHERE id = $1 FOR UPDATE`, [id]);
+      const inv = r.rows[0];
+      if (!inv) throw new ApiError("not_found");
+      if (inv.created_by !== m.member_id) throw new ApiError("forbidden");
+      const replayed = inv.status === "cancelled";
+      if (!replayed) {
+        if (inv.status !== "open" && inv.status !== "waiting") throw new ApiError("illegal_transition");
+        await q.query(`UPDATE core.investigation SET status = 'cancelled' WHERE id = $1`, [id]);
+        await notifyInbox(q, m.tenant_id, id);
+      }
+      return { replayed, view: (await investigationView(q, m, id))! };
+    });
+    return c.json(out.view, 200, out.replayed ? { [REPLAYED_HEADER]: "true" } : {});
+  })
+  .post(`/v1/investigations/:action{${ID}:approve-plan}`, requireMember, async (c) => {
+    const m = member(c);
+    const id = actionId(c, ":approve-plan");
+    if (!ApprovePlanRequest.safeParse(await body(c)).success) throw new ApiError("invalid_payload");
+    const deps = c.var.deps;
+    const out = await approvePlan(deps, m, id, continueInvestigation);
+    // Read as the member stands after the run: one whose access went mid-plan no longer sees it (review M7).
+    const now = out.member;
+    const view = now && (await withContext(deps.pools.core, contextOf(now), (q) => investigationView(q, now, id)));
+    if (!view) throw new ApiError("not_found");
+    return c.json(view, 200, out.replayed ? { [REPLAYED_HEADER]: "true" } : {});
   });

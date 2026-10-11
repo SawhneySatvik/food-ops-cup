@@ -12,12 +12,15 @@
 //                                        tell them the merchant's event volume (W1 fix #33)
 //   i=<updated_at UTC, µs>,<draft id>    core.draft, ordered by (updated_at, id)
 //   f=<updated_at UTC, µs>,<finding id>  intel.finding, ordered by (updated_at, id)
+//   v=<updated_at UTC, µs>,<inv. id>     core.investigation, ordered by (updated_at, id) — investigation progress (T-084b):
+//                                        each step, stop, cancel and plan approval moves the row; the client re-reads
+//                                        GET /v1/investigations/{id} for the checklist and its refs
 //   t.<run id>=<seq>                     intel.trace_event, seq within a run
-// Drafts and findings have no commit-ordered column: updated_at is a transaction-START time, so their reads
+// Drafts, findings and investigations have no commit-ordered column: updated_at is a transaction-START time, so their reads
 // look back LOOKBACK behind the cursor and skip rows this feed has already sent; the cursor only moves
 // forward, and an event that does not move it is sent without an `id:` line. KNOWN LIMIT (i/f only): a
 // late draft/finding change that commits while the client is disconnected, behind its Last-Event-ID, or a
-// transaction open longer than LOOKBACK, is not delivered.
+// transaction open longer than LOOKBACK, is not delivered. (i/f/v)
 import type pg from "pg";
 import { contextOf, type Principal } from "../auth/resolve.ts";
 import { type AppContext, withContext } from "../lib/db.ts";
@@ -29,7 +32,7 @@ const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const TS = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z";
 const INT = "0|[1-9]\\d{0,17}";
 const TOPIC = new RegExp(`^(kds|inbox|trace|order):(${UUID})$`);
-const PART = new RegExp(`^(?:([on])=(${INT})|([if])=(${TS}),(${UUID})|t\\.(${UUID})=(${INT}))$`);
+const PART = new RegExp(`^(?:([on])=(${INT})|([ifv])=(${TS}),(${UUID})|t\\.(${UUID})=(${INT}))$`);
 const MAX_TOPICS = 10;
 const PAGE = 200;
 const ZERO: Pos = { ts: "1970-01-01T00:00:00.000000Z", id: "00000000-0000-0000-0000-000000000000" };
@@ -49,14 +52,15 @@ interface Pos {
   id: string;
 }
 
-/** Cursor parts read through the look-back window: drafts, findings. */
-type Part = "i" | "f";
+/** Cursor parts read through the look-back window: drafts, findings, investigations. */
+type Part = "i" | "f" | "v";
 
 export interface Cursor {
   o?: number;
   n?: number;
   i?: Pos;
   f?: Pos;
+  v?: Pos;
   t: Map<string, number>;
 }
 
@@ -111,6 +115,7 @@ export function formatCursor(c: Cursor): string {
   if (c.n !== undefined) parts.push(`n=${c.n}`);
   if (c.i) parts.push(`i=${c.i.ts},${c.i.id}`);
   if (c.f) parts.push(`f=${c.f.ts},${c.f.id}`);
+  if (c.v) parts.push(`v=${c.v.ts},${c.v.id}`);
   for (const [run, seq] of c.t) parts.push(`t.${run}=${seq}`);
   return parts.join(";");
 }
@@ -119,7 +124,8 @@ export function formatCursor(c: Cursor): string {
  * Every topic must be readable by this subscriber, or the whole request is 404 — the same answer for "not
  * yours" and "does not exist" (gotcha 16). Existence is checked under the subscriber's own read context.
  *   kds:<outlet>   member whose outlet scope covers it
- *   inbox:<tenant> owner or manager of that tenant (managers then see only drafts/findings touching their outlets)
+ *   inbox:<tenant> owner or manager of that tenant (managers then see only drafts/findings touching their outlets and
+ *                  the investigations their scope covers)
  *   trace:<run>    member whose outlet scope covers the run's outlet_scope; a '{*}' run: owner, advisor or
  *                  judge only (W1 fix #37, #78 — the same roles as 0014's run policy)
  *   order:<id>     a member whose outlet scope covers the order; the signed-in customer who owns it; or the
@@ -178,8 +184,8 @@ export class Feed implements Listener {
   private readonly shopper: boolean;
   private readonly channels: Channel[];
   private cursor: Cursor = { t: new Map() };
-  /** Drafts/findings already sent (or behind the client's position at start), `id@ts` → ts, for the look-back. */
-  private seen: Record<Part, Map<string, string>> = { i: new Map(), f: new Map() };
+  /** Drafts/findings/investigations already sent (or behind the client's position at start), `id@ts` → ts, for the look-back. */
+  private seen: Record<Part, Map<string, string>> = { i: new Map(), f: new Map(), v: new Map() };
   /** Shopper feeds: order_event ids already counted into `n`. */
   private delivered = new Set<string>();
   private pending = new Set<Channel>();
@@ -225,7 +231,7 @@ export class Feed implements Listener {
     this.hub.add(this);
     this.enqueue(async () => {
       this.cursor = await this.initial(last);
-      for (const part of ["i", "f"] as const) {
+      for (const part of ["i", "f", "v"] as const) {
         const upTo = this.cursor[part];
         if (upTo) await this.window(part, (r) => this.seen[part].set(`${r.id}@${r.ts}`, r.ts), upTo);
       }
@@ -287,6 +293,7 @@ export class Feed implements Listener {
       else if (ch === "munim_inbox") {
         await this.drain("i");
         await this.drain("f");
+        await this.drain("v");
       } else await this.drainTrace();
     }
   }
@@ -333,6 +340,7 @@ export class Feed implements Listener {
       if (this.channels.includes("munim_inbox")) {
         c.i = last?.i ?? (await newest(`SELECT ${tsSql("updated_at")} AS ts, id FROM core.draft ORDER BY updated_at DESC, id DESC LIMIT 1`));
         c.f = last?.f ?? (await newest(`SELECT ${tsSql("updated_at")} AS ts, id FROM intel.finding ORDER BY updated_at DESC, id DESC LIMIT 1`));
+        c.v = last?.v ?? (await newest(`SELECT ${tsSql("updated_at")} AS ts, id FROM core.investigation ORDER BY updated_at DESC, id DESC LIMIT 1`));
       }
       const traces = this.topics.runs.length > 0 && (await this.hub.hasTraces(db));
       for (const run of this.topics.runs) {
@@ -388,8 +396,8 @@ export class Feed implements Listener {
   }
 
   /**
-   * Pages through drafts or findings from LOOKBACK before the cursor (up to `upTo` when given), oldest first,
-   * calling `each`. RLS narrows both to the subscriber's outlets.
+   * Pages through drafts, findings or investigations from LOOKBACK before the cursor (up to `upTo` when given), oldest first,
+   * calling `each`. RLS narrows all three to the subscriber's outlets.
    */
   private async window(part: Part, each: (r: Row & Record<string, unknown>) => void, upTo?: Pos): Promise<void> {
     const floor = this.cursor[part]!.ts;
@@ -397,6 +405,17 @@ export class Feed implements Listener {
     for (;;) {
       const rows = await this.read(async (db) => {
         const common = [floor, page.ts, page.id, upTo?.ts ?? null, upTo?.id ?? null];
+        if (part === "v") {
+          return (await db.query<Row & { status: string; mode: string; stop_reason: string | null; playbook_id: string; outlet_scope: string[] }>(
+            `SELECT id, status, mode, stop_reason, playbook_id, outlet_scope::text[] AS outlet_scope, ${tsSql("updated_at")} AS ts
+               FROM core.investigation
+              WHERE updated_at > $1::timestamptz - interval '${LOOKBACK_S} seconds'
+                AND (updated_at, id) > ($2::timestamptz, $3::uuid)
+                AND ($4::timestamptz IS NULL OR (updated_at, id) <= ($4::timestamptz, $5::uuid))
+              ORDER BY updated_at, id LIMIT ${PAGE}`,
+            common,
+          )).rows;
+        }
         if (part === "f") {
           return (await db.query<Row & { status: string; pack: string; type: string; severity: string; outlet_ids: string[] }>(
             `SELECT id, status, pack, type, severity, outlet_ids, ${tsSql("updated_at")} AS ts
@@ -436,6 +455,8 @@ export class Feed implements Listener {
       if (moved) this.cursor[part] = { ts: r.ts, id: r.id };
       // Findings: categorical fields only — no confidence or impact numbers (those render from snapshots).
       if (part === "f") this.emit(moved, r.id, "inbox.finding", { status: r.status, pack: r.pack, type: r.type, severity: r.severity, outlet_ids: r.outlet_ids, updated_at: r.ts });
+      // Investigations: categorical fields only — the checklist, steps and every value are read through the API.
+      else if (part === "v") this.emit(moved, r.id, "inbox.investigation", { status: r.status, mode: r.mode, stop_reason: r.stop_reason, playbook_id: r.playbook_id, outlet_scope: r.outlet_scope, updated_at: r.ts });
       // Drafts: ids and status only — the payload is fetched through the drafts API.
       else this.emit(moved, r.id, "inbox.draft", { status: r.status, command_type: r.command_type, outlet_ids: r.outlet_ids, finding_id: r.finding_id, updated_at: r.ts });
     });
