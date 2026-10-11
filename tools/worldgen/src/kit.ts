@@ -491,6 +491,19 @@ export async function history(c: Ctx, spec: HistorySpec): Promise<void> {
   }
 }
 
+/** A short payout (F3): one order line per planted aggregator bill numbered `prefix…` (dated history), at the bill's own total and tax, charged
+ *  `excessMinor` over the contracted commission. Core matches each line to its order (external ref = bill number) and measures the short
+ *  against the order total and tax (packs/finance.md §2), so the short is exactly the excess. `withholdsTax` as HistorySpec's. */
+export function shortLines(bills: Array<{ no: string; date: string; gross: number; tax: number }>, prefix: string, count: number, contractedBp: number,
+  excessMinor: number, withholdsTax: boolean): PayoutLine[] {
+  const mine = bills.filter((b) => b.no.startsWith(prefix));
+  if (mine.length !== count) throw new Error(`shortLines: ${mine.length} ${prefix} bills, expected ${count}`);
+  return mine.map((b) => {
+    if ((b.gross * contractedBp) % 10000 !== 0) throw new Error(`shortLines: ${b.no} contracted commission is not whole`);
+    return { kind: "order", orderRef: b.no, orderDate: b.date, gross: b.gross, commission: (b.gross * contractedBp) / 10000 + excessMinor, ad: 0, promo: 0, tax: withholdsTax ? b.tax : 0 };
+  });
+}
+
 // ---- storefront and customers --------------------------------------------------------------------------------------
 
 /** The owner creates a storefront key for the own-site channel; the raw key is returned once and never logged. Seeding a world again finds the
