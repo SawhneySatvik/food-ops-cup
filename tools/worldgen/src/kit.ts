@@ -64,7 +64,24 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
     await api.cmd("owner", "/v1/outlets/{id}:update", "tenancy.outlet.update.v1", `hours:${i + 1}`, { outlet_id: o.id, hours: { opens: "00:00", closes: "23:59" } }, { params: { id: o.id } });
   }
   const t = (await api.get("owner", "/v1/tenant")) as J;
-  return { country: spec.country, currency: t.base_currency as string, outlets, channels };
+  const currency = t.base_currency as string;
+  // R47 D9: the demo business's targets are the owner's own command, in force across the whole timeline (provisioning's empty default
+  // policy starts long before it). Labour 30% of sales, margin 65%. R47 D3: the deal review's margin floor (15%) and minimum supplier
+  // payment term (7 days) — demo values chosen by the orchestrator (R47 merge), not a founder decision; without them every review
+  // rule that reads them is "cannot verify" and no PO draft can pass.
+  await api.cmd("owner", "/v1/policy", "tenancy.policy.set.v1", "policy:targets", {
+    outlet_id: null, valid_from: addDays(c.asOf, -(c.days + 62)), labour_target_bp: 3000, target_margin_bp: 6500, margin_floor_bp: 1500, min_payment_days: 7,
+  });
+  // R47 D2: no budget row means AI declines. The operator proposes this month's row and approves it, the way budgets are set (R24).
+  // The month is the timeline's last (the real current month when as-of is today). Skipped, loudly in the CLI, when no operator is signed in.
+  if (api.hasOperator) {
+    const draft = api.id("config_draft:llm_budget");
+    await api.post("operator", "/platform/v1/config-drafts", {
+      draft_id: draft, target: `llm_budget:${api.tenantId}`, patch: { month: `${c.asOf.slice(0, 7)}-01`, limit_minor: 500000, currency },
+    }, { noTenant: true });
+    await api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true });
+  }
+  return { country: spec.country, currency, outlets, channels };
 }
 
 // ---- stock and catalogue -------------------------------------------------------------------------------------

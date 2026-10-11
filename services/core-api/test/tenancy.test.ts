@@ -140,9 +140,10 @@ describe("defaults by kind × country (operator seam: tenancy.provision.v1 is se
     expect(await count(`SELECT count(*) n FROM core.account WHERE tenant_id = $1`, [T])).toBe(x.accounts);
     expect(await count(`SELECT count(*) n FROM core.member WHERE tenant_id = $1`, [T])).toBe(1);
     expect(await count(`SELECT count(*) n FROM core.membership WHERE tenant_id = $1 AND role = 'owner'`, [T])).toBe(1);
-    // W2-R4: one business policy with the loyalty defaults (1 point per 1,000 minor, 10 per point), in force today.
+    // W2-R4: one business policy with the loyalty defaults (1 point per 1,000 minor, 10 per point), in force from the epoch (R47 D9: so a first
+    // target can be dated back over imported history), with no targets and no negotiation bounds.
     expect(await count(`SELECT count(*) n FROM core.business_policy WHERE tenant_id = $1 AND loyalty_earn_per_minor = 1000 AND loyalty_point_value_minor = 10
-                          AND valid_from = (now() AT TIME ZONE $2)::date`, [T, x.tz])).toBe(1);
+                          AND valid_from = '2000-01-01' AND labour_target_bp IS NULL AND target_margin_bp IS NULL AND negotiation_target_bp IS NULL`, [T])).toBe(1);
     // Every book row was stamped by the operator's own command (the guard's origin), not by anything else.
     expect(await count(`SELECT count(*) n FROM core.channel WHERE tenant_id = $1 AND origin->>'command_type' = 'tenancy.provision.v1'`, [T])).toBe(x.channels);
   });
@@ -533,6 +534,49 @@ describe("tenancy.policy.set.v1: the owner's labour and margin targets (a person
     expect((await rows()).at(-1)).toMatchObject({ vf: "2099-03-01", l: 2800, m: 7000 });
     // audited under the owner: one entry per row touched
     expect(await count(`SELECT count(*) n FROM core.audit_log WHERE tenant_id = $1 AND action = 'tenancy.policy.set.v1' AND actor->>'id' = $2`, [a.tenant, a.owner])).toBe(6);
+  });
+});
+
+describe("tenancy.policy.set.v1: the owner's negotiation bounds (R47 D7)", () => {
+  it("target ≤ walk-away on the effective pair (the other bound or its 9500/11000 default); one bound carries over; out-of-range 422", async () => {
+    const a = await onboard();
+    const set = (payload: Record<string, unknown>) => call("POST", "/v1/policy", a.token, env("tenancy.policy.set.v1", { outlet_id: null, ...payload }), a.tenant);
+    const rows = () => db.admin(`SELECT valid_from::text vf, negotiation_target_bp t, negotiation_walkaway_bp w, labour_target_bp l FROM core.business_policy WHERE tenant_id = $1 AND outlet_id IS NULL ORDER BY valid_from`, [a.tenant]).then((r) => r.rows);
+    // refusals: target above the default walk-away; walk-away below the default target; crossed pair; zero; above 20,000 — none writes a row
+    for (const bad of [{ negotiation_target_bp: 11001 }, { negotiation_walkaway_bp: 9499 }, { negotiation_target_bp: 10500, negotiation_walkaway_bp: 10400 },
+      { negotiation_target_bp: 0 }, { negotiation_walkaway_bp: 20001 }]) {
+      expect([JSON.stringify(bad), (await set({ valid_from: "2099-01-01", ...bad })).status]).toEqual([JSON.stringify(bad), 422]);
+    }
+    expect(await rows()).toHaveLength(1);
+    // accepts: the defaults themselves; a pair; then one bound alone carries the other over
+    expect((await set({ valid_from: "2099-01-01", negotiation_target_bp: 9500, negotiation_walkaway_bp: 11000 })).status).toBe(200);
+    expect((await set({ valid_from: "2099-02-01", negotiation_target_bp: 9000, negotiation_walkaway_bp: 10500 })).status).toBe(200);
+    expect((await set({ valid_from: "2099-03-01", negotiation_walkaway_bp: 12000 })).status).toBe(200);
+    expect((await set({ valid_from: "2099-04-01", labour_target_bp: 3000 })).status).toBe(200); // a labour-only version carries both bounds
+    expect((await rows()).map((r) => [r.t, r.w, r.l])).toEqual([[null, null, null], [9500, 11000, null], [9000, 10500, null], [9000, 12000, null], [9000, 12000, 3000]]);
+  });
+});
+
+describe("tenancy.policy.set.v1: the deal review's margin floor and minimum payment days (R47 D3)", () => {
+  it("floor ≤ target margin, given together or against the carried-over target; floor and days carry over; out of range 422", async () => {
+    const a = await onboard();
+    const set = (payload: Record<string, unknown>) => call("POST", "/v1/policy", a.token, env("tenancy.policy.set.v1", { outlet_id: null, ...payload }), a.tenant);
+    const rows = () => db.admin(`SELECT valid_from::text vf, margin_floor_bp f, min_payment_days d, target_margin_bp m FROM core.business_policy WHERE tenant_id = $1 AND outlet_id IS NULL ORDER BY valid_from`, [a.tenant]).then((r) => r.rows);
+    // refusals: a floor above the target in one command; floor and days out of range — none writes a row
+    for (const bad of [{ target_margin_bp: 6500, margin_floor_bp: 6501 }, { margin_floor_bp: 10001 }, { margin_floor_bp: -1 }, { min_payment_days: -1 }, { min_payment_days: 1.5 }, { min_payment_days: 366 }, { min_payment_days: 2147483648 }]) {
+      expect([JSON.stringify(bad), (await set({ valid_from: "2099-01-01", ...bad })).status]).toEqual([JSON.stringify(bad), 422]);
+    }
+    expect(await rows()).toHaveLength(1);
+    // accepts: the target, then the floor and days alone (the target carries over), then the floor at the target itself
+    expect((await set({ valid_from: "2099-01-01", target_margin_bp: 6500 })).status).toBe(200);
+    expect((await set({ valid_from: "2099-02-01", margin_floor_bp: 1500, min_payment_days: 7 })).status).toBe(200);
+    // refused against the CARRIED-OVER target (6500), not only one given in the same command
+    expect((await set({ valid_from: "2099-03-01", margin_floor_bp: 6501 })).status).toBe(422);
+    expect((await set({ valid_from: "2099-03-01", margin_floor_bp: 6500 })).status).toBe(200);
+    expect((await set({ valid_from: "2099-04-01", labour_target_bp: 3000 })).status).toBe(200); // a labour-only version carries floor and days
+    expect((await rows()).map((r) => [r.f, r.d, r.m])).toEqual([[null, null, null], [null, null, 6500], [1500, 7, 6500], [6500, 7, 6500], [6500, 7, 6500]]);
+    const audit = await db.admin(`SELECT after FROM core.audit_log WHERE tenant_id = $1 AND action = 'tenancy.policy.set.v1' AND after ? 'margin_floor_bp' ORDER BY seq`, [a.tenant]);
+    expect(audit.rows.map((r) => [r.after.margin_floor_bp, r.after.min_payment_days])).toEqual([[null, null], [1500, 7], [6500, 7], [6500, 7]]);
   });
 });
 

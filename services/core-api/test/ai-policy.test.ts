@@ -1,5 +1,5 @@
 // T-090 gates — AI policy (ledger F10 "who", F11 O-2) through the real app on embedded Postgres. Expected values are
-// hand-written here (the ledger's F10 list + O-3's INFERENCE rows; hand-picked money), never imported from the module.
+// hand-written here (the ledger's F10 list + R47 D10's rows; hand-picked money), never imported from the module.
 // Synthetic data only; the operator budget and spend rows are planted as the operator / intel spend log would hold them.
 // The canonical world (db/src/world.ts, 0020) seeds: owner ceiling auto (a row), cap 500000 INR, operator limit 500000 INR
 // for 2026-10, and 15 of model spend on 2026-10-09. A bare provisioned tenant (no seeds) stands for a new business.
@@ -14,7 +14,7 @@ import { assertModeAllowed, ceilingFor, effectiveCap, handlers } from "../src/mo
 import { policy } from "../src/modules/ai_policy/policy.ts";
 import { type Env, startEnv, type Who } from "./compliance.kit.ts";
 
-// Hand list: F10 (owner auto, manager plan, staff step) + O-3 INFERENCE (advisor step, judge plan).
+// Hand list: F10 (owner auto, manager plan, staff step) + R47 D10 (advisor step, judge plan).
 const DEFAULTS = [
   { role: "owner", mode_ceiling: "auto" },
   { role: "manager", mode_ceiling: "plan" },

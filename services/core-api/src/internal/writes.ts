@@ -109,7 +109,8 @@ export async function writeAnswer(c: Queryable, run: Run, raw: unknown) {
     ? { ok: false as const, reason_code: env.reason_code! }
     : env.segments.length === 0 ? { ok: false as const, reason_code: "missing_ref" as const } : await validateSegments(env.segments, dbResolver(c, run.scope));
   const reason = v.ok ? null : v.reason_code;
-  const stored = reason ? { answer_id: env.answer_id, segments: [], abstained: true, reason_code: reason } : env;
+  // An abstention keeps the answer's one-tap follow-up (R47 D5): "dig deeper" is still on offer when the single-agent answer could not verify.
+  const stored = reason ? { answer_id: env.answer_id, segments: [], abstained: true, reason_code: reason, ...(env.follow_up ? { follow_up: env.follow_up } : {}) } : env;
   await c.query(
     `INSERT INTO intel.answer (tenant_id, id, run_id, question, asked_by, envelope, abstained, reason_code) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [run.tenantId, env.answer_id, run.runId, question, MEMBER_ID.test(run.actor) ? run.actor : null, stored, reason !== null, reason]);

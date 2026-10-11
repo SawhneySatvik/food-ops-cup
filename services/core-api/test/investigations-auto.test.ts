@@ -105,6 +105,9 @@ const worker = (tenant: string, pass: Parameters<typeof autoPass>[1]) =>
 const onImports = (t: T) => worker(t.tenant, resumeOnImports);
 const daily = (t: T, since: Date) => worker(t.tenant, (d, tenant) => resumeDaily(d, tenant, since));
 const later = () => new Date(Date.now() + 1000);
+/** R47 D4: new data in the investigations' months (PARAMS): one journal entry dated 2026-09-12 whose created_at is now, so it arrived after
+ *  every step so far. Planted behind the book guard like the other plants here (a test arrival, not a command). */
+const arrive = (t: T) => plant(`INSERT INTO core.journal_entry (tenant_id, id, entry_date, origin) VALUES ('${t.tenant}', '${uuidv7()}', '2026-09-12', '{}')`);
 
 async function tenant(label: string): Promise<T> {
   const w = await buildTenant(db, label);
@@ -269,8 +272,26 @@ describe("T-089b (1), (6), (7), clause 1, daily — the import trigger", () => {
   it("daily: nothing waiting since the day's boundary → 0 steps; past it → the auto one only (1 step)", async () => {
     const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
     expect(await daily(A, today)).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 0 });
+    // R47 D4: past the boundary, but nothing new arrived since step 2 → 0 steps; a journal entry dated in the months arrives → 1.
+    expect(await daily(A, later())).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 0 });
+    expect((await steps(auto)).length).toBe(2);
+    await arrive(A);
+    before = await books(A); // the arrival is the test's plant, not the pass's write: the clause-1 comparison below starts after it
     expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 0, budget: 0, ceiling: 0 });
     expect([(await steps(auto)).length, (await steps(plan)).length]).toEqual([3, 1]);
+    // The step consumed the arrival: the next pass is quiet again.
+    expect(await daily(A, later())).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 0 });
+  });
+
+  it("D4: data outside the investigation's months, and a market-signal import, are not new data; a committed bank import is", async () => {
+    const B = await tenant("d4-scope");
+    const id = await approved(B, B.ownerSub, "auto");
+    // A journal entry dated October (the months are Aug and Sep), made now: not read by margin_fall.
+    await plant(`INSERT INTO core.journal_entry (tenant_id, id, entry_date, origin) VALUES ('${B.tenant}', '${uuidv7()}', '2026-10-03', '{}')`);
+    expect(await daily(B, later())).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 0 });
+    await importFile(B, "bank_statement", "synthetic_bank_1.csv");
+    expect(await daily(B, later())).toEqual({ resumed: 1, steps: 1, cancelled: 0, budget: 0, ceiling: 0 });
+    expect((await steps(id)).length).toBe(2);
   });
 
   it("(7) + clause 1: Auto created 0 drafts; the passes changed 0 book, audit, command, draft or decision rows; the audit chain verifies", async () => {
@@ -290,6 +311,7 @@ describe("T-089b (2): creator removed", () => {
     const gone = await approved(A, A.owner2Sub, "auto");
     const kept = await approved(A, A.ownerSub, "auto");
     await plant(`UPDATE core.membership SET active = false WHERE tenant_id = '${A.tenant}' AND member_id = '${A.owner2}'`);
+    await arrive(A);
     expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 1, budget: 0, ceiling: 0 });
     expect(await row(gone)).toMatchObject({ status: "cancelled", stop_reason: "scope", steps_done: 1 });
     expect((await steps(gone)).length).toBe(1);
@@ -313,11 +335,13 @@ describe("T-089b (3): outlet narrowed", () => {
       return r.rows.map((x) => [Number(x.n), x.scope]);
     };
     // Un-narrowed: an auto step over {o1,o2} counts the outlet-2 day.
+    await arrive(A);
     expect((await daily(A, later())).steps).toBe(2);
     expect(await posOpen(both, 2)).toEqual([[1, [A.outlets[0], A.outlets[1]]]]);
     expect(await posOpen(one, 2)).toEqual([[0, [A.outlets[0]]]]);
     await plant(`UPDATE core.membership SET outlet_ids = ARRAY['${A.outlets[0]}']::uuid[] WHERE tenant_id = '${A.tenant}' AND member_id = '${A.wide}'`);
     const snapsBefore = await count(`SELECT count(*) n FROM evidence.snapshot WHERE tenant_id = $1`, [A.tenant]);
+    await arrive(A);
     expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 1, budget: 0, ceiling: 0 });
     expect(await row(both)).toMatchObject({ status: "cancelled", stop_reason: "scope", steps_done: 2 });
     expect(await posOpen(one, 3)).toEqual([[0, [A.outlets[0]]]]);
@@ -339,6 +363,7 @@ describe("T-089b (4): at the cap", () => {
     spendPerCall = 0;
     await setBudget(A, 500); // spent 500 of 500: the effective cap is reached
     calls.length = 0;
+    await arrive(A);
     expect(await daily(A, later())).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 1, ceiling: 0 });
     expect(await row(id)).toMatchObject({ status: "waiting", stop_reason: "budget", steps_done: 1 });
     expect(calls.length).toBe(0);
@@ -354,6 +379,7 @@ describe("T-089b (5) ceiling lowered, and the creator's role on Auto snapshots",
     expect((await ceiling(A, "manager", "auto")).status).toBe(200);
     const mgr = await approved(A, A.managerSub, "auto");
     const own = await approved(A, A.ownerSub, "auto");
+    await arrive(A);
     expect((await daily(A, later())).steps).toBe(2);
     const advisorSnaps = (id: string) => count(
       `SELECT count(*) n FROM core.investigation_step s JOIN evidence.snapshot x ON x.tenant_id = s.tenant_id AND x.run_id = s.run_id
@@ -362,6 +388,7 @@ describe("T-089b (5) ceiling lowered, and the creator's role on Auto snapshots",
     expect(await advisorSnaps(mgr)).toBe(0);
     expect(await advisorSnaps(own)).toBeGreaterThan(0);
     expect((await ceiling(A, "manager", "plan")).status).toBe(200);
+    await arrive(A);
     expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 0, budget: 0, ceiling: 1 });
     expect(await steps(mgr)).toEqual([{ step_no: 1, triggered_by: "plan" }, { step_no: 2, triggered_by: "auto" }]);
     expect(await row(mgr)).toMatchObject({ mode: "auto", status: "waiting", stop_reason: "scope", steps_done: 2 });

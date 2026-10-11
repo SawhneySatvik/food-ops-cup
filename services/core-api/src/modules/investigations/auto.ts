@@ -26,7 +26,8 @@
 //   - The import trigger: an investigation `waiting` on its playbook's data gate resumes when an import of a kind that
 //     can complete one of the gate's still-open close items was approved after its last step. No import commit writes
 //     an outbox event (imports.run.commit.v1 returns none), so core-worker polls committed `core.import_run` rows.
-//   - The daily trigger: every open or waiting Auto investigation with no step since the day's boundary.
+//   - The daily trigger (R47 D4): every open or waiting Auto investigation with no step since the day's boundary AND new data since
+//     its last step (`newData`). A pass with nothing new steps nothing, and burns no model budget.
 //   - Auto creates no drafts and links none: no draft-linking lookup exists yet (DECISIONS 11 Oct, Plan rulings), so
 //     stop_reason `draft` is never recorded here either.
 import type { RunTokenClaims } from "@munim/contracts";
@@ -126,10 +127,11 @@ export async function resumeOnImports(deps: AutoDeps, tenantId: string): Promise
     }
     return out;
   });
-  return tallyOf(deps, tenantId, due);
+  return tallyOf(deps, tenantId, due, false);
 }
 
-/** Every open or waiting `auto` investigation with no step since `since` (the day's boundary): one resumption each. */
+/** Every open or waiting `auto` investigation with no step since `since` (the day's boundary) whose data changed (the check is
+ *  `autoStep`'s, inside the row lock): one resumption each. */
 export async function resumeDaily(deps: AutoDeps, tenantId: string, since: Date): Promise<AutoTally> {
   const due = await withContext(deps.svc, svcCtx(tenantId), async (q) => (await q.query<{ id: string }>(
     `SELECT i.id FROM core.investigation i
@@ -137,13 +139,13 @@ export async function resumeDaily(deps: AutoDeps, tenantId: string, since: Date)
         AND coalesce((SELECT max(s.started_at) FROM core.investigation_step s WHERE s.tenant_id = i.tenant_id AND s.investigation_id = i.id),
                      i.plan_approved_at) < $1
       ORDER BY i.created_at, i.id`, [since])).rows.map((r) => ({ id: r.id, since })));
-  return tallyOf(deps, tenantId, due);
+  return tallyOf(deps, tenantId, due, true);
 }
 
-async function tallyOf(deps: AutoDeps, tenantId: string, due: ReadonlyArray<{ id: string; since: Date }>): Promise<AutoTally> {
+async function tallyOf(deps: AutoDeps, tenantId: string, due: ReadonlyArray<{ id: string; since: Date }>, needsNewData: boolean): Promise<AutoTally> {
   const t: AutoTally = { resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 0 };
   for (const d of due) {
-    const r = await resume(deps, tenantId, d.id, d.since);
+    const r = await resume(deps, tenantId, d.id, d.since, needsNewData);
     if (r.steps > 0) t.resumed++;
     t.steps += r.steps;
     if (r.stop === "cancelled" || r.stop === "budget" || r.stop === "ceiling") t[r.stop]++;
@@ -151,14 +153,14 @@ async function tallyOf(deps: AutoDeps, tenantId: string, due: ReadonlyArray<{ id
   return t;
 }
 
-type Gate = { kind: "since"; at: Date } | { kind: "after"; step_no: number };
+type Gate = { kind: "since"; at: Date; needsNewData: boolean } | { kind: "after"; step_no: number };
 type Outcome =
   | { kind: "stopped"; stop: "none" | "cancelled" | "budget" | "ceiling" }
   | { kind: "stepped"; m: Member; step_no: number; step: StepResult; run: AutoRun };
 
 /** One resumption: steps until a stop, each in its own transaction (≤ max_steps, so ≤ 10 iterations). */
-async function resume(deps: AutoDeps, tenantId: string, id: string, since: Date): Promise<{ steps: number; stop: string }> {
-  let gate: Gate = { kind: "since", at: since };
+async function resume(deps: AutoDeps, tenantId: string, id: string, since: Date, needsNewData: boolean): Promise<{ steps: number; stop: string }> {
+  let gate: Gate = { kind: "since", at: since, needsNewData };
   let steps = 0;
   for (let i = 0; i < 10; i++) {
     const o = await withContext(deps.svc, svcCtx(tenantId), (q) => autoStep(q, deps.keys, tenantId, id, gate));
@@ -186,18 +188,46 @@ async function resume(deps: AutoDeps, tenantId: string, id: string, since: Date)
   return { steps, stop: "none" };
 }
 
+/** R47 D4: did data the playbook reads arrive after `since` (the investigation's last step)? Arrival is the row's own record time
+ *  (`created_at` / `updated_at` / the import's decision), never its business date: a backfilled day counts, an old day re-read does not.
+ *  margin_fall (the only playbook) reads, within its two months (`period_month`, `compare_month`; the bridge's rows, close_status):
+ *    - ledger: journal entries dated in the months (postings carry the P&L);
+ *    - sales: orders dated in the months whose row changed (completion, price or discount edits are updates);
+ *    - stock: receipts and waste (supplier price effect, waste valuation), by the movement's own day;
+ *    - close items: closed shifts (pos_days_closed), settlements overlapping the months, bank lines valued in them;
+ *    - any import of the tenant committed after `since` (the commit is what brought the rows above in, and a commit that
+ *      changed nothing in these months over-includes by one step, which is the safe side).
+ *  Month bounds are the pair's earliest start to the later month's end; stock days compare in UTC (one day of slack). */
+async function newData(q: Queryable, params: Record<string, unknown>, since: Date): Promise<boolean> {
+  const m = [params.period_month, params.compare_month].filter((x): x is string => typeof x === "string");
+  if (m.length === 0) return true; // an investigation without months cannot say what is new: resume (the pre-D4 behaviour)
+  const r = await q.query<{ fresh: boolean }>(
+    `WITH w AS (SELECT least(${m.map((_, i) => `$${i + 2}::date`).join(", ")}) AS lo,
+                       (greatest(${m.map((_, i) => `$${i + 2}::date`).join(", ")}) + interval '1 month')::date AS hi)
+     SELECT (EXISTS (SELECT 1 FROM core.journal_entry x, w WHERE x.created_at > $1 AND x.entry_date >= w.lo AND x.entry_date < w.hi)
+          OR EXISTS (SELECT 1 FROM core."order" x, w WHERE x.updated_at > $1 AND x.business_date >= w.lo AND x.business_date < w.hi)
+          OR EXISTS (SELECT 1 FROM core.stock_movement x, w WHERE x.created_at > $1 AND x.kind IN ('receipt', 'waste') AND x.at >= w.lo AND x.at < w.hi + 1)
+          OR EXISTS (SELECT 1 FROM core.shift x, w WHERE x.closed_at > $1 AND x.opened_at >= w.lo AND x.opened_at < w.hi + 1)
+          OR EXISTS (SELECT 1 FROM core.settlement x, w WHERE x.created_at > $1 AND x.period_to >= w.lo AND x.period_from < w.hi)
+          OR EXISTS (SELECT 1 FROM core.bank_line x, w WHERE x.created_at > $1 AND x.value_date >= w.lo AND x.value_date < w.hi)
+          OR EXISTS (SELECT 1 FROM core.import_run r JOIN core.decision d ON d.tenant_id = r.tenant_id AND d.id = r.decision_id
+                      WHERE r.status = 'committed' AND d.decided_at > $1)) AS fresh`, [since, ...m]);
+  return r.rows[0]!.fresh;
+}
+
 /** One Auto step in the caller's munim_svc transaction (module header, steps 1–4, then the step itself). */
 async function autoStep(q: Queryable, keys: RunTokenKeys, tenantId: string, id: string, gate: Gate): Promise<Outcome> {
   const none = { kind: "stopped", stop: "none" } as const;
+  let since = new Date(0);
   const inv = (await q.query<InvestigationRow & { stop_reason: string | null; plan_approved_at: Date | null }>(
     `SELECT ${INVESTIGATION_COLS}, i.plan_approved_at FROM core.investigation i WHERE i.id = $1 FOR UPDATE`, [id])).rows[0];
   if (!inv || inv.mode !== "auto" || (inv.status !== "open" && inv.status !== "waiting")) return none;
   if (gate.kind === "since") {
     if (inv.stop_reason !== null && inv.stop_reason !== "waiting" && inv.stop_reason !== "budget") return none;
     // Read after the lock (a fresh snapshot): a step another worker committed while this one waited is seen here.
-    const last = (await q.query<{ last: Date | null }>(
-      `SELECT max(started_at) AS last FROM core.investigation_step WHERE investigation_id = $1`, [id])).rows[0]!.last ?? inv.plan_approved_at;
-    if (last && last >= gate.at) return none;
+    since = (await q.query<{ last: Date | null }>(
+      `SELECT max(started_at) AS last FROM core.investigation_step WHERE investigation_id = $1`, [id])).rows[0]!.last ?? inv.plan_approved_at ?? new Date(0);
+    if (since >= gate.at) return none;
   } else if (inv.steps_done !== gate.step_no || inv.status !== "open") return none;
   const grant = (await q.query<{ id: string }>(
     `SELECT id FROM core.investigation_grant WHERE investigation_id = $1 AND revoked_at IS NULL`, [id])).rows[0];
@@ -208,6 +238,9 @@ async function autoStep(q: Queryable, keys: RunTokenKeys, tenantId: string, id: 
     await notifyInbox(q, tenantId, id);
     return { kind: "stopped", stop: "cancelled" };
   }
+  // After the access check (a removed creator is cancelled the same day, data or not), before ceiling and budget: those stop a
+  // run that would step, and with nothing new it would not.
+  if (gate.kind === "since" && gate.needsNewData && !(await newData(q, inv.params, since))) return none;
   if (RANK[await ceilingFor(q, m.role)] < RANK.auto) {
     await q.query(`UPDATE core.investigation SET stop_reason = 'scope' WHERE id = $1`, [id]);
     await notifyInbox(q, tenantId, id);

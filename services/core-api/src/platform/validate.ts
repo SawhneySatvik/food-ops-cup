@@ -8,7 +8,9 @@ import { ApiError } from "../lib/errors.ts";
 export type Patch = Record<string, unknown>;
 
 export type Parsed =
-  | { kind: "model_role"; role: (typeof MODEL_ROLES)[number]; provider: (typeof MODEL_PROVIDERS)[number]; model_id: string }
+  | { kind: "model_role"; role: (typeof MODEL_ROLES)[number]; provider: (typeof MODEL_PROVIDERS)[number]; model_id: string;
+      /** R47 D1: all three or none; null = unpriced (a model change that omits them clears the price, so a new model is never billed at the old one's rate). */
+      prices: { input: number; output: number; currency: string } | null }
   | { kind: "feature_flag"; key: string; value: boolean | number | string }
   | { kind: "llm_budget"; tenant_id: string; month: string; limit_minor: number; currency: string }
   | { kind: "country_pack"; code: string; effective_from: string; doc: CountryPack }
@@ -34,12 +36,21 @@ export function parsePatch(target: string, patch: Patch, today: string = todayUt
   switch (kind) {
     case "model_role": {
       if (!id || !(MODEL_ROLES as readonly string[]).includes(id)) throw bad();
-      only(patch, ["provider", "model_id"]);
+      const priced = ["input_price_per_mtok_minor", "output_price_per_mtok_minor", "price_currency"].filter((k) => k in patch);
+      // Partial price groups fail here: the three keys must all be present or all absent.
+      only(patch, priced.length === 3 ? ["provider", "model_id", "input_price_per_mtok_minor", "output_price_per_mtok_minor", "price_currency"] : ["provider", "model_id"]);
       const { provider, model_id } = patch;
       if (typeof provider !== "string" || !(MODEL_PROVIDERS as readonly string[]).includes(provider)) throw bad(); // unknown provider
       if (typeof model_id !== "string" || !MODEL_ID.test(model_id)) throw bad();
       if (isBlockedModel(model_id)) throw new ApiError("invalid_payload", "model_blocked");
-      return { kind, role: id as never, provider: provider as never, model_id };
+      let prices: Extract<Parsed, { kind: "model_role" }>["prices"] = null;
+      if (priced.length === 3) {
+        const { input_price_per_mtok_minor: i, output_price_per_mtok_minor: o, price_currency: cur } = patch;
+        if (!Number.isSafeInteger(i) || (i as number) < 0 || !Number.isSafeInteger(o) || (o as number) < 0) throw bad();
+        if (typeof cur !== "string" || !/^[A-Z]{3}$/.test(cur)) throw bad();
+        prices = { input: i as number, output: o as number, currency: cur };
+      }
+      return { kind, role: id as never, provider: provider as never, model_id, prices };
     }
     case "feature_flag": {
       if (!id || !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(id)) throw bad();

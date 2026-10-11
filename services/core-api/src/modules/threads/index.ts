@@ -35,7 +35,7 @@ export { ASK_TIMEOUT_MS, createHttpAskPort, type HttpAskPortOptions } from "./as
 export { buildSummary, refreshSummary, type SummaryRef, type SummaryTurn, type ThreadBlock, threadBlock } from "./summary.ts";
 
 /** core → intel `/ask` with the run token; resolves to intel's JSON body (validated here as `threads.intel-ask.response`). */
-export type AskPort = (runToken: string, body: { answer_id: string; question: string; addressed_to: string | null; thread: ThreadBlock | null }) => Promise<unknown>;
+export type AskPort = (runToken: string, body: { answer_id: string; question: string; addressed_to: string | null; thread: ThreadBlock | null; deep: boolean }) => Promise<unknown>;
 export interface ThreadsConfig { keys: RunTokenKeys; intel: AskPort }
 
 const configs = new WeakMap<Deps, ThreadsConfig>();
@@ -93,7 +93,7 @@ export const router = new Hono<AppEnv>()
     const deps = c.var.deps;
     const parsed = AskRequest.safeParse(await c.req.json().catch(() => undefined));
     if (!parsed.success) throw new ApiError("bad_request");
-    const { question, thread_id } = parsed.data;
+    const { question, thread_id, deep = false } = parsed.data;
     const cfg = configs.get(deps);
     if (!cfg) throw new ApiError("unavailable");
     const ctx = contextOf(m);
@@ -114,7 +114,7 @@ export const router = new Hono<AppEnv>()
       mintRunTokenIn(q, cfg.keys, { tenantId: m.tenant_id, outletScope: scope, trigger: "ask", actor: m.member_id }));
     let reported: { answer_id: string; tainted: boolean };
     try {
-      const out = IntelAskResponse.safeParse(await cfg.intel(token, { answer_id: answerId, question, addressed_to: addressed, thread: block }));
+      const out = IntelAskResponse.safeParse(await cfg.intel(token, { answer_id: answerId, question, addressed_to: addressed, thread: block, deep }));
       if (!out.success || out.data.answer_id !== answerId) throw new ApiError("unavailable");
       reported = out.data;
     } catch (e) {

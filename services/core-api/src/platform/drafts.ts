@@ -16,12 +16,17 @@ const COLS = `d.id, d.target, d.patch, d.status, d.proposed_by, d.decided_by,
   to_char(d.decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS decided_at, d.reason,
   to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`;
 
+const asNumber = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+
 /** The target's current row as a plain object (null when it has none). Dates and bigints as text/number. */
 export async function currentOf(c: Queryable, p: Parsed): Promise<Record<string, unknown> | null> {
   switch (p.kind) {
     case "model_role": {
-      const r = await c.query(`SELECT role, provider, model_id FROM platform.model_role WHERE role = $1`, [p.role]);
-      return r.rows[0] ?? null;
+      const r = await c.query(
+        `SELECT role, provider, model_id, input_price_per_mtok_minor::text AS input_price_per_mtok_minor,
+                output_price_per_mtok_minor::text AS output_price_per_mtok_minor, price_currency FROM platform.model_role WHERE role = $1`, [p.role]);
+      const row = r.rows[0];
+      return row ? { ...row, input_price_per_mtok_minor: asNumber(row.input_price_per_mtok_minor), output_price_per_mtok_minor: asNumber(row.output_price_per_mtok_minor) } : null;
     }
     case "feature_flag": {
       const r = await c.query(`SELECT key, value_type, value FROM platform.feature_flag WHERE key = $1`, [p.key]);
@@ -106,11 +111,16 @@ function sortKeys(v: unknown): unknown {
 async function apply(c: Queryable, p: Parsed): Promise<void> {
   switch (p.kind) {
     case "model_role":
-      // A new model has not been probed: probed_at resets until the probe job reports.
+      // A new model has not been probed: probed_at resets when provider or model change (a price-only change keeps the probe).
       await c.query(
-        `INSERT INTO platform.model_role (role, provider, model_id) VALUES ($1, $2, $3)
-         ON CONFLICT (role) DO UPDATE SET provider = excluded.provider, model_id = excluded.model_id, probed_at = NULL`,
-        [p.role, p.provider, p.model_id]);
+        `INSERT INTO platform.model_role (role, provider, model_id, input_price_per_mtok_minor, output_price_per_mtok_minor, price_currency)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (role) DO UPDATE SET provider = excluded.provider, model_id = excluded.model_id,
+           input_price_per_mtok_minor = excluded.input_price_per_mtok_minor, output_price_per_mtok_minor = excluded.output_price_per_mtok_minor,
+           price_currency = excluded.price_currency,
+           probed_at = CASE WHEN platform.model_role.provider = excluded.provider AND platform.model_role.model_id = excluded.model_id
+                            THEN platform.model_role.probed_at ELSE NULL END`,
+        [p.role, p.provider, p.model_id, p.prices?.input ?? null, p.prices?.output ?? null, p.prices?.currency ?? null]);
       return;
     case "feature_flag": {
       const f = await c.query<{ value_type: string }>(`SELECT value_type FROM platform.feature_flag WHERE key = $1 FOR UPDATE`, [p.key]);

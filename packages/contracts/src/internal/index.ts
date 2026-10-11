@@ -318,6 +318,8 @@ export const RunFrameResponse = z.strictObject({
   budget: RunFrameBudget.nullable(),
   /** `model` only with AI on (`intel.enabled`), a budget, and level `ok`; else `template` (rule 11). */
   narration: z.enum(["model", "template"]),
+  /** R47 D7: the owner's negotiation bounds as basis points of the reference price (target ≤ walk-away); 9500 / 11000 when the owner set none. */
+  negotiation: z.strictObject({ target_bp: z.int().min(1).max(20000), walkaway_bp: z.int().min(1).max(20000) }),
   /** The pack's licence kinds, in pack order. */
   licence_kinds: z.array(RunFrameLicenceKind),
   /** The pack's `payroll_scope`: payroll drafts exist only under `drafts` (core refuses one elsewhere, `payroll_out_of_scope`). */

@@ -20,6 +20,11 @@ export const ModelRole = z.strictObject({
   provider: ModelProvider,
   /** The provider's model identifier, e.g. "meta/llama-3.3-70b-instruct". */
   model_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/),
+  /** R47 D1: the operator's price per 1M tokens, minor units of `price_currency`. All three or none; none = unpriced,
+   *  and a live role with no price refuses live calls. */
+  input_price_per_mtok_minor: z.int().min(0).optional(),
+  output_price_per_mtok_minor: z.int().min(0).optional(),
+  price_currency: CurrencyCode.optional(),
 });
 export type ModelRole = z.infer<typeof ModelRole>;
 
@@ -28,6 +33,10 @@ export const ModelRoleRow = z.strictObject({
   provider: ModelProvider,
   model_id: z.string(),
   location: z.string().nullable(),
+  /** R47 D1: null on all three = unpriced. */
+  input_price_per_mtok_minor: z.int().min(0).nullable(),
+  output_price_per_mtok_minor: z.int().min(0).nullable(),
+  price_currency: CurrencyCode.nullable(),
   probed_at: IsoDateTime.nullable(),
   updated_at: IsoDateTime,
 });
@@ -79,7 +88,7 @@ export const BudgetRow = z.strictObject({
 
 export const OperatorRow = z.strictObject({ id: Uuid7, email: Email, active: z.boolean(), created_at: IsoDateTime });
 
-/** Targets: `model_role:<role>` {provider, model_id} · `feature_flag:<key>` {value} ·
+/** Targets: `model_role:<role>` {provider, model_id[, input_price_per_mtok_minor, output_price_per_mtok_minor, price_currency]} · `feature_flag:<key>` {value} ·
  *  `llm_budget:<tenant_id>` {month, limit_minor, currency} · `country_pack:<CODE>` {effective_from, doc} (a new
  *  version) · `plan:<code>` {name, limits, status}. The patch is checked per target when proposed and again when applied. */
 export const ConfigDraftPropose = z.strictObject({

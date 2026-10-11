@@ -5,6 +5,8 @@
 //   (5) at the cap: the run token is still minted and served (never refused for budget); level hard, narration template
 //   (6) pack, currency, ladder, thresholds and business dates = hand values (pack md tables, the tz rules by hand),
 //       incl. both Melbourne DST transitions and a Kolkata control
+//   (8) R47 D7: negotiation bounds default to 9500/11000, serve the tenant-wide policy in force (each bound alone defaults the other),
+//       and never a version that starts after the frame's date
 //   (7) no thread block: `?thread_id=` names nothing (the strict schema refuses a `thread` key)
 // Hand values: the canonical world (db/src/world.ts) — 3 restaurant outlets in Asia/Kolkata, operator limit 500000
 // INR for 2026-10, owner cap 500000 INR, one spend of 15 INR on 2026-10-09 — and the sums written below.
@@ -163,5 +165,25 @@ describe("no thread block (ruling 11 Oct: the ask body is the only source)", () 
     const body = await r.json();
     expect([r.status, "thread" in body]).toEqual([200, false]);
     expect(RunFrameResponse.parse(body).outlets.length).toBe(3);
+  });
+});
+
+describe("R47 D7: negotiation bounds in the frame", () => {
+  it("unset → 9500/11000; one bound set → the other stays its default; both → served; a future version and an outlet override are not served", async () => {
+    const tok = await run(A, ["*"]);
+    const bounds = async () => (await frame(tok)).negotiation;
+    // Behind the book guard (these are test plants, not commands): triggers off for the one statement.
+    const plant = (sql: string, args: unknown[] = []) => db.admin(`BEGIN; SET LOCAL session_replication_role = replica; ${sql.replace(/\$(\d)/g, (_, i) => `'${args[Number(i) - 1]}'`)}; COMMIT;`);
+    expect(await bounds()).toEqual({ target_bp: 9500, walkaway_bp: 11000 });
+    await plant(`UPDATE core.business_policy SET negotiation_target_bp = 9000 WHERE tenant_id = $1 AND outlet_id IS NULL`, [A.tenant]);
+    expect(await bounds()).toEqual({ target_bp: 9000, walkaway_bp: 11000 });
+    await plant(`UPDATE core.business_policy SET negotiation_walkaway_bp = 10200 WHERE tenant_id = $1 AND outlet_id IS NULL`, [A.tenant]);
+    expect(await bounds()).toEqual({ target_bp: 9000, walkaway_bp: 10200 });
+    // A version dated after the frame's day (the clock pins 2026-10-11) is not in force; an outlet-level row is not the business's.
+    await plant(`INSERT INTO core.business_policy (tenant_id, id, outlet_id, valid_from, negotiation_target_bp, negotiation_walkaway_bp, origin)
+                 VALUES ($1, $2, NULL, '2099-01-01', 8000, 9000, '{}')`, [A.tenant, uuidv7()]);
+    await plant(`INSERT INTO core.business_policy (tenant_id, id, outlet_id, valid_from, negotiation_target_bp, negotiation_walkaway_bp, origin)
+                 VALUES ($1, $2, $3, '2026-01-01', 7000, 8000, '{}')`, [A.tenant, uuidv7(), A.outlets[0]]);
+    expect(await bounds()).toEqual({ target_bp: 9000, walkaway_bp: 10200 });
   });
 });

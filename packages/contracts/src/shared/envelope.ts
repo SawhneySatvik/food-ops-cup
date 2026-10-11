@@ -24,13 +24,20 @@ const abstainRule = (e: { abstained: boolean; reason_code?: ReasonCode | null | 
     ctx.addIssue({ code: "custom", path: ["reason_code"], message: "reason_code only on an abstained envelope" });
 };
 
-/** `{answer_id, segments[{text, refs[]}], abstained, reason_code?}` (03-architecture §1.7). */
+/** A one-tap follow-up offered under an answer (ledger R47 D5). `dig_deeper`: the Manager routed the question as an
+ *  investigation without a scored band, so it answered alone instead of fanning out; the member may ask it to dig
+ *  deeper across the specialists. Nullish for the same Pydantic reason as `reason_code`. */
+export const FollowUp = z.enum(["dig_deeper"]);
+export type FollowUp = z.infer<typeof FollowUp>;
+
+/** `{answer_id, segments[{text, refs[]}], abstained, reason_code?, follow_up?}` (03-architecture §1.7). */
 export const AnswerEnvelope = z
   .strictObject({
     answer_id: Uuid7,
     segments: z.array(Segment),
     abstained: z.boolean(),
     reason_code: ReasonCode.nullish(),
+    follow_up: FollowUp.nullish(),
   })
   .superRefine(abstainRule);
 export type AnswerEnvelope = z.infer<typeof AnswerEnvelope>;

@@ -334,6 +334,60 @@ describe("access", () => {
   });
 });
 
+// R47 D1: the operator sets per-role prices through the same approved draft (R24); core serves them to intel.
+describe("model-role prices (R47 D1)", () => {
+  const priced = (extra: Record<string, unknown> = {}) => ({ provider: "gemini", model_id: "gemini-3.8-flash", input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR", ...extra });
+  const priceRow = async (role: string) =>
+    (await db.admin(`SELECT input_price_per_mtok_minor::int AS i, output_price_per_mtok_minor::int AS o, price_currency AS c, probed_at IS NOT NULL AS probed FROM platform.model_role WHERE role = $1`, [role])).rows[0];
+  const approveNew = async (target: string, patch: unknown) => {
+    const p = await propose(target, patch);
+    expect(p.status).toBe(201);
+    const a = await call("POST", `/platform/v1/config-drafts/${(await p.json()).id}:approve`, OP1, {});
+    expect(a.status).toBe(200);
+  };
+
+  it("refusals leave no draft: one or two of the three, a negative, a fraction, a lower-case currency, an unknown key", async () => {
+    const before = await draftCount();
+    for (const patch of [
+      { provider: "gemini", model_id: "gemini-3.8-flash", input_price_per_mtok_minor: 1500 },
+      { provider: "gemini", model_id: "gemini-3.8-flash", input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000 },
+      priced({ input_price_per_mtok_minor: -1 }),
+      priced({ output_price_per_mtok_minor: -1 }),
+      priced({ output_price_per_mtok_minor: 1.5 }),
+      priced({ price_currency: "inr" }),
+      priced({ price_per_token: 1 }),
+    ]) {
+      const r = await propose("model_role:vision", patch);
+      expect([r.status, (await r.json()).error.code]).toEqual([422, "invalid_payload"]);
+    }
+    expect(await draftCount()).toBe(before);
+  });
+
+  it("accept: the prices apply on approve, are audited before and after, and ride with the platform and the internal read", async () => {
+    expect(await priceRow("vision")).toEqual({ i: null, o: null, c: null, probed: false });
+    const p = await propose("model_role:vision", priced());
+    expect(p.status).toBe(201);
+    const d = await p.json();
+    expect(await priceRow("vision")).toEqual({ i: null, o: null, c: null, probed: false }); // pending: nothing applied
+    expect((await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {})).status).toBe(200);
+    expect(await priceRow("vision")).toEqual({ i: 1500, o: 6000, c: "INR", probed: false });
+    const audit = (await db.admin(`SELECT before, after FROM platform.platform_audit WHERE config_draft_id = $1 AND action = 'config_draft.apply'`, [d.id])).rows[0]!;
+    expect(audit.before).toMatchObject({ input_price_per_mtok_minor: null, price_currency: null });
+    expect(audit.after).toMatchObject({ input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR" });
+    const list = SCHEMAS["platform.model-roles"].parse(await (await call("GET", "/platform/v1/model-roles", OP1)).json());
+    expect(list.items.find((r) => r.role === "vision")).toMatchObject({ input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR" });
+    expect(list.items.find((r) => r.role === "embed")).toMatchObject({ input_price_per_mtok_minor: null, output_price_per_mtok_minor: null, price_currency: null });
+  });
+
+  it("a price-only change keeps the probe; a model change resets it and, with no prices given, clears them (an unpriced new model)", async () => {
+    await db.admin(`UPDATE platform.model_role SET probed_at = now() WHERE role = 'vision'`);
+    await approveNew("model_role:vision", priced({ input_price_per_mtok_minor: 2000 }));
+    expect(await priceRow("vision")).toEqual({ i: 2000, o: 6000, c: "INR", probed: true });
+    await approveNew("model_role:vision", { provider: "gemini", model_id: "gemini-3.5-flash-lite" });
+    expect(await priceRow("vision")).toEqual({ i: null, o: null, c: null, probed: false });
+  });
+});
+
 // R3-M5: every platform read and the draft views parse with their published (strict) schemas, each with rows to prove it.
 describe("platform responses parse with the published contracts", () => {
   it.each([

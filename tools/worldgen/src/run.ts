@@ -27,6 +27,8 @@ export interface RunOptions {
   /** Real API: its base URL and a bearer token per persona. Omit both for plan mode. */
   baseUrl?: string;
   token?: (persona: string) => string | Promise<string>;
+  /** Real API: an operator can approve platform config (token for persona "operator" and a platform.operator row). */
+  operator?: boolean;
 }
 
 export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log: string; api: Api }> {
@@ -36,6 +38,7 @@ export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log:
   const api = new Api({
     baseUrl: o.baseUrl ?? "http://plan.invalid", seed, world: o.world, token: o.token ?? (() => "plan"),
     ...(dry ? { fetch: dryFetch(mod.meta), lenient: true } : {}),
+    ...(o.operator ? { operator: true } : {}),
   });
   const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}) });
   await mod.build(c);

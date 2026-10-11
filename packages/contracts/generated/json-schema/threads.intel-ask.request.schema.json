@@ -105,6 +105,9 @@
           "type": "null"
         }
       ]
+    },
+    "deep": {
+      "type": "boolean"
     }
   },
   "required": [

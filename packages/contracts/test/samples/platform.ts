@@ -8,7 +8,8 @@ const pack = { code: "IN", version: 1, effective_from: "2026-04-01", status: "ac
 const plan = { code: "core", name: "Core", limits: { outlets: 3 }, status: "active", created_at: AT };
 const flag = { key: "intel.enabled", value_type: "boolean", value: true, description: "AI surfaces on/off", updated_at: AT };
 const budget = { tenant_id: ID, month: "2026-10-01", limit_minor: 500000, currency: "INR", spent_minor: 1500 };
-const roleRow = { role: "reason", provider: "openrouter", model_id: "meta-llama/llama-3.3-70b-instruct", location: null, probed_at: null, updated_at: AT };
+const roleRow = { role: "reason", provider: "openrouter", model_id: "meta-llama/llama-3.3-70b-instruct", location: null,
+  input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR", probed_at: null, updated_at: AT };
 const operator = { id: OP, email: "ops@example.test", active: true, created_at: AT };
 const draft = {
   id: ID, target: "model_role:reason", patch: { provider: "openrouter", model_id: "meta-llama/llama-3.3-70b-instruct" }, before: null,
@@ -16,7 +17,7 @@ const draft = {
 };
 
 export const SAMPLES: Record<string, unknown> = {
-  "platform.model-role": { role: "reason", provider: "openrouter", model_id: "meta-llama/llama-3.3-70b-instruct" },
+  "platform.model-role": { role: "reason", provider: "openrouter", model_id: "meta-llama/llama-3.3-70b-instruct", input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR" },
   "platform.model-role-row": roleRow,
   "platform.tenant": tenant,
   "platform.country-pack-row": pack,

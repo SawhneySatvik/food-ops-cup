@@ -1092,6 +1092,16 @@
           "name": "loyalty_point_value_minor",
           "type": "bigint",
           "not_null": true
+        },
+        {
+          "name": "negotiation_target_bp",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "negotiation_walkaway_bp",
+          "type": "integer",
+          "not_null": false
         }
       ]
     },
@@ -9591,6 +9601,21 @@
           "name": "updated_at",
           "type": "timestamp with time zone",
           "not_null": true
+        },
+        {
+          "name": "input_price_per_mtok_minor",
+          "type": "bigint",
+          "not_null": false
+        },
+        {
+          "name": "output_price_per_mtok_minor",
+          "type": "bigint",
+          "not_null": false
+        },
+        {
+          "name": "price_currency",
+          "type": "character(3)",
+          "not_null": false
         }
       ]
     },
@@ -18479,7 +18504,7 @@
     },
     {
       "id": "people.labour_vs_demand",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_people_labour_vs_demand",
@@ -18572,6 +18597,23 @@
             "core.staff.wage_rate_minor",
             "core.staff.monthly_salary_minor",
             "core.staff.contract_min_per_month"
+          ]
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid"
+        },
+        {
+          "name": "weekday",
+          "type": "text"
+        },
+        {
+          "name": "excess_min",
+          "type": "integer",
+          "numeric_source": [
+            "count:core.order",
+            "core.attendance.clock_in_at",
+            "core.attendance.clock_out_at"
           ]
         }
       ],
@@ -18904,7 +18946,7 @@
     },
     {
       "id": "purchasing.deal_inputs",
-      "version": 2,
+      "version": 3,
       "min_role": "manager",
       "agent_exposed": false,
       "tool": null,
@@ -18992,7 +19034,8 @@
             "core.order_line.qty_milli",
             "core.order_line.unit_price_minor",
             "core.order_line.line_discount_minor",
-            "core.order_line.tax_minor"
+            "core.order_line.tax_minor",
+            "core.price.amount_minor"
           ]
         },
         {
@@ -19004,6 +19047,10 @@
           "name": "min_payment_days",
           "type": "integer",
           "numeric_source": "core.business_policy.min_payment_days"
+        },
+        {
+          "name": "margin_rule_applies",
+          "type": "boolean"
         }
       ],
       "model_schema": null,
@@ -21964,7 +22011,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "b90b609635e967b7205817e0136bfdb0b97dc1cfcca94f1dfc233614657ee3ab",
+      "sha256": "b8d8e32b64fa5a01c79a72d70ff352507d84b2bc4bb04d40f0af683c7be5d0ad",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -21991,6 +22038,7 @@
         "db/migrations/0023_mc1e_template_versions.sql": "b469db215ee0110933bc416f4d39f3656af9e88f3fb5c4062a4322a17e6d69cc",
         "db/migrations/0024_w32_review_fixes.sql": "542c06a388851d28213590315aadc943a746042d367792dc2429e29a14ad8d9e",
         "db/migrations/0025_w3_close.sql": "f8f4905e79d0075f17e83dbaaf16ee13974a9ee3a8079b9bd3944cd71c15f044",
+        "db/migrations/0026_w3_founder_decisions.sql": "630263c2987034b46683c3d78ef64ce662af12a09a238dc71b227fe99f2bc7bf",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -22012,7 +22060,7 @@
         "packages/contracts/src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
         "packages/contracts/src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
         "packages/contracts/src/intel/specialists.ts": "c9950f7680acf28e9f026fc4bae836f21b7f7bf74553257f3be14bf0a7d03d28",
-        "packages/contracts/src/internal/index.ts": "a71274a4abbbc3e5a91927016121a7eea9925579a774797aedc6603d47b25dfb",
+        "packages/contracts/src/internal/index.ts": "e39f052df45c7605f29571eac69469d2f5e0470cb2f28190e4a0d8ac8ae9cc95",
         "packages/contracts/src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
         "packages/contracts/src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
         "packages/contracts/src/investigations/index.ts": "f6ce47fd1c3a022b6633dfd4189bdf917c1dc7842d4ada3206efe7a8a4f40901",
@@ -22030,7 +22078,7 @@
         "packages/contracts/src/packs/index.ts": "fefeb6495c4655f1e92da5e34991a7b7f4813fcf38d29c1d96bb79f07baf0e3d",
         "packages/contracts/src/people/index.ts": "8670a3edde4f6b56bbb832e39c18774646875ae252ff1b3e0a54963fcb721a7f",
         "packages/contracts/src/people/read-routes.ts": "97b9a114de5099ff5c70ab74afb071b838922436ce1b1feafd2d437e33607a8a",
-        "packages/contracts/src/platform/index.ts": "c8925562167cc062ca63329c01a060b86d689d3615ebb526cf67034dffdb2281",
+        "packages/contracts/src/platform/index.ts": "14ae9957f97134e9a7329984a40bfcaa3a3f472a65c66dfb41ae14044d738877",
         "packages/contracts/src/platform/read-routes.ts": "dc5da34a61187595de3c1c8f7999d93c93ab6b63b5661762817d3940c6481b6d",
         "packages/contracts/src/purchasing/index.ts": "075d0cad98daac8618f16f13127a2babc5d7d61aca385b5eb264a14c16a578aa",
         "packages/contracts/src/registry.ts": "3bf9e3d6c17675f4ea3877cfcb94ef18f9b97cbd75b7d9a1bdd92291f1330b42",
@@ -22038,7 +22086,7 @@
         "packages/contracts/src/shared/command.ts": "54b44302d0fa5e1f54eb9dafc18cec2bcb8e68b3afdce15dc82fe2c2bfc68b38",
         "packages/contracts/src/shared/draft.ts": "d6a23f16c1742663b19e5f0be395c821243adbcb4921d1cdca66bb3bed950a0c",
         "packages/contracts/src/shared/draftables.ts": "4bcaa87ccae30b15f7d37ce3c274072456eea44cf25754ad9afb99d0a4bb142c",
-        "packages/contracts/src/shared/envelope.ts": "db708215a9403304ec5ef72f63726a3913e8dc367a325a792e28cce980a2e6f8",
+        "packages/contracts/src/shared/envelope.ts": "4cafcbcc6c2d4e7daceed396b117aeaa80b118649dac4d342e85ac1b38a1c8f9",
         "packages/contracts/src/shared/error.ts": "43f77505beb12ce0d24ca5ed0411de141cafa2b3a02ef86730c36d1464f5d8da",
         "packages/contracts/src/shared/grammar/index.ts": "2014cd49d302d5736f9a56a6951d1c5c6e40c43d9a79425a4c0964e4c24e1137",
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
@@ -22052,11 +22100,11 @@
         "packages/contracts/src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
         "packages/contracts/src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
         "packages/contracts/src/storefront/index.ts": "57240f351ecd3d3c8872b3f50a667b9a3784ef93e1a5aaf25604e9a0d14efb65",
-        "packages/contracts/src/tenancy/index.ts": "bdb1409a5a1d5709901dabbc1cc215ba2af727f31122093f0c8e581e6e3e8b01",
+        "packages/contracts/src/tenancy/index.ts": "b17ef94109cc5bf932ecc9d93c2ab2449e1664cdac068b342dcd93382dbce0e0",
         "packages/contracts/src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
-        "packages/contracts/src/threads/index.ts": "56a36a8636cfcbd2c1146f0b6522a844d0a6fa878c447b33cc8e244c6783e666"
+        "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "557f2d46586020ccf801f50be6b07a6ab9cadbffebedd603a78757eb1c8c8bd1"
+    "body_sha256": "c60a7e274bb4264e54f4136996fae5193e9e0d9c5df622d5c9fb37da8905fff1"
   }
 }

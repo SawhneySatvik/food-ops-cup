@@ -47,7 +47,8 @@ async function main() {
       + "A the dev host-mode core-api needs real verified sign-ins; for the dev-only local sign-in start it with `MUNIM_IDP=local make up LOCAL_DB=1` and run `make seed` (it mints the tokens).");
   }
   const baseUrl = process.env.MUNIM_API_URL ?? `http://127.0.0.1:${process.env.PORT ?? "8787"}`;
-  const r = await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), baseUrl, token: (p) => tokens[p]! });
+  const r = await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), baseUrl, token: (p) => tokens[p]!, operator: tokens.operator !== undefined });
+  if (tokens.operator === undefined) console.log("worldgen: no operator token, so no AI budget is set for this business (R47 D2: with none, AI declines and rules still run). Add \"operator\" to MUNIM_SEED_TOKENS for a signed-in platform.operator.");
   console.log(`worldgen: ${world} seeded (${r.api.lines.length} writes, as_of=${asOf}, days=${days}); planted ${r.planted.length}: ${r.planted.join(" ")}`);
   console.log(`verify:   node tools/worldgen/verify/run.ts --world=${world} --as-of=${asOf}   (MUNIM_API_URL, MUNIM_SEED_TOKEN)`);
 }

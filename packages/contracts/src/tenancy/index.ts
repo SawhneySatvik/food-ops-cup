@@ -100,6 +100,10 @@ export const TenancyOnboardV1 = z.strictObject({
   }),
 });
 
+/** R47 D7: a negotiation bound as basis points of the reference price (1–20,000: up to double). */
+export const NegotiationBp = z.int().min(1).max(20000);
+export const NEGOTIATION_DEFAULTS = { target_bp: 9500, walkaway_bp: 11000 } as const;
+
 /** The owner's targets the packs judge against (core.business_policy). A policy is versioned by validity: this opens a new version from
  *  `valid_from` (which must be after the version it replaces) and closes the old one; fields not given carry over. `outlet_id` null =
  *  the tenant-wide policy; an outlet id = that outlet's override. */
@@ -109,8 +113,18 @@ export const TenancyPolicySetV1 = z
     valid_from: IsoDate,
     labour_target_bp: BasisPoints.optional(),
     target_margin_bp: BasisPoints.optional(),
+    /** R47 D3: the deal review's margin floor (a quote whose margin at the quoted cost is below it fails) — at most target_margin_bp —
+     *  and the shortest supplier payment term it accepts, in days (0003's columns). At most 365: a quote's payment_days is 0..365
+     *  (0012 intel.supplier_quote), so a longer minimum could never be met. */
+    margin_floor_bp: BasisPoints.optional(),
+    min_payment_days: z.int().min(0).max(365).optional(),
+    /** R47 D7: the share of the reference price a negotiation aims at, and the most it will pay before walking away (basis points of the
+     *  reference: 9500 = 95%, 11000 = 110%, the defaults when unset). Not BasisPoints: a walk-away above 100% is normal. Target ≤ walk-away. */
+    negotiation_target_bp: NegotiationBp.optional(),
+    negotiation_walkaway_bp: NegotiationBp.optional(),
   })
-  .refine((p) => p.labour_target_bp !== undefined || p.target_margin_bp !== undefined, "set at least one target");
+  .refine((p) => p.labour_target_bp !== undefined || p.target_margin_bp !== undefined || p.margin_floor_bp !== undefined
+    || p.min_payment_days !== undefined || p.negotiation_target_bp !== undefined || p.negotiation_walkaway_bp !== undefined, "set at least one target");
 
 export const AcceptingOrders = z.enum(["open", "busy", "paused"]);
 const Minutes = (max: number, min = 0) => z.int().min(min).max(max);

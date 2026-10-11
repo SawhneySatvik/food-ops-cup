@@ -20,6 +20,9 @@ export const AskRequest = z.strictObject({
   question: z.string().trim().min(1).max(2000),
   /** Omitted → a new thread (its specialist = the addressed one, or none for the main conversation). */
   thread_id: Uuid7.optional(),
+  /** R47 D5: the member tapped "dig deeper across specialists?" (an answer's `follow_up: dig_deeper`): an unaddressed investigation
+   *  fans out across the specialists even when the routing guess is unscored. Changes nothing for any other kind of question. */
+  deep: z.boolean().optional(),
 });
 
 /** One rolling-summary item: a validated, cited segment of an answered, untainted turn (ids and refs, no prose). */
@@ -97,6 +100,8 @@ export const IntelAskRequest = z.strictObject({
   question: z.string().min(1).max(2000),
   addressed_to: SpecialistId.nullable(),
   thread: ThreadBlock.nullable(),
+  /** The member's `deep` flag on `POST /v1/ask` (R47 D5); absent = false. */
+  deep: z.boolean().optional(),
 });
 /** intel → core: the stored answer's id and the run's taint (RunState.tainted). No signature, no prose. */
 export const IntelAskResponse = z.strictObject({ answer_id: Uuid7, tainted: z.boolean() });

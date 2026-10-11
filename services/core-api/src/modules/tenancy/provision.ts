@@ -87,6 +87,9 @@ async function financeSeedChart(): Promise<SeedChart | null> {
   return mod.seedChart ?? null;
 }
 
+/** The first business policy's start. Kept after 2000-01-01 so tenancy's "a same-day version is refused" test still hits an equal date. */
+export const POLICY_EPOCH = "2000-01-01";
+
 export async function provisionTenant(tx: Queryable, spec: ProvisionSpec): Promise<ProvisionResult> {
   const T = spec.tenant_id;
   const pack = await loadPack(tx, spec.country_code);
@@ -116,10 +119,11 @@ export async function provisionTenant(tx: Queryable, spec: ProvisionSpec): Promi
     `INSERT INTO core.membership (tenant_id, member_id, role, outlet_ids, created_by) VALUES ($1, $2, $3, '{}', $2)`,
     [T, by, role]);
   // The tenant's first business policy (W2-R4): the columns' defaults — loyalty 1 point per 1,000 minor of net, a
-  // point worth 10 at redemption — in force from today in the tenant's zone. A later policy is a new row.
+  // point worth 10 at redemption, no targets — in force from POLICY_EPOCH. A later policy is a new row. R47 D9: the epoch, not "today", so the
+  // owner can date a first target back over the history already imported (policy.set needs a valid_from after the row it replaces).
   await tx.query(
-    `INSERT INTO core.business_policy (tenant_id, id, valid_from, created_by) VALUES ($1, $2, (now() AT TIME ZONE $3)::date, $4)`,
-    [T, uuidv7(), tz ?? pack.default_timezone, by]);
+    `INSERT INTO core.business_policy (tenant_id, id, valid_from, created_by) VALUES ($1, $2, $3::date, $4)`,
+    [T, uuidv7(), POLICY_EPOCH, by]);
 
   let brand_id: string | null = null;
   const channel_ids: string[] = [];

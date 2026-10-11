@@ -6812,6 +6812,10 @@ export interface components {
             } | null;
             /** @enum {string} */
             narration: "model" | "template";
+            negotiation: {
+                target_bp: number;
+                walkaway_bp: number;
+            };
             licence_kinds: {
                 code: string;
                 /** @enum {string} */
@@ -8338,6 +8342,9 @@ export interface components {
             /** @enum {string} */
             provider: "gemini" | "openai" | "openrouter" | "nvidia";
             model_id: string;
+            input_price_per_mtok_minor?: number;
+            output_price_per_mtok_minor?: number;
+            price_currency?: string;
         };
         /** PlatformModelRoleRow */
         PlatformModelRoleRow: {
@@ -8347,6 +8354,9 @@ export interface components {
             provider: "gemini" | "openai" | "openrouter" | "nvidia";
             model_id: string;
             location: string | null;
+            input_price_per_mtok_minor: number | null;
+            output_price_per_mtok_minor: number | null;
+            price_currency: string | null;
             probed_at: components["schemas"]["IsoDatetime"] | null;
             updated_at: components["schemas"]["IsoDatetime"];
         };
@@ -8857,6 +8867,7 @@ export interface components {
             }[];
             abstained: boolean;
             reason_code?: components["schemas"]["ReasonCode"] | null;
+            follow_up?: "dig_deeper" | null;
         };
         /** FindingEnvelope */
         FindingEnvelope: {
@@ -9358,6 +9369,10 @@ export interface components {
             valid_from: string;
             labour_target_bp?: number;
             target_margin_bp?: number;
+            margin_floor_bp?: number;
+            min_payment_days?: number;
+            negotiation_target_bp?: number;
+            negotiation_walkaway_bp?: number;
         };
         /** TenancyMemberBindV1 */
         TenancyMemberBindV1: {
@@ -9505,6 +9520,7 @@ export interface components {
         V1AskRequest: {
             question: string;
             thread_id?: components["schemas"]["Uuid7"];
+            deep?: boolean;
         };
         /** V1AskResponse */
         V1AskResponse: {
@@ -9598,6 +9614,7 @@ export interface components {
             question: string;
             addressed_to: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
             thread: components["schemas"]["ThreadsBlock"] | null;
+            deep?: boolean;
         };
         /** ThreadsIntelAskResponse */
         ThreadsIntelAskResponse: {

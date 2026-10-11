@@ -39,6 +39,41 @@
               "null"
             ]
           },
+          "input_price_per_mtok_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output_price_per_mtok_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "probed_at": {
             "anyOf": [
               {
@@ -62,6 +97,9 @@
           "provider",
           "model_id",
           "location",
+          "input_price_per_mtok_minor",
+          "output_price_per_mtok_minor",
+          "price_currency",
           "probed_at",
           "updated_at"
         ],

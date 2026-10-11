@@ -15,11 +15,15 @@ import { composeCoreApi, serveApi, type CoreApi } from "../../../services/core-a
 import { parsePendingImports } from "../../../services/core-worker/src/imports/index.ts";
 import { startIntelStub, type IntelStub } from "../../../scripts/dev/intel-stub.ts";
 import { personaIdentity } from "../src/api.ts";
+import { idOf } from "../src/ids.ts";
+import { WORLDS } from "../src/run.ts";
 
 export interface Stack {
   baseUrl: string;
   /** Persona token factory for one world. */
   token(world: string): (persona: string) => string;
+  /** Superuser query on the stack's database (read-only checks in gates). */
+  admin: TestDb["admin"];
   stop(): Promise<void>;
 }
 
@@ -27,6 +31,8 @@ export async function startStack(): Promise<Stack> {
   const db: TestDb = await startTestDb();
   const stub: IntelStub = await startIntelStub();
   const idp = createLocalIdp();
+  // One platform operator per world (R47 D2): the demo business's AI budget is proposed and approved by an operator, as budgets are set.
+  for (const w of WORLDS) await db.admin(`INSERT INTO platform.operator (id, idp_sub, email) VALUES ($1, $2, $3)`, [idOf("stack", w, "operator"), personaIdentity(w, "operator").sub, personaIdentity(w, "operator").email]);
   const url = (role: string) => `postgresql://${role}:${db.password}@127.0.0.1:${db.port}/${db.database}`;
   const config = loadConfig({ env: {} });
   const log = createLogger(config, () => {});
@@ -34,7 +40,7 @@ export async function startStack(): Promise<Stack> {
   const blobDir = await mkdtemp(join(tmpdir(), "worldgen-blobs-"));
   const blobs = localBlobStore(blobDir);
   const api: CoreApi = await composeCoreApi({
-    coreUrl: url("munim_core"), svcUrl: url("munim_svc"), listenUrl: url("munim_core"), idp, config, log, blobs,
+    coreUrl: url("munim_core"), svcUrl: url("munim_svc"), platformUrl: url("munim_platform"), listenUrl: url("munim_core"), idp, config, log, blobs,
     keys: { privateKeyPem: keys.privateKey.export({ type: "pkcs8", format: "pem" }).toString(), publicKeyPem: keys.publicKey.export({ type: "spki", format: "pem" }).toString() },
     intelUrl: stub.url, serviceSecret: "worldgen-test-secret-not-real",
   });
@@ -45,6 +51,7 @@ export async function startStack(): Promise<Stack> {
   return {
     baseUrl: `http://127.0.0.1:${served.port}`,
     token: (world) => (persona) => idp.sign(personaIdentity(world, persona)),
+    admin: (sql, params) => db.admin(sql, params),
     async stop() {
       clearInterval(timer);
       await new Promise((ok) => served.server.close(() => ok(undefined)));

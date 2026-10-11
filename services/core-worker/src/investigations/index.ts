@@ -50,7 +50,8 @@ export function autoImportJob(d: AutoJobDeps): Job {
   };
 }
 
-/** Daily (00:00 UTC): every open or waiting Auto investigation with no step since that boundary. */
+/** Daily (00:00 UTC): every open or waiting Auto investigation with no step since that boundary and new data since its last step
+ *  (R47 D4: core-api's `newData`; a quiet day steps nothing). */
 export function autoDailyJob(d: AutoJobDeps): Job {
   return {
     name: "investigations-auto-daily",

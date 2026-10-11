@@ -38,8 +38,12 @@ export async function budgets(c: Queryable) {
 }
 
 export async function modelRoles(c: Queryable) {
-  const r = await c.query(`SELECT role, provider, model_id, location, ${TS("probed_at")} AS probed_at, ${TS("updated_at")} AS updated_at FROM platform.model_role ORDER BY role`);
-  return { items: r.rows };
+  // R47 D1: the operator's prices ride with the role (null = unpriced). bigint arrives as text; the contract wants a number.
+  const r = await c.query(`SELECT role, provider, model_id, location, input_price_per_mtok_minor::text AS input_price_per_mtok_minor,
+    output_price_per_mtok_minor::text AS output_price_per_mtok_minor, price_currency, ${TS("probed_at")} AS probed_at, ${TS("updated_at")} AS updated_at
+    FROM platform.model_role ORDER BY role`);
+  const num = (v: string | null) => (v === null ? null : Number(v));
+  return { items: r.rows.map((x) => ({ ...x, input_price_per_mtok_minor: num(x.input_price_per_mtok_minor), output_price_per_mtok_minor: num(x.output_price_per_mtok_minor) })) };
 }
 
 export async function operators(c: Queryable) {

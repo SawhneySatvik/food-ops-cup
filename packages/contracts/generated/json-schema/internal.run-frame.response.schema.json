@@ -199,6 +199,26 @@
         "template"
       ]
     },
+    "negotiation": {
+      "type": "object",
+      "properties": {
+        "target_bp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "walkaway_bp": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        }
+      },
+      "required": [
+        "target_bp",
+        "walkaway_bp"
+      ],
+      "additionalProperties": false
+    },
     "licence_kinds": {
       "type": "array",
       "items": {
@@ -256,6 +276,7 @@
     "outlets",
     "budget",
     "narration",
+    "negotiation",
     "licence_kinds",
     "payroll_scope"
   ],

@@ -30,6 +30,26 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 10000
+    },
+    "margin_floor_bp": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "min_payment_days": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 365
+    },
+    "negotiation_target_bp": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20000
+    },
+    "negotiation_walkaway_bp": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20000
     }
   },
   "required": [

@@ -22,6 +22,9 @@ export interface ApiOptions {
   /** A bearer token for a persona (IdP-issued). */
   token: (persona: string) => string | Promise<string>;
   fetch?: typeof fetch;
+  /** An operator is signed in (token for persona "operator", a `platform.operator` row for it): the demo business then gets its monthly AI budget,
+   *  approved by that operator (R47 D2). Plan mode always plans it, so the request log is the same shape. */
+  operator?: boolean;
   /** Plan mode: the transport is a fake, so status checks are skipped (the request log is what is under test). */
   lenient?: boolean;
 }
@@ -122,9 +125,9 @@ export class Api {
     return { status, body: (r.data ?? r.error ?? {}) as J };
   }
 
-  /** A non-command POST (upload, run create, propose): same logging, plain body. */
-  async post(persona: string, path: string, body: J, o: { params?: Record<string, string>; expect?: number[] } = {}) {
-    const c = this.#client(persona, true) as unknown as { POST(p: string, i: unknown): Promise<{ data?: J; error?: J; response: Response }> };
+  /** A non-command POST (upload, run create, propose): same logging, plain body. `noTenant`: no tenant header (operator routes). */
+  async post(persona: string, path: string, body: J, o: { params?: Record<string, string>; expect?: number[]; noTenant?: boolean } = {}) {
+    const c = this.#client(persona, !o.noTenant) as unknown as { POST(p: string, i: unknown): Promise<{ data?: J; error?: J; response: Response }> };
     const r = await c.POST(path, { body, ...(o.params ? { params: { path: o.params } } : {}) });
     if (!this.#o.lenient && !(o.expect ?? [200, 201]).includes(r.response.status)) throw new CommandRefused(r.response.status, "?", `POST ${path}`);
     return (r.data ?? {}) as J;
@@ -141,6 +144,11 @@ export class Api {
     const r = await (c as unknown as { POST(p: string, i: unknown): Promise<{ data?: J; error?: J; response: Response }> }).POST(path, { body });
     if (!this.#o.lenient && !(o.expect ?? [200, 201]).includes(r.response.status)) throw new CommandRefused(r.response.status, "?", `POST ${path}`, String(((r.error as J | undefined)?.error as J | undefined)?.reason_code ?? ""));
     return (r.data ?? {}) as J;
+  }
+
+  /** Whether the run has an operator to approve platform config (always in plan mode). */
+  get hasOperator(): boolean {
+    return this.#o.lenient === true || this.#o.operator === true;
   }
 
   /** True in plan mode (a fake transport): reads return placeholders, so a caller must not wait on what they say. */

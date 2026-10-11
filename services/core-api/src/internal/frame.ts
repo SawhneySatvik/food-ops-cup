@@ -8,10 +8,13 @@
 //     never shown (a person sees the template's snapshot);
 //   - the narration mode: `model` only with AI on (`intel.enabled`), a budget for the month, and hard_left > 0.
 //     Run tokens are never refused for budget: at the cap a run still gets its frame and runs rules only;
+//   - the owner's negotiation bounds (R47 D7): the tenant-wide business policy in force on the frame's UTC date, each bound
+//     defaulting to 9500 / 11000 bp of the reference price when unset. Outlet-level overrides are not served: the bound is per business;
 //   - the pack's `licence_kinds` (code, holder, outlet kinds, `_unverified` as a flag) and `payroll_scope` (W3.2).
 // No thread block: an ask's thread excerpt travels only in core's `/ask` body (T-088a `threadBlock`), which core binds
 // to the run it mints — a run-frame `?thread_id=` would let intel name a thread nothing ties to the run (ruling, 11 Oct).
 // No soft threshold is decided (ADR-014 §3.4 names a soft cap, no document sets it): the level is ok | hard.
+import { NEGOTIATION_DEFAULTS } from "@munim/contracts/tenancy";
 import { businessDate } from "@munim/core-domain/tz";
 import { ApiError } from "../lib/errors.ts";
 import { effectiveCap } from "../modules/ai_policy/index.ts";
@@ -55,6 +58,11 @@ export async function runFrame(c: Queryable, run: Run, at: Date) {
   const aiOn = flag.rows[0]?.value === true;
   const narration = aiOn && budget?.level === "ok" ? ("model" as const) : ("template" as const);
 
+  const pol = (await c.query<{ t: number | null; w: number | null }>(
+    `SELECT negotiation_target_bp AS t, negotiation_walkaway_bp AS w FROM core.business_policy
+      WHERE outlet_id IS NULL AND valid_from <= $1::date AND (valid_to IS NULL OR valid_to > $1::date)
+      ORDER BY valid_from DESC, id LIMIT 1`, [at.toISOString().slice(0, 10)])).rows[0];
+
   return {
     pack: { code: pack.code, version: pack.version },
     currency: pack.doc.currency.code,
@@ -63,6 +71,7 @@ export async function runFrame(c: Queryable, run: Run, at: Date) {
     outlets,
     budget,
     narration,
+    negotiation: { target_bp: pol?.t ?? NEGOTIATION_DEFAULTS.target_bp, walkaway_bp: pol?.w ?? NEGOTIATION_DEFAULTS.walkaway_bp },
     // A kind with `_unverified` notes is flagged, never explained: the notes are pack prose, a watcher needs the code.
     licence_kinds: pack.doc.licence_kinds.map((k) => ({ code: k.code, holder: k.holder, outlet_kinds: k.outlet_kinds, unverified: (k._unverified?.length ?? 0) > 0 })),
     payroll_scope: pack.doc.payroll_scope,

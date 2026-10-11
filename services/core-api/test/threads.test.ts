@@ -68,6 +68,9 @@ interface Fake {
   extra?: Record<string, unknown>;
   /** Wait here before answering (concurrency gate). */
   hold?: Promise<void>;
+  /** R47 D5: the answer offers this follow-up; `forge`: its cited cell names a snapshot that does not exist (core abstains). */
+  followUp?: string;
+  forge?: boolean;
   /** Every JSON body the fake sent or returned (gate 5) and every request core sent it. */
   sent: string[];
   received: any[];
@@ -81,11 +84,11 @@ async function fakeIntel(token: string, body: any): Promise<unknown> {
   const tok = f.foreignRun ? (await mintRunToken({ ...keys, svc: svcTx(db) }, { tenantId: f.foreignRun.tenant, outletScope: ["*"], trigger: "ask", actor: f.foreignRun.owner })).token : token;
   const s = await internal(tok, "snapshots", { template_id: "inventory.below_reorder", params: {} });
   if (s.status !== 201) throw new Error(`fake intel: snapshot ${s.status}`);
-  const snap = Snapshot.parse(await s.json()).snapshot_id;
+  const snap = f.forge ? uuidv7() : Snapshot.parse(await s.json()).snapshot_id;
   const answer = {
     question: f.question ?? body.question,
     envelope: {
-      answer_id: body.answer_id, abstained: false,
+      answer_id: body.answer_id, abstained: false, ...(f.followUp ? { follow_up: f.followUp } : {}),
       segments: [
         { text: `Stock of ⟨snap:${snap}·0·ingredient_name⟩ is low.`, refs: [`snap:${snap}`] },
         { text: `Its reorder level is ⟨snap:${snap}·0·min_qty_milli⟩.`, refs: [`snap:${snap}`] },
@@ -99,9 +102,9 @@ async function fakeIntel(token: string, body: any): Promise<unknown> {
   f.sent.push(JSON.stringify(out));
   return out;
 }
-const ask = (t: Tenant, sub: string, question: string, thread_id?: string, f: Partial<Fake> = {}) => {
+const ask = (t: Tenant, sub: string, question: string, thread_id?: string, f: Partial<Fake> = {}, extra: Record<string, unknown> = {}) => {
   fake = { tainted: false, sent: [], received: [], ...f };
-  return asMember(t, sub, "/v1/ask", { question, ...(thread_id ? { thread_id } : {}) });
+  return asMember(t, sub, "/v1/ask", { question, ...(thread_id ? { thread_id } : {}), ...extra });
 };
 const threads = () => count(`SELECT count(*) n FROM core.ai_thread WHERE tenant_id = $1`, [A.tenant]);
 const turns = () => count(`SELECT count(*) n FROM core.ai_thread_turn WHERE tenant_id = $1`, [A.tenant]);
@@ -194,6 +197,23 @@ describe("the ask path", () => {
     expect((await ask(A, A.ownerSub, " q", undefined, { question: " q 99" })).status).toBe(503);
     expect(await turns()).toBe(before);
     expect((await ask(A, A.ownerSub, " q")).status).toBe(200); // the accept
+  });
+
+  it("R47 D5: the member's `deep` flag reaches intel (false when absent; a non-boolean 400s before intel is called)", async () => {
+    expect((await ask(A, A.ownerSub, "Look into the margin")).status).toBe(200);
+    expect(fake.received.map((b) => b.deep)).toEqual([false]);
+    expect((await ask(A, A.ownerSub, "Look into the margin", undefined, {}, { deep: true })).status).toBe(200);
+    expect(fake.received.map((b) => b.deep)).toEqual([true]);
+    expect((await ask(A, A.ownerSub, "Look into the margin", undefined, {}, { deep: "yes" })).status).toBe(400);
+    expect(fake.received).toEqual([]);
+  });
+
+  it("R47 D5: an answer's follow_up is stored and served — on a validated answer and on core's own abstention (a forged ref); none when not offered", async () => {
+    const view = async (f: Partial<Fake>) => AskResponse.parse(await (await ask(A, A.ownerSub, "Look into the margin", undefined, f)).json()).answer.envelope;
+    const [ok, forged, plain] = [await view({ followUp: "dig_deeper" }), await view({ followUp: "dig_deeper", forge: true }), await view({ forge: true })];
+    expect([ok.abstained, ok.follow_up]).toEqual([false, "dig_deeper"]);
+    expect([forged.abstained, forged.segments, forged.follow_up]).toEqual([true, [], "dig_deeper"]);
+    expect([plain.abstained, plain.follow_up]).toEqual([true, undefined]);
   });
 
   it("bad bodies → 400 (empty question, a non-uuid thread id, an extra field)", async () => {

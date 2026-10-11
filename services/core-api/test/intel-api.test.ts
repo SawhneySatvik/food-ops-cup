@@ -168,6 +168,12 @@ describe("auth: service secret + run token, scope only from the token", () => {
     const roles = ModelRoleList.parse(await r.json());
     // Hand value: the six roles 0015 seeds (router, extract, narrate, reason, vision, embed).
     expect(roles.items.map((x) => x.role).sort()).toEqual(["embed", "extract", "narrate", "reason", "router", "vision"]);
+    // R47 D1: unpriced until the operator approves a price; the three fields are always present.
+    expect(roles.items.every((x) => x.input_price_per_mtok_minor === null && x.output_price_per_mtok_minor === null && x.price_currency === null)).toBe(true);
+    await db.admin(`UPDATE platform.model_role SET input_price_per_mtok_minor = 1500, output_price_per_mtok_minor = 6000, price_currency = 'INR' WHERE role = 'narrate'`);
+    const priced = ModelRoleList.parse(await (await intel(F.tokA, "model-roles", undefined, { method: "GET" })).json());
+    expect(priced.items.find((x) => x.role === "narrate")).toMatchObject({ input_price_per_mtok_minor: 1500, output_price_per_mtok_minor: 6000, price_currency: "INR" });
+    await db.admin(`UPDATE platform.model_role SET input_price_per_mtok_minor = NULL, output_price_per_mtok_minor = NULL, price_currency = NULL WHERE role = 'narrate'`);
   });
 });
 

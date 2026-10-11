@@ -100,7 +100,7 @@ describe("(a) the port's request", () => {
     handler = (_, body, res) => void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ echoed: JSON.parse(body) }));
     seen.length = 0;
     const port = createHttpAskPort({ url: intelUrl, serviceSecret: INTEL_SECRET });
-    const body = { answer_id: "01920000-0000-7000-8000-000000000001", question: "q", addressed_to: null, thread: null };
+    const body = { answer_id: "01920000-0000-7000-8000-000000000001", question: "q", addressed_to: null, thread: null, deep: false };
     expect(await port("run.token.sig", body)).toEqual({ echoed: body });
     expect(seen).toEqual([{ path: "/ask", auth: "Bearer run.token.sig", secret: INTEL_SECRET, body: JSON.stringify(body) }]);
   });
@@ -111,7 +111,7 @@ describe("(b) a hung intel", () => {
     handler = () => undefined; // never answers
     const port = createHttpAskPort({ url: intelUrl, serviceSecret: INTEL_SECRET, timeoutMs: 300 });
     const started = Date.now();
-    await expect(port("run.token.sig", { answer_id: "x", question: "q", addressed_to: null, thread: null })).rejects.toThrow(/^intel \/ask: TimeoutError$/);
+    await expect(port("run.token.sig", { answer_id: "x", question: "q", addressed_to: null, thread: null, deep: false })).rejects.toThrow(/^intel \/ask: TimeoutError$/);
     expect(Date.now() - started).toBeLessThan(5_000);
   });
 
@@ -138,7 +138,7 @@ describe("(c) intel refusing", () => {
   it("a non-2xx rejects with the status only, never the body", async () => {
     handler = (_, __, res) => void res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ secret_body: "model text" }));
     const port = createHttpAskPort({ url: intelUrl, serviceSecret: INTEL_SECRET });
-    const err = await port("t", { answer_id: "x", question: "q", addressed_to: null, thread: null }).catch((e: Error) => e);
+    const err = await port("t", { answer_id: "x", question: "q", addressed_to: null, thread: null, deep: false }).catch((e: Error) => e);
     expect((err as Error).message).toBe("intel /ask: HTTP 500");
   });
 });

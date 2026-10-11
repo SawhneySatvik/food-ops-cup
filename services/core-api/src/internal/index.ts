@@ -6,14 +6,14 @@
 //   POST findings       → 201 {outcome: stored | merged | abstained}
 //   POST drafts         → 201 {status: proposed | abstained} (idempotent, open-duplicate merge, recently_rejected)
 //   POST answers        → 201                               POST traces:batch → 201 {inserted, last_seq}
-//   GET  model-roles    → 200 platform.model_role (R36; the board files it under T-040b)
+//   GET  model-roles    → 200 platform.model_role + the operator's per-1M-token prices (R36, R47 D1; the board files it under T-040b)
 // T-040b (batches.ts, frame.ts):
 //   POST entities:batch · aliases:batch · chunks:batch · claims:batch · edges:batch · quotes:batch · spend
 //                       → 201 {inserted, existing} (idempotent by id; same id + other body → 409)
 //   POST embeddings:batch → 201, or 503 where 0013 (pgvector) is not applied
 //   POST wiki:batch      → 201 {pages[{status: stored | existing | abstained}]}
 //   POST forecasts:batch → 201 {run_inserted, inserted, existing}
-//   GET  run-frame      → 200 pack, thresholds, outlets, budget, narration
+//   GET  run-frame      → 200 pack, thresholds, outlets, budget, narration, negotiation bounds (R47 D7)
 //   GET  brief-items    → 200 the ranked inbox (brief runs only; no dedupe key)
 //   POST graph:query    → 200 {rows} — one of five core-owned graph templates, tenant from the token (graph/index.ts)
 import { MintSnapshotRequest } from "@munim/contracts";

@@ -596,6 +596,19 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "follow_up": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "dig_deeper"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
