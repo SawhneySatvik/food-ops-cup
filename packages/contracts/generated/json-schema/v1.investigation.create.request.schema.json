@@ -55,6 +55,14 @@
           }
         }
       ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "step",
+        "plan",
+        "auto"
+      ]
     }
   },
   "required": [

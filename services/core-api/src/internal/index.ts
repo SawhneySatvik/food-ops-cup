@@ -14,6 +14,7 @@
 //   POST wiki:batch      → 201 {pages[{status: stored | existing | abstained}]}
 //   POST forecasts:batch → 201 {run_inserted, inserted, existing}
 //   GET  run-frame      → 200 pack, thresholds, outlets, budget, narration
+//   GET  brief-items    → 200 the ranked inbox (brief runs only; no dedupe key)
 //   POST graph:query    → 200 {rows} — one of five core-owned graph templates, tenant from the token (graph/index.ts)
 import { MintSnapshotRequest } from "@munim/contracts";
 import { Hono, type Context } from "hono";
@@ -26,6 +27,7 @@ import { authenticate, type InternalConfig, type Run, runTx } from "./auth.ts";
 import {
   refusing, writeAliases, writeChunks, writeClaims, writeEdges, writeEmbeddings, writeEntities, writeForecasts, writeQuotes, writeSpend, writeWiki,
 } from "./batches.ts";
+import { briefItems } from "./brief.ts";
 import { writeDraft } from "./drafts.ts";
 import { graphQuery } from "./graph/index.ts";
 import { runFrame } from "./frame.ts";
@@ -84,6 +86,13 @@ export const router = new Hono<AppEnv>()
   .post(`${P}/:seg{quotes:batch}`, post(201, refusing(writeQuotes)))
   .post(`${P}/spend`, post(201, refusing(writeSpend)))
   .post(`${P}/:seg{graph:query}`, post(200, graphQuery))
+  .get(`${P}/brief-items`, async (c) => {
+    const { run, cfg } = await authenticate(c);
+    // Only a brief run reads the ranked inbox (an event or sweep token must not).
+    if (run.trigger !== "brief") throw new ApiError("not_found");
+    const at = (cfg.clock ?? (() => new Date()))();
+    return c.json(await runTx(c.var.deps, run, (q) => briefItems(q, run, at)), 200);
+  })
   .get(`${P}/run-frame`, async (c) => {
     const { run, cfg } = await authenticate(c);
     const at = (cfg.clock ?? (() => new Date()))();

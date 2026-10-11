@@ -4,7 +4,10 @@
 /events       core's publisher (CloudEvents batch): each event's run token must verify for its own tenant; then each
               event runs under its own token (T-043: events:claim, then the detectors watching its type)
 /watch:sweep  core-worker fan-out: every registered detector over the run's outlets (T-043)
-/brief        core-worker fan-out: token verified, acknowledged (T-054)
+/brief        core-worker fan-out: a `brief` token only; core's ranked inbox (`brief-items`) worded and posted as one stored
+              answer (T-054). Template wording when AI is off, the budget is out or the model fails (rule 11)
+/ingest       an `ingest` token only (a member's document upload). Token plumbing only: core has no route yet that hands
+              intel the document's text, so nothing is read or written here (W4)
 /ask          core's AskPort (T-088a; T-082b): one Manager ask under an `ask` run token → {answer_id, tainted}; the answer
               is stored through core's internal API under core's answer id, before this returns
 /investigate:narrate  core's NarratePort (T-083): one investigation step's narration under an `ask` run token → {answer_id,
@@ -31,6 +34,7 @@ from fastapi.responses import JSONResponse, Response
 from google.adk.models import BaseLlm
 from pydantic import ValidationError
 
+from munim_intel.brief import BriefItem, CoreAnswerSink, compile_brief
 from munim_intel.config import Config, ConfigError
 from munim_intel.contracts_gen.models import Cloudevent, InvestigationsNarrateRequest, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
@@ -41,7 +45,9 @@ from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, f
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
 from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed
+from munim_intel.runtime.state import Budget, RunState
 from munim_intel.smoke import smoke_run
+from munim_intel.trace.buffer import TraceBuffer
 from munim_intel.watch import sweep
 from munim_intel.watch.frame import Frame, FrameSource, core_frame_source
 from munim_intel.watch.pipeline import Report
@@ -182,6 +188,48 @@ def create_app(
     @app.post("/brief")
     async def brief(request: Request) -> Response:
         ctx = run_context(request)
+        # Only a brief token buys a brief (an event or sweep token must not read the ranked inbox or spend a model call).
+        if ctx.trigger != "brief":
+            return _error(401, "unauthenticated")
+        frame = await frame_of(ctx)
+        client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
+        try:
+            llm: BaseLlm | None = None
+            # A frame we cannot get means template wording, not an error (rule 11).
+            if frame is not None and frame.narration == "model":
+                try:
+                    llm = await llm_for_role("narrate", cfg, client)
+                except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
+                    log.warning("intel: brief run %s words by template: %s", ctx.run_id, type(e).__name__)
+            items = [
+                BriefItem(
+                    finding_id=i.finding_id.root,
+                    specialist=i.pack,
+                    severity=i.severity,
+                    kind=i.type,
+                    texts=tuple(t.root for t in i.texts),
+                    impact_ref=i.impact_ref.root if i.impact_ref else None,
+                    draft_ids=tuple(d.root for d in i.draft_ids),
+                )
+                for i in (await client.brief_items()).items
+            ]
+            # One model call for the whole brief; run_agent flushes the traces before it returns.
+            state = RunState(traces=TraceBuffer(client.write_traces), budget=Budget(max_model_calls=1, max_tool_calls=0))
+            report = await compile_brief(items, CoreAnswerSink(client), ctx=ctx, llm=llm, cfg=cfg, state=state)
+        except (CoreError, httpx.HTTPError) as e:
+            log.error("intel: brief run %s failed: %s", ctx.run_id, type(e).__name__)
+            return _error(502, "internal")
+        finally:
+            await client.aclose()
+        return JSONResponse(
+            {"run_id": ctx.run_id, "items": report.items, "posted": report.posted, "abstained": report.abstained}, status_code=202
+        )
+
+    @app.post("/ingest")
+    async def ingest(request: Request) -> Response:
+        ctx = run_context(request)
+        if ctx.trigger != "ingest":
+            return _error(401, "unauthenticated")
         return JSONResponse({"run_id": ctx.run_id}, status_code=202)
 
     @app.post("/ask")

@@ -48,7 +48,9 @@
         "event",
         "watch_sweep",
         "ask",
-        "brief"
+        "brief",
+        "ingest",
+        "auto_step"
       ]
     },
     "actor": {

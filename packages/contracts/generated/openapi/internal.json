@@ -1776,6 +1776,80 @@
           }
         }
       }
+    },
+    "/internal/intel/v1/brief-items": {
+      "get": {
+        "operationId": "getBriefItems",
+        "summary": "The ranked inbox for a brief run: stored finding texts, impact refs, draft ids (no dedupe key)",
+        "security": [
+          {
+            "runToken": [],
+            "serviceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalBriefItemsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8902,6 +8976,593 @@
         ],
         "additionalProperties": false
       },
+      "V1CatalogueItems": {
+        "title": "V1CatalogueItems",
+        "x-munim-contract": "v1.catalogue.items",
+        "x-munim-module": "catalogue",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "dish",
+                    "sku",
+                    "combo"
+                  ]
+                },
+                "name_key": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "brand_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "barcode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stock_ingredient_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "variant_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "name_key": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                      },
+                      "barcode": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "variant_id",
+                      "name_key",
+                      "barcode",
+                      "active"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "item_id",
+                "kind",
+                "name_key",
+                "category",
+                "brand_id",
+                "barcode",
+                "stock_ingredient_id",
+                "active",
+                "variants"
+              ],
+              "additionalProperties": false,
+              "title": "CatalogueItemRow"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CatalogueRecipes": {
+        "title": "V1CatalogueRecipes",
+        "x-munim-contract": "v1.catalogue.recipes",
+        "x-munim-module": "catalogue",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipe_version_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "item_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "variant_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "valid_from": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "valid_to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "yield_qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "recipe_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "ingredient_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z_]{0,15}$"
+                      },
+                      "waste_pct_bp": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    },
+                    "required": [
+                      "recipe_line_id",
+                      "ingredient_id",
+                      "qty_milli",
+                      "unit",
+                      "waste_pct_bp"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "recipe_version_id",
+                "item_id",
+                "variant_id",
+                "version",
+                "valid_from",
+                "valid_to",
+                "yield_qty_milli",
+                "lines"
+              ],
+              "additionalProperties": false,
+              "title": "CatalogueRecipeRow"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CataloguePrices": {
+        "title": "V1CataloguePrices",
+        "x-munim-contract": "v1.catalogue.prices",
+        "x-munim-module": "catalogue",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "price_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "item_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "variant_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "channel_kind": {
+                  "type": "string"
+                },
+                "amount_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "tax_class": {
+                  "type": "string"
+                },
+                "valid_from": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "valid_to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "price_id",
+                "item_id",
+                "variant_id",
+                "outlet_id",
+                "channel_kind",
+                "amount_minor",
+                "currency",
+                "tax_class",
+                "valid_from",
+                "valid_to"
+              ],
+              "additionalProperties": false,
+              "title": "CataloguePriceRow"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CatalogueDeals": {
+        "title": "V1CatalogueDeals",
+        "x-munim-contract": "v1.catalogue.deals",
+        "x-munim-module": "catalogue",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deal_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "name_key": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "rule": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "windows": {
+                  "type": "array",
+                  "items": {}
+                },
+                "outlet_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  }
+                },
+                "valid_from": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "valid_to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "deal_id",
+                "kind",
+                "name_key",
+                "rule",
+                "windows",
+                "outlet_ids",
+                "valid_from",
+                "valid_to",
+                "active"
+              ],
+              "additionalProperties": false,
+              "title": "CatalogueDealRow"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CatalogueCoupons": {
+        "title": "V1CatalogueCoupons",
+        "x-munim-contract": "v1.catalogue.coupons",
+        "x-munim-module": "catalogue",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "coupon_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9][A-Z0-9-]{2,31}$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "percent",
+                    "amount"
+                  ]
+                },
+                "value_bp": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "value_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "min_spend_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "global_cap": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "per_customer_cap": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requires_customer": {
+                  "type": "boolean"
+                },
+                "outlet_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  }
+                },
+                "campaign_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "valid_from": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "valid_to": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDatetime"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "coupon_id",
+                "code",
+                "kind",
+                "value_bp",
+                "value_minor",
+                "currency",
+                "min_spend_minor",
+                "global_cap",
+                "per_customer_cap",
+                "requires_customer",
+                "outlet_ids",
+                "campaign_id",
+                "valid_from",
+                "valid_to",
+                "active"
+              ],
+              "additionalProperties": false,
+              "title": "CatalogueCouponRow"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "CatalogueItemUpsertV1": {
         "title": "CatalogueItemUpsertV1",
         "x-munim-contract": "catalogue.item.upsert.v1",
@@ -14569,6 +15230,736 @@
           }
         ]
       },
+      "V1FinanceSettlements": {
+        "title": "V1FinanceSettlements",
+        "x-munim-contract": "v1.finance.settlements",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "settlement_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "channel_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "period_from": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "period_to": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "paid_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "external_ref": {
+                  "type": "string"
+                },
+                "net_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "settlement_id",
+                "channel_id",
+                "outlet_id",
+                "period_from",
+                "period_to",
+                "paid_on",
+                "external_ref",
+                "net_minor",
+                "currency",
+                "created_at"
+              ],
+              "additionalProperties": false,
+              "title": "SettlementItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1FinanceSettlementLines": {
+        "title": "V1FinanceSettlementLines",
+        "x-munim-contract": "v1.finance.settlement-lines",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "settlement_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "settlement_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "channel_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "line_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "line_kind": {
+                  "type": "string",
+                  "enum": [
+                    "order",
+                    "ad_fee",
+                    "promo_share",
+                    "adjustment",
+                    "other"
+                  ]
+                },
+                "external_order_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "matched_order_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gross_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "commission_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "ad_fee_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "promo_share_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "tax_withheld_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "net_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "settlement_line_id",
+                "settlement_id",
+                "channel_id",
+                "line_no",
+                "line_kind",
+                "external_order_ref",
+                "matched_order_id",
+                "gross_minor",
+                "commission_minor",
+                "ad_fee_minor",
+                "promo_share_minor",
+                "tax_withheld_minor",
+                "net_minor",
+                "currency"
+              ],
+              "additionalProperties": false,
+              "title": "SettlementLineItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1FinanceBankLines": {
+        "title": "V1FinanceBankLines",
+        "x-munim-contract": "v1.finance.bank-lines",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bank_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "account_ref": {
+                  "type": "string"
+                },
+                "value_date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "amount_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "upi",
+                    "card",
+                    "bank_transfer",
+                    "neft",
+                    "imps",
+                    "rtgs",
+                    "cash_deposit",
+                    "cheque",
+                    "fee",
+                    "other"
+                  ]
+                },
+                "payee_vpa": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "narration": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "external_ref": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "bank_line_id",
+                "outlet_id",
+                "account_ref",
+                "value_date",
+                "amount_minor",
+                "currency",
+                "method",
+                "payee_vpa",
+                "narration",
+                "external_ref",
+                "created_at"
+              ],
+              "additionalProperties": false,
+              "title": "BankLineItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1FinanceDisputes": {
+        "title": "V1FinanceDisputes",
+        "x-munim-contract": "v1.finance.disputes",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dispute_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "counterparty": {
+                  "type": "string",
+                  "enum": [
+                    "channel",
+                    "supplier"
+                  ]
+                },
+                "channel_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "supplier_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "supplier_invoice_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "basis": {
+                  "type": "string",
+                  "enum": [
+                    "unapproved_ad_fee",
+                    "short_payout",
+                    "missing_payout",
+                    "overbilled",
+                    "duplicate_invoice",
+                    "other"
+                  ]
+                },
+                "total_claimed_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "recorded",
+                    "sent",
+                    "resolved",
+                    "rejected",
+                    "withdrawn"
+                  ]
+                },
+                "resolved_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "dispute_id",
+                "counterparty",
+                "channel_id",
+                "supplier_id",
+                "supplier_invoice_id",
+                "basis",
+                "total_claimed_minor",
+                "currency",
+                "status",
+                "resolved_minor",
+                "created_at"
+              ],
+              "additionalProperties": false,
+              "title": "DisputeItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1FinanceDispute": {
+        "title": "V1FinanceDispute",
+        "x-munim-contract": "v1.finance.dispute",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "dispute_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "counterparty": {
+            "type": "string",
+            "enum": [
+              "channel",
+              "supplier"
+            ]
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supplier_invoice_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "unapproved_ad_fee",
+              "short_payout",
+              "missing_payout",
+              "overbilled",
+              "duplicate_invoice",
+              "other"
+            ]
+          },
+          "total_claimed_minor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "sent",
+              "resolved",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "resolved_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dispute_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "line_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "settlement_line_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "order_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "supplier_invoice_line_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "claimed_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "dispute_line_id",
+                "line_no",
+                "settlement_line_id",
+                "order_id",
+                "supplier_invoice_line_id",
+                "claimed_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "dispute_id",
+          "counterparty",
+          "channel_id",
+          "supplier_id",
+          "supplier_invoice_id",
+          "basis",
+          "total_claimed_minor",
+          "currency",
+          "status",
+          "resolved_minor",
+          "created_at",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "V1FinancePeriodCloses": {
+        "title": "V1FinancePeriodCloses",
+        "x-munim-contract": "v1.finance.period-closes",
+        "x-munim-module": "finance",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period_close_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "period_month": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "checklist": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "item_code": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                      },
+                      "evidence_ref": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "item_code",
+                      "evidence_ref"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "net_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "closed_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "closed_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "period_close_id",
+                "outlet_id",
+                "period_month",
+                "checklist",
+                "net_minor",
+                "currency",
+                "closed_by",
+                "closed_at"
+              ],
+              "additionalProperties": false,
+              "title": "PeriodCloseItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "FinanceChannelTermsSetV1": {
         "title": "FinanceChannelTermsSetV1",
         "x-munim-contract": "finance.channel_terms.set.v1",
@@ -15762,6 +17153,156 @@
         ],
         "additionalProperties": false
       },
+      "V1Conversations": {
+        "title": "V1Conversations",
+        "x-munim-contract": "v1.conversations",
+        "x-munim-module": "imports",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conversation_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "handover",
+                    "supplier",
+                    "customer",
+                    "imported_chat",
+                    "other"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "document_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "conversation_id",
+                "outlet_id",
+                "kind",
+                "title",
+                "document_id",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1ConversationMessages": {
+        "title": "V1ConversationMessages",
+        "x-munim-contract": "v1.conversation.messages",
+        "x-munim-module": "imports",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "conversation_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "author_member_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "author_label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "body": {
+                  "type": "string"
+                },
+                "sent_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "message_id",
+                "conversation_id",
+                "author_member_id",
+                "author_label",
+                "body",
+                "sent_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "ImportsFormatApproveV1": {
         "title": "ImportsFormatApproveV1",
         "x-munim-contract": "imports.format.approve.v1",
@@ -16260,10 +17801,21 @@
             "items": {
               "$ref": "#/components/schemas/V1ImportsRun"
             }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "runs"
+          "runs",
+          "next_cursor"
         ],
         "additionalProperties": false
       },
@@ -16449,6 +18001,208 @@
         },
         "required": [
           "draft_id"
+        ],
+        "additionalProperties": false
+      },
+      "V1WikiPages": {
+        "title": "V1WikiPages",
+        "x-munim-contract": "v1.wiki.pages",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "entity_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "current_version": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updated_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "page_id",
+                "entity_id",
+                "kind",
+                "slug",
+                "title",
+                "current_version",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1WikiPage": {
+        "title": "V1WikiPage",
+        "x-munim-contract": "v1.wiki.page",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "body": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "page_id",
+          "entity_id",
+          "kind",
+          "slug",
+          "title",
+          "current_version",
+          "updated_at",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "V1WikiVersions": {
+        "title": "V1WikiVersions",
+        "x-munim-contract": "v1.wiki.versions",
+        "x-munim-module": "intel",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "body": {
+                  "type": "array",
+                  "items": {}
+                },
+                "run_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "version_id",
+                "version",
+                "body",
+                "run_id",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
         ],
         "additionalProperties": false
       },
@@ -16657,7 +18411,9 @@
               "event",
               "watch_sweep",
               "ask",
-              "brief"
+              "brief",
+              "ingest",
+              "auto_step"
             ]
           },
           "actor": {
@@ -18953,13 +20709,13 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "maxLength": 200
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                           },
                           {
                             "type": "array",
                             "items": {
                               "type": "string",
-                              "maxLength": 200
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                             }
                           }
                         ]
@@ -20484,6 +22240,581 @@
         ],
         "additionalProperties": false
       },
+      "InternalBriefItemsResponse": {
+        "title": "InternalBriefItemsResponse",
+        "x-munim-contract": "internal.brief-items.response",
+        "x-munim-module": "internal",
+        "type": "object",
+        "properties": {
+          "items": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "finding_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "pack": {
+                  "type": "string",
+                  "enum": [
+                    "catalogue",
+                    "kitchen",
+                    "inventory_purchasing",
+                    "finance",
+                    "people",
+                    "customers",
+                    "compliance",
+                    "market"
+                  ]
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "texts": {
+                  "maxItems": 200,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "impact_ref": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "draft_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  }
+                }
+              },
+              "required": [
+                "finding_id",
+                "pack",
+                "severity",
+                "type",
+                "texts",
+                "impact_ref",
+                "draft_ids"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryIngredients": {
+        "title": "V1InventoryIngredients",
+        "x-munim-contract": "v1.inventory.ingredients",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "base_unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "shelf_life_days": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tracked_by_batch": {
+                  "type": "boolean"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ingredient_id",
+                "name",
+                "base_unit",
+                "shelf_life_days",
+                "tracked_by_batch",
+                "active"
+              ],
+              "additionalProperties": false,
+              "title": "IngredientItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryWaste": {
+        "title": "V1InventoryWaste",
+        "x-munim-contract": "v1.inventory.waste",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "waste_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "batch_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "temperature",
+                    "overprep",
+                    "expired",
+                    "damaged",
+                    "other"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "recorded_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "business_date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                }
+              },
+              "required": [
+                "waste_id",
+                "outlet_id",
+                "ingredient_id",
+                "batch_id",
+                "qty_milli",
+                "unit",
+                "reason",
+                "note",
+                "recorded_by",
+                "at",
+                "business_date"
+              ],
+              "additionalProperties": false,
+              "title": "WasteItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryCounts": {
+        "title": "V1InventoryCounts",
+        "x-munim-contract": "v1.inventory.counts",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stock_count_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "counted_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "counted_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "submitted",
+                    "cancelled"
+                  ]
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "count_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "ingredient_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "batch_id": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Uuid7"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "expected_qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "counted_qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z_]{0,15}$"
+                      }
+                    },
+                    "required": [
+                      "count_line_id",
+                      "ingredient_id",
+                      "batch_id",
+                      "expected_qty_milli",
+                      "counted_qty_milli",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "stock_count_id",
+                "outlet_id",
+                "counted_by",
+                "counted_at",
+                "status",
+                "lines"
+              ],
+              "additionalProperties": false,
+              "title": "StockCountItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryCount": {
+        "title": "V1InventoryCount",
+        "x-munim-contract": "v1.inventory.count",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "stock_count_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "counted_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "counted_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "submitted",
+              "cancelled"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "count_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "batch_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expected_qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "counted_qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                }
+              },
+              "required": [
+                "count_line_id",
+                "ingredient_id",
+                "batch_id",
+                "expected_qty_milli",
+                "counted_qty_milli",
+                "unit"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "stock_count_id",
+          "outlet_id",
+          "counted_by",
+          "counted_at",
+          "status",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "V1InventoryTransfers": {
+        "title": "V1InventoryTransfers",
+        "x-munim-contract": "v1.inventory.transfers",
+        "x-munim-module": "inventory",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transfer_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "from_outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "to_outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "sent",
+                    "received",
+                    "cancelled"
+                  ]
+                },
+                "sent_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "sent_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "received_by": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "received_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDatetime"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "transfer_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "ingredient_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "batch_id": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Uuid7"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z_]{0,15}$"
+                      }
+                    },
+                    "required": [
+                      "transfer_line_id",
+                      "ingredient_id",
+                      "batch_id",
+                      "qty_milli",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "transfer_id",
+                "from_outlet_id",
+                "to_outlet_id",
+                "status",
+                "sent_by",
+                "sent_at",
+                "received_by",
+                "received_at",
+                "lines"
+              ],
+              "additionalProperties": false,
+              "title": "TransferItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "InventoryIngredientUpsertV1": {
         "title": "InventoryIngredientUpsertV1",
         "x-munim-contract": "inventory.ingredient.upsert.v1",
@@ -21372,6 +23703,14 @@
                 }
               }
             ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "step",
+              "plan",
+              "auto"
+            ]
           }
         },
         "required": [
@@ -21396,6 +23735,22 @@
         "required": [
           "step_no"
         ],
+        "additionalProperties": false
+      },
+      "V1InvestigationCancelRequest": {
+        "title": "V1InvestigationCancelRequest",
+        "x-munim-contract": "v1.investigation.cancel.request",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "V1InvestigationApprovePlanRequest": {
+        "title": "V1InvestigationApprovePlanRequest",
+        "x-munim-contract": "v1.investigation.approve-plan.request",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       },
       "V1Investigation": {
@@ -21503,6 +23858,12 @@
             "minimum": 1,
             "maximum": 10
           },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
           "checklist": {
             "type": "array",
             "items": {
@@ -21599,6 +23960,155 @@
               ],
               "additionalProperties": false
             }
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "item_id": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                        },
+                        "label_key": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "specialist": {
+                          "type": "string",
+                          "enum": [
+                            "catalogue",
+                            "kitchen",
+                            "inventory_purchasing",
+                            "finance",
+                            "people",
+                            "customers",
+                            "compliance",
+                            "market"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "item_id",
+                        "label_key",
+                        "specialist"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "specialists": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "catalogue",
+                        "kitchen",
+                        "inventory_purchasing",
+                        "finance",
+                        "people",
+                        "customers",
+                        "compliance",
+                        "market"
+                      ]
+                    }
+                  },
+                  "estimate": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "const": "estimate (computed)"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "computed",
+                          "cannot_verify"
+                        ]
+                      },
+                      "snapshot_id": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Uuid7"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "estimate_ref": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "currency_ref": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "status",
+                      "snapshot_id",
+                      "estimate_ref",
+                      "currency_ref"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "approved_by": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "approved_at": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/IsoDatetime"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "items",
+                  "specialists",
+                  "estimate",
+                  "approved_by",
+                  "approved_at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "steps": {
             "type": "array",
@@ -21805,12 +24315,6 @@
               ],
               "additionalProperties": false
             }
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/IsoDatetime"
-          },
-          "updated_at": {
-            "$ref": "#/components/schemas/IsoDatetime"
           }
         },
         "required": [
@@ -21824,11 +24328,159 @@
           "created_by",
           "steps_done",
           "max_steps",
-          "checklist",
-          "steps",
-          "resolved_refs",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "checklist",
+          "plan",
+          "steps",
+          "resolved_refs"
+        ],
+        "additionalProperties": false
+      },
+      "V1InvestigationsResponse": {
+        "title": "V1InvestigationsResponse",
+        "x-munim-contract": "v1.investigations.response",
+        "x-munim-module": "investigations",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "investigation_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "playbook_id": {
+                  "type": "string",
+                  "enum": [
+                    "margin_fall"
+                  ]
+                },
+                "params": {
+                  "type": "object",
+                  "properties": {
+                    "period_month": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    "compare_month": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    }
+                  },
+                  "required": [
+                    "period_month",
+                    "compare_month"
+                  ],
+                  "additionalProperties": false
+                },
+                "outlet_scope": {
+                  "anyOf": [
+                    {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      }
+                    },
+                    {
+                      "minItems": 1,
+                      "maxItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "const": "*"
+                      }
+                    }
+                  ]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "step",
+                    "plan",
+                    "auto"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "waiting",
+                    "done",
+                    "no_driver_found",
+                    "cannot_verify",
+                    "cancelled",
+                    "exhausted"
+                  ]
+                },
+                "stop_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "abstain",
+                        "budget",
+                        "scope",
+                        "waiting"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "steps_done": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_steps": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "updated_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "investigation_id",
+                "playbook_id",
+                "params",
+                "outlet_scope",
+                "mode",
+                "status",
+                "stop_reason",
+                "created_by",
+                "steps_done",
+                "max_steps",
+                "created_at",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
         ],
         "additionalProperties": false
       },
@@ -23540,6 +26192,355 @@
         },
         "required": [
           "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1OrdersList": {
+        "title": "V1OrdersList",
+        "x-munim-contract": "v1.orders.list",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "channel_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "device_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "dine_in",
+                    "takeaway",
+                    "pickup",
+                    "delivery"
+                  ]
+                },
+                "table_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "accepted",
+                    "rejected",
+                    "preparing",
+                    "ready",
+                    "completed",
+                    "cancelled"
+                  ]
+                },
+                "business_date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "ticket_no": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "subtotal_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "discount_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "tax_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "total_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "promised_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDatetime"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                }
+              },
+              "required": [
+                "order_id",
+                "outlet_id",
+                "channel_id",
+                "device_id",
+                "kind",
+                "table_ref",
+                "status",
+                "business_date",
+                "ticket_no",
+                "subtotal_minor",
+                "discount_minor",
+                "tax_minor",
+                "total_minor",
+                "currency",
+                "promised_at",
+                "created_at"
+              ],
+              "additionalProperties": false,
+              "title": "OrderListItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1ShiftsList": {
+        "title": "V1ShiftsList",
+        "x-munim-contract": "v1.shifts.list",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "shift_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "device_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                },
+                "opened_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "opened_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "float_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "closed_by": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "closed_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDatetime"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "counted_cash_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expected_cash_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "variance_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "shift_id",
+                "outlet_id",
+                "device_id",
+                "status",
+                "opened_by",
+                "opened_at",
+                "float_minor",
+                "currency",
+                "closed_by",
+                "closed_at",
+                "counted_cash_minor",
+                "expected_cash_minor",
+                "variance_minor"
+              ],
+              "additionalProperties": false,
+              "title": "ShiftListItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1PickupWindowsList": {
+        "title": "V1PickupWindowsList",
+        "x-munim-contract": "v1.pickup-windows.list",
+        "x-munim-module": "orders",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pickup_window_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "starts_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "ends_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "capacity_orders": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "booked": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "pickup_window_id",
+                "outlet_id",
+                "starts_at",
+                "ends_at",
+                "capacity_orders",
+                "booked"
+              ],
+              "additionalProperties": false,
+              "title": "PickupWindowItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
         ],
         "additionalProperties": false
       },
@@ -25985,6 +28986,404 @@
         ],
         "additionalProperties": false
       },
+      "V1PeopleRosters": {
+        "title": "V1PeopleRosters",
+        "x-munim-contract": "v1.people.rosters",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "roster_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "week_start": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "cancelled"
+                  ]
+                },
+                "shifts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "roster_shift_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "staff_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "starts_at": {
+                        "$ref": "#/components/schemas/IsoDatetime"
+                      },
+                      "ends_at": {
+                        "$ref": "#/components/schemas/IsoDatetime"
+                      },
+                      "role_key": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "scheduled",
+                          "cancelled"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "roster_shift_id",
+                      "staff_id",
+                      "starts_at",
+                      "ends_at",
+                      "role_key",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "roster_id",
+                "outlet_id",
+                "week_start",
+                "status",
+                "shifts"
+              ],
+              "additionalProperties": false,
+              "title": "RosterItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1PeopleAttendance": {
+        "title": "V1PeopleAttendance",
+        "x-munim-contract": "v1.people.attendance",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attendance_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "staff_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "roster_shift_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "clock_in_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "clock_out_at": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IsoDatetime"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "device",
+                    "manual"
+                  ]
+                },
+                "recorded_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              "required": [
+                "attendance_id",
+                "outlet_id",
+                "staff_id",
+                "roster_shift_id",
+                "clock_in_at",
+                "clock_out_at",
+                "source",
+                "recorded_by"
+              ],
+              "additionalProperties": false,
+              "title": "AttendanceItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1PeopleAdvances": {
+        "title": "V1PeopleAdvances",
+        "x-munim-contract": "v1.people.advances",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "advance_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "staff_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "given",
+                    "recovered"
+                  ]
+                },
+                "amount_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "on_date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "payroll_draft_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "recorded_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              "required": [
+                "advance_id",
+                "staff_id",
+                "outlet_id",
+                "kind",
+                "amount_minor",
+                "currency",
+                "on_date",
+                "payroll_draft_id",
+                "note",
+                "recorded_by"
+              ],
+              "additionalProperties": false,
+              "title": "AdvanceItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1PeoplePayrollDrafts": {
+        "title": "V1PeoplePayrollDrafts",
+        "x-munim-contract": "v1.people.payroll-drafts",
+        "x-munim-module": "people",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "payroll_draft_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "period_month": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "approved",
+                    "paid_externally",
+                    "void"
+                  ]
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "payroll_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "staff_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "base_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "overtime_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "tips_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "advance_recovery_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "net_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    },
+                    "required": [
+                      "payroll_line_id",
+                      "staff_id",
+                      "base_minor",
+                      "overtime_minor",
+                      "tips_minor",
+                      "advance_recovery_minor",
+                      "net_minor",
+                      "currency"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "payroll_draft_id",
+                "outlet_id",
+                "period_month",
+                "status",
+                "currency",
+                "created_at",
+                "lines"
+              ],
+              "additionalProperties": false,
+              "title": "PayrollDraftItem"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "PeopleStaffUpsertV1": {
         "title": "PeopleStaffUpsertV1",
         "x-munim-contract": "people.staff.upsert.v1",
@@ -27148,6 +30547,87 @@
         "required": [
           "outlet_id",
           "staff"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformTenantSpend": {
+        "title": "PlatformTenantSpend",
+        "x-munim-contract": "platform.tenant-spend",
+        "x-munim-module": "platform",
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "limit_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "spent_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "month",
+                "limit_minor",
+                "spent_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "amount_minor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              },
+              "required": [
+                "at",
+                "amount_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "months",
+          "rows",
+          "has_more"
         ],
         "additionalProperties": false
       },
@@ -30070,7 +33550,9 @@
               "event",
               "watch_sweep",
               "ask",
-              "brief"
+              "brief",
+              "ingest",
+              "auto_step"
             ]
           },
           "actor": {
@@ -30224,13 +33706,13 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "maxLength": 200
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                     },
                     {
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "maxLength": 200
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                       }
                     }
                   ]
@@ -32006,6 +35488,104 @@
           "pay_at_counter",
           "lines",
           "events"
+        ],
+        "additionalProperties": false
+      },
+      "V1OutletCalendar": {
+        "title": "V1OutletCalendar",
+        "x-munim-contract": "v1.outlet.calendar",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "tz": {
+            "type": "string",
+            "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "calendar_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "weekly",
+                    "override"
+                  ]
+                },
+                "weekday": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "on_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "opens_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "closes_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "closed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "calendar_id",
+                "kind",
+                "weekday",
+                "on_date",
+                "opens_at",
+                "closes_at",
+                "closed"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "outlet_id",
+          "tz",
+          "rows"
         ],
         "additionalProperties": false
       },

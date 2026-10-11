@@ -22,7 +22,7 @@ function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope:
     tenant_id: tenant,
     outlet_scope: outletScope,
     trigger,
-    actor: trigger === "ask" ? uuidv7() : "watcher:smoke",
+    actor: trigger === "ask" || trigger === "ingest" ? uuidv7() : trigger === "brief" ? "brief" : "watcher:smoke",
     iat,
     exp: iat + ttlSeconds(trigger),
   });
@@ -30,6 +30,8 @@ function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope:
 
 const valid = claims(tenantA, "event", ["*"]);
 const ask = claims(tenantA, "ask", [outlet]);
+const brief = claims(tenantA, "brief", ["*"]);
+const ingest = claims(tenantA, "ingest", [outlet]);
 const expired = claims(tenantA, "event", ["*"], nowS - 3 * 3600);
 const validToken = signJwt(valid, core.privateKey);
 const [h, , s] = validToken.split(".") as [string, string, string];
@@ -42,10 +44,12 @@ console.log(JSON.stringify({
   tenant_a: tenantA,
   tenant_b: tenantB,
   outlet,
-  claims: { valid, ask },
+  claims: { valid, ask, brief, ingest },
   tokens: {
     valid: validToken,
     ask: signJwt(ask, core.privateKey),
+    brief: signJwt(brief, core.privateKey),
+    ingest: signJwt(ingest, core.privateKey),
     expired: signJwt(expired, core.privateKey),
     other_key: signJwt(valid, other.privateKey),
     tampered_to_b: `${h}.${toB}.${s}`,

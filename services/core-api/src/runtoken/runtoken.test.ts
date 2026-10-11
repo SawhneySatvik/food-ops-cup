@@ -48,6 +48,15 @@ describe("run tokens", () => {
     expect(ask.claims.exp - ask.claims.iat).toBe(900);
   });
 
+  test("ingest: an ingest run is recorded (the 0024 CHECK admits it) and gets 30 min, not the 2 h fall-through; its token verifies", async () => {
+    const { token, claims } = await mintRunToken(deps, { tenantId: A.tenant, outletScope: ["*"], trigger: "ingest", actor: A.owner });
+    expect(claims.exp - claims.iat).toBe(1800);
+    expect((await db.admin(`SELECT trigger FROM intel.run WHERE tenant_id = $1 AND id = $2`, [A.tenant, claims.run_id])).rows[0]).toEqual({ trigger: "ingest" });
+    expect(await verifyRunToken(deps, token)).toEqual({ ok: true, claims });
+    const event = await mintA();
+    expect(event.claims.exp - event.claims.iat).toBe(7200); // the pair: another trigger keeps its own TTL
+  });
+
   test("forged → refused: other key, tampered payload, alg swap, garbage; control: the same claims under the real key → accepted", async () => {
     const { token, claims } = await mintA();
     const other = generateKeyPairSync("ed25519");

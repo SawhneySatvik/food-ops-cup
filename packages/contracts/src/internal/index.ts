@@ -324,6 +324,21 @@ export const RunFrameResponse = z.strictObject({
   payroll_scope: z.enum(["drafts", "roster_only"]),
 });
 
+// GET brief-items (T-054 wiring): core's ranked inbox for the run's tenant and scope — `rankInbox` (impact × confidence ×
+// urgency, deduped, drafts attached), top first. Each item carries the finding's stored, core-validated segment texts and
+// its impact cell's canonical ref (null when the cell does not resolve), never the dedupe key (it can hold dates and
+// is never shown, review R-B) and never a number. A draft with no open finding is not an item (it ranks last).
+export const BriefItem = z.strictObject({
+  finding_id: Uuid7,
+  pack: SpecialistId,
+  severity: Severity,
+  type: Slug,
+  texts: z.array(z.string().max(2000)).max(200),
+  impact_ref: SnapCellRef.nullable(),
+  draft_ids: z.array(Uuid7),
+});
+export const BriefItemsResponse = z.strictObject({ items: z.array(BriefItem).max(50) });
+
 export const SCHEMAS = {
   "internal.events-claim.request": EventsClaimRequest,
   "internal.events-claim.response": EventsClaimResponse,
@@ -354,6 +369,7 @@ export const SCHEMAS = {
   "internal.graph-query.response": GraphQueryResponse,
   "internal.spend.request": SpendRequest,
   "internal.run-frame.response": RunFrameResponse,
+  "internal.brief-items.response": BriefItemsResponse,
 };
 
 const P = "/internal/intel/v1";
@@ -395,4 +411,7 @@ export const ROUTES: readonly Route[] = [
   { surface: "internal", method: "get", path: `${P}/run-frame`, operationId: "getRunFrame",
     summary: "The run's pack, thresholds, outlets with business dates, AI budget and narration mode",
     auth: "intel", response: "internal.run-frame.response", status: 200 },
+  { surface: "internal", method: "get", path: `${P}/brief-items`, operationId: "getBriefItems",
+    summary: "The ranked inbox for a brief run: stored finding texts, impact refs, draft ids (no dedupe key)",
+    auth: "intel", response: "internal.brief-items.response", status: 200 },
 ];

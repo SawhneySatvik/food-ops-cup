@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1.investigation.cancel.request",
+  "title": "V1InvestigationCancelRequest",
+  "x-munim-module": "investigations",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

@@ -35,9 +35,16 @@ export type VerifyResult =
   | { ok: true; claims: RunTokenClaims }
   | { ok: false; reason: "malformed" | "bad_signature" | "bad_claims" | "expired" | "unknown_run" | "ended" };
 
-/** `ask` is the interactive run (15 min); event, watch_sweep and brief runs get 2 h (covers redelivery). */
+/** `ask` is the interactive run (15 min). `ingest` is a member's document upload read by the extractor, whose model calls
+ *  run longer than an answer but not for hours (30 min: no ADR states a value; the founder may change it). Event,
+ *  watch_sweep, brief and auto_step runs get 2 h (covers redelivery). Explicit per trigger, so a new trigger is a
+ *  compile error rather than a silent 2 h. */
 export function ttlSeconds(trigger: RunTrigger): number {
-  return trigger === "ask" ? 15 * 60 : 2 * 60 * 60;
+  switch (trigger) {
+    case "ask": return 15 * 60;
+    case "ingest": return 30 * 60;
+    case "event": case "watch_sweep": case "brief": case "auto_step": return 2 * 60 * 60;
+  }
 }
 
 const HEADER = Buffer.from(JSON.stringify({ alg: "EdDSA", typ: "JWT" })).toString("base64url");

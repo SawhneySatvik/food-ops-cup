@@ -48,8 +48,7 @@ class CoreWikiSink:
         self._client = client
 
     async def post(self, req: InternalWikiBatchRequest) -> InternalWikiBatchResponse:
-        # InternalClient has no write_wiki yet (runtime/ is another lane's); it is the same call its siblings make.
-        return await self._client._post("wiki:batch", req, InternalWikiBatchResponse)  # noqa: SLF001
+        return await self._client.write_wiki(req)
 
 
 def page_id(entity_id: str) -> str:

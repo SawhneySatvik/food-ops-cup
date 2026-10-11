@@ -27,7 +27,7 @@ from munim_intel.config import ConfigError
 from munim_intel.contracts_gen.models import Cloudevent, RunTokenClaims
 
 RefusalReason = Literal["malformed", "bad_signature", "bad_claims", "expired", "wrong_tenant"]
-Trigger = Literal["event", "watch_sweep", "ask", "brief"]
+Trigger = Literal["event", "watch_sweep", "ask", "brief", "ingest", "auto_step"]
 
 _B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
 

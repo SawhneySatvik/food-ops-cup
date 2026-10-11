@@ -283,7 +283,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Items with their variants; inactive ones only with include_inactive=true */
+        get: operations["listCatalogueItems"];
         put?: never;
         /** catalogue.item.upsert.v1 — create or update an item with its variants and option groups (owner/manager, all outlets) */
         post: operations["upsertCatalogueItem"];
@@ -300,7 +301,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Recipe versions with their lines, optionally of one item */
+        get: operations["listCatalogueRecipes"];
         put?: never;
         /** catalogue.recipe.version.create.v1 — the next recipe version; closes the open one; an overlapping validity or a unit that is not the ingredient's base unit is refused */
         post: operations["createRecipeVersion"];
@@ -317,7 +319,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Price rows in every validity window, future-dated included */
+        get: operations["listCataloguePrices"];
         put?: never;
         /** catalogue.price.set.v1 — a price for an outlet and channel; closes the open one; an overlapping validity is refused */
         post: operations["setPrice"];
@@ -334,10 +337,29 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Deals visible to the caller's outlet scope (an empty outlet list = every outlet) */
+        get: operations["listCatalogueDeals"];
         put?: never;
         /** catalogue.deal.upsert.v1 — create or update a deal with its weekly windows (outlet time zone) */
         post: operations["upsertDeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalogue/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coupons visible to the caller's outlet scope (an empty outlet list = every outlet) */
+        get: operations["listCatalogueCoupons"];
+        put?: never;
+        /** catalogue.coupon.set.v1 — create a coupon or change its caps, end date or status */
+        post: operations["setCoupon"];
         delete?: never;
         options?: never;
         head?: never;
@@ -355,23 +377,6 @@ export interface paths {
         put?: never;
         /** catalogue.deal.end.v1 — end a deal (payload deal_id must equal the path id) */
         post: operations["endDeal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/catalogue/coupons": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** catalogue.coupon.set.v1 — create a coupon or change its caps, end date or status */
-        post: operations["setCoupon"];
         delete?: never;
         options?: never;
         head?: never;
@@ -583,6 +588,23 @@ export interface paths {
         put?: never;
         /** compliance.maintenance.record.v1 — record maintenance done */
         post: operations["recordMaintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One merchant-side customer record (owner/manager/staff/judge; staff see a masked phone and no email) */
+        get: operations["getCustomer"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -810,6 +832,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/finance/settlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channel settlements (owner, advisor, judge); from / to overlap the settlement period */
+        get: operations["listSettlements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/settlement-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Settlement lines with commission, ad fee, promo share and tax withheld (owner, advisor, judge) */
+        get: operations["listSettlementLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/bank-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Imported bank lines by value date (owner, advisor, judge) */
+        get: operations["listBankLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/disputes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recorded disputes with channels and suppliers (owner, advisor, judge) */
+        get: operations["listDisputes"];
+        put?: never;
+        /** finance.dispute.draft.v1 — record a channel dispute for the owner to send (also draftable) */
+        post: operations["recordDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/disputes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One dispute with its claimed lines */
+        get: operations["getDispute"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/finance/period-closes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Closed periods with their checklist (owner, advisor, judge) */
+        get: operations["listPeriodCloses"];
+        put?: never;
+        /** finance.period.close.v1 — close a month (also draftable); later entries dated in it are refused */
+        post: operations["closePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/finance/channel-terms": {
         parameters: {
             query?: never;
@@ -839,40 +965,6 @@ export interface paths {
         put?: never;
         /** finance.expense.record.v1 — record an expense (posts it) */
         post: operations["recordExpense"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/finance/disputes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** finance.dispute.draft.v1 — record a channel dispute for the owner to send (also draftable) */
-        post: operations["recordDispute"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/finance/period-closes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** finance.period.close.v1 — close a month (also draftable); later entries dated in it are refused */
-        post: operations["closePeriod"];
         delete?: never;
         options?: never;
         head?: never;
@@ -983,6 +1075,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conversations in the caller's outlet scope (handovers, supplier and imported chats); a conversation with no outlet is tenant-wide */
+        get: operations["listConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A conversation's messages, oldest first; bodies are untrusted text */
+        get: operations["listConversationMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/imports/documents": {
         parameters: {
             query?: never;
@@ -1007,7 +1133,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Import runs, newest first */
+        /** Import runs, newest first; kind and status filter, cursor = the last run's id (T-092a) */
         get: operations["listImportRuns"];
         put?: never;
         /** Start a run for an uploaded document whose format is now known (after its mapping was approved) */
@@ -1069,6 +1195,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/wiki/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Wiki pages, newest first */
+        get: operations["listWikiPages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wiki/pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One wiki page with its current body (refs unresolved) */
+        get: operations["getWikiPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wiki/pages/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page's versions with their bodies, newest first */
+        get: operations["listWikiVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -1076,7 +1253,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Findings in the caller's outlet scope */
+        /** Findings in the caller's outlet scope; pack = the specialist (T-092a) */
         get: operations["listFindings"];
         put?: never;
         post?: never;
@@ -1195,10 +1372,82 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Ingredients (tenant-wide); q matches the name; outlet is checked against the caller's scope */
+        get: operations["listIngredients"];
         put?: never;
         /** inventory.ingredient.upsert.v1 — create or edit an ingredient / stock record */
         post: operations["upsertIngredient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/waste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An outlet's waste log; business_date = the outlet's local day less its business-day cutoff */
+        get: operations["listWaste"];
+        put?: never;
+        /** inventory.waste.record.v1 — log waste; core derives the waste movement */
+        post: operations["recordWaste"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock counts with their lines (expected beside counted), newest first */
+        get: operations["listStockCounts"];
+        put?: never;
+        /** inventory.count.submit.v1 — a blind count; core derives count_adjust movements */
+        post: operations["submitStockCount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/counts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One stock count with its lines */
+        get: operations["getStockCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inventory/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Transfers visible from either end (outlet = from or to), with their lines */
+        get: operations["listTransfers"];
+        put?: never;
+        /** inventory.transfer.create.v1 — send stock to another outlet (draftable); both ends in scope */
+        post: operations["createTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1216,40 +1465,6 @@ export interface paths {
         put?: never;
         /** inventory.stock.receive.v1 — opening stock, optionally into new dated batches */
         post: operations["receiveOpeningStock"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inventory/waste": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** inventory.waste.record.v1 — log waste; core derives the waste movement */
-        post: operations["recordWaste"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inventory/counts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** inventory.count.submit.v1 — a blind count; core derives count_adjust movements */
-        post: operations["submitStockCount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1285,23 +1500,6 @@ export interface paths {
         put?: never;
         /** inventory.batch.update.v1 — correct a batch's expiry or MRP */
         post: operations["updateBatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inventory/transfers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** inventory.transfer.create.v1 — send stock to another outlet (draftable); both ends in scope */
-        post: operations["createTransfer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1349,7 +1547,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Stock movement rows for an outlet, newest first */
+        /** Stock movement rows for an outlet, newest first; kind and ref (the source row id) filter (T-092a) */
         get: operations["listStockMovements"];
         put?: never;
         post?: never;
@@ -1383,9 +1581,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Investigations in the caller's outlet scope, most recently changed first; ?status= one status */
+        get: operations["listInvestigations"];
         put?: never;
-        /** Open an investigation (Step mode) for a playbook over the caller's outlet scope; the client's id is its idempotency key */
+        /** Open an investigation (Step or Plan mode, within the role's ceiling) for a playbook over the caller's outlet scope; the client's id is its idempotency key */
         post: operations["createInvestigation"];
         delete?: never;
         options?: never;
@@ -1421,6 +1620,40 @@ export interface paths {
         put?: never;
         /** Run exactly the named next step: mint, judge in code, store, narrate */
         post: operations["continueInvestigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/investigations/{id}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel an open or waiting investigation (its creator); a repeat is a replay, a later :continue is 409 */
+        post: operations["cancelInvestigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/investigations/{id}:approve-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a Plan-mode investigation (its creator, within the role's ceiling) and run its steps inside this request until a stop */
+        post: operations["approveInvestigationPlan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1587,7 +1820,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Orders in the caller's outlet scope, newest first; a shift's orders are those it took a tender for */
+        get: operations["listOrders"];
         put?: never;
         /** orders.place.v1 — core re-prices; client totals are ignored; a preview total that no longer holds is refused (preview_total_changed) */
         post: operations["placeOrder"];
@@ -1757,7 +1991,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** An outlet's pickup slots for a local calendar day, in time order, with capacity and booked */
+        get: operations["listPickupWindows"];
         put?: never;
         /** Create pickup slots for a business date (outlet-local times, DST-safe); existing slots are kept */
         post: operations["generatePickupWindows"];
@@ -1774,7 +2009,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Drawer shifts in the caller's outlet scope, newest first (from / to = the outlet's business day of the opening, local time less its business-day cutoff) */
+        get: operations["listShifts"];
         put?: never;
         /** Open a drawer shift with its float */
         post: operations["openShift"];
@@ -1818,6 +2054,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/rosters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rosters with their shifts; week = the roster's Monday. A staff-role member gets only their own shifts */
+        get: operations["listRosters"];
+        put?: never;
+        /** Create a week's roster (a person's own command) */
+        post: operations["peopleRosterCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/people/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Clock-ins and outs; from / to = the outlet's business day (local time less its business-day cutoff). A staff-role member gets only their own */
+        get: operations["listAttendance"];
+        put?: never;
+        /** Clock a staff member in or out */
+        post: operations["peopleAttendanceRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/people/advances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Salary advances given and recovered (not for staff-role members) */
+        get: operations["listAdvances"];
+        put?: never;
+        /** Record an advance given or recovered */
+        post: operations["peopleAdvanceRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/people/payroll-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Approved payroll drafts with their lines; month = the 1st (not for staff-role members) */
+        get: operations["listPayrollDrafts"];
+        put?: never;
+        /** Record an approved payroll draft (IN only) */
+        post: operations["peoplePayrollDraftCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/staff:upsert": {
         parameters: {
             query?: never;
@@ -1829,23 +2137,6 @@ export interface paths {
         put?: never;
         /** Create or update a staff record */
         post: operations["peopleStaffUpsert"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/people/rosters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create a week's roster (a person's own command) */
-        post: operations["peopleRosterCreate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1869,40 +2160,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/people/attendance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Clock a staff member in or out */
-        post: operations["peopleAttendanceRecord"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/people/payroll-drafts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record an approved payroll draft (IN only) */
-        post: operations["peoplePayrollDraftCreate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/people/payroll-drafts/{id}:status": {
         parameters: {
             query?: never;
@@ -1914,23 +2171,6 @@ export interface paths {
         put?: never;
         /** Mark an approved payroll paid outside Munim, or void it with a reason (reverses its journal entry; owner) */
         post: operations["peoplePayrollDraftStatus"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/people/advances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record an advance given or recovered */
-        post: operations["peopleAdvanceRecord"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2031,6 +2271,23 @@ export interface paths {
         };
         /** Staff of an outlet with their pay terms (not for staff-role members) */
         get: operations["peopleStaffList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/v1/budgets/{tenant}/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A tenant's monthly AI budget and spend rows for one UTC month (default the current), newest first; operator only */
+        get: operations["getTenantSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2651,6 +2908,23 @@ export interface paths {
         put?: never;
         /** storefront.order.reschedule.v1 — inside the outlet's reschedule window; deals re-priced */
         post: operations["storefrontRescheduleOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/outlets/{id}/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An outlet's weekly hours and dated overrides (holidays), in the outlet's own zone; an outlet outside the caller's scope is 404 */
+        get: operations["getOutletCalendar"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4146,6 +4420,105 @@ export interface components {
             }[];
             refs?: string[];
         };
+        /** V1CatalogueItems */
+        V1CatalogueItems: {
+            items: {
+                item_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "dish" | "sku" | "combo";
+                name_key: string;
+                category: string;
+                brand_id: components["schemas"]["Uuid7"] | null;
+                barcode: string | null;
+                stock_ingredient_id: components["schemas"]["Uuid7"] | null;
+                active: boolean;
+                variants: {
+                    variant_id: components["schemas"]["Uuid7"];
+                    name_key: string;
+                    barcode: string | null;
+                    active: boolean;
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CatalogueRecipes */
+        V1CatalogueRecipes: {
+            items: {
+                recipe_version_id: components["schemas"]["Uuid7"];
+                item_id: components["schemas"]["Uuid7"];
+                variant_id: components["schemas"]["Uuid7"] | null;
+                version: number;
+                /** Format: date */
+                valid_from: string;
+                valid_to: string | null;
+                yield_qty_milli: number;
+                lines: {
+                    recipe_line_id: components["schemas"]["Uuid7"];
+                    ingredient_id: components["schemas"]["Uuid7"];
+                    qty_milli: number;
+                    unit: string;
+                    waste_pct_bp: number;
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CataloguePrices */
+        V1CataloguePrices: {
+            items: {
+                price_id: components["schemas"]["Uuid7"];
+                item_id: components["schemas"]["Uuid7"];
+                variant_id: components["schemas"]["Uuid7"] | null;
+                outlet_id: components["schemas"]["Uuid7"];
+                channel_kind: string;
+                amount_minor: number;
+                currency: string;
+                tax_class: string;
+                /** Format: date */
+                valid_from: string;
+                valid_to: string | null;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CatalogueDeals */
+        V1CatalogueDeals: {
+            items: {
+                deal_id: components["schemas"]["Uuid7"];
+                kind: string;
+                name_key: string;
+                rule: {
+                    [key: string]: unknown;
+                };
+                windows: unknown[];
+                outlet_ids: components["schemas"]["Uuid7"][];
+                /** Format: date */
+                valid_from: string;
+                valid_to: string | null;
+                active: boolean;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CatalogueCoupons */
+        V1CatalogueCoupons: {
+            items: {
+                coupon_id: components["schemas"]["Uuid7"];
+                code: string;
+                /** @enum {string} */
+                kind: "percent" | "amount";
+                value_bp: number | null;
+                value_minor: number | null;
+                currency: string;
+                min_spend_minor: number;
+                global_cap: number | null;
+                per_customer_cap: number | null;
+                requires_customer: boolean;
+                outlet_ids: components["schemas"]["Uuid7"][];
+                campaign_id: components["schemas"]["Uuid7"] | null;
+                valid_from: components["schemas"]["IsoDatetime"];
+                valid_to: components["schemas"]["IsoDatetime"] | null;
+                active: boolean;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
         /** CatalogueItemUpsertV1 */
         CatalogueItemUpsertV1: {
             item_id: components["schemas"]["Uuid7"];
@@ -5206,6 +5579,128 @@ export interface components {
         };
         /** MunimEvent */
         MunimEvent: components["schemas"]["MunimOrdersOrderPlacedV1"] | components["schemas"]["MunimInventoryMovementRecordedV1"] | components["schemas"]["MunimPurchasingPoCommittedV1"] | components["schemas"]["MunimKitchenTicketCreatedV1"] | components["schemas"]["MunimKitchenTicketAdvancedV1"] | components["schemas"]["MunimOrdersOrderStatusChangedV1"] | components["schemas"]["MunimOrdersOrderPromiseChangedV1"] | components["schemas"]["MunimOrdersTenderRecordedV1"] | components["schemas"]["MunimOrdersVoidRecordedV1"] | components["schemas"]["MunimOrdersRefundRecordedV1"] | components["schemas"]["MunimOrdersShiftOpenedV1"] | components["schemas"]["MunimOrdersShiftClosedV1"];
+        /** V1FinanceSettlements */
+        V1FinanceSettlements: {
+            items: {
+                settlement_id: components["schemas"]["Uuid7"];
+                channel_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                /** Format: date */
+                period_from: string;
+                /** Format: date */
+                period_to: string;
+                paid_on: string | null;
+                external_ref: string;
+                net_minor: number;
+                currency: string;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1FinanceSettlementLines */
+        V1FinanceSettlementLines: {
+            items: {
+                settlement_line_id: components["schemas"]["Uuid7"];
+                settlement_id: components["schemas"]["Uuid7"];
+                channel_id: components["schemas"]["Uuid7"];
+                line_no: number;
+                /** @enum {string} */
+                line_kind: "order" | "ad_fee" | "promo_share" | "adjustment" | "other";
+                external_order_ref: string | null;
+                matched_order_id: components["schemas"]["Uuid7"] | null;
+                gross_minor: number;
+                commission_minor: number;
+                ad_fee_minor: number;
+                promo_share_minor: number;
+                tax_withheld_minor: number;
+                net_minor: number;
+                currency: string;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1FinanceBankLines */
+        V1FinanceBankLines: {
+            items: {
+                bank_line_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                account_ref: string;
+                /** Format: date */
+                value_date: string;
+                amount_minor: number;
+                currency: string;
+                /** @enum {string} */
+                method: "upi" | "card" | "bank_transfer" | "neft" | "imps" | "rtgs" | "cash_deposit" | "cheque" | "fee" | "other";
+                payee_vpa: string | null;
+                narration: string | null;
+                external_ref: string;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1FinanceDisputes */
+        V1FinanceDisputes: {
+            items: {
+                dispute_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                counterparty: "channel" | "supplier";
+                channel_id: components["schemas"]["Uuid7"] | null;
+                supplier_id: components["schemas"]["Uuid7"] | null;
+                supplier_invoice_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                basis: "unapproved_ad_fee" | "short_payout" | "missing_payout" | "overbilled" | "duplicate_invoice" | "other";
+                total_claimed_minor: number;
+                currency: string;
+                /** @enum {string} */
+                status: "recorded" | "sent" | "resolved" | "rejected" | "withdrawn";
+                resolved_minor: number | null;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1FinanceDispute */
+        V1FinanceDispute: {
+            dispute_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            counterparty: "channel" | "supplier";
+            channel_id: components["schemas"]["Uuid7"] | null;
+            supplier_id: components["schemas"]["Uuid7"] | null;
+            supplier_invoice_id: components["schemas"]["Uuid7"] | null;
+            /** @enum {string} */
+            basis: "unapproved_ad_fee" | "short_payout" | "missing_payout" | "overbilled" | "duplicate_invoice" | "other";
+            total_claimed_minor: number;
+            currency: string;
+            /** @enum {string} */
+            status: "recorded" | "sent" | "resolved" | "rejected" | "withdrawn";
+            resolved_minor: number | null;
+            created_at: components["schemas"]["IsoDatetime"];
+            lines: {
+                dispute_line_id: components["schemas"]["Uuid7"];
+                line_no: number;
+                settlement_line_id: components["schemas"]["Uuid7"] | null;
+                order_id: components["schemas"]["Uuid7"] | null;
+                supplier_invoice_line_id: components["schemas"]["Uuid7"] | null;
+                claimed_minor: number;
+                currency: string;
+            }[];
+        };
+        /** V1FinancePeriodCloses */
+        V1FinancePeriodCloses: {
+            items: {
+                period_close_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                /** Format: date */
+                period_month: string;
+                checklist: {
+                    item_code: string;
+                    evidence_ref: string;
+                }[];
+                net_minor: number;
+                currency: string;
+                closed_by: components["schemas"]["Uuid7"];
+                closed_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
         /** FinanceChannelTermsSetV1 */
         FinanceChannelTermsSetV1: {
             channel_terms_id: components["schemas"]["Uuid7"];
@@ -5433,6 +5928,31 @@ export interface components {
                 done_by: components["schemas"]["Uuid7"] | null;
             }[];
         };
+        /** V1Conversations */
+        V1Conversations: {
+            items: {
+                conversation_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                kind: "handover" | "supplier" | "customer" | "imported_chat" | "other";
+                title: string | null;
+                document_id: components["schemas"]["Uuid7"] | null;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1ConversationMessages */
+        V1ConversationMessages: {
+            items: {
+                message_id: components["schemas"]["Uuid7"];
+                conversation_id: components["schemas"]["Uuid7"];
+                author_member_id: components["schemas"]["Uuid7"] | null;
+                author_label: string | null;
+                body: string;
+                sent_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
         /** ImportsFormatApproveV1 */
         ImportsFormatApproveV1: {
             format_id: components["schemas"]["Uuid7"];
@@ -5522,6 +6042,7 @@ export interface components {
         /** V1ImportsRunsResponse */
         V1ImportsRunsResponse: {
             runs: components["schemas"]["V1ImportsRun"][];
+            next_cursor: components["schemas"]["Uuid7"] | null;
         };
         /** V1ImportsRunRowsResponse */
         V1ImportsRunRowsResponse: {
@@ -5555,6 +6076,41 @@ export interface components {
         /** V1ImportsFormatProposeResponse */
         V1ImportsFormatProposeResponse: {
             draft_id: components["schemas"]["Uuid7"];
+        };
+        /** V1WikiPages */
+        V1WikiPages: {
+            items: {
+                page_id: components["schemas"]["Uuid7"];
+                entity_id: components["schemas"]["Uuid7"] | null;
+                kind: string;
+                slug: string;
+                title: string;
+                current_version: number | null;
+                updated_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1WikiPage */
+        V1WikiPage: {
+            page_id: components["schemas"]["Uuid7"];
+            entity_id: components["schemas"]["Uuid7"] | null;
+            kind: string;
+            slug: string;
+            title: string;
+            current_version: number | null;
+            updated_at: components["schemas"]["IsoDatetime"];
+            body: unknown[];
+        };
+        /** V1WikiVersions */
+        V1WikiVersions: {
+            items: {
+                version_id: components["schemas"]["Uuid7"];
+                version: number;
+                body: unknown[];
+                run_id: components["schemas"]["Uuid7"] | null;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
         };
         /** V1Finding */
         V1Finding: {
@@ -5598,7 +6154,7 @@ export interface components {
         V1RunResponse: {
             run_id: components["schemas"]["Uuid7"];
             /** @enum {string} */
-            trigger: "event" | "watch_sweep" | "ask" | "brief";
+            trigger: "event" | "watch_sweep" | "ask" | "brief" | "ingest" | "auto_step";
             actor: string;
             outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
             issued_at: components["schemas"]["IsoDatetime"];
@@ -6249,6 +6805,110 @@ export interface components {
             /** @enum {string} */
             payroll_scope: "drafts" | "roster_only";
         };
+        /** InternalBriefItemsResponse */
+        InternalBriefItemsResponse: {
+            items: {
+                finding_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                pack: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                /** @enum {string} */
+                severity: "low" | "medium" | "high" | "critical";
+                type: string;
+                texts: string[];
+                impact_ref: string | null;
+                draft_ids: components["schemas"]["Uuid7"][];
+            }[];
+        };
+        /** V1InventoryIngredients */
+        V1InventoryIngredients: {
+            items: {
+                ingredient_id: components["schemas"]["Uuid7"];
+                name: string;
+                base_unit: string;
+                shelf_life_days: number | null;
+                tracked_by_batch: boolean;
+                active: boolean;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1InventoryWaste */
+        V1InventoryWaste: {
+            items: {
+                waste_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                ingredient_id: components["schemas"]["Uuid7"];
+                batch_id: components["schemas"]["Uuid7"] | null;
+                qty_milli: number;
+                unit: string;
+                /** @enum {string} */
+                reason: "temperature" | "overprep" | "expired" | "damaged" | "other";
+                note: string | null;
+                recorded_by: components["schemas"]["Uuid7"];
+                at: components["schemas"]["IsoDatetime"];
+                /** Format: date */
+                business_date: string;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1InventoryCounts */
+        V1InventoryCounts: {
+            items: {
+                stock_count_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                counted_by: components["schemas"]["Uuid7"];
+                counted_at: components["schemas"]["IsoDatetime"];
+                /** @enum {string} */
+                status: "open" | "submitted" | "cancelled";
+                lines: {
+                    count_line_id: components["schemas"]["Uuid7"];
+                    ingredient_id: components["schemas"]["Uuid7"];
+                    batch_id: components["schemas"]["Uuid7"] | null;
+                    expected_qty_milli: number;
+                    counted_qty_milli: number;
+                    unit: string;
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1InventoryCount */
+        V1InventoryCount: {
+            stock_count_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            counted_by: components["schemas"]["Uuid7"];
+            counted_at: components["schemas"]["IsoDatetime"];
+            /** @enum {string} */
+            status: "open" | "submitted" | "cancelled";
+            lines: {
+                count_line_id: components["schemas"]["Uuid7"];
+                ingredient_id: components["schemas"]["Uuid7"];
+                batch_id: components["schemas"]["Uuid7"] | null;
+                expected_qty_milli: number;
+                counted_qty_milli: number;
+                unit: string;
+            }[];
+        };
+        /** V1InventoryTransfers */
+        V1InventoryTransfers: {
+            items: {
+                transfer_id: components["schemas"]["Uuid7"];
+                from_outlet_id: components["schemas"]["Uuid7"];
+                to_outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                status: "sent" | "received" | "cancelled";
+                sent_by: components["schemas"]["Uuid7"];
+                sent_at: components["schemas"]["IsoDatetime"];
+                received_by: components["schemas"]["Uuid7"] | null;
+                received_at: components["schemas"]["IsoDatetime"] | null;
+                lines: {
+                    transfer_line_id: components["schemas"]["Uuid7"];
+                    ingredient_id: components["schemas"]["Uuid7"];
+                    batch_id: components["schemas"]["Uuid7"] | null;
+                    qty_milli: number;
+                    unit: string;
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
         /** InventoryIngredientUpsertV1 */
         InventoryIngredientUpsertV1: {
             ingredient_id: components["schemas"]["Uuid7"];
@@ -6414,11 +7074,17 @@ export interface components {
                 compare_month: string;
             };
             outlet_scope?: components["schemas"]["Uuid7"][] | "*"[];
+            /** @enum {string} */
+            mode?: "step" | "plan" | "auto";
         };
         /** V1InvestigationContinueRequest */
         V1InvestigationContinueRequest: {
             step_no: number;
         };
+        /** V1InvestigationCancelRequest */
+        V1InvestigationCancelRequest: Record<string, never>;
+        /** V1InvestigationApprovePlanRequest */
+        V1InvestigationApprovePlanRequest: Record<string, never>;
         /** V1Investigation */
         V1Investigation: {
             investigation_id: components["schemas"]["Uuid7"];
@@ -6439,6 +7105,8 @@ export interface components {
             created_by: components["schemas"]["Uuid7"];
             steps_done: number;
             max_steps: number;
+            created_at: components["schemas"]["IsoDatetime"];
+            updated_at: components["schemas"]["IsoDatetime"];
             checklist: {
                 item_id: string;
                 label_key: string;
@@ -6457,6 +7125,26 @@ export interface components {
                 snapshot_ids: components["schemas"]["Uuid7"][];
                 refs: string[];
             }[];
+            plan: {
+                items: {
+                    item_id: string;
+                    label_key: string;
+                    /** @enum {string} */
+                    specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
+                }[];
+                specialists: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market")[];
+                estimate: {
+                    /** @constant */
+                    label: "estimate (computed)";
+                    /** @enum {string} */
+                    status: "computed" | "cannot_verify";
+                    snapshot_id: components["schemas"]["Uuid7"] | null;
+                    estimate_ref: string | null;
+                    currency_ref: string | null;
+                };
+                approved_by: components["schemas"]["Uuid7"] | null;
+                approved_at: components["schemas"]["IsoDatetime"] | null;
+            } | null;
             steps: {
                 step_no: number;
                 member_id: components["schemas"]["Uuid7"];
@@ -6493,8 +7181,32 @@ export interface components {
                 ref: components["schemas"]["Ref"];
                 value: string | number | boolean | null;
             }[];
-            created_at: components["schemas"]["IsoDatetime"];
-            updated_at: components["schemas"]["IsoDatetime"];
+        };
+        /** V1InvestigationsResponse */
+        V1InvestigationsResponse: {
+            items: {
+                investigation_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                playbook_id: "margin_fall";
+                params: {
+                    /** Format: date */
+                    period_month: string;
+                    /** Format: date */
+                    compare_month: string;
+                };
+                outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
+                /** @enum {string} */
+                mode: "step" | "plan" | "auto";
+                /** @enum {string} */
+                status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted";
+                stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
+                created_by: components["schemas"]["Uuid7"];
+                steps_done: number;
+                max_steps: number;
+                created_at: components["schemas"]["IsoDatetime"];
+                updated_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: string | null;
         };
         /** InvestigationsNarrateRequest */
         InvestigationsNarrateRequest: {
@@ -6799,6 +7511,63 @@ export interface components {
                     [key: string]: unknown;
                 };
             }[];
+        };
+        /** V1OrdersList */
+        V1OrdersList: {
+            items: {
+                order_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                channel_id: components["schemas"]["Uuid7"];
+                device_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                kind: "dine_in" | "takeaway" | "pickup" | "delivery";
+                table_ref: string | null;
+                /** @enum {string} */
+                status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
+                /** Format: date */
+                business_date: string;
+                ticket_no: number;
+                subtotal_minor: number;
+                discount_minor: number;
+                tax_minor: number;
+                total_minor: number;
+                currency: string;
+                promised_at: components["schemas"]["IsoDatetime"] | null;
+                created_at: components["schemas"]["IsoDatetime"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1ShiftsList */
+        V1ShiftsList: {
+            items: {
+                shift_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                device_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                status: "open" | "closed";
+                opened_by: components["schemas"]["Uuid7"];
+                opened_at: components["schemas"]["IsoDatetime"];
+                float_minor: number;
+                currency: string;
+                closed_by: components["schemas"]["Uuid7"] | null;
+                closed_at: components["schemas"]["IsoDatetime"] | null;
+                counted_cash_minor: number | null;
+                expected_cash_minor: number | null;
+                variance_minor: number | null;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1PickupWindowsList */
+        V1PickupWindowsList: {
+            items: {
+                pickup_window_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                starts_at: components["schemas"]["IsoDatetime"];
+                ends_at: components["schemas"]["IsoDatetime"];
+                capacity_orders: number;
+                booked: number;
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
         };
         /** OrdersPlaceV1 */
         OrdersPlaceV1: {
@@ -7218,6 +7987,84 @@ export interface components {
             }[];
             _unverified?: string[];
         };
+        /** V1PeopleRosters */
+        V1PeopleRosters: {
+            items: {
+                roster_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** Format: date */
+                week_start: string;
+                /** @enum {string} */
+                status: "active" | "cancelled";
+                shifts: {
+                    roster_shift_id: components["schemas"]["Uuid7"];
+                    staff_id: components["schemas"]["Uuid7"];
+                    starts_at: components["schemas"]["IsoDatetime"];
+                    ends_at: components["schemas"]["IsoDatetime"];
+                    role_key: string;
+                    /** @enum {string} */
+                    status: "scheduled" | "cancelled";
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1PeopleAttendance */
+        V1PeopleAttendance: {
+            items: {
+                attendance_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                staff_id: components["schemas"]["Uuid7"];
+                roster_shift_id: components["schemas"]["Uuid7"] | null;
+                clock_in_at: components["schemas"]["IsoDatetime"];
+                clock_out_at: components["schemas"]["IsoDatetime"] | null;
+                /** @enum {string} */
+                source: "device" | "manual";
+                recorded_by: components["schemas"]["Uuid7"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1PeopleAdvances */
+        V1PeopleAdvances: {
+            items: {
+                advance_id: components["schemas"]["Uuid7"];
+                staff_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "given" | "recovered";
+                amount_minor: number;
+                currency: string;
+                /** Format: date */
+                on_date: string;
+                payroll_draft_id: components["schemas"]["Uuid7"] | null;
+                note: string | null;
+                recorded_by: components["schemas"]["Uuid7"];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1PeoplePayrollDrafts */
+        V1PeoplePayrollDrafts: {
+            items: {
+                payroll_draft_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** Format: date */
+                period_month: string;
+                /** @enum {string} */
+                status: "approved" | "paid_externally" | "void";
+                currency: string;
+                created_at: components["schemas"]["IsoDatetime"];
+                lines: {
+                    payroll_line_id: components["schemas"]["Uuid7"];
+                    staff_id: components["schemas"]["Uuid7"];
+                    base_minor: number;
+                    overtime_minor: number;
+                    tips_minor: number;
+                    advance_recovery_minor: number;
+                    net_minor: number;
+                    currency: string;
+                }[];
+            }[];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
         /** PeopleStaffUpsertV1 */
         PeopleStaffUpsertV1: {
             staff_id: components["schemas"]["Uuid7"];
@@ -7446,6 +8293,23 @@ export interface components {
                 left_on: string | null;
                 active: boolean;
             }[];
+        };
+        /** PlatformTenantSpend */
+        PlatformTenantSpend: {
+            tenant_id: components["schemas"]["Uuid7"];
+            months: {
+                /** Format: date */
+                month: string;
+                limit_minor: number;
+                spent_minor: number;
+                currency: string;
+            }[];
+            rows: {
+                at: components["schemas"]["IsoDatetime"];
+                amount_minor: number;
+                currency: string;
+            }[];
+            has_more: boolean;
         };
         /** PlatformModelRole */
         PlatformModelRole: {
@@ -8000,7 +8864,7 @@ export interface components {
             tenant_id: components["schemas"]["Uuid7"];
             outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
             /** @enum {string} */
-            trigger: "event" | "watch_sweep" | "ask" | "brief";
+            trigger: "event" | "watch_sweep" | "ask" | "brief" | "ingest" | "auto_step";
             actor: string;
             iat: number;
             exp: number;
@@ -8343,6 +9207,21 @@ export interface components {
                 to_promised_at: components["schemas"]["IsoDatetime"] | null;
                 reason: string | null;
                 at: components["schemas"]["IsoDatetime"];
+            }[];
+        };
+        /** V1OutletCalendar */
+        V1OutletCalendar: {
+            outlet_id: components["schemas"]["Uuid7"];
+            tz: string;
+            rows: {
+                calendar_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "weekly" | "override";
+                weekday: number | null;
+                on_date: string | null;
+                opens_at: string | null;
+                closes_at: string | null;
+                closed: boolean;
             }[];
         };
         /** TenancyProvisionV1 */
@@ -9643,6 +10522,7 @@ export interface operations {
             query?: {
                 status?: "proposed" | "executing" | "executed" | "failed" | "rejected" | "stale" | "decided";
                 outlet?: string;
+                source?: string;
                 limit?: number;
                 cursor?: string;
             };
@@ -9951,6 +10831,75 @@ export interface operations {
             };
         };
     };
+    listCatalogueItems: {
+        parameters: {
+            query?: {
+                include_inactive?: "true" | "false";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CatalogueItems"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     upsertCatalogueItem: {
         parameters: {
             query?: never;
@@ -10019,6 +10968,75 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCatalogueRecipes: {
+        parameters: {
+            query?: {
+                item?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CatalogueRecipes"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10123,6 +11141,77 @@ export interface operations {
             };
         };
     };
+    listCataloguePrices: {
+        parameters: {
+            query?: {
+                item?: string;
+                outlet?: string;
+                channel_kind?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CataloguePrices"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setPrice: {
         parameters: {
             query?: never;
@@ -10191,6 +11280,74 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCatalogueDeals: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CatalogueDeals"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10295,13 +11452,79 @@ export interface operations {
             };
         };
     };
-    endDeal: {
+    listCatalogueCoupons: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CatalogueCoupons"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setCoupon: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
@@ -10310,8 +11533,8 @@ export interface operations {
                     command_id: components["schemas"]["Uuid7"];
                     idempotency_key: string;
                     /** @constant */
-                    type: "catalogue.deal.end.v1";
-                    payload: components["schemas"]["CatalogueDealEndV1"];
+                    type: "catalogue.coupon.set.v1";
+                    payload: components["schemas"]["CatalogueCouponSetV1"];
                 };
             };
         };
@@ -10383,11 +11606,13 @@ export interface operations {
             };
         };
     };
-    setCoupon: {
+    endDeal: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
         requestBody: {
@@ -10396,8 +11621,8 @@ export interface operations {
                     command_id: components["schemas"]["Uuid7"];
                     idempotency_key: string;
                     /** @constant */
-                    type: "catalogue.coupon.set.v1";
-                    payload: components["schemas"]["CatalogueCouponSetV1"];
+                    type: "catalogue.deal.end.v1";
+                    payload: components["schemas"]["CatalogueDealEndV1"];
                 };
             };
         };
@@ -11929,6 +13154,73 @@ export interface operations {
             };
         };
     };
+    getCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Customer"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listCustomers: {
         parameters: {
             query?: {
@@ -12917,6 +14209,597 @@ export interface operations {
             };
         };
     };
+    listSettlements: {
+        parameters: {
+            query?: {
+                channel?: string;
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceSettlements"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSettlementLines: {
+        parameters: {
+            query?: {
+                channel?: string;
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceSettlementLines"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listBankLines: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceBankLines"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listDisputes: {
+        parameters: {
+            query?: {
+                status?: "recorded" | "sent" | "resolved" | "rejected" | "withdrawn";
+                counterparty?: "channel" | "supplier";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceDisputes"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordDispute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "finance.dispute.draft.v1";
+                    payload: components["schemas"]["FinanceDisputeDraftV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDispute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinanceDispute"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listPeriodCloses: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1FinancePeriodCloses"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    closePeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "finance.period.close.v1";
+                    payload: components["schemas"]["FinancePeriodCloseV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listChannelTerms: {
         parameters: {
             query?: {
@@ -13085,178 +14968,6 @@ export interface operations {
                     /** @constant */
                     type: "finance.expense.record.v1";
                     payload: components["schemas"]["FinanceExpenseRecordV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            201: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    recordDispute: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "finance.dispute.draft.v1";
-                    payload: components["schemas"]["FinanceDisputeDraftV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            201: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    closePeriod: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "finance.period.close.v1";
-                    payload: components["schemas"]["FinancePeriodCloseV1"];
                 };
             };
         };
@@ -13966,6 +15677,146 @@ export interface operations {
             };
         };
     };
+    listConversations: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                kind?: "handover" | "supplier" | "customer" | "imported_chat" | "other";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Conversations"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listConversationMessages: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ConversationMessages"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     uploadImportDocument: {
         parameters: {
             query?: never;
@@ -14037,7 +15888,12 @@ export interface operations {
     };
     listImportRuns: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
+                status?: "parsing" | "previewed" | "committed" | "rejected" | "failed";
+                limit?: number;
+                cursor?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -14372,12 +16228,219 @@ export interface operations {
             };
         };
     };
+    listWikiPages: {
+        parameters: {
+            query?: {
+                kind?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1WikiPages"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getWikiPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1WikiPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWikiVersions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1WikiVersions"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listFindings: {
         parameters: {
             query?: {
                 cursor?: string;
                 limit?: number;
                 status?: "open" | "dismissed" | "resolved";
+                pack?: string;
             };
             header?: never;
             path?: never;
@@ -14851,6 +16914,76 @@ export interface operations {
             };
         };
     };
+    listIngredients: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                q?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InventoryIngredients"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     upsertIngredient: {
         parameters: {
             query?: never;
@@ -14937,34 +17070,27 @@ export interface operations {
             };
         };
     };
-    receiveOpeningStock: {
+    listWaste: {
         parameters: {
-            query?: never;
+            query: {
+                outlet: string;
+                business_date?: string;
+                limit?: number;
+                cursor?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "inventory.stock.receive.v1";
-                    payload: components["schemas"]["InventoryStockReceiveV1"];
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
                 headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommandResult"];
+                    "application/json": components["schemas"]["V1InventoryWaste"];
                 };
             };
             /** @description Bad request */
@@ -14996,15 +17122,6 @@ export interface operations {
             };
             /** @description Not found */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15109,6 +17226,76 @@ export interface operations {
             };
         };
     };
+    listStockCounts: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                status?: "open" | "submitted" | "cancelled";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InventoryCounts"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     submitStockCount: {
         parameters: {
             query?: never;
@@ -15124,6 +17311,315 @@ export interface operations {
                     /** @constant */
                     type: "inventory.count.submit.v1";
                     payload: components["schemas"]["InventoryCountSubmitV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getStockCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InventoryCount"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listTransfers: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                status?: "sent" | "received" | "cancelled";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InventoryTransfers"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "inventory.transfer.create.v1";
+                    payload: components["schemas"]["InventoryTransferCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    receiveOpeningStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "inventory.stock.receive.v1";
+                    payload: components["schemas"]["InventoryStockReceiveV1"];
                 };
             };
         };
@@ -15435,92 +17931,6 @@ export interface operations {
             };
         };
     };
-    createTransfer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "inventory.transfer.create.v1";
-                    payload: components["schemas"]["InventoryTransferCreateV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     receiveTransfer: {
         parameters: {
             query?: never;
@@ -15700,6 +18110,8 @@ export interface operations {
             query: {
                 outlet: string;
                 ingredient?: string;
+                kind?: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return";
+                ref?: string;
                 limit?: number;
                 cursor?: string;
             };
@@ -15784,6 +18196,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1InventoryBatches"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listInvestigations: {
+        parameters: {
+            query?: {
+                status?: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1InvestigationsResponse"];
                 };
             };
             /** @description Bad request */
@@ -15990,6 +18471,166 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["V1InvestigationContinueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Investigation"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    cancelInvestigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["V1InvestigationCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1Investigation"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    approveInvestigationPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["V1InvestigationApprovePlanRequest"];
             };
         };
         responses: {
@@ -16673,6 +19314,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrdersPreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listOrders: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                status?: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
+                table_ref?: string;
+                shift?: string;
+                business_date?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1OrdersList"];
                 };
             };
             /** @description Bad request */
@@ -17567,6 +20281,76 @@ export interface operations {
             };
         };
     };
+    listPickupWindows: {
+        parameters: {
+            query: {
+                outlet: string;
+                date: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PickupWindowsList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     generatePickupWindows: {
         parameters: {
             query?: never;
@@ -17635,6 +20419,79 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listShifts: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                device?: string;
+                status?: "open" | "closed";
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1ShiftsList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17894,7 +20751,77 @@ export interface operations {
             };
         };
     };
-    peopleStaffUpsert: {
+    listRosters: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                week?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleRosters"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peopleRosterCreate: {
         parameters: {
             query?: never;
             header?: never;
@@ -17907,8 +20834,8 @@ export interface operations {
                     command_id: components["schemas"]["Uuid7"];
                     idempotency_key: string;
                     /** @constant */
-                    type: "people.staff.upsert.v1";
-                    payload: components["schemas"]["PeopleStaffUpsertV1"];
+                    type: "people.roster.create.v1";
+                    payload: components["schemas"]["PeopleRosterCreateV1"];
                 };
             };
         };
@@ -17980,7 +20907,78 @@ export interface operations {
             };
         };
     };
-    peopleRosterCreate: {
+    listAttendance: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                from?: string;
+                to?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleAttendance"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peopleAttendanceRecord: {
         parameters: {
             query?: never;
             header?: never;
@@ -17993,8 +20991,407 @@ export interface operations {
                     command_id: components["schemas"]["Uuid7"];
                     idempotency_key: string;
                     /** @constant */
-                    type: "people.roster.create.v1";
-                    payload: components["schemas"]["PeopleRosterCreateV1"];
+                    type: "people.attendance.record.v1";
+                    payload: components["schemas"]["PeopleAttendanceRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAdvances: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                staff?: string;
+                status?: "given" | "recovered";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleAdvances"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peopleAdvanceRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "people.advance.record.v1";
+                    payload: components["schemas"]["PeopleAdvanceRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listPayrollDrafts: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                month?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeoplePayrollDrafts"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peoplePayrollDraftCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "people.payroll_draft.create.v1";
+                    payload: components["schemas"]["PeoplePayrollDraftCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1PeopleCommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    peopleStaffUpsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "people.staff.upsert.v1";
+                    payload: components["schemas"]["PeopleStaffUpsertV1"];
                 };
             };
         };
@@ -18152,178 +21549,6 @@ export interface operations {
             };
         };
     };
-    peopleAttendanceRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "people.attendance.record.v1";
-                    payload: components["schemas"]["PeopleAttendanceRecordV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["V1PeopleCommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    peoplePayrollDraftCreate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "people.payroll_draft.create.v1";
-                    payload: components["schemas"]["PeoplePayrollDraftCreateV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["V1PeopleCommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     peoplePayrollDraftStatus: {
         parameters: {
             query?: never;
@@ -18341,92 +21566,6 @@ export interface operations {
                     /** @constant */
                     type: "people.payroll_draft.status.v1";
                     payload: components["schemas"]["PeoplePayrollDraftStatusV1"];
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description "true" when this is the stored response of an earlier identical request */
-                    "X-Munim-Replayed"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["V1PeopleCommandResult"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not allowed */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    peopleAdvanceRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    command_id: components["schemas"]["Uuid7"];
-                    idempotency_key: string;
-                    /** @constant */
-                    type: "people.advance.record.v1";
-                    payload: components["schemas"]["PeopleAdvanceRecordV1"];
                 };
             };
         };
@@ -18911,6 +22050,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["V1PeopleStaffList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getTenantSpend: {
+        parameters: {
+            query?: {
+                month?: string;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformTenantSpend"];
                 };
             };
             /** @description Bad request */
@@ -21982,6 +25190,73 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getOutletCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1OutletCalendar"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { OutletScope, Uuid7 } from "./primitives.ts";
 
-export const RunTrigger = z.enum(["event", "watch_sweep", "ask", "brief"]);
+export const RunTrigger = z.enum(["event", "watch_sweep", "ask", "brief", "ingest", "auto_step"]);
 
 export const RunTokenClaims = z.strictObject({
   iss: z.literal("munim-core"),
@@ -17,7 +17,7 @@ export const RunTokenClaims = z.strictObject({
   actor: z.string().regex(/^(watcher:[a-z_]+|brief|[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/),
   /** Seconds since the epoch. */
   iat: z.int().positive(),
-  /** 2 h after iat for event runs, 15 min for interactive runs. */
+  /** 2 h after iat for event, sweep and brief runs, 15 min for ask runs, 30 min for ingest runs (core `ttlSeconds`). */
   exp: z.int().positive(),
 });
 export type RunTokenClaims = z.infer<typeof RunTokenClaims>;

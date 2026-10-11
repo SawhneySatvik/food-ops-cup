@@ -20,6 +20,7 @@ from munim_intel.contracts_gen.models import (
     InternalAnswersRequest,
     InternalAnswersResponse,
     InternalBatchResponse,
+    InternalBriefItemsResponse,
     InternalChunksBatchRequest,
     InternalClaimsBatchRequest,
     InternalDraftsRequest,
@@ -39,6 +40,8 @@ from munim_intel.contracts_gen.models import (
     InternalTracesBatchResponse,
     InternalWatchClaimRequest,
     InternalWatchClaimResponse,
+    InternalWikiBatchRequest,
+    InternalWikiBatchResponse,
     PlatformModelRoles,
     Snapshot,
 )
@@ -149,6 +152,9 @@ class InternalClient:
     async def write_quotes(self, req: InternalQuotesBatchRequest) -> InternalBatchResponse:
         return await self._post("quotes:batch", req, InternalBatchResponse)
 
+    async def write_wiki(self, req: InternalWikiBatchRequest) -> InternalWikiBatchResponse:
+        return await self._post("wiki:batch", req, InternalWikiBatchResponse)
+
     async def graph_query(self, template: str, args: dict[str, str | int]) -> list[dict[str, str | int | None]]:
         """One core-owned graph template under the run's tenant (core binds it from the token; never an argument).
         A POST, but it writes nothing; not retried all the same, like every internal POST."""
@@ -157,17 +163,17 @@ class InternalClient:
         rows: list[dict[str, str | int | None]] = res.model_dump(mode="json")["rows"]
         return rows
 
-    async def model_roles(self) -> PlatformModelRoles:
-        """platform.model_role (R36). Retried on a network error, 429 or 5xx — a GET writes nothing."""
+    async def _get(self, path: str, out: type[R]) -> R:
+        """Retried on a network error, 429 or 5xx — a GET writes nothing."""
         last: Exception | None = None
         for _ in range(self._read_attempts):
             try:
-                res = await self._http.get(MODEL_ROLES_PATH)
+                res = await self._http.get(path)
             except httpx.TransportError as e:
                 last = e
                 continue
             if res.is_success:
-                return PlatformModelRoles.model_validate_json(res.content)
+                return out.model_validate_json(res.content)
             last = self._error(res)
             if res.status_code != 429 and res.status_code < 500:
                 break
@@ -175,3 +181,12 @@ class InternalClient:
         if isinstance(last, CoreError):
             raise last
         raise CoreError(0, f"network:{type(last).__name__}", None)
+
+    async def model_roles(self) -> PlatformModelRoles:
+        """platform.model_role (R36)."""
+        return await self._get(MODEL_ROLES_PATH, PlatformModelRoles)
+
+    async def brief_items(self) -> InternalBriefItemsResponse:
+        """core's ranked inbox for this brief run (impact x confidence x urgency, deduped, drafts attached). Core refuses
+        any other trigger. No dedupe key rides in it."""
+        return await self._get(f"{PREFIX}/brief-items", InternalBriefItemsResponse)

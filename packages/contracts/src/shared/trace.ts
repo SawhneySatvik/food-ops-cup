@@ -23,7 +23,9 @@ export const TRACE_KINDS = [
 ] as const;
 export const TraceKind = z.enum(TRACE_KINDS);
 
-const Label = z.string().max(200);
+/** One token of at most 200 characters, no whitespace: the same pattern as intel's `check_payload` (trace/buffer.py), so
+ *  core refuses a prose payload even if a caller skipped intel's check (defence in depth, rule 8). */
+const Label = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$/);
 export const TracePayload = z.record(z.string().regex(/^[a-z_][a-z0-9_]*$/), z.union([Label, z.array(Label)]));
 
 /** Deal-review verdict. The review is deterministic (SQL + rules); `fail` and `cannot_verify` name the

@@ -70,13 +70,13 @@
                   "anyOf": [
                     {
                       "type": "string",
-                      "maxLength": 200
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                     },
                     {
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "maxLength": 200
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$"
                       }
                     }
                   ]

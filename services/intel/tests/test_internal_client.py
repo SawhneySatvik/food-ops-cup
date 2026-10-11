@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
 
-from munim_intel.contracts_gen.models import InternalSnapshotsRequest
+from munim_intel.contracts_gen.models import InternalSnapshotsRequest, InternalWikiBatchRequest
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import CoreError, InternalClient
 
@@ -84,3 +85,30 @@ def test_a_client_error_on_the_read_is_not_retried_and_exposes_codes_only() -> N
     assert len(seen) == 1
     assert (failed.value.code, failed.value.reason_code) == ("forbidden", "authority_denied")
     assert "untrusted text" not in str(failed.value)
+
+
+def test_brief_items_is_a_retried_get_and_write_wiki_a_never_retried_post() -> None:
+    seen, client = core([err(503, "unavailable"), httpx.Response(200, json={"items": []})])
+    got = asyncio.run(client().brief_items())
+    assert (len(seen), got.items, seen[0].method, seen[0].url.path) == (2, [], "GET", "/internal/intel/v1/brief-items")
+    page = "01920000-0000-7000-8000-000000000146"
+    body: dict[str, Any] = {
+        "pages": [
+            {
+                "page_id": page,
+                "entity_id": None,
+                "kind": "outlet",
+                "slug": "main",
+                "title": "Main",
+                "version_id": page,
+                "version": 1,
+                "body": [],
+            }
+        ]
+    }
+    seen, client = core([err(503, "unavailable"), httpx.Response(201, json={"pages": []})])
+    with pytest.raises(CoreError):
+        asyncio.run(client().write_wiki(InternalWikiBatchRequest.model_validate(body)))
+    assert (len(seen), seen[0].method, seen[0].url.path) == (1, "POST", "/internal/intel/v1/wiki:batch")
+    seen, client = core([httpx.Response(201, json={"pages": [{"page_id": page, "version": 1, "status": "stored", "reason_code": None}]})])
+    assert asyncio.run(client().write_wiki(InternalWikiBatchRequest.model_validate(body))).pages[0].status == "stored"
