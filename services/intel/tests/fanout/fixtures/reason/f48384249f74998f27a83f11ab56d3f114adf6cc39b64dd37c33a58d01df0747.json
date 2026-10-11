@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What cut margin in the week ending today?",
+        "specialists": [
+         "finance",
+         "people"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 50,
+    "prompt_token_count": 1372
+   }
+  }
+ ],
+ "step": 0
+}

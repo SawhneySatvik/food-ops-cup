@@ -1,0 +1,31 @@
+{
+ "agent": "munim_branch",
+ "pack": "catalogue",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "The weakest dish lost {S1.r0.loss_minor} on {S1.r0.units_sold} sold."
+         }
+        ]
+       },
+       "name": "report"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 55,
+    "prompt_token_count": 3899
+   }
+  }
+ ],
+ "step": 1
+}

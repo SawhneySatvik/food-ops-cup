@@ -1,0 +1,31 @@
+{
+ "agent": "munim_branch",
+ "pack": "inventory_purchasing",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "Waste ran {S3.r0.excess_minor} above its usual {S3.r0.median_minor}."
+         }
+        ]
+       },
+       "name": "report"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 55,
+    "prompt_token_count": 4640
+   }
+  }
+ ],
+ "step": 1
+}

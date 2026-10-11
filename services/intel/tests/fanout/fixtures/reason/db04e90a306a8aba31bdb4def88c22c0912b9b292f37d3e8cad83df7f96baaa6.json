@@ -1,0 +1,34 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "A cold-room asset logged {S1.r0.out_of_range} readings out of range, costing {S1.r0.temp_waste_minor}."
+         },
+         {
+          "text": "{S2.r0.component} moved by {S2.r0.delta_minor} against last month."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 89,
+    "prompt_token_count": 1538
+   }
+  }
+ ],
+ "step": 1
+}

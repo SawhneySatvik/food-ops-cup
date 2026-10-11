@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What went wrong on Tuesday this week?",
+        "specialists": [
+         "finance",
+         "kitchen"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 49,
+    "prompt_token_count": 1370
+   }
+  }
+ ],
+ "step": 0
+}

@@ -1,0 +1,31 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "{S1.r0.component} moved by {S1.r0.delta_minor} against last month."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 56,
+    "prompt_token_count": 4276
+   }
+  }
+ ],
+ "step": 1
+}

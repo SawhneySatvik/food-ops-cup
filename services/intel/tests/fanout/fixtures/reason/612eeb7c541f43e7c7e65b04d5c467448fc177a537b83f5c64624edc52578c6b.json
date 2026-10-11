@@ -1,0 +1,34 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "The weakest dish lost {S1.r0.loss_minor} on {S1.r0.units_sold} sold."
+         },
+         {
+          "text": "{S2.r0.component} moved by {S2.r0.delta_minor} against last month."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 80,
+    "prompt_token_count": 1527
+   }
+  }
+ ],
+ "step": 1
+}

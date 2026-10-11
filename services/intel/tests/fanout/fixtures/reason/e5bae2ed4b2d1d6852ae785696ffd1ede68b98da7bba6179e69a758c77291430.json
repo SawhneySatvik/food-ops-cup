@@ -1,0 +1,26 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "pack": "finance"
+       },
+       "name": "load_skill"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 29,
+    "prompt_token_count": 1139
+   }
+  }
+ ],
+ "step": 0
+}

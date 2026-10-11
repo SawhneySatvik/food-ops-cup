@@ -1,0 +1,30 @@
+{
+ "agent": "munim_branch",
+ "pack": "catalogue",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "channel_kind": null,
+        "from": "2026-10-04",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
+       },
+       "name": "read_catalogue_dish_margin"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 55,
+    "prompt_token_count": 3408
+   }
+  }
+ ],
+ "step": 0
+}

@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "Why were delivery payouts short in the week ending today?",
+        "specialists": [
+         "finance",
+         "customers"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 55,
+    "prompt_token_count": 1376
+   }
+  }
+ ],
+ "step": 0
+}

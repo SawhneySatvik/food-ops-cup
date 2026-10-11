@@ -1,0 +1,37 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "The weakest dish lost {S1.r0.loss_minor} on {S1.r0.units_sold} sold."
+         },
+         {
+          "text": "{S2.r0.component} moved by {S2.r0.delta_minor} against last month."
+         },
+         {
+          "text": "The coming {S3.r0.label} is expected to add {S3.r0.expected_extra_sales_minor}."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 106,
+    "prompt_token_count": 1577
+   }
+  }
+ ],
+ "step": 1
+}

@@ -1,0 +1,29 @@
+{
+ "agent": "munim_branch",
+ "pack": "kitchen",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "from": "2026-10-04",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
+       },
+       "name": "read_kitchen_ticket_times"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 48,
+    "prompt_token_count": 2642
+   }
+  }
+ ],
+ "step": 0
+}

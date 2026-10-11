@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "Why have regular customers stopped visiting?",
+        "specialists": [
+         "customers",
+         "market"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 51,
+    "prompt_token_count": 1372
+   }
+  }
+ ],
+ "step": 0
+}

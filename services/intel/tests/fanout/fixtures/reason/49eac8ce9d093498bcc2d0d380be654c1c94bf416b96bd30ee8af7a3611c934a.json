@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What raised utility and repair costs in recent months?",
+        "specialists": [
+         "compliance",
+         "finance"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 55,
+    "prompt_token_count": 1375
+   }
+  }
+ ],
+ "step": 0
+}

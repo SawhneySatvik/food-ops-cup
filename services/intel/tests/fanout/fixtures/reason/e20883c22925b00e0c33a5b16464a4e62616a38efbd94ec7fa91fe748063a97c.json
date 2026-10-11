@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What do reviews and payouts say about the week ending today?",
+        "specialists": [
+         "customers",
+         "finance"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 56,
+    "prompt_token_count": 1374
+   }
+  }
+ ],
+ "step": 0
+}

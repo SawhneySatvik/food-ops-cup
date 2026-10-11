@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What is driving waste in the week ending today?",
+        "specialists": [
+         "inventory_purchasing",
+         "kitchen"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 56,
+    "prompt_token_count": 1372
+   }
+  }
+ ],
+ "step": 0
+}

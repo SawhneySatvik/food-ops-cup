@@ -1,0 +1,27 @@
+{
+ "agent": "munim_branch",
+ "pack": "people",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": "insufficient_history",
+        "segments": []
+       },
+       "name": "report"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 37,
+    "prompt_token_count": 2972
+   }
+  }
+ ],
+ "step": 0
+}

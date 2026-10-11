@@ -25,6 +25,7 @@ from dataclasses import dataclass
 import httpx
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
+from google.adk.tools.base_tool import BaseTool
 from pydantic import ValidationError
 
 from munim_intel.config import Config, ConfigError
@@ -39,8 +40,9 @@ from munim_intel.contracts_gen.models import (
 from munim_intel.decide.mimic import router_decision_model
 from munim_intel.decide.port import Band, DecisionModel, DecisionState, EgressRefused, answer_or_fallback
 from munim_intel.decide.questions import ROUTE_INTENT
+from munim_intel.fanout.tool import Branches, FanOutTool, orchestrator_budget
 from munim_intel.llm import llm_for_role
-from munim_intel.manager.paths import PATHS, Binding, bind, not_applicable
+from munim_intel.manager.paths import FAN_OUT, PATHS, Binding, bind, not_applicable
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import PREFIX, SERVICE_SECRET_HEADER, InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
@@ -130,22 +132,37 @@ class Prepared:
     toolset: PackToolset
     assembler: ManagerAssembler
     submit: SubmitAnswerTool
+    fan_out: FanOutTool | None = None
 
 
-def prepare(ctx: RunContext, req: ThreadsIntelAskRequest, frame: InternalRunFrameResponse, client: InternalClient, b: Binding) -> Prepared:
+def prepare(
+    ctx: RunContext,
+    req: ThreadsIntelAskRequest,
+    frame: InternalRunFrameResponse,
+    client: InternalClient,
+    b: Binding,
+    branches: Branches | None = None,
+) -> Prepared:
     """The Manager's context for one ask: one RunState and HandleTable, submit_answer as the one base tool, the
-    addressed skill loaded in code (no load_skill), propose tools only as the binding says."""
+    addressed skill loaded in code (no load_skill), propose tools only as the binding says. On the unaddressed
+    `investigate` path, given `branches`, `fan_out` joins as a base tool (F5) and the run takes §3.4's fan-out
+    orchestrator caps; an addressed investigate stays with the named specialist, single agent."""
     state = RunState(traces=TraceBuffer(client.write_traces))
     handles = HandleTable(state.handles)
     toolset: PackToolset
     submit = SubmitAnswerTool(req.answer_id.root, handles, lambda: [c for s in toolset.skills for c in s.refusal_codes])
+    fan_out = None
+    if b.path is FAN_OUT and b.skill is None and branches is not None:
+        state.budget = orchestrator_budget()
+        fan_out = FanOutTool(ctx, client, handles, state, frame, branches)
+    base: list[BaseTool] = [submit] if fan_out is None else [submit, fan_out]
     toolset = PackToolset(
-        ctx, client, handles, state, propose=b.propose, payroll_scope=frame.payroll_scope, base_tools=[submit], loadable=b.loadable
+        ctx, client, handles, state, propose=b.propose, payroll_scope=frame.payroll_scope, base_tools=base, loadable=b.loadable
     )
     if b.skill is not None:
         toolset.load(b.skill)
     assembler = ManagerAssembler("orchestrator", state, handles, toolset, frame, ctx.trigger, thread=req.thread)
-    return Prepared(state, handles, toolset, assembler, submit)
+    return Prepared(state, handles, toolset, assembler, submit, fan_out)
 
 
 async def _store(client: InternalClient, req: ThreadsIntelAskRequest, envelope: AnswerEnvelope, tainted: bool) -> ThreadsIntelAskResponse:
@@ -186,7 +203,7 @@ async def answer_ask(
     if b.abstain is not None:
         return await early(b.abstain, labels)
 
-    p = prepare(ctx, req, frame, client, b)
+    p = prepare(ctx, req, frame, client, b, Branches(models.reason, cfg))
     await p.state.traces.append("route", actor, labels)
     if b.skill is not None:
         await p.state.traces.append("skill_load", actor, {"skill": b.skill, "by": "addressed"})

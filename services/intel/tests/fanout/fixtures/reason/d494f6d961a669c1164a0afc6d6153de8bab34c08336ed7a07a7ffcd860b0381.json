@@ -1,0 +1,26 @@
+{
+ "agent": "munim_branch",
+ "pack": "customers",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "query": "reviews this week"
+       },
+       "name": "search"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 31,
+    "prompt_token_count": 3233
+   }
+  }
+ ],
+ "step": 0
+}

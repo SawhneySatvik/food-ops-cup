@@ -1,0 +1,29 @@
+{
+ "agent": "munim_branch",
+ "pack": "compliance",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "from": "2026-09-01",
+        "outlet_id": null,
+        "page": 0,
+        "to": "2026-10-10"
+       },
+       "name": "read_compliance_temp_excursions"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 50,
+    "prompt_token_count": 2734
+   }
+  }
+ ],
+ "step": 0
+}

@@ -1,0 +1,28 @@
+{
+ "agent": "munim_branch",
+ "pack": "inventory_purchasing",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "outlet_id": null,
+        "page": 0,
+        "week_start": "2026-09-28"
+       },
+       "name": "read_inventory_waste_week"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 44,
+    "prompt_token_count": 4444
+   }
+  }
+ ],
+ "step": 0
+}

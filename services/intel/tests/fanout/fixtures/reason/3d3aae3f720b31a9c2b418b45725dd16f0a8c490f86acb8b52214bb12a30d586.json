@@ -1,0 +1,26 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "pack": "catalogue"
+       },
+       "name": "load_skill"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 30,
+    "prompt_token_count": 1138
+   }
+  }
+ ],
+ "step": 0
+}

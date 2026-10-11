@@ -1,0 +1,37 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "Station {S1.r0.station} ran late on {S1.r0.late_tickets} tickets."
+         },
+         {
+          "text": "Ratings averaged {S2.r0.avg_rating_x100} against a recent mean of {S2.r0.mean_8w_x100}."
+         },
+         {
+          "text": "Labour was {S3.r0.labour_bp} of sales against a target of {S3.r0.target_bp}."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 110,
+    "prompt_token_count": 1584
+   }
+  }
+ ],
+ "step": 1
+}

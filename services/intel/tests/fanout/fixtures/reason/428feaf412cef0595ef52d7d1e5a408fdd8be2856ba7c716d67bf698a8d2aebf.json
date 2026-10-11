@@ -1,0 +1,31 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "Are slow tickets, staffing and review ratings linked in recent weeks?",
+        "specialists": [
+         "kitchen",
+         "customers",
+         "people"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 62,
+    "prompt_token_count": 1377
+   }
+  }
+ ],
+ "step": 0
+}

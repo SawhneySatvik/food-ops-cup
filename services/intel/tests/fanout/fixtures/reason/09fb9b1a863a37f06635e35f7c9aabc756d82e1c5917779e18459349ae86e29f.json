@@ -1,0 +1,32 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What weakened weekend sales in recent weeks?",
+        "specialists": [
+         "market",
+         "catalogue",
+         "people",
+         "finance"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 57,
+    "prompt_token_count": 1374
+   }
+  }
+ ],
+ "step": 0
+}

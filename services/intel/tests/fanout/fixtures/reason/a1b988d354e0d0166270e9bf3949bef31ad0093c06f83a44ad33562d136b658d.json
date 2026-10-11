@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What drove labour cost up over the last fortnight?",
+        "specialists": [
+         "people",
+         "finance"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 52,
+    "prompt_token_count": 1377
+   }
+  }
+ ],
+ "step": 0
+}

@@ -1,0 +1,30 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What raised food cost this month?",
+        "specialists": [
+         "catalogue",
+         "inventory_purchasing"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 52,
+    "prompt_token_count": 1375
+   }
+  }
+ ],
+ "step": 0
+}

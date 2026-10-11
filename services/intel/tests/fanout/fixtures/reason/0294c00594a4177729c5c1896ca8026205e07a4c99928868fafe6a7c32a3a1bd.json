@@ -1,0 +1,31 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What cut profit at Indiranagar Kitchen in the week before this one?",
+        "specialists": [
+         "finance",
+         "catalogue",
+         "inventory_purchasing"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 65,
+    "prompt_token_count": 1376
+   }
+  }
+ ],
+ "step": 0
+}

@@ -1,0 +1,31 @@
+{
+ "agent": "munim_branch",
+ "pack": "finance",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "{S1.r0.component} moved by {S1.r0.delta_minor} against last month."
+         }
+        ]
+       },
+       "name": "report"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 54,
+    "prompt_token_count": 4301
+   }
+  }
+ ],
+ "step": 1
+}

@@ -1,0 +1,28 @@
+{
+ "agent": "munim_branch",
+ "pack": "finance",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "compare_month": "2026-09-01",
+        "page": 0,
+        "period_month": "2026-10-01"
+       },
+       "name": "read_finance_margin_bridge"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 49,
+    "prompt_token_count": 4098
+   }
+  }
+ ],
+ "step": 0
+}

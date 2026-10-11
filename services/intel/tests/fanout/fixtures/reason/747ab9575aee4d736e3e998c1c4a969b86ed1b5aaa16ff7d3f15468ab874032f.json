@@ -1,0 +1,31 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "What hurt the shop's results in the week ending today?",
+        "specialists": [
+         "kitchen",
+         "catalogue",
+         "finance"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 58,
+    "prompt_token_count": 1348
+   }
+  }
+ ],
+ "step": 0
+}

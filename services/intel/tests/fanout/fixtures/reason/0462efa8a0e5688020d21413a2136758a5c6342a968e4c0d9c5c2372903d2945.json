@@ -1,0 +1,32 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "Everything that hurt results in the week ending today, by area.",
+        "specialists": [
+         "finance",
+         "kitchen",
+         "people",
+         "inventory_purchasing"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 66,
+    "prompt_token_count": 1375
+   }
+  }
+ ],
+ "step": 0
+}

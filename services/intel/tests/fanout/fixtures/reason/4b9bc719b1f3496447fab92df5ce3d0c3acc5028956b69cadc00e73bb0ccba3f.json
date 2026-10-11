@@ -1,0 +1,31 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "question": "Why did margin not rise after the menu price change this month?",
+        "specialists": [
+         "catalogue",
+         "finance",
+         "market"
+        ]
+       },
+       "name": "fan_out"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 60,
+    "prompt_token_count": 1376
+   }
+  }
+ ],
+ "step": 0
+}

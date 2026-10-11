@@ -1,0 +1,27 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": "insufficient_history",
+        "segments": []
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 39,
+    "prompt_token_count": 1492
+   }
+  }
+ ],
+ "step": 1
+}

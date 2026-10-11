@@ -1,0 +1,34 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "Labour was {S1.r0.labour_bp} of sales against a target of {S1.r0.target_bp}."
+         },
+         {
+          "text": "{S2.r0.component} moved by {S2.r0.delta_minor} against last month."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 82,
+    "prompt_token_count": 1529
+   }
+  }
+ ],
+ "step": 1
+}

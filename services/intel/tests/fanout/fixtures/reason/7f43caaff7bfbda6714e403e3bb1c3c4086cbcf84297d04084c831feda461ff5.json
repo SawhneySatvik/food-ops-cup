@@ -1,0 +1,34 @@
+{
+ "agent": "munim",
+ "pack": null,
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "Ratings averaged {S1.r0.avg_rating_x100} against a recent mean of {S1.r0.mean_8w_x100}."
+         },
+         {
+          "text": "Station {S2.r0.station} ran late on {S2.r0.late_tickets} tickets."
+         }
+        ]
+       },
+       "name": "submit_answer"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 85,
+    "prompt_token_count": 1530
+   }
+  }
+ ],
+ "step": 1
+}
