@@ -6,6 +6,7 @@ import { defineDraftable } from "../shared/draftables.ts";
 import { BasisPoints, CurrencyCode, IsoDate, MinorAmount, NonEmpty, Slug, Uuid7 } from "../shared/primitives.ts";
 import { RefId } from "../shared/refs.ts";
 import type { Route } from "../shared/routes.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 /** What the owner agreed with an aggregator for a validity window (an own command, never drafted). Setting
  *  terms from `valid_from` ends the channel's open-ended terms that started earlier; any other overlap is
@@ -96,6 +97,7 @@ export const TallyExport = z.strictObject({
 export const ChannelTermsListResponse = z.strictObject({ channel_terms: z.array(FinanceChannelTermsSetV1) });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "finance.channel_terms.set.v1": FinanceChannelTermsSetV1,
   "finance.expense.record.v1": FinanceExpenseRecordV1,
   "finance.dispute.draft.v1": FinanceDisputeDraftV1,
@@ -114,6 +116,7 @@ const post = (path: string, operationId: string, command: string, summary: strin
 const date = { type: "string", format: "date" };
 
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   post("/v1/finance/channel-terms", "setChannelTerms", "finance.channel_terms.set.v1", "finance.channel_terms.set.v1 — record agreed commission, ad and promo terms for a channel (owner)"),
   post("/v1/finance/expenses", "recordExpense", "finance.expense.record.v1", "finance.expense.record.v1 — record an expense (posts it)"),
   post("/v1/finance/disputes", "recordDispute", "finance.dispute.draft.v1", "finance.dispute.draft.v1 — record a channel dispute for the owner to send (also draftable)"),

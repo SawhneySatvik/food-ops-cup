@@ -6,6 +6,7 @@ import { defineDraftable } from "../shared/draftables.ts";
 import { CommandResult } from "../shared/command.ts";
 import { CurrencyCode, IsoDate, IsoDateTime, MinorAmount, NonEmpty, Slug, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 const RoleKey = z.string().regex(/^[a-z][a-z0-9_]*$/);
 const Phone = z.string().regex(/^\+[1-9][0-9]{6,14}$/);
@@ -192,6 +193,7 @@ export const PeoplePayrollDraftStatusV1 = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "people.staff.upsert.v1": PeopleStaffUpsertV1,
   "people.roster.create.v1": PeopleRosterCreateV1,
   "people.roster.update.v1": PeopleRosterUpdateV1,
@@ -214,6 +216,7 @@ const command = (type: string, path: string, operationId: string, summary: strin
   surface: "public", method: "post", path, operationId, summary, auth: "member", command: type, response: "v1.people.command-result", status: 200, conflict: true,
 });
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   command("people.staff.upsert.v1", "/v1/people/staff:upsert", "peopleStaffUpsert", "Create or update a staff record"),
   command("people.roster.create.v1", "/v1/people/rosters", "peopleRosterCreate", "Create a week's roster (a person's own command)"),
   command("people.roster.update.v1", "/v1/people/rosters:update", "peopleRosterUpdate", "Edit or cancel a roster"),

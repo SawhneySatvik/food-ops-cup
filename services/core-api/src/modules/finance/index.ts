@@ -5,6 +5,7 @@
 //   POST /v1/finance/period-closes     finance.period.close.v1 (own command; also draftable)
 //   GET  /v1/finance/exports/tally     journal vouchers as CSV (owner, advisor, judge)
 //   GET  /v1/finance/channel-terms     recorded channel terms (owner, advisor, judge)
+//   GET  /v1/finance/settlements · settlement-lines · bank-lines · disputes (+ /{id}) · period-closes   row lists (T-092a, routes.ts)
 // finance.journal.adjust.v1 has NO route: it executes only through an approved draft.
 // Seams for other modules (W2 brief), each inside the caller's transaction: postFor / reverseFor (every seeded
 // finance.post_* rule), seedChart (T-020), recordSettlement / recordBankLines (T-030's approved import commit),
@@ -21,6 +22,7 @@ import type { Queryable } from "../../runtoken/index.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
 import { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
 import { listChannelTerms, tallyExport } from "./read.ts";
+import { readRoutes } from "./routes.ts";
 
 export { seedChart } from "./chart.ts";
 export { postFor, reverseFor, reverseSource, type PostResult, type ReversalRuleId } from "./post.ts";
@@ -100,4 +102,5 @@ export const router = new Hono<AppEnv>()
     if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || to < from) throw new ApiError("bad_request");
     if (Date.parse(to) - Date.parse(from) > 366 * 86_400_000) throw new ApiError("bad_request");
     return c.json(await withContext(c.var.deps.pools.core, contextOf(p), (q) => tallyExport(q, from, to)), 200);
-  });
+  })
+  .route("/", readRoutes);

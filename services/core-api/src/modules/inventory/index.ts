@@ -8,7 +8,8 @@
 //   POST /v1/inventory/transfers                      inventory.transfer.create.v1 (draftable; rule transfer_out)
 //   POST /v1/inventory/transfers/{id}:receive         inventory.transfer.receive.v1 (rule transfer_in)
 //   POST /v1/inventory/expired-sale-overrides         inventory.expired_sale.override.v1 (R40 C7; pack flag)
-//   GET  /v1/inventory/movements?outlet=&ingredient=&limit=&cursor=
+//   GET  /v1/inventory/movements?outlet=&ingredient=&kind=&ref=&limit=&cursor=
+//   GET  /v1/inventory/ingredients · waste · counts (+ /{id}) · transfers   row lists (T-092a, routes.ts)
 //   GET  /v1/inventory/batches?outlet=&ingredient=
 //   GET  /v1/inventory/reorder-levels?outlet=&ingredient=
 // Seams (W2 lane brief): pickSaleBatches, deriveOrderConsumption, deriveGoodsReceipt; also consumeExpiredOverrides
@@ -29,6 +30,7 @@ import {
   batchUpdate, countSubmit, expiredSaleOverride, ingredientUpsert, reorderLevelSet, stockReceive, transferCreate, transferReceive, wasteRecord,
 } from "./handlers.ts";
 import { listBatches, listMovements, listReorderLevels } from "./read.ts";
+import { readRoutes } from "./routes.ts";
 
 export { consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, pickSaleBatches, reverseOrderConsumption } from "./seams.ts";
 export type { ConsumptionResult, DerivationResult, SaleLineIn, SalePick, SalePickRefusal, SalePicks } from "./seams.ts";
@@ -91,6 +93,7 @@ function readOutlet(c: Context<AppEnv>, m: Member): string {
   if (m.outlet_ids !== "*" && !m.outlet_ids.includes(outlet)) throw new ApiError("not_found");
   return outlet;
 }
+const MOVEMENT_KINDS = ["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return"];
 function optionalId(c: Context<AppEnv>, name: string): string | undefined {
   const v = c.req.query(name);
   if (v !== undefined && !UUID.test(v)) throw new ApiError("bad_request");
@@ -116,7 +119,9 @@ export const router = new Hono<AppEnv>()
     const outlet = readOutlet(c, m);
     const limit = Number(c.req.query("limit") ?? 100);
     if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new ApiError("bad_request");
-    const q = { outlet, limit, ingredient: optionalId(c, "ingredient"), cursor: optionalId(c, "cursor") };
+    const kind = c.req.query("kind") ?? null;
+    if (kind !== null && !MOVEMENT_KINDS.includes(kind)) throw new ApiError("bad_request");
+    const q = { outlet, limit, ingredient: optionalId(c, "ingredient"), cursor: optionalId(c, "cursor"), kind, ref: optionalId(c, "ref") };
     return c.json(await withContext(c.var.deps.pools.core, contextOf(m), (db) => listMovements(db, q)), 200);
   })
   .get("/v1/inventory/batches", requireMember, async (c) => {
@@ -128,4 +133,5 @@ export const router = new Hono<AppEnv>()
     const m = member(c);
     const q = { outlet: readOutlet(c, m), ingredient: optionalId(c, "ingredient") };
     return c.json(await withContext(c.var.deps.pools.core, contextOf(m), (db) => listReorderLevels(db, q)), 200);
-  });
+  })
+  .route("/", readRoutes);

@@ -27,4 +27,21 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "v1.inventory.reorder-levels": { reorder_levels: [{ reorder_level_id: u(48), outlet_id: u(2), ingredient_id: u(40), min_qty_milli: 5000000, par_qty_milli: 20000000, updated_at: T }] },
   "v1.inventory.batches": { batches: [{ batch_id: u(47), outlet_id: u(2), ingredient_id: u(40), batch_code: "B-12", expires_on: "2026-10-14", received_at: T, mrp: { amount_minor: 9000, currency: "INR" } }] },
+  "v1.inventory.ingredients": { items: [{ ingredient_id: u(3200), name: "Synthetic paneer", base_unit: "g", shelf_life_days: 5, tracked_by_batch: true, active: true }], next_cursor: null },
+  "v1.inventory.waste": {
+    items: [{ waste_id: u(3210), outlet_id: u(2), ingredient_id: u(3200), batch_id: null, qty_milli: 500000, unit: "g", reason: "other", note: "dropped tray", recorded_by: u(8), at: T, business_date: "2026-10-09" }],
+    next_cursor: null,
+  },
+  "v1.inventory.counts": {
+    items: [{ stock_count_id: u(3220), outlet_id: u(2), counted_by: u(8), counted_at: T, status: "submitted", lines: [{ count_line_id: u(3221), ingredient_id: u(3200), batch_id: null, expected_qty_milli: 5000000, counted_qty_milli: 4800000, unit: "g" }] }],
+    next_cursor: null,
+  },
+  "v1.inventory.count": { stock_count_id: u(3220), outlet_id: u(2), counted_by: u(8), counted_at: T, status: "open", lines: [] },
+  "v1.inventory.transfers": {
+    items: [{
+      transfer_id: u(3230), from_outlet_id: u(2), to_outlet_id: u(4), status: "sent", sent_by: u(8), sent_at: T, received_by: null, received_at: null,
+      lines: [{ transfer_line_id: u(3231), ingredient_id: u(3200), batch_id: null, qty_milli: 2000000, unit: "g" }],
+    }],
+    next_cursor: null,
+  },
 };

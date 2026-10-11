@@ -11,3 +11,8 @@ proposal.catalogue.deal.end.v1
 proposal.catalogue.coupon.set.v1
 v1.catalogue.menu
 v1.catalogue.barcode
+v1.catalogue.items
+v1.catalogue.recipes
+v1.catalogue.prices
+v1.catalogue.deals
+v1.catalogue.coupons

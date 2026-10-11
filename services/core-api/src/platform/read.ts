@@ -46,3 +46,24 @@ export async function operators(c: Queryable) {
   const r = await c.query(`SELECT id, email, active, ${TS("created_at")} AS created_at FROM platform.operator ORDER BY email, id`);
   return { items: r.rows };
 }
+
+/** One tenant's AI budget months (limit, spend summed from intel.intel_spend) and that month's spend rows, newest first (T-092b).
+ *  munim_platform may select only (tenant_id, amount_minor, currency, at) of intel.intel_spend: no run, model or role column
+ *  is read here. Null when the tenant is not in the registry. */
+export async function tenantSpend(c: Queryable, tenant: string, month: string | null) {
+  if (!(await c.query(`SELECT 1 FROM platform.tenant_registry WHERE tenant_id = $1`, [tenant])).rows[0]) return null;
+  const months = await c.query<{ month: string; limit_minor: string; currency: string; spent_minor: string }>(
+    `SELECT month::text AS month, limit_minor::text AS limit_minor, currency, spent_minor::text AS spent_minor FROM platform.llm_budget_spent
+      WHERE tenant_id = $1 ORDER BY month DESC`, [tenant]);
+  const rows = await c.query<{ at: Date; amount_minor: string; currency: string }>(
+    `SELECT at, amount_minor::text AS amount_minor, currency FROM intel.intel_spend
+      WHERE tenant_id = $1 AND (at AT TIME ZONE 'UTC') >= coalesce($2::date, date_trunc('month', now() AT TIME ZONE 'UTC')::date)
+        AND (at AT TIME ZONE 'UTC') < coalesce($2::date, date_trunc('month', now() AT TIME ZONE 'UTC')::date) + interval '1 month'
+      ORDER BY at DESC LIMIT 501`, [tenant, month]);
+  return {
+    tenant_id: tenant,
+    months: months.rows.map((x) => ({ month: x.month, limit_minor: Number(x.limit_minor), spent_minor: Number(x.spent_minor), currency: x.currency })),
+    rows: rows.rows.slice(0, 500).map((x) => ({ at: x.at.toISOString(), amount_minor: Number(x.amount_minor), currency: x.currency })),
+    has_more: rows.rows.length > 500,
+  };
+}

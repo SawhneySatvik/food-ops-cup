@@ -79,4 +79,27 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "v1.catalogue.menu": { outlet_id: u(2), channel_kind: "counter", business_date: "2026-10-09", entries: [menuEntry] },
   "v1.catalogue.barcode": { barcode: "8901262010016", item_id: u(21), variant_id: null, on_sale: true, entry: { ...menuEntry, item_id: u(21), kind: "sku", name_key: "sku.butter_100g", variant_id: null, variant_name_key: null, barcode: "8901262010016", mrp_minor: 5800, option_groups: [], deals: [] } },
+  "v1.catalogue.items": {
+    items: [{ item_id: u(3400), kind: "dish", name_key: "dish.paneer_tikka", category: "starters", brand_id: null, barcode: null, stock_ingredient_id: null, active: true,
+      variants: [{ variant_id: u(3401), name_key: "variant.half", barcode: null, active: true }] }],
+    next_cursor: null,
+  },
+  "v1.catalogue.recipes": {
+    items: [{ recipe_version_id: u(3410), item_id: u(3400), variant_id: null, version: 1, valid_from: "2026-01-01", valid_to: null, yield_qty_milli: 1000,
+      lines: [{ recipe_line_id: u(3411), ingredient_id: u(3200), qty_milli: 150000, unit: "g", waste_pct_bp: 500 }] }],
+    next_cursor: null,
+  },
+  "v1.catalogue.prices": {
+    items: [{ price_id: u(3420), item_id: u(3400), variant_id: null, outlet_id: u(2), channel_kind: "counter", amount_minor: 32000, currency: "INR", tax_class: "restaurant_5", valid_from: "2026-11-01", valid_to: null }],
+    next_cursor: null,
+  },
+  "v1.catalogue.deals": {
+    items: [{ deal_id: u(3430), kind: "happy_hour", name_key: "deal.happy_hour", rule: { percent_bp: 1000 }, windows: [], outlet_ids: [], valid_from: "2026-10-01", valid_to: null, active: true }],
+    next_cursor: null,
+  },
+  "v1.catalogue.coupons": {
+    items: [{ coupon_id: u(3440), code: "WELCOME10", kind: "percent", value_bp: 1000, value_minor: null, currency: "INR", min_spend_minor: 20000, global_cap: 100, per_customer_cap: 1,
+      requires_customer: false, outlet_ids: [], campaign_id: null, valid_from: T, valid_to: null, active: true }],
+    next_cursor: null,
+  },
 };

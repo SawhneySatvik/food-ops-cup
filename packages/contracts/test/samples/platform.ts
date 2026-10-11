@@ -38,4 +38,10 @@ export const SAMPLES: Record<string, unknown> = {
   "platform.model-roles": { items: [roleRow] },
   "platform.operators": { items: [operator] },
   "platform.config-drafts": { items: [draft] },
+  "platform.tenant-spend": {
+    tenant_id: ID,
+    months: [{ month: "2026-10-01", limit_minor: 500000, spent_minor: 1200, currency: "INR" }],
+    rows: [{ at: AT, amount_minor: 1200, currency: "INR" }],
+    has_more: false,
+  },
 };

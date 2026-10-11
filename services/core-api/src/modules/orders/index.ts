@@ -9,6 +9,7 @@
 //   POST /v1/orders/{id}/voids               orders.void.record.v1    (a whole-order void cancels the order)
 //   POST /v1/orders/{id}/refunds             orders.refund.record.v1   (role cap, cumulative per order: refundHandler)
 //   POST /v1/shifts · /v1/shifts/{id}:close  orders.shift.open.v1 / orders.shift.close.v1
+//   GET  /v1/orders · /v1/shifts · /v1/pickup-windows   lists (T-092; routes.ts)
 //   GET  /v1/shifts/{id}                     the shift row: float, counted / expected cash, variance
 //   POST /v1/pickup-windows                  orders.pickup_window.generate.v1 (idempotent per slot)
 // Seams for other modules: placeHandler / previewIn on the caller's transaction (T-032 storefront), placeOrder /
@@ -28,6 +29,7 @@ import { posStatusHandler, pushBackHandler } from "./lifecycle.ts";
 import { pickupWindowHandler, refundHandler, shiftCloseHandler, shiftOpenHandler, tenderHandler, voidHandler } from "./money.ts";
 import { authorise, placeOrder, previewOrder } from "./place.ts";
 import { orderView, receiptView, shiftView } from "./read.ts";
+import { readRoutes } from "./routes.ts";
 
 export { advanceOrder, applyReprice, mover, orderStatusHandler, quoteReprice, refuseIfTendered } from "./lifecycle.ts";
 export { placeHandler, placeOrder, previewBody, previewIn, previewOrder } from "./place.ts";
@@ -143,4 +145,5 @@ export const router = new Hono<AppEnv>()
     const outlet = await outletOf(c, `SELECT outlet_id FROM core.shift WHERE id = $1`, env.data.payload.shift_id);
     await read(c, (db) => authorise(db, m, "orders.shift.close.v1", outlet));
     return run(c, m, env.data, shiftCloseHandler);
-  });
+  })
+  .route("/", readRoutes);

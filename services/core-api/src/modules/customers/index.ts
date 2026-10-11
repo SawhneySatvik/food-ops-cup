@@ -26,6 +26,7 @@ import { bulkOrderUpsert, campaignCancel, campaignCreate, customerUpsert, loyalt
 import {
   customerExists, listBulkOrders, listCampaigns, listCouponUses, listCustomers, listReservations, listReviews, readLoyalty, type Scope,
 } from "./reads.ts";
+import { readRoutes } from "./routes.ts";
 
 export { loyaltyBalance, loyaltyEarnFor, loyaltyPolicy, loyaltyRedeem, loyaltyReverseFor } from "./loyalty.ts";
 export { readLoyalty } from "./reads.ts";
@@ -147,4 +148,5 @@ export const router = new Hono<AppEnv>()
     allow(m, "owner", "manager", "judge");
     return c.json({ bulk_orders: await read(c, m, (q) => listBulkOrders(q, scopeOf(m), { outlet_id: uuidQ(c.req.query("outlet_id")) })) }, 200);
   })
-  .post("/v1/bulk-orders:upsert", requireMember, (c) => command(c, "customers.bulk_order.upsert.v1", CustomersBulkOrderUpsertV1, bulkOrderUpsert));
+  .post("/v1/bulk-orders:upsert", requireMember, (c) => command(c, "customers.bulk_order.upsert.v1", CustomersBulkOrderUpsertV1, bulkOrderUpsert))
+  .route("/", readRoutes);

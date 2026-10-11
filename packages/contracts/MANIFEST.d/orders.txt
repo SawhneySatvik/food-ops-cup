@@ -16,3 +16,6 @@ v1.order
 v1.order.receipt
 v1.shift
 orders.place.guest-response
+v1.orders.list
+v1.shifts.list
+v1.pickup-windows.list

@@ -17,6 +17,7 @@ import type { Queryable } from "../../runtoken/index.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
 import { availabilitySet, couponSet, dealEnd, dealUpsert, DRAFT_HANDLERS, itemUpsert, priceSet, recipeVersionCreate } from "./handlers.ts";
 import { itemsForSale, lookupBarcode } from "./menu.ts";
+import { readRoutes } from "./routes.ts";
 
 export { couponUses, priceLines, type PriceRequest, type PriceResult, type PricedLine, type PriceRefusal } from "./pricing.ts";
 export { itemsForSale, type MenuEntry } from "./menu.ts";
@@ -102,4 +103,5 @@ export const router = new Hono<AppEnv>()
   .get("/v1/catalogue/barcodes/:code{[0-9A-Za-z-]{4,32}}", requireMember, async (c) => {
     const { m, outlet, channel } = readArgs(c);
     return c.json(await withContext(c.var.deps.pools.core, contextOf(m), (tx) => lookupBarcode(tx, c.req.param("code"), outlet, channel)), 200);
-  });
+  })
+  .route("/", readRoutes);

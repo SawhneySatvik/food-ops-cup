@@ -53,11 +53,16 @@ export const SAMPLES: Record<string, unknown> = {
   "v1.imports.upload.request": { kind: "payout_statement", filename: "synthetic_payout_sept.csv", media_type: "text/csv", content_base64: "UGF5b3V0IFJlZg==" },
   "v1.imports.upload.response": { duplicate: false, document, run: { ...run, status: "parsing", rows_ok: 0, rows_quarantined: 0, control_total_minor: null, currency: null, total_matches: null, draft_id: null }, header: null },
   "v1.imports.run.create.request": { document_id: u(302) },
-  "v1.imports.runs.response": { runs: [run] },
+  "v1.imports.runs.response": { runs: [run], next_cursor: null },
   "v1.imports.run.rows.response": {
     staged: [{ row_no: 2, target_table: "core.settlement_line", data: { payout_ref: "SYN-PAY-1", line_kind: "order", net_minor: 26208 }, amount_minor: 26208, external_ref: "SYN-ORD-1" }],
     quarantined: [{ row_no: 5, raw: "SYN-PAY-1,31-02-2026,…", reason_code: "date_unreadable" }],
   },
   "v1.imports.format.propose.request": { document_id: u(302), kind: "bank_statement", name: "Synthetic bank layout", mapping: formatApprove.mapping },
   "v1.imports.format.propose.response": { draft_id: u(304) },
+  "v1.conversations": { items: [{ conversation_id: u(3700), outlet_id: u(2), kind: "handover", title: "Evening handover", document_id: null, created_at: T }], next_cursor: null },
+  "v1.conversation.messages": {
+    items: [{ message_id: u(3701), conversation_id: u(3700), author_member_id: null, author_label: "Synthetic <b>chef</b>", body: "Walk-in fridge is warm; <script>alert(1)</script> call the technician", sent_at: T }],
+    next_cursor: null,
+  },
 };

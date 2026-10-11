@@ -22,6 +22,7 @@ import {
 } from "./commands.ts";
 import { createKey, listKeys, revokeKey } from "./storefront-keys.ts";
 import { outletScopeOf } from "@munim/core-domain/authority";
+import { readRoutes } from "./routes.ts";
 
 export { provisionTenant } from "./provision.ts";
 export type { ProvisionResult, ProvisionSpec } from "./provision.ts";
@@ -209,4 +210,5 @@ export const router = new Hono<AppEnv>()
         ...(deps.publish ? { publish: deps.publish } : {}) },
       env, demoHandler);
     return reply(c, out, 201);
-  });
+  })
+  .route("/", readRoutes);

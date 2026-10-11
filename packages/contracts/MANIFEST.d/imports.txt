@@ -11,3 +11,5 @@ v1.imports.runs.response
 v1.imports.run.rows.response
 v1.imports.format.propose.request
 v1.imports.format.propose.response
+v1.conversations
+v1.conversation.messages

@@ -25,4 +25,11 @@ export const SAMPLES: Record<string, unknown> = {
   "v1.channels": { channels: [{ id: u(4), name: "Swiggy", kind: "aggregator:swiggy", active: true }] },
   "v1.devices": { devices: [{ id: u(5), outlet_id: u(2), kind: "pos", invoice_series: "IND-POS1", last_seen_at: null }] },
   "v1.members": { members: [{ id: u(7), name: "Meena (synthetic)", email: "meena@example.test", active: true, signed_in: true, role: "owner", outlet_ids: [] }] },
+  "v1.outlet.calendar": {
+    outlet_id: u(2), tz: "Asia/Kolkata",
+    rows: [
+      { calendar_id: u(3500), kind: "weekly", weekday: 1, on_date: null, opens_at: "10:00", closes_at: "23:00", closed: false },
+      { calendar_id: u(3501), kind: "override", weekday: null, on_date: "2026-10-20", opens_at: null, closes_at: null, closed: true },
+    ],
+  },
 };

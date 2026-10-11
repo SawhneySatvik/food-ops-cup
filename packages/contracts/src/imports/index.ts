@@ -7,6 +7,7 @@ import { z } from "zod";
 import { defineDraftable } from "../shared/draftables.ts";
 import { CurrencyCode, IsoDateTime, MinorAmount, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 /** The file kinds this module parses (core.import_run.kind, a subset of core.document.kind). `pos_bills` and
  *  `waste_log` are dated history (R44b, 0018): bills with lines, tenders, refunds and voids; waste entries.
@@ -99,7 +100,7 @@ export const ImportsUploadResponse = z.strictObject({
 
 export const ImportsRunCreateRequest = z.strictObject({ document_id: Uuid7 });
 
-export const ImportsRunsResponse = z.strictObject({ runs: z.array(ImportRunView) });
+export const ImportsRunsResponse = z.strictObject({ runs: z.array(ImportRunView), next_cursor: Uuid7.nullable() });
 
 export const StagedRow = z.strictObject({
   row_no: z.int().positive(),
@@ -127,6 +128,7 @@ export const ImportsFormatProposeRequest = z.strictObject({
 export const ImportsFormatProposeResponse = z.strictObject({ draft_id: Uuid7 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "imports.format.approve.v1": ImportsFormatApproveV1,
   "imports.run.commit.v1": ImportsRunCommitV1,
   "proposal.imports.format.approve.v1": FORMAT_APPROVE.proposal,
@@ -144,9 +146,12 @@ export const SCHEMAS = {
 
 const id = [{ name: "id", uuid: true }];
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   { surface: "public", method: "post", path: "/v1/imports/documents", operationId: "uploadImportDocument", summary: "Upload a file (sha256 unique per tenant: the same file again returns the existing document); a recognised format starts a run", auth: "member", request: "v1.imports.upload.request", response: "v1.imports.upload.response", status: 200 },
   { surface: "public", method: "post", path: "/v1/imports/runs", operationId: "createImportRun", summary: "Start a run for an uploaded document whose format is now known (after its mapping was approved)", auth: "member", request: "v1.imports.run.create.request", response: "v1.imports.run", status: 201 },
-  { surface: "public", method: "get", path: "/v1/imports/runs", operationId: "listImportRuns", summary: "Import runs, newest first", auth: "member", response: "v1.imports.runs.response", status: 200 },
+  { surface: "public", method: "get", path: "/v1/imports/runs", operationId: "listImportRuns", summary: "Import runs, newest first; kind and status filter, cursor = the last run's id (T-092a)", auth: "member", response: "v1.imports.runs.response", status: 200,
+    query: [{ name: "kind", required: false, schema: { type: "string", enum: ImportKind.options } }, { name: "status", required: false, schema: { type: "string", enum: ImportRunStatus.options } },
+      { name: "limit", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "cursor", required: false, schema: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" } }] },
   { surface: "public", method: "get", path: "/v1/imports/runs/{id}", operationId: "getImportRun", summary: "One import run (status, rows ready, rows quarantined, the file's total)", auth: "member", response: "v1.imports.run", status: 200, pathParams: id },
   { surface: "public", method: "get", path: "/v1/imports/runs/{id}/rows", operationId: "getImportRunRows", summary: "Staged rows and quarantined rows (with reasons) of one run", auth: "member", response: "v1.imports.run.rows.response", status: 200, pathParams: id },
   { surface: "public", method: "post", path: "/v1/imports/formats:propose", operationId: "proposeImportFormat", summary: "Propose a column mapping (renames + units only) for a document's layout, as a draft to approve", auth: "member", request: "v1.imports.format.propose.request", response: "v1.imports.format.propose.response", status: 201 },

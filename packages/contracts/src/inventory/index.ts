@@ -4,6 +4,7 @@ import { z } from "zod";
 import { IsoDate, IsoDateTime, MinorAmount, Money, NonEmpty, QtyMilli, Slug, Unit, Uuid7 } from "../shared/primitives.ts";
 import { defineDraftable } from "../shared/draftables.ts";
 import type { Route } from "../shared/routes.ts";
+import { MOVEMENT_KIND_VALUES, READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 export const InventoryIngredientUpsertV1 = z.strictObject({
   ingredient_id: Uuid7,
@@ -178,6 +179,7 @@ export const InventoryReorderLevelsResponse = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "inventory.ingredient.upsert.v1": InventoryIngredientUpsertV1,
   "inventory.reorder_level.set.v1": InventoryReorderLevelSetV1,
   "inventory.stock.receive.v1": InventoryStockReceiveV1,
@@ -201,6 +203,7 @@ const command = (path: string, operationId: string, type: string, summary: strin
 });
 
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   command("/v1/inventory/ingredients", "upsertIngredient", "inventory.ingredient.upsert.v1", "create or edit an ingredient / stock record"),
   command("/v1/inventory/stock:receive", "receiveOpeningStock", "inventory.stock.receive.v1", "opening stock, optionally into new dated batches"),
   command("/v1/inventory/waste", "recordWaste", "inventory.waste.record.v1", "log waste; core derives the waste movement"),
@@ -216,10 +219,12 @@ export const ROUTES: readonly Route[] = [
     "a manager or owner lets one cart line sell from one expired batch, where the country pack allows it"),
   {
     surface: "public", method: "get", path: "/v1/inventory/movements", operationId: "listStockMovements",
-    summary: "Stock movement rows for an outlet, newest first", auth: "member", response: "v1.inventory.movements", status: 200,
+    summary: "Stock movement rows for an outlet, newest first; kind and ref (the source row id) filter (T-092a)", auth: "member", response: "v1.inventory.movements", status: 200,
     query: [
       { name: "outlet", required: true, schema: uuid },
       { name: "ingredient", required: false, schema: uuid },
+      { name: "kind", required: false, schema: { type: "string", enum: [...MOVEMENT_KIND_VALUES] } },
+      { name: "ref", required: false, schema: uuid },
       { name: "limit", required: false, schema: { type: "integer", minimum: 1, maximum: 500 } },
       { name: "cursor", required: false, schema: uuid },
     ],

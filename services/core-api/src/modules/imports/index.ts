@@ -1,7 +1,7 @@
 // Imports module (T-030; R5, R28; flows/import.md; screens/onboarding-import.md B). Mounted by modules/index.ts.
 //   POST /v1/imports/documents          upload (sha256 unique per tenant: the same file returns the existing document)
 //   POST /v1/imports/runs               start a run for a stored document whose format is now known
-//   GET  /v1/imports/runs               runs, newest first
+//   GET  /v1/imports/runs?kind=&status=&limit=&cursor=   runs, newest first
 //   GET  /v1/imports/runs/{id}          one run: status and the run row's own figures
 //   GET  /v1/imports/runs/{id}/rows     staged rows + quarantined rows with reasons
 //   POST /v1/imports/formats:propose    a member's own column mapping (renames + units) → mapping draft
@@ -9,7 +9,7 @@
 // Approving imports.run.commit.v1 / imports.format.approve.v1 goes through the approvals routes; their handlers
 // are registered here. Uploads and runs are operational rows (R29): nothing here writes the books.
 import { createHash } from "node:crypto";
-import { ImportsFormatApproveV1, ImportsFormatProposeRequest, ImportsRunCreateRequest, ImportsUploadRequest, type ImportKind } from "@munim/contracts/imports";
+import { ImportsFormatApproveV1, ImportsFormatProposeRequest, ImportsRunCreateRequest, ImportsUploadRequest, ImportKind, ImportRunStatus } from "@munim/contracts/imports";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember, type Principal } from "../../auth/resolve.ts";
 import { uuidv7 } from "../../commit/index.ts";
@@ -22,6 +22,7 @@ import { blobKey, type BlobStore, DEFAULT_BLOB_DIR, localBlobStore } from "./blo
 import { formatApproveHandler, runCommitHandler } from "./commit.ts";
 import { readCsv } from "./csv.ts";
 import { BUILT_INS, checkMapping, headerSignature } from "./formats.ts";
+import { readRoutes } from "./routes.ts";
 
 export { blobKey, localBlobStore, type BlobStore } from "./blob.ts";
 export { parseRun, type ParseOutcome } from "./parse.ts";
@@ -225,9 +226,20 @@ export const router = new Hono<AppEnv>()
   .post("/v1/imports/runs", requireMember, createRun)
   .get("/v1/imports/runs", requireMember, async (c) => {
     const m = member(c);
+    // T-092a: limit (default 100, as before), keyset cursor (the last run's id), kind and status filters.
+    const q = c.req.query();
+    const limit = q.limit === undefined ? 100 : Number(q.limit);
+    const kind = q.kind === undefined ? null : ImportKind.safeParse(q.kind);
+    const status = q.status === undefined ? null : ImportRunStatus.safeParse(q.status);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || (kind && !kind.success) || (status && !status.success)
+      || (q.cursor !== undefined && !new RegExp(`^${ID}$`).test(q.cursor))) throw new ApiError("bad_request");
     const rows = await withContext(c.var.deps.pools.core, contextOf(m), async (db) =>
-      (await db.query<RunRow>(`${RUN} ORDER BY r.created_at DESC, r.id DESC LIMIT 100`)).rows);
-    return c.json({ runs: rows.map(runView) }, 200);
+      (await db.query<RunRow>(
+        `${RUN} WHERE ($1::text IS NULL OR r.kind = $1) AND ($2::text IS NULL OR r.status = $2)
+            AND ($3::uuid IS NULL OR (r.created_at, r.id) < (SELECT x.created_at, x.id FROM core.import_run x WHERE x.id = $3))
+          ORDER BY r.created_at DESC, r.id DESC LIMIT $4`,
+        [kind?.data ?? null, status?.data ?? null, q.cursor ?? null, limit + 1])).rows);
+    return c.json({ runs: rows.slice(0, limit).map(runView), next_cursor: rows.length > limit ? rows[limit - 1]!.id : null }, 200);
   })
   .get(`/v1/imports/runs/:id{${ID}}`, requireMember, async (c) => {
     const m = member(c);
@@ -249,4 +261,5 @@ export const router = new Hono<AppEnv>()
     });
     return c.json(out, 200);
   })
-  .post("/v1/imports/:action{formats:propose}", requireMember, proposeFormat);
+  .post("/v1/imports/:action{formats:propose}", requireMember, proposeFormat)
+  .route("/", readRoutes);

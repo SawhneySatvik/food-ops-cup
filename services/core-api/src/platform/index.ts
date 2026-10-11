@@ -8,7 +8,7 @@ import { ConfigDraftApprove, ConfigDraftPropose, ConfigDraftReject } from "@muni
 import { requireOperator } from "../auth/resolve.ts";
 import { replayHeaders } from "../commit/index.ts";
 import { withContext } from "../lib/db.ts";
-import { ApiError } from "../lib/errors.ts";
+import { ApiError, errorBody } from "../lib/errors.ts";
 import type { AppEnv } from "../lib/types.ts";
 import { approve, getDraftRow, listDrafts, propose, reject } from "./drafts.ts";
 import { provision } from "./provision.ts";
@@ -60,6 +60,14 @@ router
   .get("/platform/v1/plans", (c) => asOperator(c, read.plans).then((x) => c.json(x, 200)))
   .get("/platform/v1/feature-flags", (c) => asOperator(c, read.featureFlags).then((x) => c.json(x, 200)))
   .get("/platform/v1/budgets", (c) => asOperator(c, read.budgets).then((x) => c.json(x, 200)))
+  .get(`/platform/v1/budgets/:tenant{${ID}}/spend`, async (c) => {
+    const month = c.req.query("month") ?? null;
+    if (month !== null && !/^\d{4}-(0[1-9]|1[0-2])-01$/.test(month)) throw new ApiError("bad_request");
+    const out = await asOperator(c, (db) => read.tenantSpend(db, c.req.param("tenant"), month));
+    if (!out) throw new ApiError("not_found");
+    return c.json(out, 200);
+  })
+  .all(`/platform/v1/budgets/:tenant{${ID}}/spend`, (c) => c.json(errorBody("bad_request"), 405, { Allow: "GET" }))
   .get("/platform/v1/model-roles", (c) => asOperator(c, read.modelRoles).then((x) => c.json(x, 200)))
   .get("/platform/v1/operators", (c) => asOperator(c, read.operators).then((x) => c.json(x, 200)))
   .get("/platform/v1/config-drafts", async (c) => {

@@ -27,3 +27,4 @@ internal.graph-query.request
 internal.graph-query.response
 internal.spend.request
 internal.run-frame.response
+internal.brief-items.response

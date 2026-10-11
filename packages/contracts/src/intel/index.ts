@@ -12,6 +12,7 @@ import { RunTrigger } from "../shared/run-token.ts";
 import { MintSnapshotRequest } from "../shared/snapshot.ts";
 import { TraceEvent } from "../shared/trace.ts";
 import { SpecialistRegistry } from "./specialists.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 export { SPECIALIST_REGISTRY, SpecialistEntry, SpecialistRegistry } from "./specialists.ts";
 
@@ -62,6 +63,7 @@ export const TracesResponse = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "v1.finding": FindingView,
   "v1.findings.response": FindingsListResponse,
   "v1.inbox.response": InboxResponse,
@@ -79,7 +81,8 @@ const limit: QueryParam = { name: "limit", required: false, schema: { type: "int
 const read = (r: Omit<Route, "surface" | "method" | "auth" | "status">): Route => ({ surface: "public", method: "get", auth: "member", status: 200, ...r });
 
 export const ROUTES: readonly Route[] = [
-  read({ path: "/v1/findings", operationId: "listFindings", summary: "Findings in the caller's outlet scope", response: "v1.findings.response", query: [cursor, limit, { name: "status", required: false, schema: { type: "string", enum: FindingStatus.options } }] }),
+  ...READ_ROUTES,
+  read({ path: "/v1/findings", operationId: "listFindings", summary: "Findings in the caller's outlet scope; pack = the specialist (T-092a)", response: "v1.findings.response", query: [cursor, limit, { name: "status", required: false, schema: { type: "string", enum: FindingStatus.options } }, { name: "pack", required: false, schema: { type: "string", pattern: "^[a-z_]{1,40}$" } }] }),
   read({ path: "/v1/inbox", operationId: "listInbox", summary: "Findings and drafts awaiting a person", response: "v1.inbox.response", query: [cursor, limit] }),
   {
     surface: "public",

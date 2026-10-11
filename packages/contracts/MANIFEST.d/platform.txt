@@ -20,3 +20,4 @@ platform.budgets
 platform.model-roles
 platform.operators
 platform.config-drafts
+platform.tenant-spend

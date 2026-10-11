@@ -3,7 +3,7 @@
 // inventory.count_variance), never from here.
 import type { Queryable } from "../../runtoken/index.ts";
 
-export async function listMovements(c: Queryable, q: { outlet: string; ingredient: string | undefined; limit: number; cursor: string | undefined }) {
+export async function listMovements(c: Queryable, q: { outlet: string; ingredient: string | undefined; limit: number; cursor: string | undefined; kind?: string | null; ref?: string | undefined }) {
   const r = await c.query<{
     id: string; outlet_id: string; ingredient_id: string; batch_id: string | null; qty_milli: string; unit: string; kind: string;
     ref_type: string | null; ref_id: string | null; unit_cost_minor: string | null; per1000: string | null; currency: string | null; expired_sale_override_id: string | null; at: Date;
@@ -12,8 +12,9 @@ export async function listMovements(c: Queryable, q: { outlet: string; ingredien
             expired_sale_override_id, at
        FROM core.stock_movement
       WHERE outlet_id = $1 AND ($2::uuid IS NULL OR ingredient_id = $2) AND ($3::uuid IS NULL OR id < $3)
+        AND ($5::text IS NULL OR kind = $5) AND ($6::uuid IS NULL OR ref_id = $6)
       ORDER BY id DESC LIMIT $4`,
-    [q.outlet, q.ingredient ?? null, q.cursor ?? null, q.limit + 1]);
+    [q.outlet, q.ingredient ?? null, q.cursor ?? null, q.limit + 1, q.kind ?? null, q.ref ?? null]);
   const page = r.rows.slice(0, q.limit);
   return {
     movements: page.map((m) => ({

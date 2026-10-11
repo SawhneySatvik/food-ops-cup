@@ -89,6 +89,8 @@ async function snapshotsFor(c: Queryable, rows: DraftRow[], m: Member, extra: st
 export interface ListQuery {
   status?: string | undefined;
   outlet?: string | undefined;
+  /** T-092a: `intel:<pack>` | `import` | `member`. */
+  source?: string | undefined;
   limit?: string | undefined;
   cursor?: string | undefined;
 }
@@ -99,6 +101,7 @@ export async function listDrafts(pools: Pools, m: Member, q: ListQuery) {
   const limit = q.limit === undefined ? 50 : Number(q.limit);
   if (!statuses || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new ApiError("bad_request");
   if (q.outlet !== undefined && !UUID.test(q.outlet)) throw new ApiError("bad_request");
+  if (q.source !== undefined && !/^(intel:[a-z_]+|import|member)$/.test(q.source)) throw new ApiError("bad_request");
   let after: [string, string] | null = null;
   if (q.cursor !== undefined) {
     const [at, id] = Buffer.from(q.cursor, "base64url").toString("utf8").split("|");
@@ -111,10 +114,11 @@ export async function listDrafts(pools: Pools, m: Member, q: ListQuery) {
       `${SELECT}
         WHERE r.status = ANY ($1::text[])
           AND ($2::uuid IS NULL OR $2::uuid = ANY (r.outlet_ids))
+          AND ($6::text IS NULL OR r.source = $6)
           AND ($3::timestamptz IS NULL OR (r.updated_at, r.id) < ($3::timestamptz, $4::uuid))
         ORDER BY r.updated_at DESC, r.id DESC
         LIMIT $5`,
-      [statuses, q.outlet ?? null, after?.[0] ?? null, after?.[1] ?? null, limit + 1]);
+      [statuses, q.outlet ?? null, after?.[0] ?? null, after?.[1] ?? null, limit + 1, q.source ?? null]);
     const page = r.rows.slice(0, limit);
     const snaps = await snapshotsFor(c, page, m);
     const has_more = r.rows.length > limit;

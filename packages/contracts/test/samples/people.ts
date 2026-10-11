@@ -1,4 +1,4 @@
-import { S1, T, snapRef, u } from "./_ids.ts";
+import { S1, T, T_PG, snapRef, u } from "./_ids.ts";
 
 const shift = { roster_shift_id: u(1100), staff_id: u(1000), starts_at: "2026-10-12T09:00:00+05:30", ends_at: "2026-10-12T17:00:00+05:30", role_key: "cook" };
 const payrollLine = (v: unknown) => ({ staff_id: u(1000), base_minor: v, overtime_minor: v, advance_recovery_minor: v, tips_minor: v, net_minor: v });
@@ -42,5 +42,24 @@ export const SAMPLES: Record<string, unknown> = {
   "v1.people.payroll-preview.response": {
     outlet_id: u(2), period_month: "2026-08-01", currency: "INR",
     lines: [{ staff_id: u(1000), base_minor: 500000, overtime_minor: 157500, advance_recovery_minor: 0, tips_minor: 5000, net_minor: 662500, outstanding_advance_minor: 19000 }],
+  },
+  "v1.people.rosters": {
+    items: [{ roster_id: u(3300), outlet_id: u(2), week_start: "2026-10-12", status: "active", shifts: [{ roster_shift_id: u(3301), staff_id: u(1000), starts_at: T, ends_at: T_PG, role_key: "cook", status: "scheduled" }] }],
+    next_cursor: null,
+  },
+  "v1.people.attendance": {
+    items: [{ attendance_id: u(3310), outlet_id: u(2), staff_id: u(1000), roster_shift_id: null, clock_in_at: T, clock_out_at: null, source: "device", recorded_by: u(8) }],
+    next_cursor: null,
+  },
+  "v1.people.advances": {
+    items: [{ advance_id: u(3320), staff_id: u(1000), outlet_id: u(2), kind: "given", amount_minor: 1500000, currency: "INR", on_date: "2026-10-01", payroll_draft_id: null, note: null, recorded_by: u(8) }],
+    next_cursor: null,
+  },
+  "v1.people.payroll-drafts": {
+    items: [{
+      payroll_draft_id: u(3330), outlet_id: u(2), period_month: "2026-09-01", status: "approved", currency: "INR", created_at: T,
+      lines: [{ payroll_line_id: u(3331), staff_id: u(1000), base_minor: 2000000, overtime_minor: 100000, tips_minor: 0, advance_recovery_minor: 500000, net_minor: 1600000, currency: "INR" }],
+    }],
+    next_cursor: null,
   },
 };

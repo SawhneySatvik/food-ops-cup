@@ -14,3 +14,7 @@ v1.people.command-result
 v1.people.overtime.response
 v1.people.payroll-preview.response
 v1.people.staff.list
+v1.people.rosters
+v1.people.attendance
+v1.people.advances
+v1.people.payroll-drafts

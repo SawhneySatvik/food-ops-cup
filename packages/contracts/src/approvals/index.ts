@@ -166,6 +166,7 @@ export const ROUTES: readonly Route[] = [
     query: [
       { name: "status", required: false, schema: { type: "string", enum: ["proposed", "executing", "executed", "failed", "rejected", "stale", "decided"] } },
       { name: "outlet", required: false, schema: uuid },
+      { name: "source", required: false, schema: { type: "string", pattern: "^(intel:[a-z_]+|import|member)$" } },
       { name: "limit", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
       { name: "cursor", required: false, schema: { type: "string" } },
     ],

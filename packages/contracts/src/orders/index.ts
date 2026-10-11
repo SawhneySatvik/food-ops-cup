@@ -6,6 +6,8 @@ import { ReasonCode } from "../shared/reason-codes.ts";
 import { CiteRef } from "../shared/refs.ts";
 import { CommandResult } from "../shared/command.ts";
 import { ROUTES as ORDER_ROUTES } from "./routes.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
+import type { Route } from "../shared/routes.ts";
 
 export const OrderKind = z.enum(["dine_in", "takeaway", "pickup", "delivery"]);
 
@@ -354,6 +356,7 @@ export const ShiftView = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "orders.place.v1": OrdersPlaceV1,
   "orders.pickup_window.generate.v1": OrdersPickupWindowGenerateV1,
   "orders.preview.request": OrdersPreviewRequest,
@@ -373,5 +376,5 @@ export const SCHEMAS = {
   "v1.shift": ShiftView,
   "orders.place.guest-response": OrdersPlaceGuestResponse,
 };
-export const ROUTES = ORDER_ROUTES;
+export const ROUTES: readonly Route[] = [...ORDER_ROUTES, ...READ_ROUTES];
 export { ORDER_EVENT_SCHEMAS } from "./events.ts";

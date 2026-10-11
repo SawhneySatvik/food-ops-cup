@@ -136,3 +136,15 @@ export async function listBulkOrders(c: Queryable, scope: Scope, f: { outlet_id?
     currency: x.currency?.trim() ?? null, order_id: x.order_id, note: x.note, created_at: iso(x.created_at),
   }));
 }
+
+/** One merchant-side customer record (T-092b), shaped and masked like a `listCustomers` row; null when not visible. */
+export async function getCustomer(c: Queryable, id: string, full: boolean): Promise<Of<typeof CustomerView> | null> {
+  const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, boolean>; has_account: boolean; erased: boolean; created_at: Date }>(
+    `SELECT id, name, phone, email, consent, idp_sub IS NOT NULL AS has_account, erased_at IS NOT NULL AS erased, created_at FROM core.customer WHERE id = $1`, [id]);
+  const x = r.rows[0];
+  if (!x) return null;
+  return {
+    customer_id: x.id, name: x.name, phone: full ? x.phone : maskPhone(x.phone), email: full ? x.email : null,
+    consent: x.consent, has_account: x.has_account, erased: x.erased, created_at: iso(x.created_at),
+  };
+}

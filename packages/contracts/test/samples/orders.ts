@@ -70,4 +70,22 @@ export const SAMPLES: Record<string, unknown> = {
   },
   "orders.place.guest-response": { result: { command_id: u(11), type: "orders.place.v1", entity_id: u(10), committed_at: T_PG }, guest_access_token: "gst_4f9c2a7b1e8d3c6a5b0f9e8d7c6b5a49" },
   "orders.pickup_window.generate.v1": { outlet_id: u(2), business_date: "2026-10-10", from_local: "11:00", to_local: "22:30", slot_minutes: 15, capacity_orders: 10 },
+  "v1.orders.list": {
+    items: [{
+      order_id: u(3000), outlet_id: u(2), channel_id: u(7), device_id: u(9), kind: "dine_in", table_ref: "T4", status: "completed", business_date: "2026-10-09", ticket_no: 12,
+      subtotal_minor: 32000, discount_minor: 0, tax_minor: 1600, total_minor: 33600, currency: "INR", promised_at: null, created_at: T,
+    }],
+    next_cursor: null,
+  },
+  "v1.shifts.list": {
+    items: [{
+      shift_id: u(3010), outlet_id: u(2), device_id: u(9), status: "closed", opened_by: u(8), opened_at: T, float_minor: 200000, currency: "INR", closed_by: u(8), closed_at: T_PG,
+      counted_cash_minor: 1234500, expected_cash_minor: 1235000, variance_minor: -500,
+    }, {
+      shift_id: u(3011), outlet_id: u(2), device_id: null, status: "open", opened_by: u(8), opened_at: T, float_minor: 200000, currency: "INR", closed_by: null, closed_at: null,
+      counted_cash_minor: null, expected_cash_minor: null, variance_minor: null,
+    }],
+    next_cursor: u(3010),
+  },
+  "v1.pickup-windows.list": { items: [{ pickup_window_id: u(3020), outlet_id: u(2), starts_at: T, ends_at: T_PG, capacity_orders: 6, booked: 2 }], next_cursor: null },
 };

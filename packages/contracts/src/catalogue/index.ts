@@ -5,6 +5,7 @@ import { BasisPoints, CouponCode, CurrencyCode, IsoDate, IsoDateTime, LocalTime,
 import { defineDraftable } from "../shared/draftables.ts";
 import type { Route } from "../shared/routes.ts";
 import { ChannelKind } from "../tenancy/index.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 export const ItemKind = z.enum(["dish", "sku", "combo"]);
 const Barcode = z.string().regex(/^[0-9A-Za-z-]{4,32}$/);
@@ -249,6 +250,7 @@ export const BarcodeLookupResponse = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "catalogue.item.upsert.v1": CatalogueItemUpsertV1,
   "catalogue.recipe.version.create.v1": CatalogueRecipeVersionCreateV1,
   "catalogue.price.set.v1": CataloguePriceSetV1,
@@ -270,6 +272,7 @@ const command = (path: string, operationId: string, type: string, summary: strin
   surface: "public", method: "post", path, operationId, summary: `${type} — ${summary}`, auth: "member", command: type, response: "command-result", status: 200, conflict: true,
 });
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   command("/v1/catalogue/items", "upsertCatalogueItem", "catalogue.item.upsert.v1", "create or update an item with its variants and option groups (owner/manager, all outlets)"),
   command("/v1/catalogue/recipes", "createRecipeVersion", "catalogue.recipe.version.create.v1", "the next recipe version; closes the open one; an overlapping validity or a unit that is not the ingredient's base unit is refused"),
   command("/v1/catalogue/prices", "setPrice", "catalogue.price.set.v1", "a price for an outlet and channel; closes the open one; an overlapping validity is refused"),

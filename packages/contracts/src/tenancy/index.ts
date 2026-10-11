@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { CountryCode, CurrencyCode, Email, IanaZone, IsoDateTime, LocalTime, MemberRole, NonEmpty, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 /** Operator command (R27; `/platform/v1/tenants:provision`). The country chosen here is fixed once
  *  onboarding completes (R30) — there is no later country-change command. */
@@ -232,6 +233,7 @@ export const MembersResponse = z.strictObject({
 });
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "tenancy.provision.v1": TenancyProvisionV1,
   "tenancy.outlet.create.v1": TenancyOutletCreateV1,
   "tenancy.member.invite.v1": TenancyMemberInviteV1,
@@ -259,6 +261,7 @@ export const SCHEMAS = {
 };
 
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   {
     surface: "public",
     method: "post",

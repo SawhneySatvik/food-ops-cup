@@ -12,3 +12,8 @@ proposal.inventory.transfer.create.v1
 v1.inventory.movements
 v1.inventory.batches
 v1.inventory.reorder-levels
+v1.inventory.ingredients
+v1.inventory.waste
+v1.inventory.counts
+v1.inventory.count
+v1.inventory.transfers

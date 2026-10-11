@@ -8,6 +8,7 @@ import { z } from "zod";
 import { CurrencyCode, Email, IsoDateTime, MinorAmount, Slug, Uuid7 } from "../shared/primitives.ts";
 import { defineDraftable } from "../shared/draftables.ts";
 import type { Route } from "../shared/routes.ts";
+import { READ_ROUTES } from "./read-routes.ts";
 
 const Phone = z.string().regex(/^\+[1-9][0-9]{6,14}$/);
 const ConsentChannel = z.enum(["email", "sms"]);
@@ -208,6 +209,7 @@ const post = (path: string, operationId: string, summary: string, command: strin
 const q = (name: string, required = false): { name: string; required: boolean; schema: Record<string, unknown> } => ({ name, required, schema: { type: "string" } });
 
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   get("/v1/customers", "listCustomers", "Search merchant-side customer records (owner/manager/staff/judge; staff see masked contacts)", "customers.customer.list", { query: [q("q"), q("limit"), q("cursor")] }),
   post("/v1/customers:upsert", "upsertCustomer", "customers.customer.upsert.v1 — create or edit a customer record; consent can only be withdrawn", "customers.customer.upsert.v1"),
   get("/v1/customers/{id}/loyalty", "getCustomerLoyalty", "Loyalty balance (latest balance_after) and ledger entries", "customers.loyalty.ledger", { pathParams: uuidParam }),

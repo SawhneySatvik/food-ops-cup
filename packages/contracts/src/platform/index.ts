@@ -6,6 +6,7 @@ import { z } from "zod";
 import { CountryCode, CurrencyCode, Email, IsoDate, IsoDateTime, NonEmpty, Slug, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
 import { TemplateParams } from "../shared/snapshot.ts";
+import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 
 export const MODEL_ROLES = ["router", "reason", "extract", "narrate", "vision", "embed"] as const;
 export const MODEL_PROVIDERS = ["gemini", "openai", "openrouter", "nvidia"] as const;
@@ -119,6 +120,7 @@ export const OperatorList = list(OperatorRow);
 export const ConfigDraftList = list(ConfigDraftView);
 
 export const SCHEMAS = {
+  ...READ_SCHEMAS,
   "platform.model-role": ModelRole,
   "platform.model-role-row": ModelRoleRow,
   "platform.tenant": TenantRow,
@@ -147,6 +149,7 @@ const get = (path: string, operationId: string, summary: string, response: strin
   ({ surface: "public", method: "get", path, operationId, summary, auth: "operator", response, status: 200, ...extra });
 
 export const ROUTES: readonly Route[] = [
+  ...READ_ROUTES,
   get("/platform/v1/tenants", "listTenants", "Tenants from platform.tenant_registry (no tenant business data)", "platform.tenants"),
   get("/platform/v1/country-packs", "listCountryPacks", "Country pack versions", "platform.country-packs"),
   get("/platform/v1/country-packs/{code}/{version}", "getCountryPack", "One country pack version with its document", "platform.country-pack-detail",

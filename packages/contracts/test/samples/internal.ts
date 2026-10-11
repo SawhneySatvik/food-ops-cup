@@ -58,4 +58,6 @@ export const SAMPLES: Record<string, unknown> = {
       { code: "gst", holder: "business", outlet_kinds: ["restaurant", "cloud_kitchen", "store"], unverified: true }],
     payroll_scope: "drafts",
   },
+  "internal.brief-items.response": { items: [{ finding_id: u(80), pack: "finance", severity: "high", type: "finance.tender_gap",
+    texts: [`The till and the takings differ by ${snapRef(S1, 0, "on_hand_qty_milli")}.`], impact_ref: snapRef(S1, 0, "on_hand_qty_milli"), draft_ids: [u(90)] }] },
 };

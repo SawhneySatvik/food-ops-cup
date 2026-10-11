@@ -3,6 +3,7 @@
 //   POST /v1/people/staff:upsert · /rosters · /rosters:update · /attendance · /payroll-drafts · /advances ·
 //        /tip-pools · /training · /candidates:upsert     (command envelope → CommandResult)
 //   GET  /v1/people/overtime?outlet=&from=&to=         GET /v1/people/payroll-preview?outlet=&month=
+//   GET  /v1/people/rosters · attendance · advances · payroll-drafts   row lists (T-092b, routes.ts; staff see only their own shifts)
 //   GET  /v1/people/staff?outlet=                      (staff with pay terms; not for staff-role members)
 // Two commands are draftable (R16): people.roster.create.v1 and people.payroll_draft.create.v1. Their handlers are
 // registered with approvals; a draft writes nothing until a person with authority approves it.
@@ -26,6 +27,7 @@ import {
 } from "./commands.ts";
 import { overtimeRows, requireAttendance } from "./overtime.ts";
 import { listStaff, payrollDraftHandler, payrollStatusHandler, previewPayroll } from "./payroll.ts";
+import { readRoutes } from "./routes.ts";
 
 // Register once per process even if this file is loaded twice (vitest imports by path, loadRouters by URL).
 const REGISTERED = Symbol.for("munim.people.draftHandlersRegistered");
@@ -125,4 +127,5 @@ export const router = new Hono<AppEnv>()
       return previewPayroll(db, outlet, month);
     });
     return c.json({ outlet_id: outlet, period_month: month, ...out }, 200);
-  });
+  })
+  .route("/", readRoutes);
