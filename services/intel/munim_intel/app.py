@@ -5,6 +5,8 @@
               event runs under its own token (T-043: events:claim, then the detectors watching its type)
 /watch:sweep  core-worker fan-out: every registered detector over the run's outlets (T-043)
 /brief        core-worker fan-out: token verified, acknowledged (T-054)
+/ask          core's AskPort (T-088a; T-082b): one Manager ask under an `ask` run token → {answer_id, tainted}; the answer
+              is stored through core's internal API under core's answer id, before this returns
 /smoke        one trivial recorded ADK run through the echo tool: RunContext end to end
 
 Bodies are parsed by hand, so no framework validation error ever echoes a request back. Every refusal of a
@@ -28,10 +30,11 @@ from google.adk.models import BaseLlm
 from pydantic import ValidationError
 
 from munim_intel.config import Config, ConfigError
-from munim_intel.contracts_gen.models import Cloudevent
+from munim_intel.contracts_gen.models import Cloudevent, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
 from munim_intel.llm import llm_for_role
 from munim_intel.llm.providers import ProviderUnavailable
+from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
 from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed
@@ -58,11 +61,14 @@ def create_app(
     now: Callable[[], float] = time.time,
     core_transport: httpx.AsyncBaseTransport | None = None,
     frame_source: FrameSource | None = None,
+    ask_models: ModelsFactory | None = None,
 ) -> FastAPI:
     app = FastAPI(title="munim-intel", docs_url=None, redoc_url=None, openapi_url=None)
     keys: dict[str, Ed25519PublicKey] = {}
     # T-040b: core's run-frame by default; a test may pass its own source.
     frame_of = frame_source or core_frame_source(cfg, core_transport)
+    # T-082b: the route.intent decision model and the Manager's model; a test may pass recorded ones of its own.
+    models_of = ask_models or default_models(cfg)
 
     # Read lazily: core-api creates the key and the secret on its first start, which may follow intel's.
     def public_key() -> Ed25519PublicKey:
@@ -169,6 +175,30 @@ def create_app(
     async def brief(request: Request) -> Response:
         ctx = run_context(request)
         return JSONResponse({"run_id": ctx.run_id}, status_code=202)
+
+    @app.post("/ask")
+    async def ask(request: Request) -> Response:
+        ctx = run_context(request)
+        # Only an ask token buys an ask (an event or sweep token must not spend model calls here).
+        if ctx.trigger != "ask":
+            return _error(401, "unauthenticated")
+        try:
+            req = ThreadsIntelAskRequest.model_validate(await json_body(request))
+        except ValidationError:
+            return _error(400, "bad_request")
+        frame = await fetch_run_frame(ctx, cfg, core_transport)
+        if frame is None:
+            return _error(503, "unavailable")
+        client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
+        try:
+            out = await answer_ask(ctx, req, frame, client, cfg, await models_of(client))
+        except (CoreError, httpx.HTTPError, ProviderUnavailable) as e:
+            # Nothing usable was stored: core answers its member 503 and writes no turn.
+            log.error("intel: ask run %s failed: %s", ctx.run_id, type(e).__name__)
+            return _error(502, "internal")
+        finally:
+            await client.aclose()
+        return JSONResponse(out.model_dump(mode="json"))
 
     @app.post("/smoke")
     async def smoke(request: Request) -> Response:

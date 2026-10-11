@@ -31,6 +31,7 @@ import { addressedTo } from "./mention.ts";
 import { refreshSummary, type ThreadBlock, threadBlock } from "./summary.ts";
 
 export { addressedTo } from "./mention.ts";
+export { ASK_TIMEOUT_MS, createHttpAskPort, type HttpAskPortOptions } from "./askport.ts";
 export { buildSummary, refreshSummary, type SummaryRef, type SummaryTurn, type ThreadBlock, threadBlock } from "./summary.ts";
 
 /** core → intel `/ask` with the run token; resolves to intel's JSON body (validated here as `threads.intel-ask.response`). */
