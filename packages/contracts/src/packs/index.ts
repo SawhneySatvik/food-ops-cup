@@ -163,6 +163,9 @@ export const CountryPack = z
     /** Cash rounding increment in minor units (ruling #59): cash due is rounded to it, the difference is
      *  recorded on the tender as `rounding_minor`, and shift expected cash uses the rounded amount. 1 = none. */
     cash_rounding_minor: z.int().min(1),
+    /** G-13 (T-099): how a storefront order can be paid at the counter, as the storefront shows it. Optional: v1–v3 packs
+     *  have none (the storefront then shows null); every v4 pack lists them (packs.test). Recorded, never processed. */
+    pay_at_counter_methods: z.array(z.enum(["cash", "card", "upi"])).min(1).optional(),
     /** Monthly-impact severity ladder for findings (docs/plan/packs header "L"), pack minor units. */
     severity_ladder: z.strictObject({
       critical_minor_gte: MinorAmount.positive(),
@@ -212,6 +215,8 @@ export const CountryPack = z
       if (t.receipt_field !== null && !p.invoice.required_fields.includes(t.receipt_field))
         ctx.addIssue({ code: "custom", path: ["tax_ids", i, "receipt_field"], message: "receipt_field must be one of invoice.required_fields" });
     });
+    if (p.pay_at_counter_methods && new Set(p.pay_at_counter_methods).size !== p.pay_at_counter_methods.length)
+      ctx.addIssue({ code: "custom", path: ["pay_at_counter_methods"], message: "duplicate method" });
     if (p.cares && new Set(p.cares.food_kinds).size !== p.cares.food_kinds.length) ctx.addIssue({ code: "custom", path: ["cares", "food_kinds"], message: "duplicate food kind" });
     const licences = p.licence_kinds.map((k) => k.code);
     if (new Set(licences).size !== licences.length) ctx.addIssue({ code: "custom", path: ["licence_kinds"], message: "duplicate licence kind" });
