@@ -66,6 +66,13 @@ export function createPool(connectionString: string, max: number): pg.Pool {
   const pool = new pg.Pool({ connectionString, max, connectionTimeoutMillis: 5_000, idleTimeoutMillis: 30_000 });
   // An idle client dropped by the server must not crash the process; the next checkout reconnects.
   pool.on("error", () => {});
+  // pg-pool's listener above covers IDLE clients only; a checked-out client with no 'error' listener makes the
+  // EventEmitter throw and kills the process (hosted pooler sent a malformed packet mid-query, T-096). This one
+  // stays for the client's whole life: the in-flight query rejects and the caller releases the client with the
+  // error, so pg-pool destroys it. Label only — never the server's text or the connection string.
+  pool.on("connect", (client) => {
+    client.on("error", (e: Error & { code?: string }) => console.warn(`pg client error: ${e.code ?? e.name}`));
+  });
   return pool;
 }
 

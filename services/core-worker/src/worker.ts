@@ -41,6 +41,8 @@ export class Worker {
     const pool = new pg.Pool({ connectionString: o.connectionString, max: 4, idleTimeoutMillis: 10_000 });
     // An idle client's error (server restart) must not crash the process; the next checkout reconnects.
     pool.on("error", (e) => log("worker.pool_error", { error: errorLabel(e) }));
+    // Checked-out clients need their own listener or a dropped connection kills the process (T-096).
+    pool.on("connect", (c) => c.on("error", (e) => log("worker.client_error", { error: errorLabel(e) })));
     const fan = { minter: o.minter, intel: o.intel, log, concurrency: o.fanoutConcurrency ?? 4 };
     const nightly = o.nightly ?? [];
     const poison = new PoisonRows();

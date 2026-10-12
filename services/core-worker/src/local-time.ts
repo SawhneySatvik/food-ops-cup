@@ -34,6 +34,7 @@ export interface TenantClocks {
  *  nullable → first outlet's zone; `outlet.business_day_cutoff` is NOT NULL DEFAULT '04:00'). */
 export async function tenantClocks(pool: pg.Pool, tenantId: string): Promise<TenantClocks> {
   const c = await pool.connect();
+  let failed: Error | undefined;
   try {
     await c.query("BEGIN");
     await c.query(
@@ -47,10 +48,11 @@ export async function tenantClocks(pool: pg.Pool, tenantId: string): Promise<Ten
     const outlets = o.rows.map((r) => ({ outlet_id: r.id, tz: r.tz, cutoff: r.cutoff }));
     return { homeTz: t.rows[0]?.home_tz ?? outlets[0]?.tz ?? null, outlets };
   } catch (e) {
+    failed = e as Error;
     await c.query("ROLLBACK").catch(() => {});
     throw e;
   } finally {
-    c.release();
+    c.release(failed); // a failed client is destroyed, not handed to the next job (T-096)
   }
 }
 
