@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "sourceMap": false,
+    "declaration": true,
+    "rootDir": "src",
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"]
+}
