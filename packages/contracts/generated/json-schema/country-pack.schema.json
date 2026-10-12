@@ -612,6 +612,18 @@
       "minimum": 1,
       "maximum": 9007199254740991
     },
+    "pay_at_counter_methods": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "cash",
+          "card",
+          "upi"
+        ]
+      }
+    },
     "severity_ladder": {
       "type": "object",
       "properties": {

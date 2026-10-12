@@ -1,6 +1,7 @@
 // pnpm -F @munim/contracts gen
 //   zod (every src/<module>/index.ts SCHEMAS, discovered) → generated/json-schema/<name>.schema.json
-//   → generated/openapi/{public,internal}.json (OpenAPI 3.1; components = every schema)
+//   → generated/openapi/{public,internal}.json (OpenAPI 3.1; internal.json components = every schema, public.json
+//     components = the schemas its operations reach — no internal-only schema is published)
 //   → packages/sdk/src/gen/{openapi.ts,client.ts}   (openapi-typescript types + openapi-fetch client)
 //   → services/intel/munim_intel/contracts_gen/      (datamodel-code-generator → Pydantic v2)
 //   → generated/sources.sha256.json                  (stale-generation stamp: inputs + outputs)
@@ -124,13 +125,17 @@ function operation(r: Route): Json {
   const errors = { ...ERRORS, ...(r.conflict ? { "409": "Conflict" } : {}) };
   const errorSchema = (code: string) => (r.errors && (code === "409" || code === "422") ? r.errors : "error");
   const body = requestBody(r);
-  const ok: Json = { description: "OK", content: { "application/json": { schema: ref(r.response) } } };
+  // A stream's 200 is text/event-stream; each `data:` line is the JSON of `response` (seeded into the pruned
+  // components below, so the SDK still types it).
+  const ok: Json = r.stream
+    ? { description: `OK — server-sent events; each \`data:\` line is the JSON of ${pascal(r.response)} (read with the SDK's openStream, never EventSource)`, content: { "text/event-stream": { schema: { type: "string" } } } }
+    : { description: "OK", content: { "application/json": { schema: ref(r.response) } } };
   // A command's response body is stored once and replayed byte-identically; a replay is marked by header.
   if (r.command) ok.headers = { [REPLAYED_HEADER]: { description: "\"true\" when this is the stored response of an earlier identical request", schema: { type: "string", enum: ["true"] } } };
   return {
     operationId: r.operationId,
     summary: r.summary,
-    security: r.guest ? [...SECURITY[r.auth], { storefrontKey: [], guestToken: [] }] : SECURITY[r.auth],
+    security: [...SECURITY[r.auth], ...(r.guest ? [{ storefrontKey: [], guestToken: [] }] : []), ...(r.alsoAuth ?? []).flatMap((a) => SECURITY[a])],
     ...(parameters.length ? { parameters } : {}),
     ...(body ? { requestBody: body } : {}),
     responses: {
@@ -142,7 +147,12 @@ function operation(r: Route): Json {
 
 function openapi(surface: Surface | "all", schemas: Record<string, Json>): Json {
   const paths: Record<string, Json> = {};
-  for (const r of reg.routes.filter((x) => surface !== "all" && x.surface === surface)) (paths[r.path] ??= {})[r.method] = operation(r);
+  const used = new Set<string>();
+  for (const r of reg.routes.filter((x) => surface !== "all" && x.surface === surface)) {
+    const op = operation(r);
+    for (const set of op.security as Json[]) for (const k of Object.keys(set)) used.add(k);
+    (paths[r.path] ??= {})[r.method] = op;
+  }
   return {
     openapi: "3.1.0",
     info: {
@@ -154,23 +164,51 @@ function openapi(surface: Surface | "all", schemas: Record<string, Json>): Json 
     paths,
     components: {
       schemas,
-      securitySchemes: {
-        memberToken: { type: "http", scheme: "bearer", description: "IdP ID token of a signed-in person (a tenant member; alone on identity routes)" },
-        operatorToken: { type: "http", scheme: "bearer", description: "IdP ID token of a platform operator" },
-        runToken: { type: "http", scheme: "bearer", bearerFormat: "JWT (EdDSA)", description: "Run token minted by core-api (Ed25519)" },
-        serviceCredential: { type: "apiKey", in: "header", name: "x-munim-service-secret", description: "Service-to-service credential of the intel service" },
-        tenantHeader: { type: "apiKey", in: "header", name: TENANT_HEADER, description: "The tenant a member acts in (with memberToken)" },
-        storefrontKey: { type: "apiKey", in: "header", name: STOREFRONT_KEY_HEADER, description: "Public storefront key; resolves the tenant and channel" },
-        customerToken: { type: "http", scheme: "bearer", description: "IdP ID token of a customer (optional on storefront routes)" },
-        guestToken: { type: "apiKey", in: "header", name: GUEST_TOKEN_HEADER, description: "Guest access token of one order (returned once when the guest places it); with storefrontKey, on routes that mark guest access" },
-      },
+      securitySchemes: surface === "public" ? Object.fromEntries(Object.entries(SECURITY_SCHEMES).filter(([k]) => used.has(k))) : SECURITY_SCHEMES,
     },
   };
 }
+/** Every credential scheme; public.json keeps only those its operations name (no run token or service credential). */
+const SECURITY_SCHEMES: Json = {
+  memberToken: { type: "http", scheme: "bearer", description: "IdP ID token of a signed-in person (a tenant member; alone on identity routes)" },
+  operatorToken: { type: "http", scheme: "bearer", description: "IdP ID token of a platform operator" },
+  runToken: { type: "http", scheme: "bearer", bearerFormat: "JWT (EdDSA)", description: "Run token minted by core-api (Ed25519)" },
+  serviceCredential: { type: "apiKey", in: "header", name: "x-munim-service-secret", description: "Service-to-service credential of the intel service" },
+  tenantHeader: { type: "apiKey", in: "header", name: TENANT_HEADER, description: "The tenant a member acts in (with memberToken)" },
+  storefrontKey: { type: "apiKey", in: "header", name: STOREFRONT_KEY_HEADER, description: "Public storefront key; resolves the tenant and channel" },
+  customerToken: { type: "http", scheme: "bearer", description: "IdP ID token of a customer (optional on storefront routes)" },
+  guestToken: { type: "apiKey", in: "header", name: GUEST_TOKEN_HEADER, description: "Guest access token of one order (returned once when the guest places it); with storefrontKey, on routes that mark guest access" },
+};
+/** The components a surface's operations reach: every schema a route names (response, request, command, errors — a
+ *  stream's event schema has no $ref in its operation) and everything its operations and those schemas $ref, transitively. */
+function reachable(surface: Surface): Record<string, Json> {
+  const seen = new Set<string>();
+  const visit = (name: string) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    walk(components[name]);
+  };
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node === null || typeof node !== "object") return;
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "$ref" && typeof v === "string" && v.startsWith("#/components/schemas/")) visit(v.slice("#/components/schemas/".length));
+      else walk(v);
+    }
+  };
+  const routes = reg.routes.filter((r) => r.surface === surface);
+  for (const n of routes.flatMap((r) => [r.response, r.request, r.command, r.errors])) if (n) visit(pascal(n));
+  for (const r of routes) walk(operation(r));
+  const missing = [...seen].filter((n) => !components[n]);
+  if (missing.length) throw new Error(`${surface}: $ref to unknown components: ${missing.join(", ")}`);
+  return Object.fromEntries(Object.entries(components).filter(([n]) => seen.has(n)));
+}
 fresh(OPENAPI_DIR);
-for (const s of ["public", "internal"] as const) write(join(OPENAPI_DIR, `${s}.json`), json(openapi(s, components)));
+const publicComponents = reachable("public");
+write(join(OPENAPI_DIR, "public.json"), json(openapi("public", publicComponents)));
+write(join(OPENAPI_DIR, "internal.json"), json(openapi("internal", components)));
 const count = (s: Surface) => reg.routes.filter((r) => r.surface === s).length;
-step(`OpenAPI 3.1 → generated/openapi/public.json (${count("public")} routes), internal.json (${count("internal")} routes); ${reg.schemas.length} components each`);
+step(`OpenAPI 3.1 → generated/openapi/public.json (${count("public")} routes, ${Object.keys(publicComponents).length} reachable components), internal.json (${count("internal")} routes, ${reg.schemas.length} components)`);
 
 // 3 · TS SDK: types from the public document (openapi-typescript), client = openapi-fetch ------------------
 fresh(SDK_GEN);

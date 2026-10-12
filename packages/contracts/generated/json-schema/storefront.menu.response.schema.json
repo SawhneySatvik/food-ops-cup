@@ -9,6 +9,10 @@
       "type": "string",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
+    "channel_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
     "channel_kind": {
       "anyOf": [
         {
@@ -25,6 +29,29 @@
           "pattern": "^aggregator:[a-z][a-z0-9_]*$"
         }
       ]
+    },
+    "brands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "brand_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brand_id",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "prices_include_tax": {
+      "type": "boolean"
     },
     "accepting": {
       "type": "object",
@@ -97,8 +124,47 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
           },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "diet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "veg",
+                  "non_veg",
+                  "egg",
+                  "vegan"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "category": {
             "type": "string"
+          },
+          "brand_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "kind": {
             "type": "string",
@@ -140,6 +206,18 @@
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
                 },
+                "display_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "available": {
                   "type": "boolean"
                 },
@@ -152,6 +230,8 @@
               "required": [
                 "variant_id",
                 "name_key",
+                "display_name",
+                "description",
                 "available",
                 "price_minor"
               ],
@@ -170,6 +250,18 @@
                 "name_key": {
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+                },
+                "display_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "min_select": {
                   "type": "integer",
@@ -197,6 +289,18 @@
                         "type": "string",
                         "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
                       },
+                      "display_name": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "description": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "price_delta_minor": {
                         "type": "integer",
                         "minimum": -9007199254740991,
@@ -206,6 +310,8 @@
                     "required": [
                       "option_id",
                       "name_key",
+                      "display_name",
+                      "description",
                       "price_delta_minor"
                     ],
                     "additionalProperties": false
@@ -215,6 +321,8 @@
               "required": [
                 "option_group_id",
                 "name_key",
+                "display_name",
+                "description",
                 "min_select",
                 "max_select",
                 "required",
@@ -227,7 +335,11 @@
         "required": [
           "item_id",
           "name_key",
+          "display_name",
+          "description",
+          "diet",
           "category",
+          "brand_id",
           "kind",
           "available",
           "price_minor",
@@ -318,15 +430,37 @@
     "pay_at_counter": {
       "type": "boolean",
       "const": true
+    },
+    "pay_at_counter_methods": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card",
+              "upi"
+            ]
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
     "outlet_id",
+    "channel_id",
     "channel_kind",
+    "brands",
+    "prices_include_tax",
     "accepting",
     "items",
     "deals",
-    "pay_at_counter"
+    "pay_at_counter",
+    "pay_at_counter_methods"
   ],
   "additionalProperties": false
 }

@@ -110,6 +110,9 @@
       "type": "boolean",
       "const": true
     },
+    "prices_include_tax": {
+      "type": "boolean"
+    },
     "lines": {
       "type": "array",
       "items": {
@@ -154,6 +157,39 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          },
+          "tax_rate_bp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tax_component_rates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "rate_bp": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              },
+              "required": [
+                "code",
+                "rate_bp"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -163,7 +199,9 @@
           "qty_milli",
           "unit_price_minor",
           "line_discount_minor",
-          "tax_minor"
+          "tax_minor",
+          "tax_rate_bp",
+          "tax_component_rates"
         ],
         "additionalProperties": false
       }
@@ -259,6 +297,7 @@
     "cancel_window_min",
     "reschedule_window_min",
     "pay_at_counter",
+    "prices_include_tax",
     "lines",
     "events"
   ],

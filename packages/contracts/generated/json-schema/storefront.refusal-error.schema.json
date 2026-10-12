@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "storefront.refusal-error",
+  "title": "StorefrontRefusalError",
+  "x-munim-module": "storefront",
+  "type": "object",
+  "properties": {
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "bad_request",
+            "unauthenticated",
+            "forbidden",
+            "not_found",
+            "conflict",
+            "book_write_refused",
+            "country_locked",
+            "currency_mismatch",
+            "illegal_transition",
+            "override_refused",
+            "decision_refused",
+            "customer_erased",
+            "command_table_mismatch",
+            "period_closed",
+            "books_unbalanced",
+            "loyalty_refused",
+            "claim_quote_mismatch",
+            "out_of_pack_scope",
+            "sequence_gap",
+            "investigation_refused",
+            "idempotency_conflict",
+            "command_type_mismatch",
+            "invalid_payload",
+            "unregistered_command_type",
+            "cannot_verify",
+            "already_decided",
+            "stale_draft",
+            "chart_incomplete",
+            "execution_failed",
+            "unavailable",
+            "internal"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "number_grammar",
+                "unresolved_ref",
+                "cross_tenant_ref",
+                "quote_mismatch",
+                "missing_ref",
+                "settlements_missing",
+                "recipe_missing",
+                "stale_draft",
+                "authority_denied",
+                "cost_price_missing",
+                "ticket_times_missing",
+                "count_missing",
+                "expiry_missing",
+                "budget_exceeded",
+                "budget_missing",
+                "margin_below_floor",
+                "moq_exceeds_need",
+                "open_commitment_overlap",
+                "payment_terms_worse",
+                "consent_record_missing",
+                "bank_lines_missing",
+                "attendance_missing",
+                "payroll_out_of_scope",
+                "no_marketing_consent",
+                "not_a_certificate",
+                "log_coverage_missing",
+                "signal_source_missing",
+                "insufficient_history",
+                "forecast_stale",
+                "window_full",
+                "outlet_paused",
+                "item_sold_out",
+                "deal_rejudged",
+                "coupon_invalid",
+                "coupon_cap_reached",
+                "coupon_min_spend",
+                "change_window_closed",
+                "coupon_expired",
+                "coupon_out_of_scope",
+                "price_above_mrp",
+                "expired_batch",
+                "period_closed",
+                "model_blocked",
+                "preview_total_changed",
+                "buyer_identity_required",
+                "tax_id_missing",
+                "unknown_tax_class",
+                "unknown_channel",
+                "unit_mismatch",
+                "not_applicable",
+                "item_unavailable",
+                "reason_required",
+                "deal_changed",
+                "duplicate_invoice",
+                "guest_cannot_change",
+                "refund_first",
+                "order_tendered",
+                "cash_below_rounding",
+                "recently_rejected",
+                "mode_above_ceiling",
+                "cap_above_platform_budget",
+                "platform_budget_missing",
+                "assignee_missing",
+                "campaign_audience_unscoped",
+                "specialist_needed",
+                "cares_not_available",
+                "cares_not_enabled",
+                "cares_not_opted_in",
+                "cares_city_mismatch",
+                "recipient_ineligible",
+                "listing_expired",
+                "qty_exceeds_on_hand",
+                "qty_exceeds_listed",
+                "cooked_hold_exceeded",
+                "line_expired",
+                "no_eligible_recipient",
+                "no_rostered_staff",
+                "offer_not_enabled",
+                "offer_closed",
+                "claim_decided",
+                "claim_received",
+                "rate_limited",
+                "pickup_time_outside_window"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "reason_code"
+      ],
+      "additionalProperties": false,
+      "title": "ErrorBody"
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "line_no": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "item_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "variant_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deal_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]{2,31}$"
+        },
+        "min_spend_minor": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "shortfall_minor": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "old_total_minor": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "new_total_minor": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "additionalProperties": false
+}

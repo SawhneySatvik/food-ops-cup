@@ -30,6 +30,35 @@
           },
           "address": {
             "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_ids": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "label",
+                "value"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -37,14 +66,35 @@
           "name",
           "kind",
           "tz",
-          "address"
+          "address",
+          "phone",
+          "tax_ids"
         ],
         "additionalProperties": false
       }
+    },
+    "pay_at_counter_methods": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card",
+              "upi"
+            ]
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
-    "outlets"
+    "outlets",
+    "pay_at_counter_methods"
   ],
   "additionalProperties": false
 }

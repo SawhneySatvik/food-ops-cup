@@ -307,11 +307,35 @@
           "type": "null"
         }
       ]
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "const": "Measured on synthetic data"
+        },
+        "recipients": {
+          "type": "string",
+          "const": "to simulated recipients"
+        }
+      },
+      "required": [
+        "data",
+        "recipients"
+      ],
+      "additionalProperties": false
+    },
+    "note_key": {
+      "type": "string",
+      "const": "cares.note.check_local_rules"
     }
   },
   "required": [
     "items",
-    "next_cursor"
+    "next_cursor",
+    "labels",
+    "note_key"
   ],
   "additionalProperties": false
 }

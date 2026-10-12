@@ -6,7 +6,7 @@ import { serve } from "@hono/node-server";
 import { type Config, createLogger, type IdpMode, type Logger, loadRepoConfig, resolveIdpMode } from "@munim/config";
 import type { Hono } from "hono";
 import pg from "pg";
-import { createApp } from "./app.ts";
+import { createApp, parseCorsOrigins } from "./app.ts";
 import type { IdP } from "./auth/port.ts";
 import { storefrontResolver } from "./auth/resolve.ts";
 import type { PublishDeps } from "./commit/index.ts";
@@ -14,6 +14,7 @@ import { createHttpPublisher, createPersistentLocalIdp, devhostIdp } from "./dev
 import { setIdpMode } from "./health/index.ts";
 import { configureInternal } from "./internal/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
+import { configureCaresNetwork } from "./modules/cares-network/index.ts";
 import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
 import { configureInvestigations, createHttpNarratePort } from "./modules/investigations/index.ts";
 import { configureThreads, createHttpAskPort } from "./modules/threads/index.ts";
@@ -42,6 +43,10 @@ export interface CoreApiWiring {
   keys: { privateKeyPem: string; publicKeyPem: string };
   intelUrl: string;
   serviceSecret: string;
+  /** Exact browser origins for the public routes (lib/cors.ts); unset or empty = no CORS headers. */
+  corsOrigins?: readonly string[];
+  /** Proxies in front of core-api (the Cares-network rate limiter's client address); unset = the module's default 0. */
+  trustedProxyHops?: number;
 }
 
 export interface CoreApi {
@@ -76,7 +81,8 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
     connect: () => new pg.Client({ connectionString: w.listenUrl, application_name: "munim_stream_listen", keepAlive: true }),
   });
   // createApp awaits loadContracts() → loadRegistry(), so every draftable type is registered before serving (gotcha 28).
-  const app = await createApp(deps);
+  if (w.trustedProxyHops !== undefined) configureCaresNetwork({ trustedProxyHops: w.trustedProxyHops });
+  const app = await createApp(deps, { corsOrigins: w.corsOrigins ?? [] });
   configureInternal(deps, { serviceSecret: w.serviceSecret, keys });
   // T-082b: `POST /v1/ask` calls intel's `/ask` synchronously (a test may re-configure the port on the same deps).
   configureThreads(deps, { keys, intel: createHttpAskPort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
@@ -120,6 +126,8 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
       keys: ensureDevRunTokenKeys(config.runTokenKeyDir),
       intelUrl: config.intelUrl,
       serviceSecret: config.serviceSecret(),
+      corsOrigins: parseCorsOrigins(config.corsOrigins),
+      trustedProxyHops: config.trustedProxyHops,
     });
     const { port, server } = await serveApi(api.app, config.port);
     log(`core-api: listening on ${port}`);

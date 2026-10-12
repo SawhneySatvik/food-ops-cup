@@ -176,6 +176,10 @@
     "in_app"
   ],
   "cash_rounding_minor": 5,
+  "pay_at_counter_methods": [
+    "cash",
+    "card"
+  ],
   "severity_ladder": {
     "critical_minor_gte": 100000,
     "high_minor_gte": 20000,

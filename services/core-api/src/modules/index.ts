@@ -36,6 +36,7 @@ export const MODULES = [
   "traces",
   "lineage",
   "investigations",
+  "cares",
 ] as const;
 export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal", "platform"] as const;
 

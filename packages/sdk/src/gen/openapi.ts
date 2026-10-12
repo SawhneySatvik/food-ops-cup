@@ -3182,7 +3182,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Price a cart (Preview; writes nothing); channel comes from the key */
+        /** Price a cart (Preview; writes nothing) with tax rates, component amounts and refusal parameters; channel comes from the key */
         post: operations["storefrontPreviewOrder"];
         delete?: never;
         options?: never;
@@ -3199,7 +3199,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Guest or signed-in checkout in one transaction; pay at the counter */
+        /** Guest or signed-in checkout in one transaction; pay at the counter. A refusal's 409 / 422 body carries `params` */
         post: operations["storefrontPlaceOrder"];
         delete?: never;
         options?: never;
@@ -3267,8 +3267,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** storefront.order.reschedule.v1 — inside the outlet's reschedule window; deals re-priced */
+        /** storefront.order.reschedule.v1 — inside the outlet's reschedule window; deals re-priced (deal_rejudged carries old/new totals in `params`) */
         post: operations["storefrontRescheduleOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server-sent events for the given topics (kds / order / inbox / trace); text/event-stream, read with the SDK's openStream; resume with Last-Event-ID; heartbeat every 20 s, closed at 55 min */
+        get: operations["streamEvents"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4950,29 +4967,6 @@ export interface components {
         CaresClaimReceiveV1: {
             claim_id: components["schemas"]["Uuid7"];
         };
-        /** ProposalCaresListingPublishV1 */
-        ProposalCaresListingPublishV1: {
-            listing_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            kind: "donation" | "offer";
-            recipient_id: components["schemas"]["Uuid7"] | null;
-            pickup_from: components["schemas"]["IsoDatetime"];
-            pickup_to: components["schemas"]["IsoDatetime"];
-            lines: {
-                line_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                food_kind: "cooked" | "raw" | "packaged";
-                item_id: components["schemas"]["Uuid7"] | null;
-                ingredient_id: components["schemas"]["Uuid7"] | null;
-                batch_id: components["schemas"]["Uuid7"] | null;
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-                expires_on: string | null;
-                unit_price_minor: components["schemas"]["Ref"] | null;
-                currency: string | null;
-            }[];
-        };
         /** CaresNetworkSnapshotMint */
         CaresNetworkSnapshotMint: {
             template_id: string;
@@ -4999,6 +4993,14 @@ export interface components {
                 pickup_to: string;
                 active: boolean;
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1CaresRecipients */
         V1CaresRecipients: {
@@ -5020,11 +5022,69 @@ export interface components {
                 lat_e6: number;
                 lng_e6: number;
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1CaresListings */
         V1CaresListings: {
-            items: components["schemas"]["V1CaresListing"][];
+            items: {
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "donation" | "offer";
+                /** @enum {string} */
+                status: "published" | "allocated" | "closed" | "withdrawn";
+                recipient_id: components["schemas"]["Uuid7"] | null;
+                pickup_from: components["schemas"]["IsoDatetime"];
+                pickup_to: components["schemas"]["IsoDatetime"];
+                /** Format: date */
+                pickup_on: string;
+                published_by: components["schemas"]["Uuid7"];
+                published_at: components["schemas"]["IsoDatetime"];
+                lines: {
+                    line_id: components["schemas"]["Uuid7"];
+                    line_no: number;
+                    /** @enum {string} */
+                    food_kind: "cooked" | "raw" | "packaged";
+                    item_id: components["schemas"]["Uuid7"] | null;
+                    ingredient_id: components["schemas"]["Uuid7"] | null;
+                    batch_id: components["schemas"]["Uuid7"] | null;
+                    qty_milli: number;
+                    unit: string;
+                    expires_on: string | null;
+                    unit_price_minor: number | null;
+                    currency: string | null;
+                }[];
+                handovers: {
+                    handover_id: components["schemas"]["Uuid7"];
+                    allocation_id: components["schemas"]["Uuid7"] | null;
+                    /** @enum {string} */
+                    status: "recorded" | "voided";
+                    handed_at: components["schemas"]["IsoDatetime"];
+                    recorded_by: components["schemas"]["Uuid7"];
+                    voided_by: components["schemas"]["Uuid7"] | null;
+                    void_reason_code: string | null;
+                    lines: {
+                        listing_line_id: components["schemas"]["Uuid7"];
+                        qty_milli: number;
+                    }[];
+                }[];
+            }[];
             next_cursor: components["schemas"]["Uuid7"] | null;
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1CaresListing */
         V1CaresListing: {
@@ -5069,6 +5129,14 @@ export interface components {
                     qty_milli: number;
                 }[];
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1CaresMarket */
         V1CaresMarket: {
@@ -5094,6 +5162,16 @@ export interface components {
                     currency: string;
                 }[];
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
+            /** @constant */
+            money_label: "Recorded, never processed";
         };
         /** V1CaresClaims */
         V1CaresClaims: {
@@ -5129,6 +5207,16 @@ export interface components {
                     }[];
                 };
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
+            /** @constant */
+            money_label: "Recorded, never processed";
         };
         /** V1CaresInboundClaims */
         V1CaresInboundClaims: {
@@ -5145,6 +5233,16 @@ export interface components {
                     unit_price_minor: number;
                 }[];
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
+            /** @constant */
+            money_label: "Recorded, never processed";
         };
         /** V1CaresNetworkCities */
         V1CaresNetworkCities: {
@@ -5214,6 +5312,14 @@ export interface components {
                     ref: components["schemas"]["Ref"];
                 };
             }[];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1CaresNetworkSnapshot */
         V1CaresNetworkSnapshot: {
@@ -5236,6 +5342,14 @@ export interface components {
             sha256: string;
             created_at: components["schemas"]["IsoDatetime"];
             published_at: components["schemas"]["IsoDatetime"];
+            labels: {
+                /** @constant */
+                data: "Measured on synthetic data";
+                /** @constant */
+                recipients: "to simulated recipients";
+            };
+            /** @constant */
+            note_key: "cares.note.check_local_rules";
         };
         /** V1StorefrontCares */
         V1StorefrontCares: {
@@ -5268,135 +5382,6 @@ export interface components {
         /** PlatformCaresNetworkSnapshots */
         PlatformCaresNetworkSnapshots: {
             items: components["schemas"]["PlatformCaresNetworkSnapshot"][];
-        };
-        /** MunimCaresListingPublishedV1 */
-        MunimCaresListingPublishedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.listing.published.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                listing_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "donation" | "offer";
-            };
-        };
-        /** MunimCaresListingClosedV1 */
-        MunimCaresListingClosedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.listing.closed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                listing_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "donation" | "offer";
-                /** @enum {string} */
-                status: "closed" | "withdrawn";
-            };
-        };
-        /** MunimCaresHandoverRecordedV1 */
-        MunimCaresHandoverRecordedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.handover.recorded.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                handover_id: components["schemas"]["Uuid7"];
-                listing_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "donation" | "offer";
-            };
-        };
-        /** MunimCaresHandoverVoidedV1 */
-        MunimCaresHandoverVoidedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.handover.voided.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                handover_id: components["schemas"]["Uuid7"];
-                listing_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "donation" | "offer";
-            };
-        };
-        /** MunimCaresClaimCreatedV1 */
-        MunimCaresClaimCreatedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.claim.created.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                claim_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-            };
-        };
-        /** MunimCaresClaimDecidedV1 */
-        MunimCaresClaimDecidedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.cares.claim.decided.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                claim_id: components["schemas"]["Uuid7"];
-                listing_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                verdict: "accepted" | "declined";
-            };
         };
         /** V1CatalogueItems */
         V1CatalogueItems: {
@@ -5512,6 +5497,8 @@ export interface components {
                 name_key: string;
                 barcode: string | null;
                 active: boolean;
+                display_name?: string | null;
+                description?: string | null;
             }[];
             option_groups: {
                 option_group_id: components["schemas"]["Uuid7"];
@@ -5532,8 +5519,15 @@ export interface components {
                         unit: string;
                         waste_pct_bp: number;
                     }[];
+                    display_name?: string | null;
+                    description?: string | null;
                 }[];
+                display_name?: string | null;
+                description?: string | null;
             }[];
+            display_name?: string | null;
+            description?: string | null;
+            diet?: ("veg" | "non_veg" | "egg" | "vegan") | null;
             /** @enum {string} */
             kind: "dish" | "combo";
             stock_ingredient_id: components["schemas"]["Uuid7"] | null;
@@ -5551,6 +5545,8 @@ export interface components {
                 name_key: string;
                 barcode: string | null;
                 active: boolean;
+                display_name?: string | null;
+                description?: string | null;
             }[];
             option_groups: {
                 option_group_id: components["schemas"]["Uuid7"];
@@ -5571,8 +5567,15 @@ export interface components {
                         unit: string;
                         waste_pct_bp: number;
                     }[];
+                    display_name?: string | null;
+                    description?: string | null;
                 }[];
+                display_name?: string | null;
+                description?: string | null;
             }[];
+            display_name?: string | null;
+            description?: string | null;
+            diet?: ("veg" | "non_veg" | "egg" | "vegan") | null;
             /** @constant */
             kind: "sku";
             stock_ingredient_id: components["schemas"]["Uuid7"];
@@ -5671,61 +5674,6 @@ export interface components {
             variant_id: components["schemas"]["Uuid7"] | null;
             available: boolean;
         };
-        /** ProposalCataloguePriceSetV1 */
-        ProposalCataloguePriceSetV1: {
-            price_id: components["schemas"]["Uuid7"];
-            item_id: components["schemas"]["Uuid7"];
-            variant_id: components["schemas"]["Uuid7"] | null;
-            outlet_id: components["schemas"]["Uuid7"];
-            channel_kind: ("counter" | "table_qr" | "pickup" | "own_site") | string;
-            amount_minor: components["schemas"]["Ref"];
-            currency: string;
-            tax_class: string;
-            /** Format: date */
-            valid_from: string;
-            valid_to: string | null;
-        };
-        /** ProposalCatalogueRecipeVersionCreateV1 */
-        ProposalCatalogueRecipeVersionCreateV1: {
-            recipe_version_id: components["schemas"]["Uuid7"];
-            item_id: components["schemas"]["Uuid7"];
-            variant_id: components["schemas"]["Uuid7"] | null;
-            version: components["schemas"]["Ref"];
-            /** Format: date */
-            valid_from: string;
-            valid_to: string | null;
-            yield_qty_milli: components["schemas"]["Ref"];
-            lines: {
-                ingredient_id: components["schemas"]["Uuid7"];
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-                waste_pct_bp: components["schemas"]["Ref"];
-            }[];
-        };
-        /** ProposalCatalogueDealEndV1 */
-        ProposalCatalogueDealEndV1: {
-            deal_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            valid_to: string;
-        };
-        /** ProposalCatalogueCouponSetV1 */
-        ProposalCatalogueCouponSetV1: {
-            coupon_id: components["schemas"]["Uuid7"];
-            code: string;
-            /** @enum {string} */
-            kind: "percent" | "amount";
-            value_bp: components["schemas"]["Ref"] | null;
-            value_minor: components["schemas"]["Ref"] | null;
-            currency: string;
-            min_spend_minor: components["schemas"]["Ref"];
-            global_cap: components["schemas"]["Ref"] | null;
-            per_customer_cap: components["schemas"]["Ref"] | null;
-            requires_customer: boolean;
-            outlet_ids: components["schemas"]["Uuid7"][];
-            valid_from: components["schemas"]["IsoDatetime"];
-            valid_to: components["schemas"]["IsoDatetime"] | null;
-            active: boolean;
-        };
         /** V1CatalogueMenu */
         V1CatalogueMenu: {
             outlet_id: components["schemas"]["Uuid7"];
@@ -5740,6 +5688,12 @@ export interface components {
                 name_key: string;
                 variant_name_key: string | null;
                 category: string;
+                brand_id: components["schemas"]["Uuid7"] | null;
+                display_name: string | null;
+                description: string | null;
+                diet: ("veg" | "non_veg" | "egg" | "vegan") | null;
+                variant_display_name: string | null;
+                variant_description: string | null;
                 barcode: string | null;
                 price_id: components["schemas"]["Uuid7"];
                 price_minor: number;
@@ -5758,7 +5712,11 @@ export interface components {
                         name_key: string;
                         price_delta_minor: number;
                         currency: string;
+                        display_name: string | null;
+                        description: string | null;
                     }[];
+                    display_name: string | null;
+                    description: string | null;
                 }[];
                 deals: {
                     deal_id: components["schemas"]["Uuid7"];
@@ -5786,6 +5744,12 @@ export interface components {
                 name_key: string;
                 variant_name_key: string | null;
                 category: string;
+                brand_id: components["schemas"]["Uuid7"] | null;
+                display_name: string | null;
+                description: string | null;
+                diet: ("veg" | "non_veg" | "egg" | "vegan") | null;
+                variant_display_name: string | null;
+                variant_description: string | null;
                 barcode: string | null;
                 price_id: components["schemas"]["Uuid7"];
                 price_minor: number;
@@ -5804,7 +5768,11 @@ export interface components {
                         name_key: string;
                         price_delta_minor: number;
                         currency: string;
+                        display_name: string | null;
+                        description: string | null;
                     }[];
+                    display_name: string | null;
+                    description: string | null;
                 }[];
                 deals: {
                     deal_id: components["schemas"]["Uuid7"];
@@ -5917,18 +5885,6 @@ export interface components {
             vendor: string | null;
             amc_id: components["schemas"]["Uuid7"] | null;
             note: string | null;
-        };
-        /** ProposalComplianceMaintenanceScheduleV1 */
-        ProposalComplianceMaintenanceScheduleV1: {
-            maintenance_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            asset_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            kind: "preventive" | "inspection";
-            /** Format: date */
-            due_on: string;
-            estimated_cost_minor: components["schemas"]["Ref"] | null;
-            vendor_note: string | null;
         };
         /** V1ComplianceLicences */
         V1ComplianceLicences: {
@@ -6068,44 +6024,6 @@ export interface components {
             customer_id: components["schemas"]["Uuid7"];
             points: number;
             note: string;
-        };
-        /** CustomersCampaignCreateV1 */
-        CustomersCampaignCreateV1: {
-            campaign_id: components["schemas"]["Uuid7"];
-            name: string;
-            /** @enum {string} */
-            channel: "email" | "sms";
-            outlet_ids: components["schemas"]["Uuid7"][];
-            segment_snapshot_id: components["schemas"]["Uuid7"];
-            audience_count: number;
-            message_key: string;
-            placeholders: {
-                key: string;
-                value: number;
-            }[];
-            coupon_id: components["schemas"]["Uuid7"] | null;
-            send_at: components["schemas"]["IsoDatetime"];
-            window_from: components["schemas"]["IsoDatetime"] | null;
-            window_to: components["schemas"]["IsoDatetime"] | null;
-        };
-        /** ProposalCustomersCampaignCreateV1 */
-        ProposalCustomersCampaignCreateV1: {
-            campaign_id: components["schemas"]["Uuid7"];
-            name: string;
-            /** @enum {string} */
-            channel: "email" | "sms";
-            outlet_ids: components["schemas"]["Uuid7"][];
-            segment_snapshot_id: components["schemas"]["Uuid7"];
-            audience_count: components["schemas"]["Ref"];
-            message_key: string;
-            placeholders: {
-                key: string;
-                value: components["schemas"]["Ref"];
-            }[];
-            coupon_id: components["schemas"]["Uuid7"] | null;
-            send_at: components["schemas"]["IsoDatetime"];
-            window_from: components["schemas"]["IsoDatetime"] | null;
-            window_to: components["schemas"]["IsoDatetime"] | null;
         };
         /** CustomersCampaignCancelV1 */
         CustomersCampaignCancelV1: {
@@ -6289,274 +6207,6 @@ export interface components {
         CustomersBulkOrderList: {
             bulk_orders: components["schemas"]["V1BulkOrder"][];
         };
-        /** MunimOrdersOrderPlacedV1 */
-        MunimOrdersOrderPlacedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.order.placed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                channel_id: components["schemas"]["Uuid7"];
-                /** @constant */
-                status: "placed";
-                placed_at: components["schemas"]["IsoDatetime"];
-            };
-        };
-        /** MunimInventoryMovementRecordedV1 */
-        MunimInventoryMovementRecordedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.inventory.movement.recorded.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                outlet_id: components["schemas"]["Uuid7"];
-                movement_ids: components["schemas"]["Uuid7"][];
-                ingredient_ids: components["schemas"]["Uuid7"][];
-                /** @enum {string} */
-                kind: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return" | "donation" | "surplus_out" | "surplus_in" | "cares_reversal";
-                ref_type: string;
-                ref_id: components["schemas"]["Uuid7"];
-            };
-        };
-        /** MunimPurchasingPoCommittedV1 */
-        MunimPurchasingPoCommittedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.purchasing.po.committed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                po_id: components["schemas"]["Uuid7"];
-                supplier_id: components["schemas"]["Uuid7"];
-                outlet_ids: components["schemas"]["Uuid7"][];
-                decision_id: components["schemas"]["Uuid7"] | null;
-                draft_id: components["schemas"]["Uuid7"] | null;
-            };
-        };
-        /** MunimKitchenTicketCreatedV1 */
-        MunimKitchenTicketCreatedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.kitchen.ticket.created.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                ticket_id: components["schemas"]["Uuid7"];
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                station: string;
-                /** @enum {string} */
-                status: "queued" | "preparing" | "ready" | "done";
-            };
-        };
-        /** MunimKitchenTicketAdvancedV1 */
-        MunimKitchenTicketAdvancedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.kitchen.ticket.advanced.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                ticket_id: components["schemas"]["Uuid7"];
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                station: string;
-                /** @enum {string} */
-                status: "queued" | "preparing" | "ready" | "done";
-                /** @enum {string} */
-                from_status: "queued" | "preparing" | "ready" | "done";
-            };
-        };
-        /** MunimOrdersOrderStatusChangedV1 */
-        MunimOrdersOrderStatusChangedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.order.status_changed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                from_status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
-                /** @enum {string} */
-                to_status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
-            };
-        };
-        /** MunimOrdersOrderPromiseChangedV1 */
-        MunimOrdersOrderPromiseChangedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.order.promise_changed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                reason_code: string;
-            };
-        };
-        /** MunimOrdersTenderRecordedV1 */
-        MunimOrdersTenderRecordedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.tender.recorded.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                tender_id: components["schemas"]["Uuid7"];
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                method: "cash" | "card" | "upi";
-            };
-        };
-        /** MunimOrdersVoidRecordedV1 */
-        MunimOrdersVoidRecordedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.void.recorded.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                void_id: components["schemas"]["Uuid7"];
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                reason_code: string;
-            };
-        };
-        /** MunimOrdersRefundRecordedV1 */
-        MunimOrdersRefundRecordedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.refund.recorded.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                refund_id: components["schemas"]["Uuid7"];
-                order_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                method: "cash" | "card" | "upi";
-                reason_code: string;
-            };
-        };
-        /** MunimOrdersShiftOpenedV1 */
-        MunimOrdersShiftOpenedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.shift.opened.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                shift_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                device_id: components["schemas"]["Uuid7"] | null;
-            };
-        };
-        /** MunimOrdersShiftClosedV1 */
-        MunimOrdersShiftClosedV1: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            /** @constant */
-            type: "munim.orders.shift.closed.v1";
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                shift_id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                device_id: components["schemas"]["Uuid7"] | null;
-            };
-        };
-        /** MunimEvent */
-        MunimEvent: components["schemas"]["MunimOrdersOrderPlacedV1"] | components["schemas"]["MunimInventoryMovementRecordedV1"] | components["schemas"]["MunimPurchasingPoCommittedV1"] | components["schemas"]["MunimKitchenTicketCreatedV1"] | components["schemas"]["MunimKitchenTicketAdvancedV1"] | components["schemas"]["MunimOrdersOrderStatusChangedV1"] | components["schemas"]["MunimOrdersOrderPromiseChangedV1"] | components["schemas"]["MunimOrdersTenderRecordedV1"] | components["schemas"]["MunimOrdersVoidRecordedV1"] | components["schemas"]["MunimOrdersRefundRecordedV1"] | components["schemas"]["MunimOrdersShiftOpenedV1"] | components["schemas"]["MunimOrdersShiftClosedV1"];
         /** V1FinanceSettlements */
         V1FinanceSettlements: {
             items: {
@@ -6736,66 +6386,6 @@ export interface components {
             net_minor: number;
             currency: string;
         };
-        /** FinanceJournalAdjustV1 */
-        FinanceJournalAdjustV1: {
-            journal_entry_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            entry_date: string;
-            outlet_id: components["schemas"]["Uuid7"] | null;
-            reverses_id: components["schemas"]["Uuid7"] | null;
-            postings: {
-                account_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                side: "debit" | "credit";
-                amount_minor: number;
-            }[];
-            currency: string;
-            memo_key: string;
-        };
-        /** ProposalFinanceDisputeDraftV1 */
-        ProposalFinanceDisputeDraftV1: {
-            dispute_id: components["schemas"]["Uuid7"];
-            channel_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            basis: "unapproved_ad_fee" | "short_payout" | "missing_payout";
-            lines: {
-                settlement_line_id: components["schemas"]["Uuid7"] | null;
-                order_id: components["schemas"]["Uuid7"] | null;
-                claimed_minor: components["schemas"]["Ref"];
-            }[];
-            total_claimed_minor: components["schemas"]["Ref"];
-            currency: string;
-            break_ids: components["schemas"]["Uuid7"][];
-        };
-        /** ProposalFinanceJournalAdjustV1 */
-        ProposalFinanceJournalAdjustV1: {
-            journal_entry_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            entry_date: string;
-            outlet_id: components["schemas"]["Uuid7"] | null;
-            reverses_id: components["schemas"]["Uuid7"] | null;
-            postings: {
-                account_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                side: "debit" | "credit";
-                amount_minor: components["schemas"]["Ref"];
-            }[];
-            currency: string;
-            memo_key: string;
-        };
-        /** ProposalFinancePeriodCloseV1 */
-        ProposalFinancePeriodCloseV1: {
-            period_close_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"] | null;
-            /** Format: date */
-            period_month: string;
-            checklist: {
-                item_code: string;
-                evidence_ref: components["schemas"]["RefId"];
-            }[];
-            net_minor: components["schemas"]["Ref"];
-            currency: string;
-        };
         /** V1FinanceTallyExport */
         V1FinanceTallyExport: {
             file_name: string;
@@ -6851,31 +6441,6 @@ export interface components {
             assignee_member_id: components["schemas"]["Uuid7"] | null;
             due_on: string | null;
         };
-        /** ProposalGoalsGoalCreateV1 */
-        ProposalGoalsGoalCreateV1: {
-            goal_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"] | null;
-            /** @enum {string} */
-            metric: "net_sales" | "orders";
-            target_value: components["schemas"]["Ref"];
-            /** Format: date */
-            period_from: string;
-            /** Format: date */
-            due_on: string;
-            basis_snapshot_id: components["schemas"]["Uuid7"] | null;
-        };
-        /** ProposalGoalsTaskCreateV1 */
-        ProposalGoalsTaskCreateV1: {
-            task_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"] | null;
-            title_key: string;
-            assignee_member_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            due_on: string;
-            finding_id: components["schemas"]["Uuid7"] | null;
-            /** @default null */
-            cares_listing_id: components["schemas"]["Uuid7"] | null;
-        };
         /** V1Goals */
         V1Goals: {
             items: {
@@ -6904,6 +6469,7 @@ export interface components {
                 /** Format: date */
                 due_on: string;
                 finding_id: components["schemas"]["Uuid7"] | null;
+                cares_listing_id: components["schemas"]["Uuid7"] | null;
                 /** @enum {string} */
                 status: "open" | "done" | "cancelled";
                 done_at: components["schemas"]["IsoDatetime"] | null;
@@ -6934,42 +6500,6 @@ export interface components {
                 sent_at: components["schemas"]["IsoDatetime"];
             }[];
             next_cursor: components["schemas"]["Uuid7"] | null;
-        };
-        /** ImportsFormatApproveV1 */
-        ImportsFormatApproveV1: {
-            format_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
-            name: string;
-            header: string[];
-            header_signature: string;
-            mapping: {
-                source: string;
-                target: string;
-                unit?: string;
-            }[];
-        };
-        /** ImportsRunCommitV1 */
-        ImportsRunCommitV1: {
-            import_run_id: components["schemas"]["Uuid7"];
-        };
-        /** ProposalImportsFormatApproveV1 */
-        ProposalImportsFormatApproveV1: {
-            format_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
-            name: string;
-            header: string[];
-            header_signature: string;
-            mapping: {
-                source: string;
-                target: string;
-                unit?: string;
-            }[];
-        };
-        /** ProposalImportsRunCommitV1 */
-        ProposalImportsRunCommitV1: {
-            import_run_id: components["schemas"]["Uuid7"];
         };
         /** V1ImportsDocument */
         V1ImportsDocument: {
@@ -7154,681 +6684,12 @@ export interface components {
             events: components["schemas"]["TraceEvent"][];
             next_after_seq: number | null;
         };
-        /** IntelSpecialistsRegistry */
-        IntelSpecialistsRegistry: {
-            specialists: {
-                id: string;
-                /** @enum {string} */
-                kind: "specialist" | "manager" | "service";
-                name_key: string;
-                desk_key: string | null;
-                aliases: string[];
-                detectors: string[];
-                templates: string[];
-                draftables: string[];
-                workflow_draftables: string[];
-            }[];
-        };
         /** V1SnapshotsRequest */
         V1SnapshotsRequest: {
             template_id: string;
             params: {
                 [key: string]: string | number | boolean | null | string[];
             };
-        };
-        /** InternalEventsClaimRequest */
-        InternalEventsClaimRequest: {
-            event_id: components["schemas"]["Uuid7"];
-        };
-        /** InternalEventsClaimResponse */
-        InternalEventsClaimResponse: {
-            event_id: components["schemas"]["Uuid7"];
-            claimed_at: components["schemas"]["IsoDatetime"];
-        };
-        /** InternalWatchClaimRequest */
-        InternalWatchClaimRequest: {
-            pack: string;
-        };
-        /** InternalWatchClaimResponse */
-        InternalWatchClaimResponse: {
-            pack: string;
-            go: boolean;
-            last_run_at: components["schemas"]["IsoDatetime"] | null;
-        };
-        /** InternalSnapshotsRequest */
-        InternalSnapshotsRequest: {
-            template_id: string;
-            params: {
-                [key: string]: string | number | boolean | null | string[];
-            };
-        };
-        /** InternalFindingsRequest */
-        InternalFindingsRequest: {
-            pack: string;
-            type: string;
-            /** @enum {string} */
-            severity: "low" | "medium" | "high" | "critical";
-            confidence_bp: number;
-            dedupe_key: string;
-            envelope: components["schemas"]["FindingEnvelope"];
-        };
-        /** InternalFindingsResponse */
-        InternalFindingsResponse: {
-            finding_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            outcome: "stored" | "merged" | "abstained";
-            reason_code: components["schemas"]["ReasonCode"] | null;
-        };
-        /** InternalDraftsRequest */
-        InternalDraftsRequest: {
-            draft_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            pack: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
-            command_type: string;
-            payload: {
-                listing_id: string;
-                outlet_id: string;
-                /** @enum {string} */
-                kind: "donation" | "offer";
-                recipient_id: string | null;
-                /** Format: date-time */
-                pickup_from: string;
-                /** Format: date-time */
-                pickup_to: string;
-                lines: {
-                    line_id: string;
-                    /** @enum {string} */
-                    food_kind: "cooked" | "raw" | "packaged";
-                    item_id: string | null;
-                    ingredient_id: string | null;
-                    batch_id: string | null;
-                    qty_milli: string;
-                    unit: string;
-                    expires_on: string | null;
-                    unit_price_minor: string | null;
-                    currency: string | null;
-                }[];
-            } | {
-                coupon_id: string;
-                code: string;
-                /** @enum {string} */
-                kind: "percent" | "amount";
-                value_bp: string | null;
-                value_minor: string | null;
-                currency: string;
-                min_spend_minor: string;
-                global_cap: string | null;
-                per_customer_cap: string | null;
-                requires_customer: boolean;
-                outlet_ids: string[];
-                /** Format: date-time */
-                valid_from: string;
-                valid_to: string | null;
-                active: boolean;
-            } | {
-                deal_id: string;
-                /** Format: date */
-                valid_to: string;
-            } | {
-                price_id: string;
-                item_id: string;
-                variant_id: string | null;
-                outlet_id: string;
-                channel_kind: ("counter" | "table_qr" | "pickup" | "own_site") | string;
-                amount_minor: string;
-                currency: string;
-                tax_class: string;
-                /** Format: date */
-                valid_from: string;
-                valid_to: string | null;
-            } | {
-                recipe_version_id: string;
-                item_id: string;
-                variant_id: string | null;
-                version: string;
-                /** Format: date */
-                valid_from: string;
-                valid_to: string | null;
-                yield_qty_milli: string;
-                lines: {
-                    ingredient_id: string;
-                    qty_milli: string;
-                    unit: string;
-                    waste_pct_bp: string;
-                }[];
-            } | {
-                maintenance_id: string;
-                outlet_id: string;
-                asset_id: string;
-                /** @enum {string} */
-                kind: "preventive" | "inspection";
-                /** Format: date */
-                due_on: string;
-                estimated_cost_minor: string | null;
-                vendor_note: string | null;
-            } | {
-                campaign_id: string;
-                name: string;
-                /** @enum {string} */
-                channel: "email" | "sms";
-                outlet_ids: string[];
-                segment_snapshot_id: string;
-                audience_count: string;
-                message_key: string;
-                placeholders: {
-                    key: string;
-                    value: string;
-                }[];
-                coupon_id: string | null;
-                /** Format: date-time */
-                send_at: string;
-                window_from: string | null;
-                window_to: string | null;
-            } | {
-                dispute_id: string;
-                channel_id: string;
-                /** @enum {string} */
-                basis: "unapproved_ad_fee" | "short_payout" | "missing_payout";
-                lines: {
-                    settlement_line_id: string | null;
-                    order_id: string | null;
-                    claimed_minor: string;
-                }[];
-                total_claimed_minor: string;
-                currency: string;
-                break_ids: string[];
-            } | {
-                journal_entry_id: string;
-                /** Format: date */
-                entry_date: string;
-                outlet_id: string | null;
-                reverses_id: string | null;
-                postings: {
-                    account_id: string;
-                    /** @enum {string} */
-                    side: "debit" | "credit";
-                    amount_minor: string;
-                }[];
-                currency: string;
-                memo_key: string;
-            } | {
-                period_close_id: string;
-                outlet_id: string | null;
-                /** Format: date */
-                period_month: string;
-                checklist: {
-                    item_code: string;
-                    evidence_ref: string;
-                }[];
-                net_minor: string;
-                currency: string;
-            } | {
-                goal_id: string;
-                outlet_id: string | null;
-                /** @enum {string} */
-                metric: "net_sales" | "orders";
-                target_value: string;
-                /** Format: date */
-                period_from: string;
-                /** Format: date */
-                due_on: string;
-                basis_snapshot_id: string | null;
-            } | {
-                task_id: string;
-                outlet_id: string | null;
-                title_key: string;
-                assignee_member_id: string;
-                /** Format: date */
-                due_on: string;
-                finding_id: string | null;
-                /** @default null */
-                cares_listing_id: string | null;
-            } | {
-                format_id: string;
-                /** @enum {string} */
-                kind: "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log" | "stock_count";
-                name: string;
-                header: string[];
-                header_signature: string;
-                mapping: {
-                    source: string;
-                    target: string;
-                    unit?: string;
-                }[];
-            } | {
-                import_run_id: string;
-            } | {
-                outlet_id: string;
-                ingredient_id: string;
-                min_qty_milli: string;
-                par_qty_milli: string;
-            } | {
-                transfer_id: string;
-                from_outlet_id: string;
-                to_outlet_id: string;
-                lines: {
-                    ingredient_id: string;
-                    batch_id: string | null;
-                    qty_milli: string;
-                    unit: string;
-                }[];
-            } | {
-                prep_list_id: string;
-                outlet_id: string;
-                /** Format: date */
-                business_date: string;
-                lines: {
-                    ingredient_id: string;
-                    qty_milli: string;
-                    unit: string;
-                }[];
-            } | {
-                outlet_id: string;
-                item_id: string;
-                station: string;
-                prep_sec: string;
-                /** Format: date */
-                valid_from: string;
-            } | {
-                payroll_draft_id: string;
-                outlet_id: string;
-                period_month: string;
-                currency: string;
-                lines: {
-                    staff_id: string;
-                    base_minor: string;
-                    overtime_minor: string;
-                    advance_recovery_minor: string;
-                    tips_minor: string;
-                    net_minor: string;
-                }[];
-            } | {
-                roster_id: string;
-                outlet_id: string;
-                /** Format: date */
-                week_start: string;
-                shifts: {
-                    roster_shift_id: string;
-                    staff_id: string;
-                    /** Format: date-time */
-                    starts_at: string;
-                    /** Format: date-time */
-                    ends_at: string;
-                    role_key: string;
-                }[];
-            } | {
-                dispute_id: string;
-                supplier_invoice_id: string;
-                /** @enum {string} */
-                basis: "overbilled" | "duplicate_invoice" | "other";
-                lines: {
-                    invoice_line_id: string;
-                    claimed_minor: string;
-                }[];
-            } | {
-                supplier_invoice_id: string;
-                supplier_id: string;
-                invoice_no: string;
-                /** Format: date */
-                invoice_date: string;
-                po_id: string | null;
-                currency: string;
-                lines: {
-                    line_id: string;
-                    po_line_id: string | null;
-                    ingredient_id: string | null;
-                    description: string | null;
-                    qty_milli: string;
-                    unit: string;
-                    unit_price_minor: string;
-                    tax_minor: string;
-                }[];
-            } | {
-                po_id: string;
-                supplier_id: string;
-                outlet_ids: string[];
-                currency: string;
-                expected_on: string | null;
-                negotiation_run_id: string | null;
-                lines: {
-                    ingredient_id: string;
-                    qty_milli: string;
-                    unit: string;
-                    unit_price_minor: string;
-                }[];
-            } | {
-                supplier_return_id: string;
-                outlet_id: string;
-                supplier_id: string;
-                goods_received_id: string | null;
-                reason_code: string;
-                note: string;
-                lines: {
-                    batch_id: string | null;
-                    ingredient_id: string;
-                    qty_milli: string;
-                    unit: string;
-                }[];
-            };
-            outlet_ids: components["schemas"]["Uuid7"][];
-            finding_id: components["schemas"]["Uuid7"] | null;
-            evidence: components["schemas"]["RefId"][];
-            based_on: string[];
-        };
-        /** InternalDraftsResponse */
-        InternalDraftsResponse: {
-            draft_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            status: "proposed" | "abstained";
-            reason_code: components["schemas"]["ReasonCode"] | null;
-        };
-        /** InternalAnswersRequest */
-        InternalAnswersRequest: {
-            question: string;
-            envelope: components["schemas"]["AnswerEnvelope"];
-        };
-        /** InternalAnswersResponse */
-        InternalAnswersResponse: {
-            answer_id: components["schemas"]["Uuid7"];
-            abstained: boolean;
-            reason_code: components["schemas"]["ReasonCode"] | null;
-        };
-        /** InternalTracesBatchRequest */
-        InternalTracesBatchRequest: {
-            events: ({
-                id: components["schemas"]["Uuid7"];
-                seq: number;
-                parent_id: components["schemas"]["Uuid7"] | null;
-                actor: string;
-                at: components["schemas"]["IsoDatetime"];
-                /** @enum {string} */
-                kind: "route" | "skill_load" | "subagent_start" | "subagent_end" | "tool_call" | "tool_result" | "a2a_send" | "a2a_receive" | "finding" | "draft" | "abstain" | "error";
-                payload: {
-                    [key: string]: string | string[];
-                };
-            } | {
-                id: components["schemas"]["Uuid7"];
-                seq: number;
-                parent_id: components["schemas"]["Uuid7"] | null;
-                actor: string;
-                at: components["schemas"]["IsoDatetime"];
-                /** @constant */
-                kind: "review";
-                payload: components["schemas"]["TraceReviewPayload"];
-            })[];
-        };
-        /** InternalTracesBatchResponse */
-        InternalTracesBatchResponse: {
-            inserted: number;
-            last_seq: number;
-        };
-        /** InternalBatchResponse */
-        InternalBatchResponse: {
-            inserted: number;
-            existing: number;
-        };
-        /** InternalEntitiesBatchRequest */
-        InternalEntitiesBatchRequest: {
-            entities: {
-                id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "business" | "outlet" | "brand" | "channel" | "item" | "ingredient" | "supplier" | "person" | "customer" | "day" | "other";
-                core_ref: string | null;
-                name: string;
-            }[];
-        };
-        /** InternalAliasesBatchRequest */
-        InternalAliasesBatchRequest: {
-            aliases: {
-                id: components["schemas"]["Uuid7"];
-                entity_id: components["schemas"]["Uuid7"];
-                alias: string;
-                /** @enum {string} */
-                source: "core" | "claim" | "import" | "member";
-            }[];
-        };
-        /** InternalChunksBatchRequest */
-        InternalChunksBatchRequest: {
-            chunks: {
-                id: components["schemas"]["Uuid7"];
-                document_id: components["schemas"]["Uuid7"] | null;
-                message_id: components["schemas"]["Uuid7"] | null;
-                seq: number;
-                char_start: number;
-                text: string;
-            }[];
-        };
-        /** InternalClaimsBatchRequest */
-        InternalClaimsBatchRequest: {
-            claims: {
-                id: components["schemas"]["Uuid7"];
-                chunk_id: components["schemas"]["Uuid7"] | null;
-                message_id: components["schemas"]["Uuid7"] | null;
-                span_start: number;
-                span_end: number;
-                quote: string;
-                subject_entity_id: components["schemas"]["Uuid7"] | null;
-                predicate: string;
-                object: string | null;
-                object_entity_id: components["schemas"]["Uuid7"] | null;
-            }[];
-        };
-        /** InternalEdgesBatchRequest */
-        InternalEdgesBatchRequest: {
-            edges: {
-                id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                kind: "uses" | "quoted" | "sold" | "wasted" | "supplies" | "works_at" | "mentions" | "supported_by" | "proposes" | "about" | "contradicts";
-                src_entity_id: components["schemas"]["Uuid7"];
-                dst_entity_id: components["schemas"]["Uuid7"];
-                claim_id: components["schemas"]["Uuid7"] | null;
-                source_ref: string | null;
-                valid_from: string | null;
-                valid_to: string | null;
-            }[];
-        };
-        /** InternalEmbeddingsBatchRequest */
-        InternalEmbeddingsBatchRequest: {
-            embeddings: {
-                chunk_id: components["schemas"]["Uuid7"];
-                embedding_micro: number[];
-            }[];
-        };
-        /** InternalWikiBatchRequest */
-        InternalWikiBatchRequest: {
-            pages: {
-                page_id: components["schemas"]["Uuid7"];
-                entity_id: components["schemas"]["Uuid7"] | null;
-                kind: string;
-                slug: string;
-                title: string;
-                version_id: components["schemas"]["Uuid7"];
-                version: number;
-                body: {
-                    text: string;
-                    refs: components["schemas"]["RefId"][];
-                }[];
-            }[];
-        };
-        /** InternalWikiBatchResponse */
-        InternalWikiBatchResponse: {
-            pages: {
-                page_id: components["schemas"]["Uuid7"];
-                version: number;
-                /** @enum {string} */
-                status: "stored" | "existing" | "abstained";
-                reason_code: components["schemas"]["ReasonCode"] | null;
-            }[];
-        };
-        /** InternalForecastsBatchRequest */
-        InternalForecastsBatchRequest: {
-            forecast_run: {
-                id: components["schemas"]["Uuid7"];
-                method: string;
-                /** Format: date */
-                trained_through: string;
-                horizon_days: number;
-                holdout_days: number;
-                wape_bp: number | null;
-                baseline_wape_bp: number | null;
-                bias_bp: number | null;
-            };
-            points: {
-                id: components["schemas"]["Uuid7"];
-                outlet_id: components["schemas"]["Uuid7"];
-                item_id: components["schemas"]["Uuid7"] | null;
-                /** Format: date */
-                business_on: string;
-                slot_start: string | null;
-                method: string;
-                qty_milli: number;
-                lo_qty_milli: number;
-                hi_qty_milli: number;
-                inputs_snapshot_id: components["schemas"]["Uuid7"];
-            }[];
-        };
-        /** InternalForecastsBatchResponse */
-        InternalForecastsBatchResponse: {
-            run_inserted: boolean;
-            inserted: number;
-            existing: number;
-        };
-        /** InternalQuotesBatchRequest */
-        InternalQuotesBatchRequest: {
-            quotes: {
-                id: components["schemas"]["Uuid7"];
-                supplier_id: components["schemas"]["Uuid7"];
-                ingredient_id: components["schemas"]["Uuid7"];
-                round: number;
-                qty_milli: number;
-                unit: string;
-                unit_price_minor: number;
-                currency: string;
-                min_order_qty_milli: number;
-                payment_days: number;
-                terms: {
-                    [key: string]: boolean | number | string;
-                };
-                trace_event_id: components["schemas"]["Uuid7"] | null;
-                source_chunk_id: components["schemas"]["Uuid7"];
-                spans: {
-                    unit_price_minor: [
-                        number,
-                        number
-                    ];
-                    qty_milli: [
-                        number,
-                        number
-                    ];
-                    min_order_qty_milli: [
-                        number,
-                        number
-                    ] | null;
-                    payment_days: [
-                        number,
-                        number
-                    ] | null;
-                };
-            }[];
-        };
-        /** InternalGraphQueryRequest */
-        InternalGraphQueryRequest: {
-            /** @enum {string} */
-            template: "price_shock_path" | "dish_margin_drivers" | "supplier_dependency" | "claim_support" | "neighbourhood";
-            args: {
-                [key: string]: string | number;
-            };
-        };
-        /** InternalGraphQueryResponse */
-        InternalGraphQueryResponse: {
-            rows: {
-                [key: string]: string | number | null;
-            }[];
-        };
-        /** InternalSpendRequest */
-        InternalSpendRequest: {
-            entries: {
-                id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                role: "router" | "reason" | "extract" | "narrate" | "vision" | "embed";
-                /** @enum {string} */
-                provider: "gemini" | "openai" | "openrouter" | "nvidia";
-                model_id: string;
-                input_tokens: number;
-                output_tokens: number;
-                amount_minor: number;
-                currency: string;
-            }[];
-        };
-        /** InternalRunFrameResponse */
-        InternalRunFrameResponse: {
-            pack: {
-                code: string;
-                version: number;
-            };
-            currency: string;
-            severity_ladder: {
-                critical_minor_gte: number;
-                high_minor_gte: number;
-                medium_minor_gte: number;
-            };
-            detectors: {
-                [key: string]: {
-                    thresholds: {
-                        [key: string]: number;
-                    };
-                };
-            };
-            outlets: {
-                id: components["schemas"]["Uuid7"];
-                name: string;
-                /** @enum {string} */
-                kind: "restaurant" | "cloud_kitchen" | "store";
-                tz: string;
-                /** Format: date */
-                business_date: string;
-            }[];
-            budget: {
-                /** Format: date */
-                month: string;
-                currency: string;
-                owner_cap_minor: number | null;
-                operator_limit_minor: number;
-                effective_cap_minor: number;
-                spent_minor: number;
-                hard_left_minor: number;
-                /** @enum {string} */
-                level: "ok" | "hard";
-            } | null;
-            /** @enum {string} */
-            narration: "model" | "template";
-            negotiation: {
-                target_bp: number;
-                walkaway_bp: number;
-            };
-            licence_kinds: {
-                code: string;
-                /** @enum {string} */
-                holder: "business" | "outlet";
-                outlet_kinds: ("restaurant" | "cloud_kitchen" | "store")[];
-                unverified: boolean;
-            }[];
-            /** @enum {string} */
-            payroll_scope: "drafts" | "roster_only";
-        };
-        /** InternalBriefItemsResponse */
-        InternalBriefItemsResponse: {
-            items: {
-                finding_id: components["schemas"]["Uuid7"];
-                /** @enum {string} */
-                pack: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
-                /** @enum {string} */
-                severity: "low" | "medium" | "high" | "critical";
-                type: string;
-                texts: string[];
-                impact_ref: string | null;
-                draft_ids: components["schemas"]["Uuid7"][];
-            }[];
         };
         /** V1InventoryIngredients */
         V1InventoryIngredients: {
@@ -8010,25 +6871,6 @@ export interface components {
             qty_milli: number;
             reason_code: string;
             note: string;
-        };
-        /** ProposalInventoryReorderLevelSetV1 */
-        ProposalInventoryReorderLevelSetV1: {
-            outlet_id: components["schemas"]["Uuid7"];
-            ingredient_id: components["schemas"]["Uuid7"];
-            min_qty_milli: components["schemas"]["Ref"];
-            par_qty_milli: components["schemas"]["Ref"];
-        };
-        /** ProposalInventoryTransferCreateV1 */
-        ProposalInventoryTransferCreateV1: {
-            transfer_id: components["schemas"]["Uuid7"];
-            from_outlet_id: components["schemas"]["Uuid7"];
-            to_outlet_id: components["schemas"]["Uuid7"];
-            lines: {
-                ingredient_id: components["schemas"]["Uuid7"];
-                batch_id: components["schemas"]["Uuid7"] | null;
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-            }[];
         };
         /** V1InventoryMovements */
         V1InventoryMovements: {
@@ -8222,34 +7064,6 @@ export interface components {
             }[];
             next_cursor: string | null;
         };
-        /** InvestigationsNarrateRequest */
-        InvestigationsNarrateRequest: {
-            answer_id: components["schemas"]["Uuid7"];
-            question: string;
-            /** @enum {string} */
-            playbook_id: "margin_fall";
-            /** @enum {string} */
-            owner: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
-            items: {
-                item_id: string;
-                /** @enum {string} */
-                specialist: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
-                /** @enum {string} */
-                verdict: "pending" | "supported" | "refuted" | "cannot_verify";
-                cells: {
-                    ref: string;
-                    column: string;
-                }[];
-                template: string;
-            }[];
-        };
-        /** InvestigationsNarrateResponse */
-        InvestigationsNarrateResponse: {
-            answer_id: components["schemas"]["Uuid7"];
-            tainted: boolean;
-            /** @enum {string} */
-            source: "model" | "template";
-        };
         /** KitchenTicketAdvanceV1 */
         KitchenTicketAdvanceV1: {
             ticket_id: components["schemas"]["Uuid7"];
@@ -8276,27 +7090,6 @@ export interface components {
             lines: {
                 ingredient_id: components["schemas"]["Uuid7"];
                 qty_milli: number;
-                unit: string;
-            }[];
-        };
-        /** ProposalKitchenPrepTimeSetV1 */
-        ProposalKitchenPrepTimeSetV1: {
-            outlet_id: components["schemas"]["Uuid7"];
-            item_id: components["schemas"]["Uuid7"];
-            station: string;
-            prep_sec: components["schemas"]["Ref"];
-            /** Format: date */
-            valid_from: string;
-        };
-        /** ProposalKitchenPrepListCreateV1 */
-        ProposalKitchenPrepListCreateV1: {
-            prep_list_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            business_date: string;
-            lines: {
-                ingredient_id: components["schemas"]["Uuid7"];
-                qty_milli: components["schemas"]["Ref"];
                 unit: string;
             }[];
         };
@@ -8864,150 +7657,6 @@ export interface components {
             expected_cash_minor: number | null;
             variance_minor: number | null;
         };
-        /** OrdersPlaceGuestResponse */
-        OrdersPlaceGuestResponse: {
-            result: components["schemas"]["CommandResult"];
-            guest_access_token: string | null;
-        };
-        /** CountryPack */
-        CountryPack: {
-            code: string;
-            version: number;
-            /** Format: date */
-            effective_from: string;
-            name: string;
-            locale: string;
-            currency: {
-                code: string;
-                minor_unit: number;
-                symbol: string;
-            };
-            fy_start_month: number;
-            timezones: string[];
-            default_timezone: string;
-            formats: {
-                /** @enum {string} */
-                number_grouping: "indian" | "thousands";
-                decimal_separator: string;
-                group_separator: string;
-                date: string;
-                magnitude_words: {
-                    word: string;
-                    suffix: string;
-                    exponent: number;
-                }[];
-            };
-            tax: {
-                regime: string;
-                /** @enum {string} */
-                price_display: "inclusive" | "exclusive";
-                /** @constant */
-                rounding: "half_up_per_line";
-                default_class: string;
-                classes: {
-                    code: string;
-                    label: string;
-                    rate_bp: number;
-                    components: {
-                        code: string;
-                        rate_bp: number;
-                    }[];
-                    input_tax_credit: boolean;
-                    /** @enum {string} */
-                    supply: "service" | "goods" | "any";
-                    applies_to: string;
-                    _unverified?: string[];
-                }[];
-                _unverified?: string[];
-            };
-            tax_ids: {
-                code: string;
-                label: string;
-                pattern: string;
-                /** @enum {string} */
-                holder: "business" | "outlet";
-                required: boolean;
-                on_receipt: boolean;
-                receipt_field: string | null;
-                _unverified?: string[];
-            }[];
-            invoice: {
-                title: string;
-                every_receipt_is_tax_invoice: boolean;
-                required_fields: string[];
-                buyer_identity_above_minor: number | null;
-                _unverified?: string[];
-            };
-            printed_price: {
-                /** @enum {string} */
-                rule: "none" | "sale_above_mrp_refused";
-                applies_to: string | null;
-                _unverified?: string[];
-            };
-            aggregators: {
-                code: string;
-                display_name: string;
-                import_format: string;
-                /** @enum {string} */
-                tax_treatment: "merchant_collects" | "operator_collects_excluded";
-                legal_basis: string | null;
-                _unverified?: string[];
-            }[];
-            /** @enum {string} */
-            payroll_scope: "drafts" | "roster_only";
-            surcharges: {
-                /** @enum {string} */
-                card_surcharge: "not_applicable" | "allowed" | "prohibited";
-                _unverified?: string[];
-            };
-            compliance_calendar: {
-                code: string;
-                label: string;
-                /** @enum {string} */
-                recurrence: "monthly" | "quarterly" | "annual" | "on_change";
-                due_day_after_period: number | null;
-                _unverified?: string[];
-            }[];
-            licence_kinds: {
-                code: string;
-                label: string;
-                /** @enum {string} */
-                holder: "business" | "outlet";
-                outlet_kinds: ("restaurant" | "cloud_kitchen" | "store")[];
-                _unverified?: string[];
-            }[];
-            expired_sale_override: boolean;
-            status_channels: ("in_app" | "email" | "sms")[];
-            cash_rounding_minor: number;
-            severity_ladder: {
-                critical_minor_gte: number;
-                high_minor_gte: number;
-                medium_minor_gte: number;
-                _notes: string[];
-            };
-            detectors: {
-                [key: string]: {
-                    thresholds: {
-                        [key: string]: number;
-                    };
-                    _notes: string[];
-                };
-            };
-            chart_of_accounts: {
-                code: string;
-                name: string;
-                /** @enum {string} */
-                type: "asset" | "liability" | "equity" | "income" | "expense";
-            }[];
-            cares?: {
-                food_kinds: ("cooked" | "raw" | "packaged")[];
-                offers_enabled: boolean;
-                cooked_max_hold_min: number;
-                min_days_left_at_pickup: number;
-                _notes: string[];
-            };
-            _unverified?: string[];
-        };
         /** V1PeopleRosters */
         V1PeopleRosters: {
             items: {
@@ -9226,35 +7875,6 @@ export interface components {
             source: string | null;
             note: string | null;
         };
-        /** ProposalPeopleRosterCreateV1 */
-        ProposalPeopleRosterCreateV1: {
-            roster_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            /** Format: date */
-            week_start: string;
-            shifts: {
-                roster_shift_id: components["schemas"]["Uuid7"];
-                staff_id: components["schemas"]["Uuid7"];
-                starts_at: components["schemas"]["IsoDatetime"];
-                ends_at: components["schemas"]["IsoDatetime"];
-                role_key: string;
-            }[];
-        };
-        /** ProposalPeoplePayrollDraftCreateV1 */
-        ProposalPeoplePayrollDraftCreateV1: {
-            payroll_draft_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            period_month: string;
-            currency: string;
-            lines: {
-                staff_id: components["schemas"]["Uuid7"];
-                base_minor: components["schemas"]["Ref"];
-                overtime_minor: components["schemas"]["Ref"];
-                advance_recovery_minor: components["schemas"]["Ref"];
-                tips_minor: components["schemas"]["Ref"];
-                net_minor: components["schemas"]["Ref"];
-            }[];
-        };
         /** V1PeopleCommandResult */
         V1PeopleCommandResult: {
             command_id: components["schemas"]["Uuid7"];
@@ -9331,17 +7951,6 @@ export interface components {
                 currency: string;
             }[];
             has_more: boolean;
-        };
-        /** PlatformModelRole */
-        PlatformModelRole: {
-            /** @enum {string} */
-            role: "router" | "reason" | "extract" | "narrate" | "vision" | "embed";
-            /** @enum {string} */
-            provider: "gemini" | "openai" | "openrouter" | "nvidia";
-            model_id: string;
-            input_price_per_mtok_minor?: number;
-            output_price_per_mtok_minor?: number;
-            price_currency?: string;
         };
         /** PlatformModelRoleRow */
         PlatformModelRoleRow: {
@@ -9611,67 +8220,6 @@ export interface components {
                 unit: string;
             }[];
         };
-        /** ProposalPurchasingPoCreateV1 */
-        ProposalPurchasingPoCreateV1: {
-            po_id: components["schemas"]["Uuid7"];
-            supplier_id: components["schemas"]["Uuid7"];
-            outlet_ids: components["schemas"]["Uuid7"][];
-            currency: string;
-            expected_on: string | null;
-            negotiation_run_id: components["schemas"]["Uuid7"] | null;
-            lines: {
-                ingredient_id: components["schemas"]["Uuid7"];
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-                unit_price_minor: components["schemas"]["Ref"];
-            }[];
-        };
-        /** ProposalPurchasingInvoiceDisputeV1 */
-        ProposalPurchasingInvoiceDisputeV1: {
-            dispute_id: components["schemas"]["Uuid7"];
-            supplier_invoice_id: components["schemas"]["Uuid7"];
-            /** @enum {string} */
-            basis: "overbilled" | "duplicate_invoice" | "other";
-            lines: {
-                invoice_line_id: components["schemas"]["Uuid7"];
-                claimed_minor: components["schemas"]["Ref"];
-            }[];
-        };
-        /** ProposalPurchasingInvoiceRecordV1 */
-        ProposalPurchasingInvoiceRecordV1: {
-            supplier_invoice_id: components["schemas"]["Uuid7"];
-            supplier_id: components["schemas"]["Uuid7"];
-            invoice_no: string;
-            /** Format: date */
-            invoice_date: string;
-            po_id: components["schemas"]["Uuid7"] | null;
-            currency: string;
-            lines: {
-                line_id: components["schemas"]["Uuid7"];
-                po_line_id: components["schemas"]["Uuid7"] | null;
-                ingredient_id: components["schemas"]["Uuid7"] | null;
-                description: string | null;
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-                unit_price_minor: components["schemas"]["Ref"];
-                tax_minor: components["schemas"]["Ref"];
-            }[];
-        };
-        /** ProposalPurchasingSupplierReturnCreateV1 */
-        ProposalPurchasingSupplierReturnCreateV1: {
-            supplier_return_id: components["schemas"]["Uuid7"];
-            outlet_id: components["schemas"]["Uuid7"];
-            supplier_id: components["schemas"]["Uuid7"];
-            goods_received_id: components["schemas"]["Uuid7"] | null;
-            reason_code: string;
-            note: string;
-            lines: {
-                batch_id: components["schemas"]["Uuid7"] | null;
-                ingredient_id: components["schemas"]["Uuid7"];
-                qty_milli: components["schemas"]["Ref"];
-                unit: string;
-            }[];
-        };
         /** V1Supplier */
         V1Supplier: {
             supplier_id: components["schemas"]["Uuid7"];
@@ -9854,7 +8402,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited" | "pickup_time_outside_window";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -9876,43 +8424,6 @@ export interface components {
             impact_ref: string | null;
             abstained: boolean;
             reason_code?: components["schemas"]["ReasonCode"] | null;
-        };
-        /** PersonEdit */
-        PersonEdit: {
-            value: number;
-            typed_by: components["schemas"]["Uuid7"];
-        };
-        /** RunTokenClaims */
-        RunTokenClaims: {
-            /** @constant */
-            iss: "munim-core";
-            /** @constant */
-            aud: "munim-intel";
-            run_id: components["schemas"]["Uuid7"];
-            tenant_id: components["schemas"]["Uuid7"];
-            outlet_scope: components["schemas"]["Uuid7"][] | "*"[];
-            /** @enum {string} */
-            trigger: "event" | "watch_sweep" | "ask" | "brief" | "ingest" | "auto_step";
-            actor: string;
-            iat: number;
-            exp: number;
-        };
-        /** Cloudevent */
-        Cloudevent: {
-            /** @constant */
-            specversion: "1.0";
-            id: components["schemas"]["Uuid7"];
-            time: components["schemas"]["IsoDatetime"];
-            /** @constant */
-            datacontenttype: "application/json";
-            tenantid: components["schemas"]["Uuid7"];
-            munimrun: string;
-            source: string;
-            type: string;
-            subject: components["schemas"]["Uuid7"];
-            data: {
-                [key: string]: unknown;
-            };
         };
         /** TraceEvent */
         TraceEvent: {
@@ -9945,15 +8456,6 @@ export interface components {
             reason_code: components["schemas"]["ReasonCode"] | null;
             refs: components["schemas"]["RefId"][];
             subject_id: components["schemas"]["Uuid7"] | null;
-        };
-        /** CommandEnvelope */
-        CommandEnvelope: {
-            command_id: components["schemas"]["Uuid7"];
-            idempotency_key: string;
-            type: string;
-            payload: {
-                [key: string]: unknown;
-            };
         };
         /** CommandResult */
         CommandResult: {
@@ -10087,17 +8589,34 @@ export interface components {
                 kind: "restaurant" | "cloud_kitchen" | "store";
                 tz: string;
                 address: string;
+                phone: string | null;
+                tax_ids: {
+                    code: string;
+                    label: string;
+                    value: string;
+                }[];
             }[];
+            pay_at_counter_methods: ("cash" | "card" | "upi")[] | null;
         };
         /** StorefrontMenuResponse */
         StorefrontMenuResponse: {
             outlet_id: components["schemas"]["Uuid7"];
+            channel_id: components["schemas"]["Uuid7"];
             channel_kind: ("counter" | "table_qr" | "pickup" | "own_site") | string;
+            brands: {
+                brand_id: components["schemas"]["Uuid7"];
+                name: string;
+            }[];
+            prices_include_tax: boolean;
             accepting: components["schemas"]["StorefrontAcceptingResponse"];
             items: {
                 item_id: components["schemas"]["Uuid7"];
                 name_key: string;
+                display_name: string | null;
+                description: string | null;
+                diet: ("veg" | "non_veg" | "egg" | "vegan") | null;
                 category: string;
+                brand_id: components["schemas"]["Uuid7"] | null;
                 /** @enum {string} */
                 kind: "dish" | "sku" | "combo";
                 available: boolean;
@@ -10106,18 +8625,24 @@ export interface components {
                 variants: {
                     variant_id: components["schemas"]["Uuid7"];
                     name_key: string;
+                    display_name: string | null;
+                    description: string | null;
                     available: boolean;
                     price_minor: number;
                 }[];
                 option_groups: {
                     option_group_id: components["schemas"]["Uuid7"];
                     name_key: string;
+                    display_name: string | null;
+                    description: string | null;
                     min_select: number;
                     max_select: number;
                     required: boolean;
                     options: {
                         option_id: components["schemas"]["Uuid7"];
                         name_key: string;
+                        display_name: string | null;
+                        description: string | null;
                         price_delta_minor: number;
                     }[];
                 }[];
@@ -10137,6 +8662,7 @@ export interface components {
             }[];
             /** @constant */
             pay_at_counter: true;
+            pay_at_counter_methods: ("cash" | "card" | "upi")[] | null;
         };
         /** StorefrontAcceptingResponse */
         StorefrontAcceptingResponse: {
@@ -10188,6 +8714,8 @@ export interface components {
             status: "placed" | "accepted" | "rejected" | "preparing" | "ready" | "completed" | "cancelled";
             ticket_no: number;
             total_minor: number;
+            tax_minor: number;
+            prices_include_tax: boolean;
             currency: string;
             promised_at: components["schemas"]["IsoDatetime"] | null;
             /** @constant */
@@ -10217,6 +8745,7 @@ export interface components {
             reschedule_window_min: number;
             /** @constant */
             pay_at_counter: true;
+            prices_include_tax: boolean;
             lines: {
                 line_no: number;
                 item_id: components["schemas"]["Uuid7"];
@@ -10225,6 +8754,11 @@ export interface components {
                 unit_price_minor: number;
                 line_discount_minor: number;
                 tax_minor: number;
+                tax_rate_bp: number | null;
+                tax_component_rates: {
+                    code: string;
+                    rate_bp: number;
+                }[];
             }[];
             events: {
                 /** @enum {string} */
@@ -10236,6 +8770,95 @@ export interface components {
                 reason: string | null;
                 at: components["schemas"]["IsoDatetime"];
             }[];
+        };
+        /** StorefrontPreviewResponse */
+        StorefrontPreviewResponse: {
+            /** @constant */
+            label: "preview";
+            priced_at: components["schemas"]["IsoDatetime"];
+            currency: string;
+            tax_rule: {
+                pack_code: string;
+                pack_version: number;
+            };
+            lines: {
+                line_no: number;
+                item_id: components["schemas"]["Uuid7"];
+                variant_id: components["schemas"]["Uuid7"] | null;
+                qty_milli: number;
+                unit_price_minor: number;
+                options_minor: number;
+                line_discount_minor: number;
+                tax_class: string;
+                tax_minor: number;
+                line_total_minor: number;
+                price_ref: string;
+                option_refs: string[];
+                deal_refs: string[];
+                coupon_refs: string[];
+                tax_rate_bp: number;
+                tax_components: {
+                    code: string;
+                    rate_bp: number;
+                    amount_minor: number;
+                }[];
+            }[];
+            subtotal_minor: number;
+            discount_minor: number;
+            tax_minor: number;
+            total_minor: number;
+            refusals: {
+                line_no: number | null;
+                reason_code: components["schemas"]["ReasonCode"];
+                params?: {
+                    line_no?: number;
+                    item_id?: components["schemas"]["Uuid7"];
+                    variant_id?: components["schemas"]["Uuid7"] | null;
+                    deal_id?: components["schemas"]["Uuid7"];
+                    code?: string;
+                    min_spend_minor?: number;
+                    shortfall_minor?: number;
+                    old_total_minor?: number;
+                    new_total_minor?: number;
+                    currency?: string;
+                };
+            }[];
+            tax_components: {
+                code: string;
+                rate_bp: number;
+                amount_minor: number;
+            }[];
+            prices_include_tax: boolean;
+        };
+        /** StorefrontRefusalError */
+        StorefrontRefusalError: {
+            /** ErrorBody */
+            error: {
+                /** @enum {string} */
+                code: "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "book_write_refused" | "country_locked" | "currency_mismatch" | "illegal_transition" | "override_refused" | "decision_refused" | "customer_erased" | "command_table_mismatch" | "period_closed" | "books_unbalanced" | "loyalty_refused" | "claim_quote_mismatch" | "out_of_pack_scope" | "sequence_gap" | "investigation_refused" | "idempotency_conflict" | "command_type_mismatch" | "invalid_payload" | "unregistered_command_type" | "cannot_verify" | "already_decided" | "stale_draft" | "chart_incomplete" | "execution_failed" | "unavailable" | "internal";
+                message: string;
+                reason_code: components["schemas"]["ReasonCode"] | null;
+            };
+            params?: {
+                line_no?: number;
+                item_id?: components["schemas"]["Uuid7"];
+                variant_id?: components["schemas"]["Uuid7"] | null;
+                deal_id?: components["schemas"]["Uuid7"];
+                code?: string;
+                min_spend_minor?: number;
+                shortfall_minor?: number;
+                old_total_minor?: number;
+                new_total_minor?: number;
+                currency?: string;
+            };
+        };
+        /** StreamEvent */
+        StreamEvent: {
+            id: string;
+            type: string;
+            data: {
+                [key: string]: unknown;
+            };
         };
         /** V1OutletCalendar */
         V1OutletCalendar: {
@@ -10275,6 +8898,7 @@ export interface components {
             tax_ids: {
                 [key: string]: string;
             };
+            phone?: string | null;
         };
         /** TenancyMemberInviteV1 */
         TenancyMemberInviteV1: {
@@ -10345,6 +8969,7 @@ export interface components {
             pickup_slot_min?: number;
             pickup_lead_min?: number;
             upi_vpa?: string | null;
+            phone?: string | null;
             business_day_cutoff?: string;
             hours?: {
                 opens: string;
@@ -10469,6 +9094,7 @@ export interface components {
                 pickup_lead_min: number;
                 upi_vpa: string | null;
                 business_day_cutoff: string;
+                phone: string | null;
             }[];
         };
         /** V1Brands */
@@ -10592,31 +9218,6 @@ export interface components {
                 updated_at: components["schemas"]["IsoDatetime"];
             }[];
             next_cursor: string | null;
-        };
-        /** ThreadsBlock */
-        ThreadsBlock: {
-            thread_id: components["schemas"]["Uuid7"];
-            summary_refs: {
-                turn_no: number;
-                answer_id: components["schemas"]["Uuid7"];
-                segment: number;
-                refs: components["schemas"]["RefId"][];
-            }[];
-            last_turn_ids: components["schemas"]["Uuid7"][];
-            tainted: boolean;
-        };
-        /** ThreadsIntelAskRequest */
-        ThreadsIntelAskRequest: {
-            answer_id: components["schemas"]["Uuid7"];
-            question: string;
-            addressed_to: ("catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market") | null;
-            thread: components["schemas"]["ThreadsBlock"] | null;
-            deep?: boolean;
-        };
-        /** ThreadsIntelAskResponse */
-        ThreadsIntelAskResponse: {
-            answer_id: components["schemas"]["Uuid7"];
-            tainted: boolean;
         };
     };
     responses: never;
@@ -27667,7 +26268,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrdersPreviewResponse"];
+                    "application/json": components["schemas"]["StorefrontPreviewResponse"];
                 };
             };
             /** @description Bad request */
@@ -27712,7 +26313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
                 };
             };
             /** @description Validation failed */
@@ -27721,7 +26322,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
                 };
             };
         };
@@ -27790,7 +26391,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
                 };
             };
             /** @description Validation failed */
@@ -27799,7 +26400,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
                 };
             };
         };
@@ -28109,6 +26710,73 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontRefusalError"];
+                };
+            };
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query: {
+                topics: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK — server-sent events; each `data:` line is the JSON of StreamEvent (read with the SDK's openStream, never EventSource) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

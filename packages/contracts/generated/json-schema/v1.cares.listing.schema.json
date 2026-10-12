@@ -273,6 +273,28 @@
         ],
         "additionalProperties": false
       }
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "const": "Measured on synthetic data"
+        },
+        "recipients": {
+          "type": "string",
+          "const": "to simulated recipients"
+        }
+      },
+      "required": [
+        "data",
+        "recipients"
+      ],
+      "additionalProperties": false
+    },
+    "note_key": {
+      "type": "string",
+      "const": "cares.note.check_local_rules"
     }
   },
   "required": [
@@ -287,7 +309,9 @@
     "published_by",
     "published_at",
     "lines",
-    "handovers"
+    "handovers",
+    "labels",
+    "note_key"
   ],
   "additionalProperties": false
 }

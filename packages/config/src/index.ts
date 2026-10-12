@@ -79,6 +79,12 @@ export interface Config {
   runTokenKeyDir: string;
   /** intel's base URL: `MUNIM_INTEL_URL`, default http://127.0.0.1:8081 (the local intel stub in dev). */
   intelUrl: string;
+  /** `MUNIM_CORS_ORIGINS`, trimmed, default "": the comma-separated browser origins core-api's public routes allow
+   *  (parsed by core-api's parseCorsOrigins; empty = no CORS). Not a secret, but never logged. */
+  corsOrigins: string;
+  /** `MUNIM_TRUSTED_PROXY_HOPS`: how many proxies in front of core-api append to X-Forwarded-For (the rate limiters'
+   *  client address). A whole number 0–99, default 0; anything else is a ConfigError (gotcha 17: never a silent default). */
+  trustedProxyHops: number;
   /** The core → intel shared service secret (dev; 03-arch §1.9): `MUNIM_SERVICE_SECRET`, else generated once
    *  under `<runDir>/service-secret` (mode 0600). Registered for redaction. */
   serviceSecret(): string;
@@ -145,6 +151,10 @@ export function loadConfig(opts: LoadOptions = {}): Config {
   const port = Number(env.PORT ?? "8787");
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new ConfigError("PORT must be an integer 1–65535");
 
+  const hopsRaw = env.MUNIM_TRUSTED_PROXY_HOPS?.trim() ?? "";
+  if (hopsRaw !== "" && !/^[0-9]{1,2}$/.test(hopsRaw)) throw new ConfigError("MUNIM_TRUSTED_PROXY_HOPS must be a whole number from 0 to 99");
+  const trustedProxyHops = hopsRaw === "" ? 0 : Number(hopsRaw);
+
   const runDir = env.MUNIM_RUN_DIR?.trim() || opts.runDir || ".run";
   const register = (label: string, v: string) => {
     addSecret(label, v);
@@ -202,6 +212,8 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     runDir,
     runTokenKeyDir: join(runDir, "keys"),
     intelUrl: env.MUNIM_INTEL_URL?.trim() || DEFAULT_INTEL_URL,
+    corsOrigins: env.MUNIM_CORS_ORIGINS?.trim() ?? "",
+    trustedProxyHops,
     serviceSecret() {
       let v = env.MUNIM_SERVICE_SECRET?.trim();
       if (!v) {

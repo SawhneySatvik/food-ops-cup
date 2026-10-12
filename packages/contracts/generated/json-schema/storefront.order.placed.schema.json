@@ -31,6 +31,14 @@
       "minimum": -9007199254740991,
       "maximum": 9007199254740991
     },
+    "tax_minor": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "prices_include_tax": {
+      "type": "boolean"
+    },
     "currency": {
       "type": "string",
       "pattern": "^[A-Z]{3}$"
@@ -63,6 +71,8 @@
     "status",
     "ticket_no",
     "total_minor",
+    "tax_minor",
+    "prices_include_tax",
     "currency",
     "promised_at",
     "pay_at_counter",

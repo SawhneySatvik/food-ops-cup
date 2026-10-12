@@ -93,6 +93,12 @@
           "business_day_cutoff": {
             "type": "string",
             "pattern": "^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -110,7 +116,8 @@
           "pickup_slot_min",
           "pickup_lead_min",
           "upi_vpa",
-          "business_day_cutoff"
+          "business_day_cutoff",
+          "phone"
         ],
         "additionalProperties": false
       }

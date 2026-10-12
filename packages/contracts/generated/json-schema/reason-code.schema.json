@@ -86,6 +86,7 @@
     "offer_closed",
     "claim_decided",
     "claim_received",
-    "rate_limited"
+    "rate_limited",
+    "pickup_time_outside_window"
   ]
 }

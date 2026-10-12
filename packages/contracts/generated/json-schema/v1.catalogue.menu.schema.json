@@ -77,6 +77,57 @@
           "category": {
             "type": "string"
           },
+          "brand_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "diet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "veg",
+                  "non_veg",
+                  "egg",
+                  "vegan"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "barcode": {
             "type": [
               "string",
@@ -162,16 +213,42 @@
                       "currency": {
                         "type": "string",
                         "pattern": "^[A-Z]{3}$"
+                      },
+                      "display_name": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "description": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
                       "option_id",
                       "name_key",
                       "price_delta_minor",
-                      "currency"
+                      "currency",
+                      "display_name",
+                      "description"
                     ],
                     "additionalProperties": false
                   }
+                },
+                "display_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -180,7 +257,9 @@
                 "min_select",
                 "max_select",
                 "required",
-                "options"
+                "options",
+                "display_name",
+                "description"
               ],
               "additionalProperties": false
             }
@@ -251,6 +330,12 @@
           "name_key",
           "variant_name_key",
           "category",
+          "brand_id",
+          "display_name",
+          "description",
+          "diet",
+          "variant_display_name",
+          "variant_description",
           "barcode",
           "price_id",
           "price_minor",

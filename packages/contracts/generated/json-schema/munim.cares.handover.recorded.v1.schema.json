@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "munim.cares.handover.recorded.v1",
   "title": "MunimCaresHandoverRecordedV1",
-  "x-munim-module": "cares",
+  "x-munim-module": "events",
   "type": "object",
   "properties": {
     "specversion": {

@@ -31,6 +31,21 @@ describe("loading", () => {
     expect(() => loadConfig({ env: { MUNIM_MODEL_MODE: "liv" } })).toThrow(ConfigError);
   });
 
+  it("MUNIM_CORS_ORIGINS is passed through trimmed, default empty", () => {
+    expect(loadConfig({ env: {} }).corsOrigins).toBe("");
+    expect(loadConfig({ env: { MUNIM_CORS_ORIGINS: "  https://a.example.test, https://b.example.test \n" } }).corsOrigins).toBe("https://a.example.test, https://b.example.test");
+  });
+
+  it("MUNIM_TRUSTED_PROXY_HOPS: a whole number 0–99, default 0; anything else is a ConfigError (gotcha 17)", () => {
+    expect(loadConfig({ env: {} }).trustedProxyHops).toBe(0);
+    expect(loadConfig({ env: { MUNIM_TRUSTED_PROXY_HOPS: "  " } }).trustedProxyHops).toBe(0);
+    expect(loadConfig({ env: { MUNIM_TRUSTED_PROXY_HOPS: " 2 " } }).trustedProxyHops).toBe(2);
+    expect(loadConfig({ env: { MUNIM_TRUSTED_PROXY_HOPS: "99" } }).trustedProxyHops).toBe(99);
+    for (const bad of ["100", "-1", "1.5", "abc", "1e1", "0x1", "2 3"]) {
+      expect(() => loadConfig({ env: { MUNIM_TRUSTED_PROXY_HOPS: bad } }), bad).toThrow(ConfigError);
+    }
+  });
+
   it("dbUrl logs in as the role on the transaction pooler", () => {
     const dir = mkdtempSync(join(tmpdir(), "munim-config-"));
     writeFileSync(join(dir, "db-roles.json"), JSON.stringify({ munim_core: "core-role-pw-1" }));

@@ -332,6 +332,11 @@
     "in_app"
   ],
   "cash_rounding_minor": 100,
+  "pay_at_counter_methods": [
+    "cash",
+    "card",
+    "upi"
+  ],
   "severity_ladder": {
     "critical_minor_gte": 5000000,
     "high_minor_gte": 1000000,

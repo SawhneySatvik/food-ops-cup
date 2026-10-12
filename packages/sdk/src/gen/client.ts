@@ -284,6 +284,7 @@ export const OPERATIONS = [
   "POST /v1/storefront/orders/{id}:cancel",
   "POST /v1/storefront/orders/{id}:reschedule-preview",
   "POST /v1/storefront/orders/{id}:reschedule",
+  "GET /v1/stream",
   "GET /v1/outlets/{id}/calendar",
   "POST /platform/v1/tenants:provision",
   "POST /v1/outlets",

@@ -126,10 +126,39 @@
         ],
         "additionalProperties": false
       }
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "const": "Measured on synthetic data"
+        },
+        "recipients": {
+          "type": "string",
+          "const": "to simulated recipients"
+        }
+      },
+      "required": [
+        "data",
+        "recipients"
+      ],
+      "additionalProperties": false
+    },
+    "note_key": {
+      "type": "string",
+      "const": "cares.note.check_local_rules"
+    },
+    "money_label": {
+      "type": "string",
+      "const": "Recorded, never processed"
     }
   },
   "required": [
-    "items"
+    "items",
+    "labels",
+    "note_key",
+    "money_label"
   ],
   "additionalProperties": false
 }

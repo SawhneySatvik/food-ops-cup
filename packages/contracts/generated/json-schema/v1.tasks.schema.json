@@ -49,6 +49,17 @@
               }
             ]
           },
+          "cares_listing_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -88,6 +99,7 @@
           "assignee_member_id",
           "due_on",
           "finding_id",
+          "cares_listing_id",
           "status",
           "done_at",
           "done_by"

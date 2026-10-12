@@ -81,24 +81,43 @@ describe("country packs", () => {
     const js = JSON.parse(readFileSync(join(PKG, "generated", "json-schema", "country-pack.schema.json"), "utf8"));
     // `cares` is optional (ADR-015 §6: a v1–v3 pack has none, and a pack without it means Cares is off), so it is declared
     // but not required.
-    const keys = Object.keys(load("IN")).filter((k) => k !== "_unverified" && k !== "cares");
+    const keys = Object.keys(load("IN")).filter((k) => k !== "_unverified" && k !== "cares" && k !== "pay_at_counter_methods");
     expect([...js.required].sort()).toEqual(keys.sort());
     expect(Object.keys(js.properties)).toContain("cares");
     expect(js.required).not.toContain("cares");
+    // G-13: optional for the same reason (v1–v3 packs have none); every v4 pack lists it (below).
+    expect(Object.keys(js.properties)).toContain("pay_at_counter_methods");
+    expect(js.required).not.toContain("pay_at_counter_methods");
   });
 
   // ADR-015 §6 / T-095c gate. The v3 documents are committed copies of the packs as they were before v4 (git HEAD of 12 Oct):
   // the independent source for "v3 still parses and a v4 adds only the cares block".
   const v3 = (c: string) => JSON.parse(readFileSync(join(PKG, "test", "fixtures", `${c}.v3.json`), "utf8"));
-  it.each(["IN", "AU"])("%s v3 still parses unchanged (cares absent) and v4 differs from it only by version, date and cares", (c) => {
+  it.each(["IN", "AU"])("%s v3 still parses unchanged (cares absent) and v4 differs from it only by version, date, cares and pay_at_counter_methods", (c) => {
     const old = v3(c);
     expect([old.version, "cares" in old]).toEqual([3, false]);
     expect(CountryPack.safeParse(old).success).toBe(true);
     const now = load(c);
     expect(now.version).toBe(4);
-    const { version: _v, effective_from: _e, cares: _c, ...rest } = now;
+    expect("pay_at_counter_methods" in old).toBe(false);
+    const { version: _v, effective_from: _e, cares: _c, pay_at_counter_methods: _m, ...rest } = now;
     const { version: _v3, effective_from: _e3, ...rest3 } = old;
     expect(rest).toEqual(rest3);
+  });
+
+  // G-13 (T-099). Expected lists are the founder-set R1 values, written here independently of the pack files.
+  it.each([
+    ["IN", ["cash", "card", "upi"]],
+    ["AU", ["cash", "card"]],
+  ])("%s v4 lists its pay-at-counter methods", (c, methods) => {
+    expect(CountryPack.parse(load(c)).pay_at_counter_methods).toEqual(methods);
+  });
+  it.each([
+    ["empty list", (p: any) => ({ ...p, pay_at_counter_methods: [] })],
+    ["a method outside cash / card / upi", (p: any) => ({ ...p, pay_at_counter_methods: ["cash", "cheque"] })],
+    ["duplicate method", (p: any) => ({ ...p, pay_at_counter_methods: ["cash", "cash"] })],
+  ])("a pack with a bad pay_at_counter_methods is refused: %s", (_label, mutate) => {
+    expect(CountryPack.safeParse(mutate(load("IN"))).success).toBe(false);
   });
 
   it.each(["IN", "AU"])("%s v4 carries the cares operating values and no legal text (founder answer 4)", (c) => {

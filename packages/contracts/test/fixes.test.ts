@@ -164,3 +164,34 @@ describe("#4 tax id ↔ receipt field", () => {
     expect(load("IN")._unverified.some((x: string) => x.startsWith("cash_rounding_minor 100"))).toBe(true);
   });
 });
+
+// R3 (mg-1): public.json publishes only what its operations reach, the stream is text/event-stream with its event schema
+// kept, and `alsoAuth` is a security alternative. internal.json keeps every component (the Pydantic input is separate).
+describe("public.json components = what the public operations reach", () => {
+  const internal = JSON.parse(readFileSync(join(PKG, "generated", "openapi", "internal.json"), "utf8"));
+  const problems = (doc: any): string[] => {
+    const out: string[] = [];
+    const names = Object.keys(doc.components.schemas);
+    if (names.length < 100) out.push(`only ${names.length} components`);
+    for (const n of names) if (/^(Internal|Proposal|Munim[A-Z])/.test(n) || n === "RunTokenClaims") out.push(`internal-only component ${n}`);
+    for (const r of new Set(JSON.stringify(doc).match(/#\/components\/schemas\/[A-Za-z0-9_]+/g) ?? [])) if (!doc.components.schemas[r.split("/").pop()!]) out.push(`dangling ${r}`);
+    if (!doc.components.schemas.StreamEvent) out.push("StreamEvent missing");
+    for (const s of ["runToken", "serviceCredential"]) if (doc.components.securitySchemes[s]) out.push(`scheme ${s}`);
+    return out;
+  };
+  it("no internal-only schema or credential; every $ref resolves; the stream event schema is kept", () => {
+    expect(problems(openapi)).toEqual([]);
+    expect(Object.keys(internal.components.schemas)).toEqual(expect.arrayContaining(["InternalDraftsRequest", "CountryPack", "MunimEvent"]));
+  });
+  it("RED-PROOF: a planted internal component, a dropped StreamEvent and a published service credential are each caught", () => {
+    const { StreamEvent: _drop, ...rest } = openapi.components.schemas;
+    const bad = { ...openapi, components: { schemas: { ...rest, InternalDraftsRequest: internal.components.schemas.InternalDraftsRequest }, securitySchemes: internal.components.securitySchemes } };
+    expect(problems(bad)).toEqual(["internal-only component InternalDraftsRequest", "StreamEvent missing", "scheme runToken", "scheme serviceCredential"]);
+  });
+  it("GET /v1/stream: 200 is text/event-stream naming StreamEvent; storefront, guest and member credentials are alternatives", () => {
+    const op = openapi.paths["/v1/stream"].get;
+    expect(Object.keys(op.responses["200"].content)).toEqual(["text/event-stream"]);
+    expect(op.responses["200"].description).toContain("StreamEvent");
+    expect(op.security).toEqual([{ storefrontKey: [] }, { storefrontKey: [], customerToken: [] }, { storefrontKey: [], guestToken: [] }, { memberToken: [], tenantHeader: [] }]);
+  });
+});
