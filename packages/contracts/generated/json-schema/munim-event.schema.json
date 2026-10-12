@@ -166,7 +166,11 @@
                 "transfer_in",
                 "count_adjust",
                 "supplier_return",
-                "sale_return"
+                "sale_return",
+                "donation",
+                "surplus_out",
+                "surplus_in",
+                "cares_reversal"
               ]
             },
             "ref_type": {

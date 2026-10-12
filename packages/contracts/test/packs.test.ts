@@ -79,8 +79,43 @@ describe("country packs", () => {
 
   it("the generated JSON Schema requires every top-level key the packs carry", () => {
     const js = JSON.parse(readFileSync(join(PKG, "generated", "json-schema", "country-pack.schema.json"), "utf8"));
-    const keys = Object.keys(load("IN")).filter((k) => k !== "_unverified");
+    // `cares` is optional (ADR-015 §6: a v1–v3 pack has none, and a pack without it means Cares is off), so it is declared
+    // but not required.
+    const keys = Object.keys(load("IN")).filter((k) => k !== "_unverified" && k !== "cares");
     expect([...js.required].sort()).toEqual(keys.sort());
+    expect(Object.keys(js.properties)).toContain("cares");
+    expect(js.required).not.toContain("cares");
+  });
+
+  // ADR-015 §6 / T-095c gate. The v3 documents are committed copies of the packs as they were before v4 (git HEAD of 12 Oct):
+  // the independent source for "v3 still parses and a v4 adds only the cares block".
+  const v3 = (c: string) => JSON.parse(readFileSync(join(PKG, "test", "fixtures", `${c}.v3.json`), "utf8"));
+  it.each(["IN", "AU"])("%s v3 still parses unchanged (cares absent) and v4 differs from it only by version, date and cares", (c) => {
+    const old = v3(c);
+    expect([old.version, "cares" in old]).toEqual([3, false]);
+    expect(CountryPack.safeParse(old).success).toBe(true);
+    const now = load(c);
+    expect(now.version).toBe(4);
+    const { version: _v, effective_from: _e, cares: _c, ...rest } = now;
+    const { version: _v3, effective_from: _e3, ...rest3 } = old;
+    expect(rest).toEqual(rest3);
+  });
+
+  it.each(["IN", "AU"])("%s v4 carries the cares operating values and no legal text (founder answer 4)", (c) => {
+    const p = CountryPack.parse(load(c));
+    expect(p.cares).toMatchObject({ food_kinds: ["cooked", "raw", "packaged"], offers_enabled: true, cooked_max_hold_min: 120, min_days_left_at_pickup: 1 });
+    expect(Object.keys(p.cares!).sort()).toEqual(["_notes", "cooked_max_hold_min", "food_kinds", "min_days_left_at_pickup", "offers_enabled"]);
+    for (const n of p.cares!._notes) expect(n).toMatch(/^INFERENCE: /);
+  });
+
+  it.each([
+    ["unknown cares field (a legal text field)", (p: any) => ({ ...p, cares: { ...p.cares, legal_note: "x" } })],
+    ["food kind outside the three", (p: any) => ({ ...p, cares: { ...p.cares, food_kinds: ["raw", "frozen"] } })],
+    ["duplicate food kind", (p: any) => ({ ...p, cares: { ...p.cares, food_kinds: ["raw", "raw"] } })],
+    ["fractional hold", (p: any) => ({ ...p, cares: { ...p.cares, cooked_max_hold_min: 90.5 } })],
+    ["cares without notes", (p: any) => ({ ...p, cares: { ...p.cares, _notes: [] } })],
+  ])("a mutated v4 pack is refused: %s", (_label, mutate) => {
+    expect(CountryPack.safeParse(mutate(load("IN"))).success).toBe(false);
   });
 
   it("@munim/contracts/packs resolves by package name and exports the validated docs", async () => {

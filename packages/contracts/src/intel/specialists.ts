@@ -79,8 +79,8 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       ],
       "specialist",
       // Ingestion's supplier-invoice draft (T-056). The negotiation's PO (T-055) is purchasing.po.create.v1, already a
-      // propose draftable above, so it is not repeated here.
-      ["purchasing.invoice.record.v1"],
+      // propose draftable above, so it is not repeated here. ADR-015: the expiry_risk Cares donation listing.
+      ["purchasing.invoice.record.v1", "cares.listing.publish.v1"],
     ),
     e(
       "finance",
@@ -97,6 +97,10 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       ["people.overtime_drift", "people.overstaffed_slot", "people.labour_pct_high", "people.advance_unrecovered"],
       ["people.labour_vs_demand", "people.overtime_drift", "people.labour_pct", "people.attendance_coverage", "people.advances_open", "people.payroll_lines"],
       ["people.roster.create.v1", "people.payroll_draft.create.v1"],
+      "specialist",
+      // ADR-015: the overstaffed_slot pack-and-hand-over task. Compliance and market propose the same command as a tool;
+      // people's is drafted by deterministic mapping code only.
+      ["goals.task.create.v1"],
     ),
     e(
       "customers",
@@ -120,7 +124,7 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       "desk.market",
       ["market", "strategy", "market_strategy"],
       ["market.event_ahead", "market.competitor_undercut", "market.goal_off_track"],
-      ["market.signal_uplift", "market.upcoming", "market.competitor_gap", "market.viability", "market.goal_progress", "market.goal_baseline", "market.goals"],
+      ["market.signal_uplift", "market.upcoming", "market.competitor_gap", "market.viability", "market.goal_progress", "market.goal_baseline", "market.goals", "cares.listings", "cares.impact"],
       ["goals.goal.create.v1", "goals.task.create.v1"],
     ),
     // A shared service, not a team member: no desk, no alias, proposes nothing (pack forecast §6 drafts

@@ -52,9 +52,10 @@ FINDING = "01920000-0000-7000-8000-00000000c001"
 #     inventory.count_variance (registry-only: 0022, assigned by orchestrator 11 Oct) = 12, + 5 proposes = 17
 #   kitchen 5 + 2 = 7 · people 6 + 2 = 8 · compliance 5 + 2 = 7
 #   customers 7 + 0 = 7 (R-B S1-B / S1-D ruling, 11 Oct: coupon.set and campaign.create are not agent-exposed)
-#   market 6 reads + market.goals (registry-only: 0022, assigned by orchestrator 11 Oct) = 7, + 2 proposes = 9
-# Every one is <= 20 (F3). Reads over all specialists = 6+9+12+5+6+7+5+7 = 57, plus forecast's 3 exposed (points, accuracy,
-# freshness; forecast.md §3 lists 5 minus the 2 input-only) = 60 = EVERY_TOOL reads below.
+#   market 6 reads + market.goals (registry-only: 0022, assigned by orchestrator 11 Oct) + cares.listings + cares.impact
+#     (0028, ADR-015 §4) = 9, + 2 proposes = 11
+# Every one is <= 20 (F3). Reads over all specialists = 6+9+12+5+6+7+5+9 = 59, plus forecast's 3 exposed (points, accuracy,
+# freshness; forecast.md §3 lists 5 minus the 2 input-only) = 62 = EVERY_TOOL reads below.
 TOOLSET_SIZE = {
     "catalogue": 9,
     "finance": 12,
@@ -63,11 +64,13 @@ TOOLSET_SIZE = {
     "people": 8,
     "customers": 7,
     "compliance": 7,
-    "market": 9,
+    "market": 11,
 }
 #: Every model tool: 18 proposals (23 - 5 not agent-exposed) + 60 agent-exposed templates (db/tests/manifest.ts TEMPLATES 68 after 0022 - 1 platform
 #: operator - 3 intel.* - 4 ADR-014 §5.1 not-agent-exposed = 60; 0022's five new ones are owned by specialists now).
-EVERY_TOOL = 78
+#: 0028 (ADR-015): + cares.listings and cares.impact (market) = 62 agent-exposed templates; cares.recipient_match, cares.pickup_crew
+#: (mapping code) and platform.cares_network_impact (operator) are not. Proposals stay 18 (cares.listing.publish is a workflow draftable).
+EVERY_TOOL = 80
 #: MANIFEST.d proposal lines (23) - 3 workflow / import-only - coupon.set and campaign.create (R-B S1-B / S1-D).
 PROPOSALS = 18
 

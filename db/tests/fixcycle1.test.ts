@@ -405,9 +405,9 @@ describe("#23 — book status transitions", () => {
     expect(back?.code).toBe("MB004");
   });
 
-  test("the transition table holds the 71 hand-listed pairs over 21 tables", async () => {
+  test("the transition table holds the 71 hand-listed pairs over 21 tables (+ 0028's 10 Cares pairs over 4)", async () => {
     const r = await db.admin("SELECT count(*)::int n, count(DISTINCT table_name)::int t FROM core.book_status_transition");
-    expect(r.rows[0]).toEqual({ n: 71, t: 21 });
+    expect(r.rows[0]).toEqual({ n: 71 + 10, t: 21 + 4 });
   });
 
   test("RED-PROOF: drop status_transition on core.campaign → cancelled → queued accepted", async () => {

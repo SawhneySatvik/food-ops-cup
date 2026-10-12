@@ -71,7 +71,7 @@ describe("pack, outlets, business dates (gates 3 and 6)", () => {
   it("the canonical IN world: pack IN v3, INR, ladder L and cost_drift thresholds from the pack md, 3 restaurant outlets in Kolkata", async () => {
     clock = new Date("2026-10-11T20:00:00Z"); // 01:30 IST on the 12th: before the 04:00 cutoff → business date the 11th
     const f = await frame(await run(A, ["*"]));
-    expect([f.pack, f.currency]).toEqual([{ code: "IN", version: 3 }, "INR"]);
+    expect([f.pack, f.currency]).toEqual([{ code: "IN", version: 4 }, "INR"]); // v4: the optional Cares block (ADR-015 §6)
     // packs header L: ₹50,000 / ₹10,000 / ₹2,000 of monthly impact, in paise.
     expect(f.severity_ladder).toEqual({ critical_minor_gte: 5_000_000, high_minor_gte: 1_000_000, medium_minor_gte: 200_000 });
     // catalogue.md §4: cost_change_bp ≥ 800 and a cost rise ≥ ₹5.

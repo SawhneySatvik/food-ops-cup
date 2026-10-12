@@ -4,8 +4,9 @@
 export type Surface = "public" | "internal";
 /** member: IdP token + X-Munim-Tenant · operator: IdP token · intel: run token + service credential ·
  *  storefront: X-Munim-Storefront-Key (+ an optional customer token) · identity: an IdP token alone, for a
- *  person with no tenant yet (onboarding, "my tenants"). */
-export type Auth = "member" | "operator" | "intel" | "storefront" | "identity";
+ *  person with no tenant yet (onboarding, "my tenants") · public: no credential at all (ADR-015 §2.1: the Munim
+ *  Cares network pages; OpenAPI `security: []`, read-only, rate-limited by core-api). */
+export type Auth = "member" | "operator" | "intel" | "storefront" | "identity" | "public";
 export type QueryParam = { name: string; required: boolean; schema: Record<string, unknown> };
 export type Route = {
   surface: Surface;

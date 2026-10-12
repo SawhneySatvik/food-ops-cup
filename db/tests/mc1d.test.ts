@@ -101,7 +101,7 @@ describe("G1 — every derivation rule declares its binding", () => {
       .rows.map((r) => [r.rule_id, r.source_table, r.target_table, r.source_state, r.binding].join(" | ")).sort();
     console.log(`G1: ${KEYS.length} rule rows in the file, ${unbound(DOC.rules).length} unbound; ${got.length} in the database`);
     expect(unbound(DOC.rules)).toEqual([]);
-    expect(KEYS.length).toBe(54);
+    expect(KEYS.length).toBe(58); // 0028 adds 4 (Cares)
     expect(got).toEqual(want);
   });
 
@@ -198,10 +198,10 @@ describe("G2 — a derived row must belong to its source (relaxed states)", () =
     const otherOutlet = (o: string | null) => (o === o0 ? o1 : o0);
 
     // Builders: the written row (and its id) per target table.
-    const sm = (m: { outlet: string; ing: string; batch: string | null; qty: number; kind: string; ref: string; refId: string }) => {
+    const sm = (m: { outlet: string; ing: string; batch: string | null; qty: number; kind: string; ref: string; refId: string; unit?: string }) => {
       const mid = uuidv7();
       return { mid, sql: `INSERT INTO core.stock_movement (tenant_id, id, outlet_id, ingredient_id, batch_id, qty_milli, unit, kind, ref_type, ref_id)
-                         VALUES ($1, $2, $3, $4, $5, $6, 'g', $7, $8, $9)`, params: [T, mid, m.outlet, m.ing, m.batch, m.qty, m.kind, m.ref, m.refId] };
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, params: [T, mid, m.outlet, m.ing, m.batch, m.qty, m.unit ?? "g", m.kind, m.ref, m.refId] };
     };
     const okSm = (m: Parameters<typeof sm>[0]) => {
       const x = sm(m);
@@ -310,10 +310,13 @@ describe("G2 — a derived row must belong to its source (relaxed states)", () =
       return { bid, sql: `INSERT INTO core.batch (tenant_id, id, outlet_id, ingredient_id, batch_code) VALUES ($1, $2, $3, $4, $5)`, params: [T, bid, outlet, ing, `T-${bid}`] };
     };
     const nb = batchRow(o1, tr.ing);
+    // 0028: the rule creates the destination's batch — an UPDATE of an existing one (outlet and ingredient matching) is not it.
+    const tb = batchRow(o1, tr.ing);
     cases["inventory.transfer_in|core.transfer|core.batch"] = {
       source: `core.transfer:${tr.id}`,
+      prep: [{ sql: tb.sql, params: tb.params, rule: "inventory.transfer_in", source: `core.transfer:${tr.id}` }],
       ok: { sql: nb.sql, params: nb.params, probe: { table: "core.batch", id: nb.bid } },
-      bad: [batchRow(o0, tr.ing), batchRow(o1, ing2)],
+      bad: [batchRow(o0, tr.ing), batchRow(o1, ing2), { sql: `UPDATE core.batch SET expires_on = '2026-12-31' WHERE tenant_id = $1 AND id = $2`, params: [T, tb.bid] }],
     };
     cases["inventory.supplier_return|core.supplier_return|core.stock_movement"] = {
       source: `core.supplier_return:${ret.id}`,
@@ -324,6 +327,79 @@ describe("G2 — a derived row must belong to its source (relaxed states)", () =
       source: `core.sale_return:${skuReturn}`,
       ok: okSm({ outlet: o0, ing: w.ingredient, batch: null, qty: 1000, kind: "sale_return", ref: "core.sale_return", refId: skuReturn }),
       bad: [sm({ outlet: o0, ing: ing2, batch: null, qty: 1000, kind: "sale_return", ref: "core.sale_return", refId: skuReturn })],
+    };
+    // 0028 (Cares): the world's outlet-1 hand-over (200 g of its donation line, batch 1) and outlet-1 claim (500 g claimed,
+    // 300 g received here by the buyer's own receive command). The world's claim names no real offer, so the receive rule
+    // (received = the qty the offerer handed over, read through core.cares_claim_outcome; its own gate is cares-0028 RECV)
+    // is switched off in this clone for that one write: G2 judges the bindings alone.
+    const ho = await one<{ id: string }>(B, `SELECT id FROM core.cares_handover WHERE tenant_id = $1 AND outlet_id = $2`, [T, o0]);
+    const cl = await one<{ id: string; line: string }>(B, `SELECT c.id, l.id line FROM core.cares_claim c JOIN core.cares_claim_line l ON l.claim_id = c.id
+      WHERE c.tenant_id = $1 AND c.outlet_id = $2`, [T, o0]);
+    // A second line of the same ingredient in kg (1 kg received): each unit is capped by its own lines only.
+    const kgLine = uuidv7();
+    await B.withContext("munim_core", own("cares.claim.create.v1"), (c) =>
+      c.query(`INSERT INTO core.cares_claim_line (tenant_id, id, claim_id, offer_line_id, ingredient_id, qty_milli, unit, unit_price_minor)
+               VALUES ($1, $2, $3, $4, $5, 1000, 'kg', 30)`, [T, kgLine, cl.id, uuidv7(), w.ingredient]));
+    await B.admin(`ALTER TABLE core.cares_claim_line DISABLE TRIGGER cares_rules`);
+    await B.withContext("munim_core", own("cares.claim.receive.v1"), async (c) => {
+      await c.query(`UPDATE core.cares_claim_line SET received_qty_milli = 300000 WHERE tenant_id = $1 AND id = $2`, [T, cl.line]);
+      await c.query(`UPDATE core.cares_claim_line SET received_qty_milli = 1000 WHERE tenant_id = $1 AND id = $2`, [T, kgLine]);
+    });
+    await B.admin(`ALTER TABLE core.cares_claim_line ENABLE TRIGGER cares_rules`);
+    const b0 = w.batches[0];
+    cases["inventory.cares_handover|core.cares_handover|core.stock_movement"] = {
+      source: `core.cares_handover:${ho.id}`,
+      ok: okSm({ outlet: o0, ing: w.ingredient, batch: b0, qty: -200000, kind: "donation", ref: "core.cares_handover", refId: ho.id }),
+      bad: [sm({ outlet: o0, ing: w.ingredient, batch: b0, qty: -200001, kind: "donation", ref: "core.cares_handover", refId: ho.id }),
+            sm({ outlet: o0, ing: w.ingredient, batch: b0, qty: -1000, kind: "surplus_out", ref: "core.cares_handover", refId: ho.id }),
+            sm({ outlet: o0, ing: ing2, batch: null, qty: -1000, kind: "donation", ref: "core.cares_handover", refId: ho.id }),
+            sm({ outlet: o0, ing: w.ingredient, batch: w.batches[1], qty: -1000, kind: "donation", ref: "core.cares_handover", refId: ho.id }),
+            sm({ outlet: o1, ing: w.ingredient, batch: null, qty: -1000, kind: "donation", ref: "core.cares_handover", refId: ho.id }),
+            // 0.2 kg against a 200 g line: never in another unit than the ingredient's base unit (g).
+            sm({ outlet: o0, ing: w.ingredient, batch: b0, qty: -200, kind: "donation", ref: "core.cares_handover", refId: ho.id, unit: "kg" })],
+    };
+    const handed = sm({ outlet: o0, ing: w.ingredient, batch: b0, qty: -200000, kind: "donation", ref: "core.cares_handover", refId: ho.id });
+    cases["inventory.cares_handover_void|core.cares_handover|core.stock_movement"] = {
+      source: `core.cares_handover:${ho.id}`,
+      prep: [{ sql: handed.sql, params: handed.params, rule: "inventory.cares_handover", source: `core.cares_handover:${ho.id}` }],
+      ok: okSm({ outlet: o0, ing: w.ingredient, batch: b0, qty: 200000, kind: "cares_reversal", ref: "core.cares_handover", refId: ho.id }),
+      bad: [sm({ outlet: o0, ing: w.ingredient, batch: b0, qty: 200001, kind: "cares_reversal", ref: "core.cares_handover", refId: ho.id }),
+            sm({ outlet: o0, ing: w.ingredient, batch: null, qty: 1000, kind: "cares_reversal", ref: "core.cares_handover", refId: ho.id })],
+    };
+    const kgIn = sm({ outlet: o0, ing: w.ingredient, batch: null, qty: 1000, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id, unit: "kg" });
+    cases["inventory.cares_claim_receive|core.cares_claim|core.stock_movement"] = {
+      source: `core.cares_claim:${cl.id}`,
+      prep: [{ sql: kgIn.sql, params: kgIn.params, rule: "inventory.cares_claim_receive", source: `core.cares_claim:${cl.id}` }],
+      ok: okSm({ outlet: o0, ing: w.ingredient, batch: null, qty: 300000, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id }),
+      bad: [sm({ outlet: o0, ing: w.ingredient, batch: null, qty: 299999, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id }),
+            sm({ outlet: o0, ing: ing2, batch: null, qty: 300000, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id }),
+            sm({ outlet: o0, ing: w.ingredient, batch: null, qty: 300000, kind: "receipt", ref: "core.cares_claim", refId: cl.id }),
+            sm({ outlet: o1, ing: w.ingredient, batch: null, qty: 300000, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id }),
+            // A second 1 kg after the prep's 1 kg: the kg line received 1 kg (the g line's 300000 is no kg allowance).
+            sm({ outlet: o0, ing: w.ingredient, batch: null, qty: 1000, kind: "surplus_in", ref: "core.cares_claim", refId: cl.id, unit: "kg" })],
+    };
+    const careBatch = (outlet: string, ing: string, expires: string) => {
+      const bid = uuidv7();
+      return { bid, sql: `INSERT INTO core.batch (tenant_id, id, outlet_id, ingredient_id, batch_code, expires_on) VALUES ($1, $2, $3, $4, $5, $6)`,
+               params: [T, bid, outlet, ing, `C-${bid}`, expires] };
+    };
+    const cb = careBatch(o0, w.ingredient, "2026-10-12");
+    // A batch the receive created earlier (prep): updating it (its expiry kept, so outlet, ingredient and expiry all match)
+    // is not a creation; nor is a new batch carrying an MRP or a supplier.
+    const pb = careBatch(o0, w.ingredient, "2026-10-12");
+    const mrp = careBatch(o0, w.ingredient, "2026-10-12");
+    const sup = careBatch(o0, w.ingredient, "2026-10-12");
+    const grnB = careBatch(o0, w.ingredient, "2026-10-12");
+    const grnLine = (await one<{ id: string }>(B, `SELECT id FROM core.grn_line WHERE tenant_id = $1 AND goods_received_id = $2 LIMIT 1`, [T, grn.id])).id;
+    cases["inventory.cares_claim_receive|core.cares_claim|core.batch"] = {
+      source: `core.cares_claim:${cl.id}`,
+      prep: [{ sql: pb.sql, params: pb.params, rule: "inventory.cares_claim_receive", source: `core.cares_claim:${cl.id}` }],
+      ok: { sql: cb.sql, params: cb.params, probe: { table: "core.batch", id: cb.bid } },
+      bad: [careBatch(o0, w.ingredient, "2026-10-13"), careBatch(o1, w.ingredient, "2026-10-12"), careBatch(o0, ing2, "2026-10-12"),
+            { sql: `UPDATE core.batch SET expires_on = '2026-10-12' WHERE tenant_id = $1 AND id = $2`, params: [T, pb.bid] },
+            { sql: mrp.sql.replace("expires_on)", "expires_on, mrp_minor, currency)").replace("$6)", "$6, 5000, $7)"), params: [...mrp.params, w.currency] },
+            { sql: sup.sql.replace("expires_on)", "expires_on, supplier_id)").replace("$6)", "$6, $7)"), params: [...sup.params, inv.supplier_id] },
+            { sql: grnB.sql.replace("expires_on)", "expires_on, grn_line_id)").replace("$6)", "$6, $7)"), params: [...grnB.params, grnLine] }],
     };
     cases["inventory.count_adjust|core.stock_count|core.stock_movement"] = {
       source: `core.stock_count:${count.id}`,

@@ -93,7 +93,7 @@ function readOutlet(c: Context<AppEnv>, m: Member): string {
   if (m.outlet_ids !== "*" && !m.outlet_ids.includes(outlet)) throw new ApiError("not_found");
   return outlet;
 }
-const MOVEMENT_KINDS = ["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return"];
+const MOVEMENT_KINDS = ["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return", "donation", "surplus_out", "surplus_in", "cares_reversal"];
 function optionalId(c: Context<AppEnv>, name: string): string | undefined {
   const v = c.req.query(name);
   if (v !== undefined && !UUID.test(v)) throw new ApiError("bad_request");

@@ -11,6 +11,9 @@ import type { LeafOverrides } from "./transform.ts";
 // finding-scoped audience land (R-B S1-B, S1-D); a member still sets coupons and creates campaigns directly.
 export const NOT_AGENT_EXPOSED = [
   "imports.format.approve.v1", "imports.run.commit.v1", "purchasing.invoice.record.v1", "catalogue.coupon.set.v1", "customers.campaign.create.v1",
+  // ADR-015: Cares listing drafts are emitted by deterministic mapping code (expiry_risk), never a model tool; cooked lines
+  // only through the owner's own command.
+  "cares.listing.publish.v1",
 ] as const;
 
 export const ACTION_LEAVES: Record<string, LeafOverrides> = {
@@ -24,7 +27,9 @@ export const ACTION_LEAVES: Record<string, LeafOverrides> = {
   "finance.journal.adjust.v1": { minted: ["/journal_entry_id"] },
   "finance.period.close.v1": { minted: ["/period_close_id"] },
   "goals.goal.create.v1": { minted: ["/goal_id"], snapshot: ["/basis_snapshot_id"] },
-  "goals.task.create.v1": { minted: ["/task_id"], finding: ["/finding_id"] },
+  // cares_listing_id is set by the people overstaffed_slot mapping (ADR-015 §4), never by a model: the propose tool sends null.
+  "goals.task.create.v1": { minted: ["/task_id"], finding: ["/finding_id"], fixed: ["/cares_listing_id"] },
+  "cares.listing.publish.v1": { minted: ["/listing_id", "/lines/*/line_id"] },
   "inventory.reorder_level.set.v1": {},
   "inventory.transfer.create.v1": { minted: ["/transfer_id"] },
   "kitchen.prep_list.create.v1": { minted: ["/prep_list_id"] },

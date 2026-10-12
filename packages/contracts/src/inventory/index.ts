@@ -126,7 +126,7 @@ export const REORDER_LEVEL_SET_DRAFT = defineDraftable("inventory.reorder_level.
 export const TRANSFER_CREATE_DRAFT = defineDraftable("inventory.transfer.create.v1", InventoryTransferCreateV1);
 
 /** Stock movement rows (each number is the row's own field). On-hand totals are snapshot cells, never here. */
-export const MovementKind = z.enum(["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return"]);
+export const MovementKind = z.enum(["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return", "donation", "surplus_out", "surplus_in", "cares_reversal"]);
 export const InventoryMovementsResponse = z.strictObject({
   movements: z.array(
     z.strictObject({

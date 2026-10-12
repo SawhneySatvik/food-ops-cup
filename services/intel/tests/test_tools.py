@@ -74,20 +74,32 @@ def expected_generated() -> int:
     rows, 0024's one "@3" row, 0025's one "@2" row and 0026's one "@2" and one "@3" row; 68 distinct ids) minus the
     operator template (platform.spend_by_tenant), the
     core-consumed `intel.*` templates (0020: track record, budget left, cost estimate) and the four ADR-014 §5.1
-    not-agent-exposed templates (hand list below): 68 - 1 - 3 - 4 = 60 reads, + (23 - 5) = 18 proposals = 78."""
+    not-agent-exposed templates (hand list below): 68 - 1 - 3 - 4 = 60 reads, + (23 - 5) = 18 proposals = 78.
+    0028 (ADR-015): + five template ids (101 entries, 73 ids): cares.listings and cares.impact are market reads;
+    cares.recipient_match and cares.pickup_crew are read by mapping code only; platform.cares_network_impact is the operator's
+    → 73 - 2 platform - 3 - 6 = 62 reads. + one proposal line (cares.listing.publish, an inventory_purchasing workflow
+    draftable, not agent-exposed) → 24 - 6 = 18 proposals. 62 + 18 = 80."""
     lines = [n for f in (REPO / "packages/contracts/MANIFEST.d").glob("*.txt") for n in f.read_text().split()]
     proposals = [n for n in lines if n.startswith("proposal.")]
     listed = re.search(r"export const TEMPLATES = \[(.*?)\]\.sort\(\);", (REPO / "db/tests/manifest.ts").read_text(), re.S)
     assert listed is not None
     entries = re.findall(r'"([a-z_]+\.[a-z_.]+(?:@[0-9]+)?)"', listed.group(1))  # template ids only (a comment may quote a word)
     templates = sorted({e.split("@")[0] for e in entries})  # the tools bind the latest version of each id
-    not_exposed = {"forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"}
-    exposed = [t for t in templates if t != "platform.spend_by_tenant" and not t.startswith("intel.") and t not in not_exposed]
+    not_exposed = {
+        "forecast.sales_history",
+        "forecast.slot_profile",
+        "purchasing.deal_inputs",
+        "purchasing.invoice_duplicates",
+        "cares.recipient_match",
+        "cares.pickup_crew",
+    }
+    exposed = [t for t in templates if not t.startswith(("platform.", "intel.")) and t not in not_exposed]
     # Cross-check literals: 96 entries - 26 "@2" rows (0025: investigation_cost_estimate v2; 0026: labour_vs_demand v2)
-    # - 2 "@3" rows (0024: settlement_vs_orders; 0026: deal_inputs) = 68 ids; 68 - 8 = 60 reads; 23 proposal lines - 5 = 18.
-    assert (len(entries), len(templates), len(exposed), len(proposals)) == (96, 68, 60, 23)
+    # - 2 "@3" rows (0024: settlement_vs_orders; 0026: deal_inputs) = 68 ids; + 0028's five v1 ids = 73; 73 - 11 = 62 reads;
+    # 24 proposal lines - 6 = 18.
+    assert (len(entries), len(templates), len(exposed), len(proposals)) == (101, 73, 62, 24)
     assert len([e for e in entries if e.endswith("@2")]) == 26
-    return (len(proposals) - 5) + len(exposed)
+    return (len(proposals) - 6) + len(exposed)
 
 
 def test_no_registered_tool_takes_a_tenant() -> None:

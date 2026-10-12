@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cares.profile.set.v1",
+  "title": "CaresProfileSetV1",
+  "x-munim-module": "cares",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused"
+      ]
+    },
+    "public_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "b2b_enabled": {
+      "type": "boolean"
+    },
+    "outlets": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "outlet_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "city_code": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "lat_e6": {
+            "type": "integer",
+            "minimum": -90000000,
+            "maximum": 90000000
+          },
+          "lng_e6": {
+            "type": "integer",
+            "minimum": -180000000,
+            "maximum": 180000000
+          },
+          "pickup_from": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "pickup_to": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "outlet_id",
+          "city_code",
+          "lat_e6",
+          "lng_e6",
+          "pickup_from",
+          "pickup_to",
+          "active"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "status",
+    "public_name",
+    "b2b_enabled",
+    "outlets"
+  ],
+  "additionalProperties": false
+}

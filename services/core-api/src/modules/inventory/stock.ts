@@ -39,7 +39,7 @@ export async function inSourceState(c: Queryable, rule: string, table: string, i
 }
 const quoteIdent = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
-export type Kind = "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return";
+export type Kind = "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return" | "donation" | "surplus_out" | "surplus_in" | "cares_reversal";
 export type MovementInsert = {
   outlet_id: string;
   ingredient_id: string;

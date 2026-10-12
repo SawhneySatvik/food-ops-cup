@@ -44,7 +44,7 @@ export const READ_SCHEMAS = {
   "v1.inventory.transfers": Page(TransferItem),
 };
 
-export const MOVEMENT_KIND_VALUES = ["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return"] as const;
+export const MOVEMENT_KIND_VALUES = ["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return", "donation", "surplus_out", "surplus_in", "cares_reversal"] as const;
 
 export const READ_ROUTES: readonly Route[] = [
   read("/v1/inventory/ingredients", "listIngredients", "Ingredients (tenant-wide); q matches the name; outlet is checked against the caller's scope", "v1.inventory.ingredients", { query: [param("outlet", uuid), param("q", { type: "string", maxLength: 100 }), limit, cursor] }),

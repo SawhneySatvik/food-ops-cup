@@ -276,6 +276,367 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cares/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The business's Munim Cares setup: availability, operator enablement, profile and outlet cities */
+        get: operations["getCaresProfile"];
+        put?: never;
+        /** cares.profile.set.v1 — opt in or pause, name the business, set each outlet's city, location and pickup hours */
+        post: operations["setCaresProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Simulated recipients in the outlet's city */
+        get: operations["listCaresRecipients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Surplus listings and their hand-overs, newest first */
+        get: operations["listCaresListings"];
+        put?: never;
+        /** cares.listing.publish.v1 — publish a donation or an offer (owner or judge; intel may draft it, cooked lines only by the owner's own command) */
+        post: operations["publishCaresListing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/listings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One listing with its lines and hand-overs */
+        get: operations["getCaresListing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/listings/{id}:withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.listing.withdraw.v1 — withdraw a published listing (not after an offer is allocated) */
+        post: operations["withdrawCaresListing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/handovers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.handover.record.v1 — record what was handed over; core derives the stock movements */
+        post: operations["recordCaresHandover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/handovers/{id}:void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.handover.void.v1 — void a recorded hand-over with a reason; stock comes back (not after the buyer received) */
+        post: operations["voidCaresHandover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/market": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Other businesses' shared surplus offers in the caller's cities (needs B2B on) */
+        get: operations["listCaresMarket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The buyer's own claims with their outcome */
+        get: operations["listCaresClaims"];
+        put?: never;
+        /** cares.claim.create.v1 — claim every line of an offer at the offered quantity (all-or-nothing); the price is recorded, never processed */
+        post: operations["createCaresClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/claims/{id}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.claim.cancel.v1 — cancel a claim before any verdict */
+        post: operations["cancelCaresClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/claims/{id}:close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.claim.close.v1 — close a claim whose outcome is declined */
+        post: operations["closeCaresClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/claims/{id}:receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.claim.receive.v1 — receive an accepted, handed-over claim into stock */
+        post: operations["receiveCaresClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/listings/{id}/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Claims on the caller's own offer */
+        get: operations["listCaresInboundClaims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares/listings/{id}:decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** cares.claim.decide.v1 — accept or decline one claim on the caller's offer (one accepted claim per offer) */
+        post: operations["decideCaresClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares-network/cities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cities with surplus-sharing businesses (Simulated recipients; Check your local food-donation rules) */
+        get: operations["listCaresNetworkCities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares-network/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live donation listings in a city to Simulated recipients */
+        get: operations["listCaresNetworkListings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares-network/listings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One live donation listing (404 when not live) */
+        get: operations["getCaresNetworkListing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares-network/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Meals shared across Munim to Simulated recipients: the latest published network snapshot, each value beside its ref */
+        get: operations["getCaresNetworkImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cares-network/snapshots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A published network snapshot with its rows and sha256 (404 when unpublished) */
+        get: operations["getCaresNetworkSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/storefront/cares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The storefront key's own live donation listings (uncached; a bad key or a non-storefront channel is 404) */
+        get: operations["getStorefrontCares"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/v1/network-snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Minted network snapshots with their publish state */
+        get: operations["listCaresNetworkSnapshots"];
+        put?: never;
+        /** Mint the network impact snapshot (operator template platform.cares_network_impact); nothing is public until a config draft publishes it */
+        post: operations["mintCaresNetworkSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalogue/items": {
         parameters: {
             query?: never;
@@ -3599,6 +3960,35 @@ export interface components {
             draft_id: components["schemas"]["Uuid7"];
             command_type: string;
             edited_payload: ({
+                listing_id: string;
+                outlet_id: string;
+                /** @enum {string} */
+                kind: "donation" | "offer";
+                recipient_id: string | null;
+                /** Format: date-time */
+                pickup_from: string;
+                /** Format: date-time */
+                pickup_to: string;
+                lines: {
+                    line_id: string;
+                    /** @enum {string} */
+                    food_kind: "cooked" | "raw" | "packaged";
+                    item_id: string | null;
+                    ingredient_id: string | null;
+                    batch_id: string | null;
+                    qty_milli: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    unit: string;
+                    expires_on: string | null;
+                    unit_price_minor: (string | {
+                        value: number;
+                        typed_by: string;
+                    }) | null;
+                    currency: string | null;
+                }[];
+            } | {
                 coupon_id: string;
                 code: string;
                 /** @enum {string} */
@@ -3785,6 +4175,8 @@ export interface components {
                 /** Format: date */
                 due_on: string;
                 finding_id: string | null;
+                /** @default null */
+                cares_listing_id: string | null;
             } | {
                 format_id: string;
                 /** @enum {string} */
@@ -3977,6 +4369,35 @@ export interface components {
             draft_id: components["schemas"]["Uuid7"];
             command_type: string;
             payload: {
+                listing_id: string;
+                outlet_id: string;
+                /** @enum {string} */
+                kind: "donation" | "offer";
+                recipient_id: string | null;
+                /** Format: date-time */
+                pickup_from: string;
+                /** Format: date-time */
+                pickup_to: string;
+                lines: {
+                    line_id: string;
+                    /** @enum {string} */
+                    food_kind: "cooked" | "raw" | "packaged";
+                    item_id: string | null;
+                    ingredient_id: string | null;
+                    batch_id: string | null;
+                    qty_milli: string | {
+                        value: number;
+                        typed_by: string;
+                    };
+                    unit: string;
+                    expires_on: string | null;
+                    unit_price_minor: (string | {
+                        value: number;
+                        typed_by: string;
+                    }) | null;
+                    currency: string | null;
+                }[];
+            } | {
                 coupon_id: string;
                 code: string;
                 /** @enum {string} */
@@ -4163,6 +4584,8 @@ export interface components {
                 /** Format: date */
                 due_on: string;
                 finding_id: string | null;
+                /** @default null */
+                cares_listing_id: string | null;
             } | {
                 format_id: string;
                 /** @enum {string} */
@@ -4436,6 +4859,544 @@ export interface components {
                 now: string | number | boolean | null;
             }[];
             refs?: string[];
+        };
+        /** CaresProfileSetV1 */
+        CaresProfileSetV1: {
+            /** @enum {string} */
+            status: "active" | "paused";
+            public_name: string;
+            b2b_enabled: boolean;
+            outlets: {
+                outlet_id: components["schemas"]["Uuid7"];
+                city_code: string;
+                lat_e6: number;
+                lng_e6: number;
+                pickup_from: string;
+                pickup_to: string;
+                active: boolean;
+            }[];
+        };
+        /** CaresListingPublishV1 */
+        CaresListingPublishV1: {
+            listing_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            kind: "donation" | "offer";
+            recipient_id: components["schemas"]["Uuid7"] | null;
+            pickup_from: components["schemas"]["IsoDatetime"];
+            pickup_to: components["schemas"]["IsoDatetime"];
+            lines: {
+                line_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                food_kind: "cooked" | "raw" | "packaged";
+                item_id: components["schemas"]["Uuid7"] | null;
+                ingredient_id: components["schemas"]["Uuid7"] | null;
+                batch_id: components["schemas"]["Uuid7"] | null;
+                qty_milli: number;
+                unit: string;
+                expires_on: string | null;
+                unit_price_minor: number | null;
+                currency: string | null;
+            }[];
+        };
+        /** CaresListingWithdrawV1 */
+        CaresListingWithdrawV1: {
+            listing_id: components["schemas"]["Uuid7"];
+        };
+        /** CaresHandoverRecordV1 */
+        CaresHandoverRecordV1: {
+            handover_id: components["schemas"]["Uuid7"];
+            listing_id: components["schemas"]["Uuid7"];
+            allocation_id: components["schemas"]["Uuid7"] | null;
+            lines: {
+                listing_line_id: components["schemas"]["Uuid7"];
+                qty_milli: number;
+            }[];
+        };
+        /** CaresHandoverVoidV1 */
+        CaresHandoverVoidV1: {
+            handover_id: components["schemas"]["Uuid7"];
+            reason_code: string;
+        };
+        /** CaresClaimCreateV1 */
+        CaresClaimCreateV1: {
+            claim_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            offer_tenant_id: components["schemas"]["Uuid7"];
+            offer_listing_id: components["schemas"]["Uuid7"];
+            lines: {
+                offer_line_id: components["schemas"]["Uuid7"];
+                ingredient_id: components["schemas"]["Uuid7"];
+            }[];
+        };
+        /** CaresClaimCancelV1 */
+        CaresClaimCancelV1: {
+            claim_id: components["schemas"]["Uuid7"];
+        };
+        /** CaresClaimCloseV1 */
+        CaresClaimCloseV1: {
+            claim_id: components["schemas"]["Uuid7"];
+        };
+        /** CaresClaimDecideV1 */
+        CaresClaimDecideV1: {
+            allocation_id: components["schemas"]["Uuid7"];
+            listing_id: components["schemas"]["Uuid7"];
+            claim_tenant_id: components["schemas"]["Uuid7"];
+            claim_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            verdict: "accepted" | "declined";
+        };
+        /** CaresClaimReceiveV1 */
+        CaresClaimReceiveV1: {
+            claim_id: components["schemas"]["Uuid7"];
+        };
+        /** ProposalCaresListingPublishV1 */
+        ProposalCaresListingPublishV1: {
+            listing_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            kind: "donation" | "offer";
+            recipient_id: components["schemas"]["Uuid7"] | null;
+            pickup_from: components["schemas"]["IsoDatetime"];
+            pickup_to: components["schemas"]["IsoDatetime"];
+            lines: {
+                line_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                food_kind: "cooked" | "raw" | "packaged";
+                item_id: components["schemas"]["Uuid7"] | null;
+                ingredient_id: components["schemas"]["Uuid7"] | null;
+                batch_id: components["schemas"]["Uuid7"] | null;
+                qty_milli: components["schemas"]["Ref"];
+                unit: string;
+                expires_on: string | null;
+                unit_price_minor: components["schemas"]["Ref"] | null;
+                currency: string | null;
+            }[];
+        };
+        /** CaresNetworkSnapshotMint */
+        CaresNetworkSnapshotMint: {
+            template_id: string;
+            params: {
+                [key: string]: string | number | boolean | null | string[];
+            };
+        };
+        /** V1CaresProfile */
+        V1CaresProfile: {
+            available: boolean;
+            enabled: boolean;
+            profile: {
+                /** @enum {string} */
+                status: "active" | "paused";
+                public_name: string;
+                b2b_enabled: boolean;
+            } | null;
+            outlets: {
+                outlet_id: components["schemas"]["Uuid7"];
+                city_code: string;
+                lat_e6: number;
+                lng_e6: number;
+                pickup_from: string;
+                pickup_to: string;
+                active: boolean;
+            }[];
+        };
+        /** V1CaresRecipients */
+        V1CaresRecipients: {
+            items: {
+                recipient_id: components["schemas"]["Uuid7"];
+                city_code: string;
+                name: string;
+                /** @enum {string} */
+                kind: "ngo" | "food_bank";
+                /** @constant */
+                simulated: true;
+                accepts_cooked: boolean;
+                accepts_raw: boolean;
+                accepts_packaged: boolean;
+                capacity_kg_per_day: number;
+                capacity_portions_per_day: number;
+                receiving_from: string;
+                receiving_to: string;
+                lat_e6: number;
+                lng_e6: number;
+            }[];
+        };
+        /** V1CaresListings */
+        V1CaresListings: {
+            items: components["schemas"]["V1CaresListing"][];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CaresListing */
+        V1CaresListing: {
+            listing_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"];
+            /** @enum {string} */
+            kind: "donation" | "offer";
+            /** @enum {string} */
+            status: "published" | "allocated" | "closed" | "withdrawn";
+            recipient_id: components["schemas"]["Uuid7"] | null;
+            pickup_from: components["schemas"]["IsoDatetime"];
+            pickup_to: components["schemas"]["IsoDatetime"];
+            /** Format: date */
+            pickup_on: string;
+            published_by: components["schemas"]["Uuid7"];
+            published_at: components["schemas"]["IsoDatetime"];
+            lines: {
+                line_id: components["schemas"]["Uuid7"];
+                line_no: number;
+                /** @enum {string} */
+                food_kind: "cooked" | "raw" | "packaged";
+                item_id: components["schemas"]["Uuid7"] | null;
+                ingredient_id: components["schemas"]["Uuid7"] | null;
+                batch_id: components["schemas"]["Uuid7"] | null;
+                qty_milli: number;
+                unit: string;
+                expires_on: string | null;
+                unit_price_minor: number | null;
+                currency: string | null;
+            }[];
+            handovers: {
+                handover_id: components["schemas"]["Uuid7"];
+                allocation_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                status: "recorded" | "voided";
+                handed_at: components["schemas"]["IsoDatetime"];
+                recorded_by: components["schemas"]["Uuid7"];
+                voided_by: components["schemas"]["Uuid7"] | null;
+                void_reason_code: string | null;
+                lines: {
+                    listing_line_id: components["schemas"]["Uuid7"];
+                    qty_milli: number;
+                }[];
+            }[];
+        };
+        /** V1CaresMarket */
+        V1CaresMarket: {
+            items: {
+                offer_tenant_id: components["schemas"]["Uuid7"];
+                listing_id: components["schemas"]["Uuid7"];
+                business_name: string;
+                outlet_name: string;
+                city_code: string;
+                pickup_from: components["schemas"]["IsoDatetime"];
+                pickup_to: components["schemas"]["IsoDatetime"];
+                /** Format: date */
+                pickup_on: string;
+                lines: {
+                    offer_line_id: components["schemas"]["Uuid7"];
+                    /** @enum {string} */
+                    food_kind: "cooked" | "raw" | "packaged";
+                    label: string;
+                    qty_milli: number;
+                    unit: string;
+                    expires_on: string | null;
+                    unit_price_minor: number;
+                    currency: string;
+                }[];
+            }[];
+        };
+        /** V1CaresClaims */
+        V1CaresClaims: {
+            items: {
+                claim_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                offer_tenant_id: components["schemas"]["Uuid7"];
+                offer_listing_id: components["schemas"]["Uuid7"];
+                allocation_id: components["schemas"]["Uuid7"] | null;
+                /** @enum {string} */
+                status: "requested" | "cancelled" | "closed" | "received";
+                total_minor: number;
+                currency: string;
+                created_by: components["schemas"]["Uuid7"];
+                created_at: components["schemas"]["IsoDatetime"];
+                lines: {
+                    offer_line_id: components["schemas"]["Uuid7"];
+                    ingredient_id: components["schemas"]["Uuid7"];
+                    qty_milli: number;
+                    unit: string;
+                    unit_price_minor: number;
+                    expires_on: string | null;
+                    received_qty_milli: number | null;
+                }[];
+                outcome: {
+                    /** @enum {string} */
+                    verdict: "accepted" | "declined" | "none";
+                    allocation_id: components["schemas"]["Uuid7"] | null;
+                    decided_at: components["schemas"]["IsoDatetime"] | null;
+                    lines: {
+                        offer_line_id: components["schemas"]["Uuid7"];
+                        handed_qty_milli: number;
+                    }[];
+                };
+            }[];
+        };
+        /** V1CaresInboundClaims */
+        V1CaresInboundClaims: {
+            items: {
+                claim_tenant_id: components["schemas"]["Uuid7"];
+                claim_id: components["schemas"]["Uuid7"];
+                buyer_public_name: string;
+                /** @enum {string} */
+                status: "requested" | "cancelled" | "closed" | "received";
+                created_at: components["schemas"]["IsoDatetime"];
+                lines: {
+                    offer_line_id: components["schemas"]["Uuid7"];
+                    qty_milli: number;
+                    unit_price_minor: number;
+                }[];
+            }[];
+        };
+        /** V1CaresNetworkCities */
+        V1CaresNetworkCities: {
+            items: {
+                code: string;
+                country_code: string;
+                name: string;
+            }[];
+        };
+        /** V1CaresNetworkListings */
+        V1CaresNetworkListings: {
+            items: components["schemas"]["V1CaresNetworkListing"][];
+            next_cursor: components["schemas"]["Uuid7"] | null;
+        };
+        /** V1CaresNetworkListing */
+        V1CaresNetworkListing: {
+            listing_id: components["schemas"]["Uuid7"];
+            city_code: string;
+            business_name: string;
+            outlet_name: string;
+            pickup_from: components["schemas"]["IsoDatetime"];
+            pickup_to: components["schemas"]["IsoDatetime"];
+            recipient_name: string;
+            /** @constant */
+            recipient_simulated: true;
+            lines: {
+                line_no: number;
+                /** @enum {string} */
+                food_kind: "cooked" | "raw" | "packaged";
+                label_key: string | null;
+                label: string | null;
+                qty_milli: number;
+                unit: string;
+                expires_on: string | null;
+            }[];
+        };
+        /** V1CaresNetworkImpact */
+        V1CaresNetworkImpact: {
+            snapshot_id: components["schemas"]["Uuid7"];
+            as_of: components["schemas"]["IsoDatetime"];
+            template_id: string;
+            template_version: number;
+            rows: {
+                city_code: string | null;
+                businesses: {
+                    value: number;
+                    ref: components["schemas"]["Ref"];
+                };
+                donations: {
+                    value: number;
+                    ref: components["schemas"]["Ref"];
+                };
+                meals_portions_milli: {
+                    value: number;
+                    ref: components["schemas"]["Ref"];
+                };
+                weight_g: {
+                    value: number;
+                    ref: components["schemas"]["Ref"];
+                };
+                volume_ml: {
+                    value: number;
+                    ref: components["schemas"]["Ref"];
+                };
+                all_synthetic: {
+                    value: boolean;
+                    ref: components["schemas"]["Ref"];
+                };
+            }[];
+        };
+        /** V1CaresNetworkSnapshot */
+        V1CaresNetworkSnapshot: {
+            snapshot_id: components["schemas"]["Uuid7"];
+            template_id: string;
+            template_version: number;
+            params: {
+                [key: string]: string | number | boolean | null | string[];
+            };
+            columns: {
+                name: string;
+                /** @enum {string} */
+                type: "integer" | "numeric" | "text" | "date" | "timestamptz" | "boolean" | "uuid";
+                numeric_source?: (string | string[]) | null;
+            }[];
+            rows: {
+                [key: string]: string | number | boolean | null;
+            }[];
+            row_count: number;
+            sha256: string;
+            created_at: components["schemas"]["IsoDatetime"];
+            published_at: components["schemas"]["IsoDatetime"];
+        };
+        /** V1StorefrontCares */
+        V1StorefrontCares: {
+            items: components["schemas"]["V1CaresNetworkListing"][];
+        };
+        /** PlatformCaresNetworkSnapshot */
+        PlatformCaresNetworkSnapshot: {
+            snapshot_id: components["schemas"]["Uuid7"];
+            template_id: string;
+            template_version: number;
+            params: {
+                [key: string]: string | number | boolean | null | string[];
+            };
+            columns: {
+                name: string;
+                /** @enum {string} */
+                type: "integer" | "numeric" | "text" | "date" | "timestamptz" | "boolean" | "uuid";
+                numeric_source?: (string | string[]) | null;
+            }[];
+            rows: {
+                [key: string]: string | number | boolean | null;
+            }[];
+            row_count: number;
+            sha256: string;
+            created_at: components["schemas"]["IsoDatetime"];
+            minted_by_operator_id: components["schemas"]["Uuid7"];
+            published_at: components["schemas"]["IsoDatetime"] | null;
+            publish_draft_id: components["schemas"]["Uuid7"] | null;
+        };
+        /** PlatformCaresNetworkSnapshots */
+        PlatformCaresNetworkSnapshots: {
+            items: components["schemas"]["PlatformCaresNetworkSnapshot"][];
+        };
+        /** MunimCaresListingPublishedV1 */
+        MunimCaresListingPublishedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.listing.published.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "donation" | "offer";
+            };
+        };
+        /** MunimCaresListingClosedV1 */
+        MunimCaresListingClosedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.listing.closed.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "donation" | "offer";
+                /** @enum {string} */
+                status: "closed" | "withdrawn";
+            };
+        };
+        /** MunimCaresHandoverRecordedV1 */
+        MunimCaresHandoverRecordedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.handover.recorded.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                handover_id: components["schemas"]["Uuid7"];
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "donation" | "offer";
+            };
+        };
+        /** MunimCaresHandoverVoidedV1 */
+        MunimCaresHandoverVoidedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.handover.voided.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                handover_id: components["schemas"]["Uuid7"];
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                kind: "donation" | "offer";
+            };
+        };
+        /** MunimCaresClaimCreatedV1 */
+        MunimCaresClaimCreatedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.claim.created.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                claim_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+            };
+        };
+        /** MunimCaresClaimDecidedV1 */
+        MunimCaresClaimDecidedV1: {
+            /** @constant */
+            specversion: "1.0";
+            id: components["schemas"]["Uuid7"];
+            time: components["schemas"]["IsoDatetime"];
+            /** @constant */
+            datacontenttype: "application/json";
+            tenantid: components["schemas"]["Uuid7"];
+            munimrun: string;
+            source: string;
+            /** @constant */
+            type: "munim.cares.claim.decided.v1";
+            subject: components["schemas"]["Uuid7"];
+            data: {
+                claim_id: components["schemas"]["Uuid7"];
+                listing_id: components["schemas"]["Uuid7"];
+                outlet_id: components["schemas"]["Uuid7"];
+                /** @enum {string} */
+                verdict: "accepted" | "declined";
+            };
         };
         /** V1CatalogueItems */
         V1CatalogueItems: {
@@ -5370,7 +6331,7 @@ export interface components {
                 movement_ids: components["schemas"]["Uuid7"][];
                 ingredient_ids: components["schemas"]["Uuid7"][];
                 /** @enum {string} */
-                kind: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return";
+                kind: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return" | "donation" | "surplus_out" | "surplus_in" | "cares_reversal";
                 ref_type: string;
                 ref_id: components["schemas"]["Uuid7"];
             };
@@ -5880,6 +6841,8 @@ export interface components {
             /** Format: date */
             due_on: string;
             finding_id: components["schemas"]["Uuid7"] | null;
+            /** @default null */
+            cares_listing_id: components["schemas"]["Uuid7"] | null;
         };
         /** GoalsTaskUpdateV1 */
         GoalsTaskUpdateV1: {
@@ -5910,6 +6873,8 @@ export interface components {
             /** Format: date */
             due_on: string;
             finding_id: components["schemas"]["Uuid7"] | null;
+            /** @default null */
+            cares_listing_id: components["schemas"]["Uuid7"] | null;
         };
         /** V1Goals */
         V1Goals: {
@@ -6261,6 +7226,29 @@ export interface components {
             pack: "catalogue" | "kitchen" | "inventory_purchasing" | "finance" | "people" | "customers" | "compliance" | "market";
             command_type: string;
             payload: {
+                listing_id: string;
+                outlet_id: string;
+                /** @enum {string} */
+                kind: "donation" | "offer";
+                recipient_id: string | null;
+                /** Format: date-time */
+                pickup_from: string;
+                /** Format: date-time */
+                pickup_to: string;
+                lines: {
+                    line_id: string;
+                    /** @enum {string} */
+                    food_kind: "cooked" | "raw" | "packaged";
+                    item_id: string | null;
+                    ingredient_id: string | null;
+                    batch_id: string | null;
+                    qty_milli: string;
+                    unit: string;
+                    expires_on: string | null;
+                    unit_price_minor: string | null;
+                    currency: string | null;
+                }[];
+            } | {
                 coupon_id: string;
                 code: string;
                 /** @enum {string} */
@@ -6393,6 +7381,8 @@ export interface components {
                 /** Format: date */
                 due_on: string;
                 finding_id: string | null;
+                /** @default null */
+                cares_listing_id: string | null;
             } | {
                 format_id: string;
                 /** @enum {string} */
@@ -7050,7 +8040,7 @@ export interface components {
                 qty_milli: number;
                 unit: string;
                 /** @enum {string} */
-                kind: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return";
+                kind: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return" | "donation" | "surplus_out" | "surplus_in" | "cares_reversal";
                 ref_type: string | null;
                 ref_id: components["schemas"]["Uuid7"] | null;
                 unit_cost: components["schemas"]["Money"] | null;
@@ -8009,6 +8999,13 @@ export interface components {
                 /** @enum {string} */
                 type: "asset" | "liability" | "equity" | "income" | "expense";
             }[];
+            cares?: {
+                food_kinds: ("cooked" | "raw" | "packaged")[];
+                offers_enabled: boolean;
+                cooked_max_hold_min: number;
+                min_days_left_at_pickup: number;
+                _notes: string[];
+            };
             _unverified?: string[];
         };
         /** V1PeopleRosters */
@@ -8857,7 +9854,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -10872,6 +11869,1883 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DraftsDecisionError"];
+                };
+            };
+        };
+    };
+    getCaresProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresProfile"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setCaresProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.profile.set.v1";
+                    payload: components["schemas"]["CaresProfileSetV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresRecipients: {
+        parameters: {
+            query: {
+                outlet: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresRecipients"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresListings: {
+        parameters: {
+            query?: {
+                outlet?: string;
+                kind?: "donation" | "offer";
+                status?: "published" | "allocated" | "closed" | "withdrawn";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresListings"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    publishCaresListing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.listing.publish.v1";
+                    payload: components["schemas"]["CaresListingPublishV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCaresListing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresListing"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    withdrawCaresListing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.listing.withdraw.v1";
+                    payload: components["schemas"]["CaresListingWithdrawV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordCaresHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.handover.record.v1";
+                    payload: components["schemas"]["CaresHandoverRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    voidCaresHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.handover.void.v1";
+                    payload: components["schemas"]["CaresHandoverVoidV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresMarket: {
+        parameters: {
+            query?: {
+                listing?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresMarket"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresClaims: {
+        parameters: {
+            query?: {
+                outlet?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresClaims"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createCaresClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.claim.create.v1";
+                    payload: components["schemas"]["CaresClaimCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    cancelCaresClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.claim.cancel.v1";
+                    payload: components["schemas"]["CaresClaimCancelV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    closeCaresClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.claim.close.v1";
+                    payload: components["schemas"]["CaresClaimCloseV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    receiveCaresClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.claim.receive.v1";
+                    payload: components["schemas"]["CaresClaimReceiveV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresInboundClaims: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresInboundClaims"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decideCaresClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "cares.claim.decide.v1";
+                    payload: components["schemas"]["CaresClaimDecideV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresNetworkCities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresNetworkCities"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresNetworkListings: {
+        parameters: {
+            query?: {
+                city?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresNetworkListings"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCaresNetworkListing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresNetworkListing"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCaresNetworkImpact: {
+        parameters: {
+            query?: {
+                city?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresNetworkImpact"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCaresNetworkSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1CaresNetworkSnapshot"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getStorefrontCares: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1StorefrontCares"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listCaresNetworkSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformCaresNetworkSnapshots"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    mintCaresNetworkSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaresNetworkSnapshotMint"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformCaresNetworkSnapshot"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -18155,7 +21029,7 @@ export interface operations {
             query: {
                 outlet: string;
                 ingredient?: string;
-                kind?: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return";
+                kind?: "receipt" | "sale_consumption" | "waste" | "transfer_out" | "transfer_in" | "count_adjust" | "supplier_return" | "sale_return" | "donation" | "surplus_out" | "surplus_in" | "cares_reversal";
                 ref?: string;
                 limit?: number;
                 cursor?: string;

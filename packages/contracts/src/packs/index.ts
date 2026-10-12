@@ -173,6 +173,21 @@ export const CountryPack = z
     /** `detectors.<detector_id>` thresholds (docs/plan/packs/*.md §4), pack currency for money. */
     detectors: z.record(z.string().regex(/^[a-z][a-z_]*\.[a-z][a-z0-9_]*$/), Detector),
     chart_of_accounts: z.array(Account).min(1),
+    /** Munim Cares operating values (ADR-015 §6). Optional: v1–v3 packs have none, and a pack without it means Cares is
+     *  off (`cares_not_available`). Operating limits only — no legal text, no compliance claim. */
+    cares: z
+      .strictObject({
+        food_kinds: z.array(z.enum(["cooked", "raw", "packaged"])).min(1),
+        /** Whether businesses may share surplus with each other (the B2B offers). */
+        offers_enabled: z.boolean(),
+        /** A cooked pickup must start within this many minutes of the listing's approval. */
+        cooked_max_hold_min: z.int().positive(),
+        /** A line's expires_on must be at least this many days after the pickup date. */
+        min_days_left_at_pickup: z.int().min(0),
+        /** Provenance; every value is INFERENCE. */
+        _notes: z.array(z.string().min(1)).min(1),
+      })
+      .optional(),
     _unverified: Unverified,
   })
   .superRefine((p, ctx) => {
@@ -197,6 +212,7 @@ export const CountryPack = z
       if (t.receipt_field !== null && !p.invoice.required_fields.includes(t.receipt_field))
         ctx.addIssue({ code: "custom", path: ["tax_ids", i, "receipt_field"], message: "receipt_field must be one of invoice.required_fields" });
     });
+    if (p.cares && new Set(p.cares.food_kinds).size !== p.cares.food_kinds.length) ctx.addIssue({ code: "custom", path: ["cares", "food_kinds"], message: "duplicate food kind" });
     const licences = p.licence_kinds.map((k) => k.code);
     if (new Set(licences).size !== licences.length) ctx.addIssue({ code: "custom", path: ["licence_kinds"], message: "duplicate licence kind" });
     if ((p.printed_price.rule === "none") !== (p.printed_price.applies_to === null))

@@ -1,0 +1,29 @@
+{
+ "agent": "munim_branch",
+ "pack": "market",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "as_of": null,
+        "days": 14,
+        "outlet_id": null,
+        "page": 0
+       },
+       "name": "read_market_upcoming"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 43,
+    "prompt_token_count": 3783
+   }
+  }
+ ],
+ "step": 0
+}

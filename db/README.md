@@ -40,7 +40,8 @@ the `ingest` run trigger, `finance.settlement_vs_orders` v3), 0025 W3 close (`in
 remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`), 0026 W3 founder decisions (R47: per-role AI
 prices on `platform.model_role`, negotiation bounds on `core.business_policy`, `people.labour_vs_demand` v2 at the extra staff's
 rate, `purchasing.deal_inputs` v3 with shop SKU margins), 0027 T-098 (stop reason `ceiling`: a lowered ceiling downgrades a
-running Auto investigation to Plan; Auto entered only with the plan approval) — gates see 26 applied.
+running Auto investigation to Plan; Auto entered only with the plan approval), 0028 Munim Cares (ADR-015 §1: 4 platform tables,
+9 core books, 4 stock kinds, 10 commands, 3 derivation rules, 5 definer reads, 5 templates) — gates see 27 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -112,7 +113,7 @@ own-row rule (R41): with `app.role = 'customer'` only the row `id = app.customer
 | `MB002` | `country_locked` | change of country/currency/FY start/onboarded_at after onboarding (R30) |
 | `MB003` | `currency_mismatch` | any currency column ≠ tenant base currency (R30) |
 | `MB004` | `illegal_transition` | order, draft, purchase order, transfer status; forged `exec_txid` |
-| `MB005` | `override_refused` | expired-sale override reused, or `decided_by` ≠ signed-in member (R40 C7) |
+| `MB005` | `override_refused` | expired-sale override reused, or `decided_by` ≠ signed-in member (R40 C7); a Cares actor column (`published_by`, `recorded_by`, `voided_by`, `created_by`, `decided_by`) ≠ signed-in member (0028) |
 | `MB006` | `decision_refused` | `core.decision.decided_by` ≠ `app.member_id`, or `app.role` not allowed for the draft's command type |
 | `MB007` | `customer_erased` | `erased_at` set outside `customers.erasure.request.v1`, or any change to an erased profile (R41) |
 | `MB008` | `command_table_mismatch` | the command (own command, or the approved draft's command type) does not list the table in `core.command_authority.target_tables`, and no later branch admits the row |
@@ -734,8 +735,92 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
   `investigation_rules`, which fires after `auto_entry` (trigger name order).
 - **The standing grant is not revoked** (`munim_svc` cannot: grant_rules needs the signed-in member). It is inert: an auto
   step and an `auto_step` run both need `mode = 'auto'` (MB015 after the downgrade, gated).
-- **Gates:** `tests/ceiling-0027.test.ts` (each refusal paired with an accept); `db/tests/redproof-0027.sh`. Red-proof
-  scripts plant `0028_redproof_plant.sql` now; `grants.test.ts` plants `0028_planted.sql`.
+- **Gates:** `tests/ceiling-0027.test.ts` (each refusal paired with an accept); `db/tests/redproof-0027.sh`.
+
+**Munim Cares (0028, ADR-015 §1, §2.3; ledger R48 F-2) — shapes other lanes code against.** The header of 0028 is the full list.
+- **Platform (operator, via approved config drafts):** `platform.cares_city (code, country_code, name, status)`;
+  `platform.cares_recipient` — **simulated only**: CHECK `cares_recipient_simulated_check` (`simulated`) and
+  `cares_recipient_name_simulated_check` (name contains `(simulated)`), both 23514; `munim_platform` updates every column but
+  `id` and `simulated`. `platform.cares_enablement (tenant_id, enabled, config_draft_id NOT NULL, updated_at)` — RLS as
+  `llm_budget`; every insert/update names a draft with target `cares_enablement:<tenant>` (immediate, MB004).
+  `platform.network_snapshot` — `munim_core` INSERTs, unpublished (operator mint; the template must be an operator
+  `platform.*` one, else 23514; published at insert → MB004); `munim_platform` sets `published_at` + `publish_draft_id`
+  once, together, with a config draft whose target is `cares_public_impact:<snapshot id>` (immediate, MB004); `rows` etc.
+  never change (no grant; the trigger refuses even the owner). **Both are R24 approvals:** a deferred constraint trigger
+  `draft_applied` requires, at COMMIT, the named draft `applied` with `decided_at = now()` — approved in the same
+  transaction (platform/drafts.ts `approve` applies, then flips; a proposed draft or an old applied draft → MB004).
+  No `munim_svc` grant. The world fixture's operator (`w.operator`, world-operator@example.test) approves its enablement.
+- **Books (all `munim:book`, guard, forced RLS, shopper deny):** `cares_profile` (one per tenant), `cares_outlet` (PK
+  `(tenant_id, outlet_id)`), `cares_listing` (+ `_line`), `cares_handover` (+ `_line`), `cares_claim` (+ `_line`, buyer's),
+  `cares_allocation` (offerer's). Writers set: listing `status = 'published'` and `pickup_on = ((pickup_from AT TIME ZONE
+  outlet.tz) − business_day_cutoff)::date` (23514 otherwise); lines: exactly one of item (cooked, unit `portion`) /
+  ingredient; donation lines unpriced, offer lines priced and never cooked (23514); a cooked line never under an approved
+  draft (owner's own command only, MB004); a donation names a recipient, an offer none. **Actor columns** `published_by`,
+  `recorded_by`, `voided_by`, `cares_claim.created_by`, `cares_allocation.decided_by` = `app.member_id` (MB005, as 0005's
+  expired-sale override; under a draft that is the approver). Hand-over: created `recorded`, only of a **published
+  donation** or an **allocated offer** (MB004 — so a closed listing takes no more hand-overs, re-record after a void
+  included: T-095a closes a listing only when it is done); a donation's has no `allocation_id`, an offer's the listing's
+  **accepted** allocation (23514); Σ non-voided hand-over lines per listing line ≤ its `qty_milli` (MB001; the line trigger
+  locks the listing row FOR UPDATE and re-reads kind/status under it); `voided` is final (a second void or an un-void →
+  MB004). Listing → `closed` (by `handover.record`) only when a recorded hand-over with ≥ 1 line was created in the same
+  transaction (`created_at = now()`; handler order: header, lines, then close). Claim: created `requested` with no
+  allocation; `allocation_id` set once, by receive, to the accepted allocation `cares_claim_outcome` shows the receiving
+  member; each line's `received_qty_milli` set once, to that line's `handed_qty_milli` there (MB004); CHECK
+  `cares_claim_received_allocation` (received ⇒ allocation, 23514). Allocation: immutable; inserted by decide, on an offer;
+  an accepted one only while the offer is `published` (MB004); one `accepted` per listing (23505, index
+  `cares_allocation_one_accepted`). Cross-tenant ids (`cares_claim.offer_*`, `allocation_id`;
+  `cares_allocation.claim_*`) are plain uuids — no FK, so no RI error reveals another tenant's row.
+- **One command per row operation.** The guard admits any command that lists a table, for any operation, so every Cares
+  insert and status move is pinned to its command in the `cares_rules` triggers (MB004 otherwise), read through
+  `core.cares_command(tenant)` = the executing approved draft's command type, else `app.command_type`: listing + lines
+  inserted by `publish`; listing → `withdrawn` by `withdraw`, → `allocated` by `decide`, → `closed` by `handover.record`;
+  hand-over + lines inserted by `handover.record`, → `voided` (with `voided_by`, `void_reason_code`) by `handover.void`;
+  claim + lines inserted by `claim.create`; claim → `cancelled` / `closed` / `received` by `cancel` / `close` / `receive`;
+  claim `allocation_id` and line `received_qty_milli` by `receive`.
+- **UPDATE grants (`munim_core`):** profile `status, public_name, b2b_enabled`; outlet `city_code, lat_e6, lng_e6,
+  pickup_from, pickup_to, active`; listing `status`; hand-over `status, voided_by, void_reason_code`; claim `status,
+  allocation_id`; claim line `received_qty_milli`. `munim_svc` SELECT only; `munim_intel_ro` nothing.
+- **Commands** (`command_authority`, none draft-only): `cares.profile.set.v1` owner/judge tenant → profile, outlet;
+  `cares.listing.publish.v1` owner/judge → listing, lines; `cares.listing.withdraw.v1` owner/manager/judge → listing;
+  `cares.handover.record.v1` owner/manager/staff/judge → hand-over, lines **and listing** (to close it: no other command reaches
+  `closed`); `cares.handover.void.v1` owner/judge → hand-over; `cares.claim.create.v1` owner/manager/judge → claim, lines;
+  `cares.claim.cancel.v1`, `cares.claim.close.v1` owner/manager/judge → claim; `cares.claim.decide.v1` owner/judge →
+  allocation, listing; `cares.claim.receive.v1` owner/manager/staff/judge → claim, lines. All outlet scope but profile.set.
+- **Stock kinds:** `donation` (−), `surplus_out` (−), `surplus_in` (+), `cares_reversal` (+); CHECKs `stock_movement_kind_check`
+  and `stock_movement_sign_check` (0005's unnamed `stock_movement_check` is gone). No journal posting.
+- **Derivations** (bindings in `db/derivation-rules.json`): `inventory.cares_handover` (recorded hand-over → `donation` /
+  `surplus_out` by listing kind, ref = the hand-over, its outlet, **in the ingredient's base unit**; per (ingredient, batch)
+  and per ingredient Σ |qty| in that unit ≤ the lines: raw/packaged qty (kg↔g, l↔ml to the movement's unit; a line without
+  batch = any batch), cooked portions × the dish's base-unit recipe lines valid on the hand-over's business date, rounded
+  **up**); `inventory.cares_handover_void` (voided → `cares_reversal`, cumulative per (ingredient, batch, unit) ≤ Σ |out|);
+  `inventory.cares_claim_receive` (received claim → `surplus_in` equal to one line's ingredient, unit and
+  `received_qty_milli`, cumulative per ingredient and unit ≤ Σ received in that unit; and its `core.batch`: a **new** row
+  (`o.id IS NULL`) with the line's expiry and no `mrp_minor`, `supplier_id` or `grn_line_id`). 0028 also adds `o.id IS NULL`
+  to `inventory.transfer_in → core.batch` (core-api only inserts there).
+  These rows are not seen by `packages/core-domain/test/rules-parity.test.ts` (its parser reads 3-value tuples only, as for
+  0021's `count_adjust`); T-095a owns the core-domain code.
+- **Definer reads** (owner `munim_crosstenant`, STABLE, EXECUTE `munim_core` only; 0 rows — never an error — without a
+  verified context): `core.cares_network_listings(p_city, p_tenant, p_listing, p_after, p_limit)` (live donations of shown
+  tenants, id order after the cursor, ≤ 50; shown = tenant active, profile active, enablement on, no active judge
+  membership; no `app.*` needed); `core.cares_market_offers(p_listing)` (caller = active owner/manager/judge of `app.tenant_id`
+  with an enabled b2b profile; other tenants' live offers in its Cares cities); `core.cares_inbound_claims(p_listing)` and
+  `core.cares_claim_outcome(p_claim)` (caller's own listing / claim, member's outlet scope as core-domain `outletScopeOf`:
+  membership `outlet_ids`, or every outlet when empty for owner/judge; the outcome reads the offer only when it is an offer
+  of an offerer `cares_market_offers` would show, else `declined` — no status oracle); `core.cares_network_listings` also
+  needs the recipient `active`; `core.cares_network_impact(p_from, p_to, p_city)` (`app.role = 'operator'`, an active
+  `app.operator_id` and **no** `app.tenant_id`; donations by the listing's `pickup_on`; Σ row `city_code` NULL first).
+  core-api's `POST /platform/v1/snapshots` refuses `platform.cares_network_impact` (404): it is minted only into
+  `platform.network_snapshot`. `munim_crosstenant` reads exactly 66 columns of the 12 Cares tables (0028 post-conditions list them).
+- **Templates:** `cares.recipient_match` (manager), `cares.listings` (staff), `cares.pickup_crew` (manager), `cares.impact`
+  (manager; Σ row `kind = 'total'`, then `donation`, `offer`), `platform.cares_network_impact` (operator). CHECK
+  `snapshot_template_cares_definers` (case-insensitive): only an operator `platform.*` template may name a definer read. Impact windows use the
+  listing's `pickup_on` (INFERENCE: the network read has no outlet zone grant). recipient_match returns 0 rows unless the
+  tenant's latest active pack has `cares.min_days_left_at_pickup`.
+- **Gates:** `tests/cares-0028.test.ts` (incl. two-connection tests: concurrent hand-overs serialised by the listing lock; a
+  withdraw committed mid-hand-over); the G2 case table of `tests/mc1d.test.ts` (each rule: matching row admitted, mismatches
+  MB001, incl. a kg movement against a g line and UPDATEs of an existing batch); `db/tests/redproof-0028.sh` (one plant per
+  gate; `check name pattern [test file]`). Red-proof scripts plant `0029_redproof_plant.sql` now; `grants.test.ts` plants
+  `0029_planted.sql`.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

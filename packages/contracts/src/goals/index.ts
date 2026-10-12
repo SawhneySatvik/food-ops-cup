@@ -31,6 +31,8 @@ export const GoalsTaskCreateV1 = z.strictObject({
   assignee_member_id: Uuid7,
   due_on: IsoDate,
   finding_id: Uuid7.nullable(),
+  /** ADR-015: the Munim Cares listing a pack-and-hand-over task is for. Absent = null (every other task). */
+  cares_listing_id: Uuid7.nullable().default(null),
 });
 
 /** At least one change. `status` done/cancelled closes the task; the assignee/due date may be changed by a manager. */

@@ -59,6 +59,11 @@ function derive(schema: z.ZodType, leaf: Leaf, where: string): z.ZodType {
       return derive(def.innerType, leaf, where).optional();
     case "nullable":
       return derive(def.innerType, leaf, where).nullable();
+    // ADR-015 §5: goals.task.create.v1 gains `cares_listing_id: Uuid7.nullable().default(null)`; older proposals omit it.
+    // Only a null default: any other default value could be a bare number a person never typed.
+    case "default":
+      if (def.defaultValue !== null) throw new Error(`draft payload: non-null default at ${where} (fail closed)`);
+      return derive(def.innerType, leaf, where).default(null);
     case "union":
       return z.union((def.options as z.ZodType[]).map((o, i) => derive(o, leaf, `${where}|${i}`)) as [z.ZodType, z.ZodType, ...z.ZodType[]]);
     default:

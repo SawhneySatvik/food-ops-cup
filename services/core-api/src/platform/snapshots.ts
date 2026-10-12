@@ -11,10 +11,15 @@ import { ApiError } from "../lib/errors.ts";
 import type { AppEnv } from "../lib/types.ts";
 import { bindNamedParams, runTemplate } from "../modules/approvals/snapshots.ts";
 
+/** Network-wide templates (ADR-015 §2.3): minted only into platform.network_snapshot with no tenant context, never into
+ *  a tenant's evidence.snapshot (core.cares_network_impact also returns 0 rows under a tenant, 0028). */
+const NETWORK_ONLY = new Set(["platform.cares_network_impact"]);
+
 export async function mintOperatorSnapshot(c: Context<AppEnv>, operatorId: string, raw: unknown): Promise<Snapshot> {
   const parsed = SnapshotMintOperator.safeParse(raw);
   if (!parsed.success) throw new ApiError("bad_request");
   const { tenant_id, template_id, params } = parsed.data;
+  if (NETWORK_ONLY.has(template_id)) throw new ApiError("not_found"); // not on this route's allow-list
   return withContext(c.var.deps.pools.core, { tenant_id, outlet_ids: "*", role: "operator", operator_id: operatorId }, async (db) => {
     const t = await db.query<{ version: number; sql: string; min_role: string }>(
       `SELECT version, sql, min_role FROM evidence.snapshot_template WHERE id = $1 ORDER BY version DESC LIMIT 1`, [template_id]);

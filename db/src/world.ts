@@ -535,5 +535,73 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
   await db.withContext("munim_platform", {}, async (c) => {
     await c.query(`INSERT INTO platform.llm_budget (tenant_id, month, limit_minor, currency) VALUES ($1, '2026-10-01', 500000, $2)`, [T, currency]);
   });
+  await addCares(db, w);
   return w;
+}
+
+/** 0028 (Munim Cares): rows in the ten new tenant tables only — no stock movement, task or batch — so lanes counting the
+ *  older tables see the world they saw. The world's operator (`w.operator`) becomes a platform.operator row
+ *  (world-operator@example.test) because the enablement row must cite a config draft approved in its own transaction
+ *  (0028 draft_applied; an applied draft names its deciding operator). A simulated recipient is listed; the owner opts
+ *  outlets 1 and 2 in and, at each, publishes a past donation (handed over in part) and a past offer (accepted for a buyer
+ *  claim, so allocated), and claims another business's offer. Pickups are in the past, so nothing is live on the network
+ *  page. Skipped on a database migrated to an earlier file. */
+async function addCares(db: TestDb, w: World): Promise<void> {
+  const T = w.tenant;
+  if (!(await db.admin("SELECT to_regclass('core.cares_listing') IS NOT NULL AS ok")).rows[0]!.ok) return;
+  const city = w.country === "IN" ? { code: "mumbai", name: "Mumbai", lat: 19076000, lng: 72877700 } : { code: "melbourne", name: "Melbourne", lat: -37813600, lng: 144963100 };
+  const recipient = u();
+  await db.withContext("munim_platform", {}, async (c) => {
+    const draft = u();
+    await c.query(`INSERT INTO platform.cares_city (code, country_code, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [city.code, w.country, city.name]);
+    await c.query(`INSERT INTO platform.cares_recipient (id, city_code, name, kind, simulated, accepts_cooked, accepts_raw, accepts_packaged,
+                     capacity_kg_per_day, capacity_portions_per_day, receiving_from, receiving_to, lat_e6, lng_e6)
+                   VALUES ($1, $2, 'Lotus Lane Food Bank (simulated)', 'food_bank', true, true, true, true, 200, 300, '16:00', '21:00', $3, $4)`,
+      [recipient, city.code, city.lat + 4000, city.lng + 4000]);
+    // As platform/drafts.ts approve: the target row first, then the draft flips to applied in the same transaction.
+    await c.query(`INSERT INTO platform.operator (id, idp_sub, email) VALUES ($1, $2, 'world-operator@example.test')`, [w.operator, `world-operator-${w.operator}`]);
+    await c.query(`INSERT INTO platform.config_draft (id, target, patch, proposed_by) VALUES ($1, $2, '{"enabled": true}', $3)`,
+      [draft, `cares_enablement:${T}`, `operator:${w.operator}`]);
+    await c.query(`INSERT INTO platform.cares_enablement (tenant_id, enabled, config_draft_id) VALUES ($1, true, $2)`, [T, draft]);
+    await c.query(`UPDATE platform.config_draft SET status = 'applied', decided_by = $2, decided_at = now() WHERE id = $1`, [draft, w.operator]);
+  });
+  await db.withContext("munim_core", ownerCtx(w), async (c) => {
+    const q: Q = (sql, params) => c.query(sql, params);
+    const cmd = (type: string) => c.query("SELECT set_config('app.command_type', $1, true)", [type]);
+    await cmd("cares.profile.set.v1");
+    await q(`INSERT INTO core.cares_profile (tenant_id, id, public_name, b2b_enabled) VALUES ($1, $2, 'Synthetic Kitchen', true)`, [T, u()]);
+    for (const [k, o] of [w.outlets[0], w.outlets[1]].entries()) {
+      await q(`INSERT INTO core.cares_outlet (tenant_id, outlet_id, city_code, lat_e6, lng_e6, pickup_from, pickup_to) VALUES ($1, $2, $3, $4, $5, '17:00', '20:00')`,
+        [T, o, city.code, city.lat + k * 1000, city.lng]);
+    }
+    for (const k of [0, 1] as const) {
+      const o = w.outlets[k];
+      const [donation, offer, dLine, oLine, handover, allocation, claim] = [u(), u(), u(), u(), u(), u(), u()];
+      const listing = `INSERT INTO core.cares_listing (tenant_id, id, outlet_id, kind, recipient_id, pickup_from, pickup_to, pickup_on, published_by)
+                       SELECT $1, $2, $3, $4, $5, $6::timestamptz, $6::timestamptz + interval '2 hours',
+                              (($6::timestamptz AT TIME ZONE ou.tz) - ou.business_day_cutoff)::date, $7
+                         FROM core.outlet ou WHERE ou.tenant_id = $1 AND ou.id = $3`;
+      await cmd("cares.listing.publish.v1");
+      await q(listing, [T, donation, o, "donation", recipient, "2026-10-10T12:30:00Z", w.owner]);
+      await q(`INSERT INTO core.cares_listing_line (tenant_id, id, listing_id, line_no, food_kind, ingredient_id, batch_id, qty_milli, unit, expires_on)
+               VALUES ($1, $2, $3, 1, 'raw', $4, $5, 500000, 'g', '2026-10-12')`, [T, dLine, donation, w.ingredient, w.batches[k]]);
+      await q(listing, [T, offer, o, "offer", null, "2026-10-10T12:30:00Z", w.owner]);
+      await q(`INSERT INTO core.cares_listing_line (tenant_id, id, listing_id, line_no, food_kind, ingredient_id, qty_milli, unit, expires_on, unit_price_minor, currency)
+               VALUES ($1, $2, $3, 1, 'raw', $4, 1000000, 'g', '2026-10-12', 30, $5)`, [T, oLine, offer, w.ingredient, w.currency]);
+      await cmd("cares.handover.record.v1");
+      await q(`INSERT INTO core.cares_handover (tenant_id, id, listing_id, outlet_id, handed_at, recorded_by) VALUES ($1, $2, $3, $4, '2026-10-10T13:00:00Z', $5)`,
+        [T, handover, donation, o, w.owner]);
+      await q(`INSERT INTO core.cares_handover_line (tenant_id, id, handover_id, listing_line_id, qty_milli) VALUES ($1, $2, $3, $4, 200000)`, [T, u(), handover, dLine]);
+      // Another (synthetic) business's claim on this offer, accepted; this business's claim on another's offer.
+      await cmd("cares.claim.decide.v1");
+      await q(`INSERT INTO core.cares_allocation (tenant_id, id, listing_id, outlet_id, claim_tenant_id, claim_id, buyer_public_name, verdict, total_minor, currency, decided_by)
+               VALUES ($1, $2, $3, $4, $5, $6, 'Synthetic Buyer', 'accepted', 30000, $7, $8)`, [T, allocation, offer, o, u(), u(), w.currency, w.owner]);
+      await q(`UPDATE core.cares_listing SET status = 'allocated' WHERE tenant_id = $1 AND id = $2`, [T, offer]);
+      await cmd("cares.claim.create.v1");
+      await q(`INSERT INTO core.cares_claim (tenant_id, id, outlet_id, offer_tenant_id, offer_listing_id, total_minor, currency, created_by) VALUES ($1, $2, $3, $4, $5, 15000, $6, $7)`,
+        [T, claim, o, u(), u(), w.currency, w.owner]);
+      await q(`INSERT INTO core.cares_claim_line (tenant_id, id, claim_id, offer_line_id, ingredient_id, qty_milli, unit, unit_price_minor, expires_on)
+               VALUES ($1, $2, $3, $4, $5, 500000, 'g', 30, '2026-10-12')`, [T, u(), claim, u(), w.ingredient]);
+    }
+  });
 }

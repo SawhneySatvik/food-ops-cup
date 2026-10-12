@@ -1,0 +1,31 @@
+{
+ "agent": "munim_branch",
+ "pack": "market",
+ "responses": [
+  {
+   "content": {
+    "parts": [
+     {
+      "function_call": {
+       "args": {
+        "abstain": null,
+        "segments": [
+         {
+          "text": "The coming {S1.r0.label} is expected to add {S1.r0.expected_extra_sales_minor}."
+         }
+        ]
+       },
+       "name": "report"
+      }
+     }
+    ],
+    "role": "model"
+   },
+   "usage_metadata": {
+    "candidates_token_count": 58,
+    "prompt_token_count": 4071
+   }
+  }
+ ],
+ "step": 1
+}

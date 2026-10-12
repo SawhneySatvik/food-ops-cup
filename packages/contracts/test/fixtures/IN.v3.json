@@ -1,0 +1,884 @@
+{
+  "code": "IN",
+  "version": 3,
+  "effective_from": "2026-10-11",
+  "name": "India",
+  "locale": "en-IN",
+  "currency": {
+    "code": "INR",
+    "minor_unit": 2,
+    "symbol": "₹"
+  },
+  "fy_start_month": 4,
+  "timezones": [
+    "Asia/Kolkata"
+  ],
+  "default_timezone": "Asia/Kolkata",
+  "formats": {
+    "number_grouping": "indian",
+    "decimal_separator": ".",
+    "group_separator": ",",
+    "date": "dd/MM/yyyy",
+    "magnitude_words": [
+      {
+        "word": "thousand",
+        "suffix": "k",
+        "exponent": 3
+      },
+      {
+        "word": "lakh",
+        "suffix": "L",
+        "exponent": 5
+      },
+      {
+        "word": "crore",
+        "suffix": "Cr",
+        "exponent": 7
+      }
+    ]
+  },
+  "tax": {
+    "regime": "gst_in",
+    "price_display": "exclusive",
+    "rounding": "half_up_per_line",
+    "default_class": "restaurant_5",
+    "classes": [
+      {
+        "code": "restaurant_5",
+        "label": "GST 5% (restaurant service, no input tax credit)",
+        "rate_bp": 500,
+        "components": [
+          {
+            "code": "CGST",
+            "rate_bp": 250
+          },
+          {
+            "code": "SGST",
+            "rate_bp": 250
+          }
+        ],
+        "input_tax_credit": false,
+        "supply": "service",
+        "applies_to": "Restaurant service, including takeaway and own delivery, outside specified premises"
+      },
+      {
+        "code": "restaurant_specified_premises_18",
+        "label": "GST 18% (restaurant in specified premises, with input tax credit)",
+        "rate_bp": 1800,
+        "components": [
+          {
+            "code": "CGST",
+            "rate_bp": 900
+          },
+          {
+            "code": "SGST",
+            "rate_bp": 900
+          }
+        ],
+        "input_tax_credit": true,
+        "supply": "service",
+        "applies_to": "Restaurant service in specified premises (hotel premises above the notified room-tariff threshold)",
+        "_unverified": [
+          "R21 lists GST IN 5%/18%; the specified-premises class and its room-tariff threshold were not re-read against a primary source in T-002"
+        ]
+      },
+      {
+        "code": "goods_exempt",
+        "label": "Nil-rated / exempt goods",
+        "rate_bp": 0,
+        "components": [],
+        "input_tax_credit": true,
+        "supply": "goods",
+        "applies_to": "Shop items with no GST (e.g. unpackaged fresh produce)",
+        "_unverified": [
+          "Which goods are nil-rated or exempt was not researched; the class exists so a shop can mark items"
+        ]
+      },
+      {
+        "code": "goods_5",
+        "label": "GST 5% (goods)",
+        "rate_bp": 500,
+        "components": [
+          {
+            "code": "CGST",
+            "rate_bp": 250
+          },
+          {
+            "code": "SGST",
+            "rate_bp": 250
+          }
+        ],
+        "input_tax_credit": true,
+        "supply": "goods",
+        "applies_to": "Shop items in the 5% slab, chosen per item"
+      },
+      {
+        "code": "goods_12",
+        "label": "GST 12% (goods)",
+        "rate_bp": 1200,
+        "components": [
+          {
+            "code": "CGST",
+            "rate_bp": 600
+          },
+          {
+            "code": "SGST",
+            "rate_bp": 600
+          }
+        ],
+        "input_tax_credit": true,
+        "supply": "goods",
+        "applies_to": "Shop items in the 12% slab, chosen per item",
+        "_unverified": [
+          "The September 2025 GST rate rationalisation was reported to fold most 12% goods into 5% or 18%; whether a 12% goods slab still applies to any item was not verified. Kept as data so an item can carry it if it does"
+        ]
+      },
+      {
+        "code": "goods_18",
+        "label": "GST 18% (goods)",
+        "rate_bp": 1800,
+        "components": [
+          {
+            "code": "CGST",
+            "rate_bp": 900
+          },
+          {
+            "code": "SGST",
+            "rate_bp": 900
+          }
+        ],
+        "input_tax_credit": true,
+        "supply": "goods",
+        "applies_to": "Shop items in the 18% slab, chosen per item"
+      }
+    ],
+    "_unverified": [
+      "price_display \"exclusive\" (GST added on the bill) is common restaurant practice, not a sourced rule; packaged goods carry an MRP that is tax-inclusive",
+      "Intra-state CGST+SGST split only; IGST for inter-state supply is not modelled",
+      "Per-item goods slabs are data chosen by the merchant; the pack does not map HSN codes to slabs"
+    ]
+  },
+  "tax_ids": [
+    {
+      "code": "GSTIN",
+      "label": "GSTIN",
+      "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
+      "holder": "outlet",
+      "required": true,
+      "on_receipt": true,
+      "receipt_field": "gstin",
+      "_unverified": [
+        "GST registration turnover thresholds are not modelled; the pack assumes a registered business"
+      ]
+    },
+    {
+      "code": "FSSAI",
+      "label": "FSSAI Lic. No.",
+      "pattern": "^[0-9]{14}$",
+      "holder": "outlet",
+      "required": true,
+      "on_receipt": true,
+      "receipt_field": "fssai_number"
+    }
+  ],
+  "invoice": {
+    "title": "Tax Invoice",
+    "every_receipt_is_tax_invoice": true,
+    "required_fields": [
+      "seller_name",
+      "seller_address",
+      "gstin",
+      "fssai_number",
+      "invoice_no",
+      "invoice_date",
+      "items",
+      "taxable_value",
+      "tax_components",
+      "total"
+    ],
+    "buyer_identity_above_minor": null,
+    "_unverified": [
+      "Exact GST invoice field list (e.g. SAC code, place of supply) not re-read against the CGST Rules",
+      "Buyer details threshold for B2C invoices not modelled"
+    ]
+  },
+  "printed_price": {
+    "rule": "sale_above_mrp_refused",
+    "applies_to": "Packaged goods sold by a shop that carry a printed MRP (maximum retail price, inclusive of all taxes)",
+    "_unverified": [
+      "The MRP rule follows the Legal Metrology (Packaged Commodities) Rules as commonly applied; exceptions (e.g. restaurant service of packaged drinks) were not researched"
+    ]
+  },
+  "aggregators": [
+    {
+      "code": "swiggy",
+      "display_name": "Swiggy",
+      "import_format": "swiggy_orders_v1",
+      "tax_treatment": "operator_collects_excluded",
+      "legal_basis": "CGST Act Sec 9(5): GST on restaurant service supplied through an electronic commerce operator is paid by the operator",
+      "_unverified": [
+        "Statement format is Swiggy/Zomato-shaped synthetic data, not the operators’ actual export layout"
+      ]
+    },
+    {
+      "code": "zomato",
+      "display_name": "Zomato",
+      "import_format": "zomato_orders_v1",
+      "tax_treatment": "operator_collects_excluded",
+      "legal_basis": "CGST Act Sec 9(5): GST on restaurant service supplied through an electronic commerce operator is paid by the operator",
+      "_unverified": [
+        "Statement format is Swiggy/Zomato-shaped synthetic data, not the operators’ actual export layout"
+      ]
+    }
+  ],
+  "payroll_scope": "drafts",
+  "surcharges": {
+    "card_surcharge": "not_applicable",
+    "_unverified": [
+      "No surcharge rule is modelled for IN; card-network and RBI positions on surcharging were not researched"
+    ]
+  },
+  "compliance_calendar": [
+    {
+      "code": "gst.gstr1",
+      "label": "GSTR-1 (outward supplies)",
+      "recurrence": "monthly",
+      "due_day_after_period": 11,
+      "_unverified": [
+        "Due day and the quarterly (QRMP) option not re-read against the GST portal"
+      ]
+    },
+    {
+      "code": "gst.gstr3b",
+      "label": "GSTR-3B (summary return and payment)",
+      "recurrence": "monthly",
+      "due_day_after_period": 20,
+      "_unverified": [
+        "Due day and the quarterly (QRMP) option not re-read against the GST portal"
+      ]
+    },
+    {
+      "code": "fssai.licence_details",
+      "label": "FSSAI licence details current on every bill",
+      "recurrence": "on_change",
+      "due_day_after_period": null
+    }
+  ],
+  "licence_kinds": [
+    {
+      "code": "fssai",
+      "label": "FSSAI licence / registration",
+      "holder": "outlet",
+      "outlet_kinds": [
+        "restaurant",
+        "cloud_kitchen",
+        "store"
+      ]
+    },
+    {
+      "code": "gst",
+      "label": "GST registration",
+      "holder": "business",
+      "outlet_kinds": [
+        "restaurant",
+        "cloud_kitchen",
+        "store"
+      ],
+      "_unverified": [
+        "Registration is turnover-dependent; the pack treats it as tracked for every business"
+      ]
+    },
+    {
+      "code": "trade_licence",
+      "label": "Trade licence (municipal)",
+      "holder": "outlet",
+      "outlet_kinds": [
+        "restaurant",
+        "cloud_kitchen",
+        "store"
+      ],
+      "_unverified": [
+        "Name, issuer and renewal period vary by municipality"
+      ]
+    },
+    {
+      "code": "fire_noc",
+      "label": "Fire NOC",
+      "holder": "outlet",
+      "outlet_kinds": [
+        "restaurant",
+        "cloud_kitchen"
+      ],
+      "_unverified": [
+        "Applicability depends on state rules, seating and floor area; shops not modelled"
+      ]
+    },
+    {
+      "code": "shops_establishment",
+      "label": "Shops and Establishments registration",
+      "holder": "outlet",
+      "outlet_kinds": [
+        "restaurant",
+        "cloud_kitchen",
+        "store"
+      ],
+      "_unverified": [
+        "State-specific Act; renewal periods differ by state"
+      ]
+    }
+  ],
+  "expired_sale_override": false,
+  "status_channels": [
+    "in_app"
+  ],
+  "cash_rounding_minor": 100,
+  "severity_ladder": {
+    "critical_minor_gte": 5000000,
+    "high_minor_gte": 1000000,
+    "medium_minor_gte": 200000,
+    "_notes": [
+      "INFERENCE: severity ladder L from the docs/plan/packs header (₹50,000 / ₹10,000 / ₹2,000; A$1,000 / A$200 / A$40 of monthly impact)"
+    ]
+  },
+  "detectors": {
+    "catalogue.negative_margin": {
+      "thresholds": {
+        "margin_minor_lt": 0,
+        "units_sold_gte": 20,
+        "window_days": 14,
+        "high_units_rank_lte": 10
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "catalogue.cost_drift": {
+      "thresholds": {
+        "cost_change_bp_gte": 800,
+        "cost_increase_minor_gte": 500,
+        "lookback_days": 90
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): lookback_days 90 — catalogue.md §4 names no lookback; any lookback past the cost move gives the same drift cell"
+      ]
+    },
+    "catalogue.recipe_waste_gap": {
+      "thresholds": {
+        "waste_gap_bp_gte": 300,
+        "units_sold_gte": 20,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): window_days 14 — the 14-day window catalogue.md §4 gives negative_margin on the same template"
+      ]
+    },
+    "catalogue.deal_loss": {
+      "thresholds": {
+        "deal_loss_minor_gt": 0,
+        "orders_gte": 30,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "catalogue.above_mrp": {
+      "thresholds": {
+        "price_over_mrp_minor_gt": 0
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "catalogue.below_cost": {
+      "thresholds": {
+        "below_cost_minor_gt": 0,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/catalogue.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 merge, T-044): window_days 14 — catalogue.md §4 \"14-day window\""
+      ]
+    },
+    "compliance.licence_expiring": {
+      "thresholds": {
+        "days_left_lte": 30,
+        "critical_days_left_lte": 7
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "compliance.missed_logs": {
+      "thresholds": {
+        "coverage_bp_lt": 9000,
+        "high_coverage_bp_lt": 6000,
+        "window_days": 7
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "compliance.temp_excursion": {
+      "thresholds": {
+        "out_of_range_gte": 2
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "compliance.amc_waste": {
+      "thresholds": {
+        "amc_waste_minor_gte": 100000,
+        "window_days": 90
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "compliance.maintenance_overdue": {
+      "thresholds": {
+        "preventive_overdue_days_gt": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "compliance.energy_drift": {
+      "thresholds": {
+        "per_order_vs_median_bp_gte": 13000,
+        "baseline_months": 3
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/compliance-assets.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "customers.coupon_cap_evasion": {
+      "thresholds": {
+        "cap_evasion_minor_gte": 50000,
+        "window_days": 30
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/customers-growth.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "customers.staff_applied_coupon": {
+      "thresholds": {
+        "uses_gte": 10,
+        "uses_vs_outlet_median_bp_gte": 30000,
+        "high_cash_share_bp_gt": 5000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/customers-growth.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "customers.coupon_spike": {
+      "thresholds": {
+        "uses_vs_median_bp_gte": 50000,
+        "uses_gte": 20,
+        "first_time_share_bp_gte": 7000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/customers-growth.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "customers.regulars_lapsing": {
+      "thresholds": {
+        "at_risk_count_gte": 15,
+        "at_risk_share_bp_gte": 1000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/customers-growth.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "customers.rating_drop": {
+      "thresholds": {
+        "rating_drop_x100_gte": 50,
+        "reviews_gte": 10,
+        "high_late_change_bp_gte": 2500,
+        "baseline_weeks": 8
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/customers-growth.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "finance.unapproved_ad_fee": {
+      "thresholds": {
+        "unapproved_minor_gte": 10000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/finance.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "finance.short_payout": {
+      "thresholds": {
+        "short_minor_gte": 20000,
+        "line_short_minor_gte": 100,
+        "line_short_bp_gte": 50
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/finance.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "finance.missing_payout": {
+      "thresholds": {
+        "days_unsettled_gt": 10
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/finance.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "finance.tender_gap": {
+      "thresholds": {
+        "gap_minor_gte": 50000,
+        "gap_days_gte": 3,
+        "window_days": 7,
+        "critical_voids_vs_median_bp_gte": 20000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/finance.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "finance.gst_mismatch": {
+      "thresholds": {
+        "abs_diff_minor_gte": 1000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/finance.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "forecast.accuracy_drift": {
+      "thresholds": {
+        "wape_over_naive_bp_gt": 500,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/forecast.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "forecast.bias": {
+      "thresholds": {
+        "abs_bias_bp_gte": 1500,
+        "high_abs_bias_bp_gte": 3000,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/forecast.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "forecast.stale": {
+      "thresholds": {
+        "trained_lag_days_gt": 1
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/forecast.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "inventory.shortfall": {
+      "thresholds": {
+        "shortfall_qty_milli_gt": 0,
+        "lead_days": 2
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "inventory.waste_spike": {
+      "thresholds": {
+        "waste_vs_median_bp_gte": 15000,
+        "excess_minor_gte": 150000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "inventory.expiry_risk": {
+      "thresholds": {
+        "days_to_expiry_lte": 3,
+        "sku_days_to_expiry_lte": 7,
+        "at_risk_minor_gte": 50000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "inventory.shrinkage": {
+      "thresholds": {
+        "loss_share_bp_gte": 200,
+        "loss_minor_gte": 200000,
+        "window_days": 30
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists submitted stock counts (pack §4 names no listing window); a re-listed count re-detects into its open finding"
+      ]
+    },
+    "inventory.dead_stock": {
+      "thresholds": {
+        "days": 60,
+        "value_minor_gte": 100000,
+        "medium_value_minor_gte": 1000000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "purchasing.price_creep": {
+      "thresholds": {
+        "creep_bp_gte": 500,
+        "observations_gte": 2
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "purchasing.overbilled": {
+      "thresholds": {
+        "overbilled_minor_gte": 10000,
+        "window_days": 30
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists invoices (pack §4 names no listing window); a re-listed invoice re-detects into its open finding"
+      ]
+    },
+    "purchasing.near_duplicate_invoice": {
+      "thresholds": {
+        "days_apart_lte": 7,
+        "window_days": 30
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/inventory-purchasing.md §4 (D-1); no repo doc fixes these values",
+        "INFERENCE (W3.2 integration): window_days 30 — how far back the driver lists invoices (pack §4 names no listing window); a re-listed invoice re-detects into its open finding"
+      ]
+    },
+    "kitchen.ticket_drift": {
+      "thresholds": {
+        "drift_bp_gte": 2500,
+        "tickets_now_gte": 30,
+        "load_ratio_bp_lt": 13000,
+        "medium_p80_gap_sec_gte": 300
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/kitchen.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "kitchen.remakes": {
+      "thresholds": {
+        "remake_minor_gte": 100000,
+        "remake_share_bp_gte": 200,
+        "window_days": 7
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/kitchen.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "kitchen.overprep": {
+      "thresholds": {
+        "overprep_vs_median_bp_gte": 15000,
+        "overprep_minor_gte": 100000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/kitchen.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "kitchen.prep_time_gap": {
+      "thresholds": {
+        "abs_gap_sec_gte": 180,
+        "tickets_gte": 50,
+        "window_days": 14
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/kitchen.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "market.event_ahead": {
+      "thresholds": {
+        "days_ahead_lte": 7,
+        "abs_uplift_bp_gte": 2000,
+        "occurrences_gte": 2,
+        "unreflected_band_bp": 500
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/market-strategy.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "market.competitor_undercut": {
+      "thresholds": {
+        "gap_bp_gte": 1000,
+        "units_rank_lte": 20,
+        "observations_gte": 2,
+        "window_days": 30,
+        "medium_units_change_bp_lte": -1500
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/market-strategy.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "market.goal_off_track": {
+      "thresholds": {
+        "pace_bp_lt": 7000,
+        "elapsed_bp_gte": 5000,
+        "high_elapsed_bp_gte": 8000
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/market-strategy.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "people.overtime_drift": {
+      "thresholds": {
+        "extra_min_gte": 600,
+        "window_weeks": 4
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/people.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "people.overstaffed_slot": {
+      "thresholds": {
+        "attended_vs_needed_bp_gte": 15000,
+        "slots_gte": 4,
+        "slots_window": 6
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/people.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "people.labour_pct_high": {
+      "thresholds": {
+        "default_target_bp": 3500,
+        "consecutive_weeks": 2
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/people.md §4 (D-1); no repo doc fixes these values"
+      ]
+    },
+    "people.advance_unrecovered": {
+      "thresholds": {
+        "outstanding_minor_gte": 200000,
+        "days_since_given_gt": 60
+      },
+      "_notes": [
+        "INFERENCE: transcribed from docs/plan/packs/people.md §4 (D-1); no repo doc fixes these values"
+      ]
+    }
+  },
+  "chart_of_accounts": [
+    {
+      "code": "1000",
+      "name": "Cash on hand",
+      "type": "asset"
+    },
+    {
+      "code": "1010",
+      "name": "Bank",
+      "type": "asset"
+    },
+    {
+      "code": "1100",
+      "name": "Aggregator receivables",
+      "type": "asset"
+    },
+    {
+      "code": "1110",
+      "name": "Counter sales clearing",
+      "type": "asset"
+    },
+    {
+      "code": "1200",
+      "name": "Inventory",
+      "type": "asset"
+    },
+    {
+      "code": "1250",
+      "name": "Staff advances",
+      "type": "asset"
+    },
+    {
+      "code": "2000",
+      "name": "Supplier payables",
+      "type": "liability"
+    },
+    {
+      "code": "2050",
+      "name": "Goods received not invoiced",
+      "type": "liability"
+    },
+    {
+      "code": "2100",
+      "name": "Output GST payable",
+      "type": "liability"
+    },
+    {
+      "code": "3000",
+      "name": "Owner's equity",
+      "type": "equity"
+    },
+    {
+      "code": "4000",
+      "name": "Food and beverage sales",
+      "type": "income"
+    },
+    {
+      "code": "4100",
+      "name": "Loyalty redemptions",
+      "type": "income"
+    },
+    {
+      "code": "4900",
+      "name": "Cash rounding",
+      "type": "income"
+    },
+    {
+      "code": "5000",
+      "name": "Cost of goods sold",
+      "type": "expense"
+    },
+    {
+      "code": "5100",
+      "name": "Wastage",
+      "type": "expense"
+    },
+    {
+      "code": "6000",
+      "name": "Aggregator commission",
+      "type": "expense"
+    },
+    {
+      "code": "6010",
+      "name": "Aggregator ads and promotions",
+      "type": "expense"
+    },
+    {
+      "code": "6100",
+      "name": "Rent",
+      "type": "expense"
+    },
+    {
+      "code": "6200",
+      "name": "Utilities",
+      "type": "expense"
+    },
+    {
+      "code": "6300",
+      "name": "Salaries and wages",
+      "type": "expense"
+    },
+    {
+      "code": "6400",
+      "name": "Payment fees",
+      "type": "expense"
+    },
+    {
+      "code": "6900",
+      "name": "Other operating expenses",
+      "type": "expense"
+    }
+  ],
+  "_unverified": [
+    "Sec 9(5) treatment is cited from a secondary source (R2); aggregator orders are excluded from the restaurant’s own GST liability on that basis",
+    "cash_rounding_minor 100 (round-off to the nearest rupee on cash bills) is INFERENCE (orchestrator ruling #59), not a sourced rule"
+  ]
+}

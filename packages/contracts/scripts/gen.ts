@@ -112,6 +112,8 @@ const SECURITY: Record<Route["auth"], Json[]> = {
   identity: [{ memberToken: [] }],
   intel: [{ runToken: [], serviceCredential: [] }],
   storefront: [{ storefrontKey: [] }, { storefrontKey: [], customerToken: [] }],
+  // An empty list is "no authentication" in OpenAPI; an omitted `security` would inherit, so it is explicit.
+  public: [],
 };
 
 function operation(r: Route): Json {
@@ -222,6 +224,12 @@ export function createMunimClient(opts: MunimClientOptions): MunimClient {
     },
   });
   return client;
+}
+
+/** Client for \`auth: "public"\` routes (the Munim Cares network pages): sends no token, tenant or key, so a browser or the
+ *  marketing site cannot leak one by accident. */
+export function createPublicClient(opts: { baseUrl: string; fetch?: typeof fetch }): MunimClient {
+  return createClient<paths>({ baseUrl: opts.baseUrl, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
 }
 
 /** True when a command response is a replay of an earlier identical request. */

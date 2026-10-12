@@ -188,16 +188,16 @@ describe("other config targets", () => {
 
   it("country pack: a new version needs a future start and the next version number; the schema is enforced", async () => {
     const packs = await (await call("GET", "/platform/v1/country-packs", OP1)).json();
-    expect(packs.items.map((p: { code: string; version: number }) => `${p.code}${p.version}`).sort()).toEqual(["AU3", "IN3"]);
-    const cur = await (await call("GET", "/platform/v1/country-packs/IN/3", OP1)).json();
+    expect(packs.items.map((p: { code: string; version: number }) => `${p.code}${p.version}`).sort()).toEqual(["AU4", "IN4"]); // v4: the optional Cares block (ADR-015 §6)
+    const cur = await (await call("GET", "/platform/v1/country-packs/IN/4", OP1)).json();
     expect(cur.doc.code).toBe("IN");
-    const doc = { ...cur.doc, version: 4, effective_from: "2027-04-01" };
+    const doc = { ...cur.doc, version: 5, effective_from: "2027-04-01" };
     expect((await propose("country_pack:IN", { effective_from: "2020-01-01", doc: { ...doc, effective_from: "2020-01-01" } })).status).toBe(422); // past
     expect((await propose("country_pack:IN", { effective_from: "2027-04-01", doc: { ...doc, currency: "x" } })).status).toBe(422); // schema
     const d = await (await propose("country_pack:IN", { effective_from: "2027-04-01", doc })).json();
     expect((await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {})).status).toBe(200);
-    expect((await db.admin("SELECT version FROM platform.country_pack WHERE code = 'IN' ORDER BY version")).rows.map((r) => r.version)).toEqual([3, 4]);
-    const skip = await (await propose("country_pack:IN", { effective_from: "2027-05-01", doc: { ...doc, version: 6, effective_from: "2027-05-01" } })).json();
+    expect((await db.admin("SELECT version FROM platform.country_pack WHERE code = 'IN' ORDER BY version")).rows.map((r) => r.version)).toEqual([4, 5]);
+    const skip = await (await propose("country_pack:IN", { effective_from: "2027-05-01", doc: { ...doc, version: 7, effective_from: "2027-05-01" } })).json();
     expect((await call("POST", `/platform/v1/config-drafts/${skip.id}:approve`, OP1, {})).status).toBe(409);
   });
 
@@ -206,7 +206,8 @@ describe("other config targets", () => {
     await call("POST", `/platform/v1/config-drafts/${d.id}:approve`, OP1, {});
     expect((await (await call("GET", "/platform/v1/plans", OP1)).json()).items).toEqual([expect.objectContaining({ code: "core", limits: { outlets: 3 } })]);
     const ops = await (await call("GET", "/platform/v1/operators", OP1)).json();
-    expect(ops.items.map((o: { email: string }) => o.email)).toEqual(["ops1@example.test", "ops2@example.test"]);
+    // + the world's operator: since 0028 it approves the world's Cares enablement draft (db/src/world.ts addCares).
+    expect(ops.items.map((o: { email: string }) => o.email)).toEqual(["ops1@example.test", "ops2@example.test", "world-operator@example.test"]);
     expect(JSON.stringify(ops)).not.toContain("idp_sub");
   });
 
@@ -287,6 +288,15 @@ describe("operator snapshots (R40 C4)", () => {
     const refused = await call("POST", "/platform/v1/snapshots", OP1, { tenant_id: A.tenant, template_id: "inventory.below_reorder", params: {} });
     expect(refused.status).toBe(404);
     expect((await call("POST", "/platform/v1/snapshots", OP1, { tenant_id: uuidv7(), template_id: "platform.tenant_outlets", params: {} })).status).toBe(404);
+  });
+  it("refuses the network impact template (ADR-015 §2.3: minted only into platform.network_snapshot) — 404, no tenant snapshot row", async () => {
+    const count = async () => Number((await db.admin("SELECT count(*) AS n FROM evidence.snapshot WHERE tenant_id = $1 AND template_id = 'platform.cares_network_impact'", [A.tenant])).rows[0]!.n);
+    const before = await count();
+    const r = await call("POST", "/platform/v1/snapshots", OP1,
+      { tenant_id: A.tenant, template_id: "platform.cares_network_impact", params: { from: "2026-10-01", to: "2026-10-31", city_code: null } });
+    expect(r.status).toBe(404);
+    expect(await count()).toBe(before);
+    expect(before).toBe(0);
   });
 });
 

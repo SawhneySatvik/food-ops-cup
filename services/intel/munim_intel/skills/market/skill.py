@@ -28,7 +28,8 @@ INSTRUCTIONS_MD = (
     "insufficient_history. Never predict success.\n"
     "- A competitor price gap is a prompt to review a price, never a price proposal.\n"
     "- A goal proposal takes its target from a goal_baseline cell; a task proposal names the finding it answers. "
-    "A proposal changes nothing until a named person approves it."
+    "A proposal changes nothing until a named person approves it.\n"
+    "- Cares figures go to simulated recipients and are measured on synthetic data; meals are cooked portions only."
 )
 
 READ_TEMPLATES = (
@@ -39,6 +40,9 @@ READ_TEMPLATES = (
     "market.goal_progress",
     "market.goal_baseline",
     "market.goals",
+    # ADR-015 §4: the Cares listings and impact report (0028).
+    "cares.listings",
+    "cares.impact",
 )
 DRAFTABLES = ("goals.goal.create.v1", "goals.task.create.v1")
 #: The pack §7 refusals this skill names.

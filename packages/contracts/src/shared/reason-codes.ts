@@ -77,6 +77,15 @@ export const W2_REASON_CODES = ["not_applicable", "item_unavailable", "reason_re
 export const W3_REASON_CODES = ["recently_rejected", "mode_above_ceiling", "cap_above_platform_budget", "platform_budget_missing", "assignee_missing",
   "campaign_audience_unscoped", "specialist_needed"] as const;
 
+/** Munim Cares (ADR-015 §1.3): setup, listing, B2B offer and public-route refusals. */
+export const CARES_REASON_CODES = [
+  "cares_not_available", "cares_not_enabled", "cares_not_opted_in", "cares_city_mismatch",
+  "recipient_ineligible", "listing_expired", "qty_exceeds_on_hand", "qty_exceeds_listed", "cooked_hold_exceeded", "line_expired",
+  "no_eligible_recipient", "no_rostered_staff",
+  "offer_not_enabled", "offer_closed", "claim_decided", "claim_received",
+  "rate_limited",
+] as const;
+
 export const REASON_CODES = [
   ...CORE_REASON_CODES,
   ...PACK_REASON_CODES,
@@ -85,6 +94,7 @@ export const REASON_CODES = [
   ...PACK_RULE_REASON_CODES,
   ...W2_REASON_CODES,
   ...W3_REASON_CODES,
+  ...CARES_REASON_CODES,
 ] as const;
 export const ReasonCode = z.enum(REASON_CODES);
 export type ReasonCode = z.infer<typeof ReasonCode>;

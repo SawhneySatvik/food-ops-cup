@@ -1199,6 +1199,583 @@
       ]
     },
     {
+      "name": "core.cares_allocation",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "listing_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "claim_tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "claim_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "buyer_public_name",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "verdict",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "total_minor",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "currency",
+          "type": "character(3)",
+          "not_null": true
+        },
+        {
+          "name": "decided_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_claim",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "offer_tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "offer_listing_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "allocation_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "total_minor",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "currency",
+          "type": "character(3)",
+          "not_null": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_claim_line",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "claim_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "offer_line_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "ingredient_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "qty_milli",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "unit_price_minor",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "expires_on",
+          "type": "date",
+          "not_null": false
+        },
+        {
+          "name": "received_qty_milli",
+          "type": "bigint",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_handover",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "listing_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "allocation_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "handed_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "recorded_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "voided_by",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "void_reason_code",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_handover_line",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "handover_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "listing_line_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "qty_milli",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_listing",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "recipient_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "pickup_from",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "pickup_to",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "pickup_on",
+          "type": "date",
+          "not_null": true
+        },
+        {
+          "name": "published_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_listing_line",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "listing_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "line_no",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "food_kind",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "item_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "ingredient_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "not_null": false
+        },
+        {
+          "name": "qty_milli",
+          "type": "bigint",
+          "not_null": true
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "expires_on",
+          "type": "date",
+          "not_null": false
+        },
+        {
+          "name": "unit_price_minor",
+          "type": "bigint",
+          "not_null": false
+        },
+        {
+          "name": "currency",
+          "type": "character(3)",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_outlet",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,outlet_id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "outlet_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "city_code",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "lat_e6",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "lng_e6",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "pickup_from",
+          "type": "time without time zone",
+          "not_null": true
+        },
+        {
+          "name": "pickup_to",
+          "type": "time without time zone",
+          "not_null": true
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.cares_profile",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "public_name",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "b2b_enabled",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
       "name": "core.channel",
       "tag": "book",
       "tenant": true,
@@ -7351,6 +7928,11 @@
           "name": "origin",
           "type": "jsonb",
           "not_null": true
+        },
+        {
+          "name": "cares_listing_id",
+          "type": "uuid",
+          "not_null": false
         }
       ]
     },
@@ -9405,6 +9987,155 @@
       ]
     },
     {
+      "name": "platform.cares_city",
+      "tag": null,
+      "tenant": false,
+      "primary_key": "{code}",
+      "columns": [
+        {
+          "name": "code",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "country_code",
+          "type": "character(2)",
+          "not_null": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "platform.cares_enablement",
+      "tag": null,
+      "tenant": true,
+      "primary_key": "{tenant_id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "config_draft_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "platform.cares_recipient",
+      "tag": null,
+      "tenant": false,
+      "primary_key": "{id}",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "city_code",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "simulated",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "accepts_cooked",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "accepts_raw",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "accepts_packaged",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "capacity_kg_per_day",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "capacity_portions_per_day",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "receiving_from",
+          "type": "time without time zone",
+          "not_null": true
+        },
+        {
+          "name": "receiving_to",
+          "type": "time without time zone",
+          "not_null": true
+        },
+        {
+          "name": "lat_e6",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "lng_e6",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        }
+      ]
+    },
+    {
       "name": "platform.config_draft",
       "tag": null,
       "tenant": false,
@@ -9615,6 +10346,69 @@
         {
           "name": "price_currency",
           "type": "character(3)",
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "name": "platform.network_snapshot",
+      "tag": null,
+      "tenant": false,
+      "primary_key": "{id}",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "template_id",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "template_version",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "params",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "rows",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "row_count",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "minted_by_operator_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "not_null": false
+        },
+        {
+          "name": "publish_draft_id",
+          "type": "uuid",
           "not_null": false
         }
       ]
@@ -10023,6 +10817,160 @@
         "to": "evidence.snapshot",
         "from_cols": "{tenant_id,segment_snapshot_id}",
         "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_allocation_tenant_id_decided_by_fkey",
+        "from": "core.cares_allocation",
+        "to": "core.member",
+        "from_cols": "{tenant_id,decided_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_allocation_tenant_id_listing_id_outlet_id_fkey",
+        "from": "core.cares_allocation",
+        "to": "core.cares_listing",
+        "from_cols": "{tenant_id,listing_id,outlet_id}",
+        "to_cols": "{tenant_id,id,outlet_id}"
+      },
+      {
+        "name": "cares_claim_tenant_id_created_by_fkey",
+        "from": "core.cares_claim",
+        "to": "core.member",
+        "from_cols": "{tenant_id,created_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_claim_tenant_id_outlet_id_fkey",
+        "from": "core.cares_claim",
+        "to": "core.cares_outlet",
+        "from_cols": "{tenant_id,outlet_id}",
+        "to_cols": "{tenant_id,outlet_id}"
+      },
+      {
+        "name": "cares_claim_line_tenant_id_claim_id_fkey",
+        "from": "core.cares_claim_line",
+        "to": "core.cares_claim",
+        "from_cols": "{tenant_id,claim_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_claim_line_tenant_id_ingredient_id_fkey",
+        "from": "core.cares_claim_line",
+        "to": "core.ingredient",
+        "from_cols": "{tenant_id,ingredient_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_handover_tenant_id_allocation_id_listing_id_fkey",
+        "from": "core.cares_handover",
+        "to": "core.cares_allocation",
+        "from_cols": "{tenant_id,allocation_id,listing_id}",
+        "to_cols": "{tenant_id,id,listing_id}"
+      },
+      {
+        "name": "cares_handover_tenant_id_listing_id_outlet_id_fkey",
+        "from": "core.cares_handover",
+        "to": "core.cares_listing",
+        "from_cols": "{tenant_id,listing_id,outlet_id}",
+        "to_cols": "{tenant_id,id,outlet_id}"
+      },
+      {
+        "name": "cares_handover_tenant_id_recorded_by_fkey",
+        "from": "core.cares_handover",
+        "to": "core.member",
+        "from_cols": "{tenant_id,recorded_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_handover_tenant_id_voided_by_fkey",
+        "from": "core.cares_handover",
+        "to": "core.member",
+        "from_cols": "{tenant_id,voided_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_handover_line_tenant_id_handover_id_fkey",
+        "from": "core.cares_handover_line",
+        "to": "core.cares_handover",
+        "from_cols": "{tenant_id,handover_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_handover_line_tenant_id_listing_line_id_fkey",
+        "from": "core.cares_handover_line",
+        "to": "core.cares_listing_line",
+        "from_cols": "{tenant_id,listing_line_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_listing_recipient_id_fkey",
+        "from": "core.cares_listing",
+        "to": "platform.cares_recipient",
+        "from_cols": "{recipient_id}",
+        "to_cols": "{id}"
+      },
+      {
+        "name": "cares_listing_tenant_id_outlet_id_fkey",
+        "from": "core.cares_listing",
+        "to": "core.cares_outlet",
+        "from_cols": "{tenant_id,outlet_id}",
+        "to_cols": "{tenant_id,outlet_id}"
+      },
+      {
+        "name": "cares_listing_tenant_id_published_by_fkey",
+        "from": "core.cares_listing",
+        "to": "core.member",
+        "from_cols": "{tenant_id,published_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_listing_line_tenant_id_batch_id_fkey",
+        "from": "core.cares_listing_line",
+        "to": "core.batch",
+        "from_cols": "{tenant_id,batch_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_listing_line_tenant_id_ingredient_id_fkey",
+        "from": "core.cares_listing_line",
+        "to": "core.ingredient",
+        "from_cols": "{tenant_id,ingredient_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_listing_line_tenant_id_item_id_fkey",
+        "from": "core.cares_listing_line",
+        "to": "core.item",
+        "from_cols": "{tenant_id,item_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_listing_line_tenant_id_listing_id_fkey",
+        "from": "core.cares_listing_line",
+        "to": "core.cares_listing",
+        "from_cols": "{tenant_id,listing_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_outlet_city_code_fkey",
+        "from": "core.cares_outlet",
+        "to": "platform.cares_city",
+        "from_cols": "{city_code}",
+        "to_cols": "{code}"
+      },
+      {
+        "name": "cares_outlet_tenant_id_outlet_id_fkey",
+        "from": "core.cares_outlet",
+        "to": "core.outlet",
+        "from_cols": "{tenant_id,outlet_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "cares_profile_tenant_id_fkey",
+        "from": "core.cares_profile",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
       },
       {
         "name": "channel_tenant_id_fkey",
@@ -11649,6 +12597,13 @@
         "to_cols": "{tenant_id,id}"
       },
       {
+        "name": "task_cares_listing_fk",
+        "from": "core.task",
+        "to": "core.cares_listing",
+        "from_cols": "{tenant_id,cares_listing_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
         "name": "task_tenant_id_assignee_member_id_fkey",
         "from": "core.task",
         "to": "core.member",
@@ -12293,6 +13248,27 @@
         "to_cols": "{tenant_id,id}"
       },
       {
+        "name": "cares_enablement_config_draft_id_fkey",
+        "from": "platform.cares_enablement",
+        "to": "platform.config_draft",
+        "from_cols": "{config_draft_id}",
+        "to_cols": "{id}"
+      },
+      {
+        "name": "cares_enablement_tenant_id_fkey",
+        "from": "platform.cares_enablement",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "cares_recipient_city_code_fkey",
+        "from": "platform.cares_recipient",
+        "to": "platform.cares_city",
+        "from_cols": "{city_code}",
+        "to_cols": "{code}"
+      },
+      {
         "name": "config_draft_decided_by_fkey",
         "from": "platform.config_draft",
         "to": "platform.operator",
@@ -12305,6 +13281,27 @@
         "to": "core.tenant",
         "from_cols": "{tenant_id}",
         "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "network_snapshot_minted_by_operator_id_fkey",
+        "from": "platform.network_snapshot",
+        "to": "platform.operator",
+        "from_cols": "{minted_by_operator_id}",
+        "to_cols": "{id}"
+      },
+      {
+        "name": "network_snapshot_publish_draft_id_fkey",
+        "from": "platform.network_snapshot",
+        "to": "platform.config_draft",
+        "from_cols": "{publish_draft_id}",
+        "to_cols": "{id}"
+      },
+      {
+        "name": "network_snapshot_template_id_template_version_fkey",
+        "from": "platform.network_snapshot",
+        "to": "evidence.snapshot_template",
+        "from_cols": "{template_id,template_version}",
+        "to_cols": "{id,version}"
       },
       {
         "name": "platform_audit_config_draft_id_fkey",
@@ -12361,6 +13358,386 @@
     ]
   },
   "functions": [
+    {
+      "id": "cares.impact",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": true,
+      "tool": "read_cares_impact",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "handovers",
+          "type": "integer",
+          "numeric_source": "count:core.cares_handover"
+        },
+        {
+          "name": "portions_milli",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "weight_g",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "volume_ml",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "units_milli",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "value_at_cost_minor",
+          "type": "integer",
+          "numeric_source": [
+            "core.stock_movement.qty_milli",
+            "core.stock_movement.unit_cost_per_1000_minor"
+          ]
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "from": {
+            "type": "string",
+            "description": "A calendar date, YYYY-MM-DD."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "to",
+          "from",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "cares.listings",
+      "version": 1,
+      "min_role": "staff",
+      "agent_exposed": true,
+      "tool": "read_cares_listings",
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(published|allocated|closed|withdrawn)$"
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "listing_id",
+          "type": "uuid"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        },
+        {
+          "name": "recipient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "pickup_from",
+          "type": "timestamptz"
+        },
+        {
+          "name": "pickup_to",
+          "type": "timestamptz"
+        },
+        {
+          "name": "pickup_on",
+          "type": "date"
+        },
+        {
+          "name": "pickup_weekday",
+          "type": "text"
+        },
+        {
+          "name": "pickup_slot_start",
+          "type": "text"
+        },
+        {
+          "name": "lines",
+          "type": "integer",
+          "numeric_source": "count:core.cares_listing_line"
+        }
+      ],
+      "model_schema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Text matching ^(published|allocated|closed|withdrawn)$."
+          },
+          "outlet_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Handle of the snapshot cell holding this id, e.g. S1.r0.<column>. Never type an id."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page of rows to show, 0 first (50 rows a page). Re-reads the stored snapshot; past page 2, narrow the parameters instead."
+          }
+        },
+        "required": [
+          "status",
+          "outlet_id",
+          "page"
+        ],
+        "additionalProperties": false
+      },
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "cares.pickup_crew",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "listing_id"
+        ],
+        "properties": {
+          "outlet_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "listing_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "staff_id",
+          "type": "uuid"
+        },
+        {
+          "name": "member_id",
+          "type": "uuid"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": false
+        },
+        {
+          "path": "/listing_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
+    {
+      "id": "cares.recipient_match",
+      "version": 1,
+      "min_role": "manager",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "outlet_id",
+          "needs_cooked",
+          "needs_raw",
+          "needs_packaged",
+          "qty_milli",
+          "unit",
+          "expires_on"
+        ],
+        "properties": {
+          "unit": {
+            "type": "string",
+            "pattern": "^[a-z][a-z_]{0,15}$"
+          },
+          "needs_raw": {
+            "type": "boolean"
+          },
+          "outlet_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "qty_milli": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expires_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "needs_cooked": {
+            "type": "boolean"
+          },
+          "needs_packaged": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "recipient_id",
+          "type": "uuid"
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "simulated",
+          "type": "boolean"
+        },
+        {
+          "name": "distance_m",
+          "type": "integer",
+          "numeric_source": [
+            "core.cares_outlet.lat_e6",
+            "core.cares_outlet.lng_e6",
+            "platform.cares_recipient.lat_e6",
+            "platform.cares_recipient.lng_e6"
+          ]
+        },
+        {
+          "name": "capacity_fit",
+          "type": "boolean"
+        },
+        {
+          "name": "overlap_min",
+          "type": "integer",
+          "numeric_source": [
+            "core.cares_outlet.pickup_from",
+            "core.cares_outlet.pickup_to",
+            "platform.cares_recipient.receiving_from",
+            "platform.cares_recipient.receiving_to"
+          ]
+        },
+        {
+          "name": "pickup_from",
+          "type": "timestamptz"
+        },
+        {
+          "name": "pickup_to",
+          "type": "timestamptz"
+        },
+        {
+          "name": "pickup_on",
+          "type": "date"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": false
+        }
+      ],
+      "optional": []
+    },
     {
       "id": "catalogue.cost_drift",
       "version": 2,
@@ -18903,6 +20280,77 @@
       "optional": []
     },
     {
+      "id": "platform.cares_network_impact",
+      "version": 1,
+      "min_role": "operator",
+      "agent_exposed": false,
+      "tool": null,
+      "params_schema": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "city_code"
+        ],
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "city_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "columns": [
+        {
+          "name": "city_code",
+          "type": "text"
+        },
+        {
+          "name": "businesses",
+          "type": "integer",
+          "numeric_source": "count:core.cares_profile"
+        },
+        {
+          "name": "donations",
+          "type": "integer",
+          "numeric_source": "count:core.cares_handover"
+        },
+        {
+          "name": "meals_portions_milli",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "weight_g",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "volume_ml",
+          "type": "integer",
+          "numeric_source": "core.cares_handover_line.qty_milli"
+        },
+        {
+          "name": "all_synthetic",
+          "type": "boolean"
+        }
+      ],
+      "model_schema": null,
+      "leaves": [],
+      "optional": []
+    },
+    {
       "id": "platform.spend_by_tenant",
       "version": 1,
       "min_role": "operator",
@@ -19437,6 +20885,75 @@
     }
   ],
   "actions": [
+    {
+      "command_type": "cares.listing.publish.v1",
+      "contract": "proposal.cares.listing.publish.v1",
+      "tool": null,
+      "agent_exposed": false,
+      "stages": [
+        "preview",
+        "approve",
+        "commit"
+      ],
+      "auto_apply": false,
+      "authority": {
+        "allowed_roles": [
+          "judge",
+          "owner"
+        ],
+        "scope": "outlet",
+        "max_amount_minor": null
+      },
+      "model_schema": null,
+      "leaves": [
+        {
+          "path": "/listing_id",
+          "kind": "minted",
+          "nullable": false
+        },
+        {
+          "path": "/outlet_id",
+          "kind": "entity",
+          "nullable": false
+        },
+        {
+          "path": "/recipient_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/line_id",
+          "kind": "minted",
+          "nullable": false
+        },
+        {
+          "path": "/lines/*/item_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/ingredient_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/batch_id",
+          "kind": "entity",
+          "nullable": true
+        },
+        {
+          "path": "/lines/*/qty_milli",
+          "kind": "ref",
+          "nullable": false
+        },
+        {
+          "path": "/lines/*/unit_price_minor",
+          "kind": "ref",
+          "nullable": true
+        }
+      ],
+      "optional": []
+    },
     {
       "command_type": "catalogue.coupon.set.v1",
       "contract": "proposal.catalogue.coupon.set.v1",
@@ -20621,6 +22138,11 @@
         {
           "path": "/finding_id",
           "kind": "finding",
+          "nullable": true
+        },
+        {
+          "path": "/cares_listing_id",
+          "kind": "fixed",
           "nullable": true
         }
       ],
@@ -21989,7 +23511,9 @@
         "market.viability",
         "market.goal_progress",
         "market.goal_baseline",
-        "market.goals"
+        "market.goals",
+        "cares.listings",
+        "cares.impact"
       ],
       "templates_pending": [],
       "draftables": [
@@ -22011,7 +23535,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "a4cd4e9463aaf48d4387b5ecb2fced0c833aa64596400762beb2d68108edb3b3",
+      "sha256": "d18390fc8cbd909a00f373be23572d0e724a8f783d3e75441716da2ce089423c",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -22040,35 +23564,38 @@
         "db/migrations/0025_w3_close.sql": "f8f4905e79d0075f17e83dbaaf16ee13974a9ee3a8079b9bd3944cd71c15f044",
         "db/migrations/0026_w3_founder_decisions.sql": "630263c2987034b46683c3d78ef64ce662af12a09a238dc71b227fe99f2bc7bf",
         "db/migrations/0027_t098_auto_ceiling_downgrade.sql": "6ccaf968169f7bcb98b920846d900c78bdefcf7a321cf0a562b1b214cc1dd861",
+        "db/migrations/0028_cares.sql": "1bb37978712bba947ed66ebb1daf8412f96ac238295e541b01ee98a68c7c4ca7",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
-        "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
+        "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
         "packages/contracts/src/ai_policy/index.ts": "c500bc3c8a46b6bc4f170d8c84bc6faf1a3a92bf6ecc21f261623cafd538c4c3",
         "packages/contracts/src/approvals/index.ts": "6eb93a5fa59b6b69a3ccb466429f8028223518b4495b7ae6c16c1902f98d56f0",
+        "packages/contracts/src/cares/events.ts": "af4fb897186592cad810cc4b75d45f80a55f04ed9f28dedf0fdb9b47d26419c7",
+        "packages/contracts/src/cares/index.ts": "03d94cad8a9b41fcfd11e37cda01937095ca77f324e5e80b9071d0e43592d95e",
         "packages/contracts/src/catalogue/index.ts": "d8d07df230397c93b0218d50b7c06dee0acf848efe73626deb0317821a71ff44",
         "packages/contracts/src/catalogue/read-routes.ts": "65e2781fd30d130e750d914241bafd5c8e6ec197c17663bf28d2143b0b65fb96",
         "packages/contracts/src/compliance/index.ts": "4e6db3e379d9df14cce7b7f03a3e9f0301d3ab0803bdd0b81a60e250e370aa0b",
         "packages/contracts/src/customers/index.ts": "16cdc538740cf838f90600a590a45516eddff19d9a3630c0b376090869c00b18",
         "packages/contracts/src/customers/read-routes.ts": "b7c48d8e7cd4c2af5eb185461132309382987d090a651dd20cf80f2b6dca202c",
-        "packages/contracts/src/events/index.ts": "1eeb49f27f475ab12caacfa5f65bedd7c3d76483c4f6a8f3425214db0bf5eecb",
+        "packages/contracts/src/events/index.ts": "5830d101c28e20740bc078d9066a293a2c508ea330ad707c8949da091e9b4157",
         "packages/contracts/src/finance/index.ts": "beecd41fc6d3f16edf799eb9bf5cdd04bf97750315c92bc13b62ff253825f3e4",
         "packages/contracts/src/finance/read-routes.ts": "9e7260d74eebc6c4e03eeaf1a84d1e86ccf13ffebf243d11cb232217d27da4a7",
         "packages/contracts/src/findings/index.ts": "33ca0bb6cb4f8ec360ca7c0792c3479e2d2bff491cd3362f41c0c8583d72df03",
-        "packages/contracts/src/goals/index.ts": "a175c1db84787f86284324852b30af8d37ed3d5de0ee2786473f53a246a48bc2",
+        "packages/contracts/src/goals/index.ts": "87c3adf523aac41bab92d698df63a1f78f4259d05f184a454337126256ab595a",
         "packages/contracts/src/imports/index.ts": "80d0626ad2278b844d26641cc2d698bbb2bcfa743b408e8663b27f37e7abe5a5",
         "packages/contracts/src/imports/read-routes.ts": "91d7c3ec920f540ad1c3c02e1972ceec3c74baebcfdd6b3dde4ac7423d866baf",
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
         "packages/contracts/src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
-        "packages/contracts/src/intel/specialists.ts": "c9950f7680acf28e9f026fc4bae836f21b7f7bf74553257f3be14bf0a7d03d28",
+        "packages/contracts/src/intel/specialists.ts": "d8b581ddfb7e9aa688c03e1042a5a1825c870feb845b2e65b7971a3e26364d93",
         "packages/contracts/src/internal/index.ts": "e39f052df45c7605f29571eac69469d2f5e0470cb2f28190e4a0d8ac8ae9cc95",
-        "packages/contracts/src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
-        "packages/contracts/src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
+        "packages/contracts/src/inventory/index.ts": "6901a0a716f29fb209f44dd6460e095ce963691507f9c9741a355dc015d77a34",
+        "packages/contracts/src/inventory/read-routes.ts": "71ee24cd61ddba899d309547c0ab12383455baec5766ddfc53f807aed4e8dda4",
         "packages/contracts/src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
         "packages/contracts/src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
-        "packages/contracts/src/ontology/actions.ts": "666b9527395a3a41d3117b1fec21549de22d7a2064d780089254403b42e5007f",
+        "packages/contracts/src/ontology/actions.ts": "8fbde995feb9f2f0f78b61a8467be42491879f35eccd7781190ef01db0ef4162",
         "packages/contracts/src/ontology/lint.ts": "6bf298e6a9773960c53936e6aff4396e4a5d0af6f80cb278bffd7bb565d26005",
         "packages/contracts/src/ontology/stamp.ts": "9ceb542b08ee8c73f39d6f66e290193dfa081412d295b8a0ceddac8dec117c2e",
         "packages/contracts/src/ontology/transform.ts": "8124bc743d70aa8fbd0ee41f29b2ef8d0be4010ae323935588dde85237709cd5",
@@ -22076,7 +23603,7 @@
         "packages/contracts/src/orders/index.ts": "5d4b5476cca384035d330e6798077636dd4e702d554a75fda6a5f8b882efd4c7",
         "packages/contracts/src/orders/read-routes.ts": "95fbfb9fce52c0c76437ff81fd1dc8188ffcbbfde7cf144c6d52c21cbaa4f1ec",
         "packages/contracts/src/orders/routes.ts": "6cfc6229fc77ecb196e755895b515b6901bb84d2551ae5a0c08117cb8d1233f6",
-        "packages/contracts/src/packs/index.ts": "fefeb6495c4655f1e92da5e34991a7b7f4813fcf38d29c1d96bb79f07baf0e3d",
+        "packages/contracts/src/packs/index.ts": "2054eacc3dc40d15d312c34e377ea7ffeaceec644a235c14ae3c748c80d75b45",
         "packages/contracts/src/people/index.ts": "8670a3edde4f6b56bbb832e39c18774646875ae252ff1b3e0a54963fcb721a7f",
         "packages/contracts/src/people/read-routes.ts": "97b9a114de5099ff5c70ab74afb071b838922436ce1b1feafd2d437e33607a8a",
         "packages/contracts/src/platform/index.ts": "14ae9957f97134e9a7329984a40bfcaa3a3f472a65c66dfb41ae14044d738877",
@@ -22085,7 +23612,7 @@
         "packages/contracts/src/registry.ts": "3bf9e3d6c17675f4ea3877cfcb94ef18f9b97cbd75b7d9a1bdd92291f1330b42",
         "packages/contracts/src/shared/cloudevents.ts": "33700ec7cfef94d50183f19f8175c31fdff87adfa9e047a550e40488d724088f",
         "packages/contracts/src/shared/command.ts": "54b44302d0fa5e1f54eb9dafc18cec2bcb8e68b3afdce15dc82fe2c2bfc68b38",
-        "packages/contracts/src/shared/draft.ts": "d6a23f16c1742663b19e5f0be395c821243adbcb4921d1cdca66bb3bed950a0c",
+        "packages/contracts/src/shared/draft.ts": "d9821d30952127f712a6f81f66a364aaedf187ac0afe5f9b7c130cfb2767d846",
         "packages/contracts/src/shared/draftables.ts": "4bcaa87ccae30b15f7d37ce3c274072456eea44cf25754ad9afb99d0a4bb142c",
         "packages/contracts/src/shared/envelope.ts": "4cafcbcc6c2d4e7daceed396b117aeaa80b118649dac4d342e85ac1b38a1c8f9",
         "packages/contracts/src/shared/error.ts": "43f77505beb12ce0d24ca5ed0411de141cafa2b3a02ef86730c36d1464f5d8da",
@@ -22093,9 +23620,9 @@
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
         "packages/contracts/src/shared/primitives.ts": "97b9d196f7f5354c5924e12475ab6f2c7fa79b109e8ce3fb3ab961167bdf7de2",
-        "packages/contracts/src/shared/reason-codes.ts": "d96c8b94f1571826045191e6b5a930e7bbbced1907135fc35763c3c4d1d798af",
+        "packages/contracts/src/shared/reason-codes.ts": "02d9e21a941de3fb13f9398d462f172736ef6ed3184ac12f7f1a792a1100f5dc",
         "packages/contracts/src/shared/refs.ts": "1ca3960ba3c317b909b6dfddf6c73ac16b4d7afd1acbccae8a8405c6ca1c006c",
-        "packages/contracts/src/shared/routes.ts": "e815580adbc060081a30073274af1ae94c0944d854446316479f0d2e27cc327e",
+        "packages/contracts/src/shared/routes.ts": "3ee50d500e88e9edb0902c4a8b13bdf9eda678beaa80b1476079330818526edc",
         "packages/contracts/src/shared/run-token.ts": "0edaf277e73c31a5ea7bc45c16c452e06950dcf17beb9c1cc1007dbab5321097",
         "packages/contracts/src/shared/snapshot.ts": "3d3ca4eda9abae7a51208c8bcc4df616f99001f67499c8793e650a1dacde0e02",
         "packages/contracts/src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
@@ -22106,6 +23633,6 @@
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "c60a7e274bb4264e54f4136996fae5193e9e0d9c5df622d5c9fb37da8905fff1"
+    "body_sha256": "5a7a2b3876ab2accb92e8364eaa5b0b0f5edf92d493cb244fb25728e857f09f5"
   }
 }

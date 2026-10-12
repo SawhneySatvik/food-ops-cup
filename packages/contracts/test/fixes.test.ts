@@ -98,9 +98,8 @@ describe("DB parity (#38 #41 #42)", () => {
     const m = /status\s+text\s+NOT NULL DEFAULT 'queued' CHECK \(status IN \(([^)]+)\)\)/.exec(sql("0004_catalogue_orders_customer.sql"));
     expect([...KitchenTicketStatus.options]).toEqual(m![1]!.split(",").map((x) => x.trim().replaceAll("'", "")));
   });
-  it("movement kinds = core.stock_movement.kind CHECK", () => {
-    const ddl = sql("0005_inventory_store_purchasing.sql").split("CREATE TABLE core.stock_movement")[1]!.split(";")[0]!;
-    const m = /kind\s+text\s+NOT NULL CHECK \(kind IN \(([^)]+)\)\)/.exec(ddl.replace(/\s*\n\s*/g, " "));
+  it("movement kinds = core.stock_movement.kind CHECK (0028 replaced 0005's with the full named list)", () => {
+    const m = /ADD CONSTRAINT stock_movement_kind_check CHECK \(kind IN \(([^)]+)\)\)/.exec(sql("0028_cares.sql").replace(/\s*\n\s*/g, " "));
     expect([...MovementKind.options].sort()).toEqual(m![1]!.split(",").map((x) => x.trim().replaceAll("'", "")).sort());
   });
   it("movement ref_type pattern = core.stock_movement.ref_type CHECK", () => {

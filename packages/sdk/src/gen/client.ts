@@ -42,6 +42,12 @@ export function createMunimClient(opts: MunimClientOptions): MunimClient {
   return client;
 }
 
+/** Client for `auth: "public"` routes (the Munim Cares network pages): sends no token, tenant or key, so a browser or the
+ *  marketing site cannot leak one by accident. */
+export function createPublicClient(opts: { baseUrl: string; fetch?: typeof fetch }): MunimClient {
+  return createClient<paths>({ baseUrl: opts.baseUrl, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+}
+
 /** True when a command response is a replay of an earlier identical request. */
 export const isReplayed = (response: Response): boolean => response.headers.get(REPLAYED_HEADER) === "true";
 
@@ -63,6 +69,31 @@ export const OPERATIONS = [
   "GET /v1/drafts/{id}",
   "POST /v1/drafts/{id}:approve",
   "POST /v1/drafts/{id}:reject",
+  "GET /v1/cares/profile",
+  "POST /v1/cares/profile",
+  "GET /v1/cares/recipients",
+  "GET /v1/cares/listings",
+  "POST /v1/cares/listings",
+  "GET /v1/cares/listings/{id}",
+  "POST /v1/cares/listings/{id}:withdraw",
+  "POST /v1/cares/handovers",
+  "POST /v1/cares/handovers/{id}:void",
+  "GET /v1/cares/market",
+  "GET /v1/cares/claims",
+  "POST /v1/cares/claims",
+  "POST /v1/cares/claims/{id}:cancel",
+  "POST /v1/cares/claims/{id}:close",
+  "POST /v1/cares/claims/{id}:receive",
+  "GET /v1/cares/listings/{id}/claims",
+  "POST /v1/cares/listings/{id}:decide",
+  "GET /v1/cares-network/cities",
+  "GET /v1/cares-network/listings",
+  "GET /v1/cares-network/listings/{id}",
+  "GET /v1/cares-network/impact",
+  "GET /v1/cares-network/snapshots/{id}",
+  "GET /v1/storefront/cares",
+  "POST /platform/v1/network-snapshots",
+  "GET /platform/v1/network-snapshots",
   "GET /v1/catalogue/items",
   "GET /v1/catalogue/recipes",
   "GET /v1/catalogue/prices",

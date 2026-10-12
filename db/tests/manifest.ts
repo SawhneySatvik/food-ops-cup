@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0027 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0028 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -30,6 +30,7 @@ export const MIGRATIONS = [
   "0025_w3_close",
   "0026_w3_founder_decisions",
   "0027_t098_auto_ceiling_downgrade",
+  "0028_cares",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -216,6 +217,20 @@ export const TABLES: Record<string, T> = {
   "core.investigation": op(), // intel.run's scope form on outlet_scope
   "core.investigation_step": op(), // through its investigation
   "core.investigation_grant": op(), // intel.run's scope form on outlet_scope
+  // 0028 (ADR-015 §1): Munim Cares — operator tables (enablement per tenant, as llm_budget) and nine books
+  "platform.cares_city": plain(),
+  "platform.cares_recipient": plain(),
+  "platform.cares_enablement": plain(true),
+  "platform.network_snapshot": plain(),
+  "core.cares_profile": book(),
+  "core.cares_outlet": book(true),
+  "core.cares_listing": book(true),
+  "core.cares_listing_line": book(), // through its listing (PARENT_SCOPED)
+  "core.cares_handover": book(true),
+  "core.cares_handover_line": book(), // through its hand-over (PARENT_SCOPED)
+  "core.cares_claim": book(true),
+  "core.cares_claim_line": book(), // through its claim (PARENT_SCOPED)
+  "core.cares_allocation": book(true),
 };
 
 export const OUR_SCHEMAS = ["core", "evidence", "intel", "platform", "intel_ro", "munim_meta"];
@@ -233,8 +248,10 @@ export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
  *  0012 80, 0014 1, 0015 3, 0016 1 (= 346 through 0019), minus 1 dropped by 0014 (expired_sale_override → order_line, re-added
  *  as its 1) = 345; 0020 adds 20 (ai_thread 2, ai_thread_turn 3, ai_policy 1, ai_budget_cap 1, investigation 3,
  *  investigation_grant 4, investigation_step 5, intel.run.grant_id 1) = 365; 0024 adds 1 (intel.supplier_quote.source_chunk_id
- *  → intel.chunk) = 366. */
-export const EXPECTED_COUNTS = { all: 154, core: 125, book: 94, tenant: 140, outlet: 54, fk: 366 };
+ *  → intel.chunk) = 366; 0028 adds 29 (cares_recipient 1, cares_enablement 2, network_snapshot 3, cares_profile 1, cares_outlet 2,
+ *  cares_listing 3, cares_listing_line 4, cares_handover 3 + the allocation FK added after, cares_handover_line 2, cares_claim 2,
+ *  cares_claim_line 2, cares_allocation 2, task.cares_listing_id 1) = 395. */
+export const EXPECTED_COUNTS = { all: 167, core: 134, book: 103, tenant: 150, outlet: 59, fk: 395 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -284,7 +301,10 @@ export const LEGAL_ORDER_TRANSITIONS = [
 
 /** SECURITY DEFINER / munim_crosstenant-owned objects (03-architecture §1.2). */
 export const CROSSTENANT_OBJECTS = [
-  "core.active_tenants", "core.customer_claim_guest_token", "core.customer_claim_verified_email_guests",
+  "core.active_tenants",
+  // 0028 (ADR-015 §1.5): the five Cares reads.
+  "core.cares_claim_outcome", "core.cares_inbound_claims", "core.cares_market_offers", "core.cares_network_impact", "core.cares_network_listings",
+  "core.customer_claim_guest_token", "core.customer_claim_verified_email_guests",
   "core.customer_erase_merged_guests", "core.memberships_for_sub",
   "core.outbox_claim",
   "core.tenant_for_storefront_key",
@@ -326,6 +346,8 @@ export const TEMPLATES = [
   "intel.investigation_cost_estimate@2",
   // 0026 (R47 D6, D3): labour_vs_demand v2 (per outlet, excess at the extra staff's rate, Σ rows), deal_inputs v3 (shop SKU margin).
   "people.labour_vs_demand@2", "purchasing.deal_inputs@3",
+  // 0028 (ADR-015 §1.6): the Cares templates (four member, one operator).
+  "cares.impact", "cares.listings", "cares.pickup_crew", "cares.recipient_match", "platform.cares_network_impact",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read
@@ -335,6 +357,10 @@ export const PARENT_SCOPED: Record<string, { parent: string; fk: string }> = {
   "core.payroll_draft_line": { parent: "core.payroll_draft", fk: "payroll_draft_id" },
   "core.settlement_line": { parent: "core.settlement", fk: "settlement_id" },
   "core.tip_pool_share": { parent: "core.tip_pool", fk: "tip_pool_id" },
+  // 0028: the Cares lines.
+  "core.cares_listing_line": { parent: "core.cares_listing", fk: "listing_id" },
+  "core.cares_handover_line": { parent: "core.cares_handover", fk: "handover_id" },
+  "core.cares_claim_line": { parent: "core.cares_claim", fk: "claim_id" },
 };
 /** 0019 O1: outlet-scoped tables whose outlet_id may be NULL (a tenant-wide row, visible to every member). */
 export const OUTLET_NULLABLE = [
@@ -372,4 +398,13 @@ export const INTEL_NUMERIC_ALLOW = [
   // 0021, widened by hand: forecast.freshness counts a run's points per outlet and forecast.accuracy counts its days
   // (row counts of the forecast service's output, never a model-typed value; R25).
   "count:intel.forecast_point",
+  // 0028 (ADR-015 §1.6), widened by hand: the operator's simulated-recipient directory (platform-trusted rows, never a model
+  // value) — location for cares.recipient_match distance_m, capacities for the capacity fit, and (beyond the ADR's four,
+  // lane m-d deviation) the receiving hours that overlap_min is computed from.
+  "platform.cares_recipient.lat_e6",
+  "platform.cares_recipient.lng_e6",
+  "platform.cares_recipient.capacity_kg_per_day",
+  "platform.cares_recipient.capacity_portions_per_day",
+  "platform.cares_recipient.receiving_from",
+  "platform.cares_recipient.receiving_to",
 ];

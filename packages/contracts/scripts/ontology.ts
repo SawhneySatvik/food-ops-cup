@@ -34,7 +34,8 @@ const LINEAGE = [
 const FORBIDDEN_PARAM = /tenant|^run_id$|actor/;
 // ADR-014 §5.1: pack templates that are inputs to deterministic code (forecast engine, deal review, duplicate check),
 // never a model tool. Same hand list as packages/contracts/test/specialists.test.ts.
-const NOT_AGENT_EXPOSED_TEMPLATES = ["forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates"];
+// ADR-015: the Cares follow-ups (recipient_match for expiry_risk, pickup_crew for overstaffed_slot) are mapping inputs, not tools.
+const NOT_AGENT_EXPOSED_TEMPLATES = ["forecast.sales_history", "forecast.slot_profile", "purchasing.deal_inputs", "purchasing.invoice_duplicates", "cares.recipient_match", "cares.pickup_crew"];
 const step = (m: string) => console.log(`ontology: ${m}`);
 const fail = (m: string): never => {
   throw new Error(`ontology: ${m}`);
@@ -180,9 +181,12 @@ try {
   for (const s of SPECIALIST_REGISTRY.specialists) {
     const foreign = s.draftables.filter((d) => !exposedActions.has(d));
     if (foreign.length) fail(`specialist ${s.id} proposes non-exposed draftables ${foreign.join(", ")}`);
-    // Workflow draftables (DECISIONS 11 Oct, W3.2) are emitted by code, never by a model: registered, and NOT agent-exposed.
-    const workflow = s.workflow_draftables.filter((d) => !draftable(d) || exposedActions.has(d));
-    if (workflow.length) fail(`specialist ${s.id} lists workflow draftables that are unregistered or agent-exposed: ${workflow.join(", ")}`);
+    // Workflow draftables (DECISIONS 11 Oct, W3.2) are emitted by code, never by this specialist's model: registered, not among its
+    // own propose tools, and agent-exposed only where another specialist proposes them (people's Cares task = goals.task, which
+    // compliance and market propose; ADR-015 §4).
+    const proposedElsewhere = (d: string) => SPECIALIST_REGISTRY.specialists.some((o) => o.id !== s.id && o.draftables.includes(d));
+    const workflow = s.workflow_draftables.filter((d) => !draftable(d) || s.draftables.includes(d) || (exposedActions.has(d) && !proposedElsewhere(d)));
+    if (workflow.length) fail(`specialist ${s.id} lists workflow draftables that are unregistered, its own propose tools, or agent-exposed with no proposer: ${workflow.join(", ")}`);
   }
   const owned = new Set(specialists.flatMap((s) => s.templates));
   step(`unowned agent-exposed templates: ${[...exposedTemplates].filter((t) => !owned.has(t)).join(", ") || "none"}`);

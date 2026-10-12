@@ -156,7 +156,8 @@ async function policyFailures(x: TestDb): Promise<{ checked: number; failures: s
     if (p.chk !== wantChk) failures.push(`${t}: WITH CHECK not as written`);
     if (p.cmd !== "*" || !p.permissive || p.roles.join() !== "public") failures.push(`${t}: cmd=${p.cmd} permissive=${p.permissive} roles=${p.roles}`);
   }
-  const stray = all.filter((p) => !tables.includes(p.t) && p.t !== "platform.llm_budget");
+  // 0028: platform.cares_enablement carries llm_budget's policies (pinned in its own test below).
+  const stray = all.filter((p) => !tables.includes(p.t) && p.t !== "platform.llm_budget" && p.t !== "platform.cares_enablement");
   const budgetCustomer = all.filter((p) => p.t === "platform.llm_budget" && !p.permissive && p.name === "customer_scope");
   if (all.filter((p) => p.t === "platform.llm_budget" && p.name === "guest_scope" && p.qual === NG).length !== 1) failures.push("platform.llm_budget: guest_scope missing");
   if (budgetCustomer.length !== 1 || budgetCustomer[0]!.qual !== NC || budgetCustomer[0]!.chk !== NC) failures.push("platform.llm_budget: customer_scope missing or not deny");
@@ -177,7 +178,7 @@ describe("policy predicates read back as written", () => {
     }, {});
     console.log(`policies: ${r.checked - r.failures.length}/${r.checked} tables in their written form; forms:`, forms);
     expect(r.failures).toEqual([]);
-    expect(r.checked).toBe(TENANT_TABLES.length - 1);
+    expect(r.checked).toBe(TENANT_TABLES.length - 2); // the two platform tenant tables (llm_budget, cares_enablement) are pinned below
   });
 
   test("intel.intel_spend: operators read spend across tenants (budgets), nothing else", async () => {
@@ -190,6 +191,16 @@ describe("policy predicates read back as written", () => {
     expect(ps).toEqual([
       { t: "platform.llm_budget", name: "operator_all", cmd: "*", permissive: true, roles: ["munim_platform"], qual: "true", chk: "true" },
       { t: "platform.llm_budget", name: "tenant_read", cmd: "r", permissive: true, roles: ["munim_core", "munim_svc"], qual: TENANT, chk: null },
+    ]);
+  });
+
+  test("0028 platform.cares_enablement: as llm_budget — operator sees all, core/svc read own tenant only, shoppers denied", async () => {
+    const ps = (await policies(db)).filter((p) => p.t === "platform.cares_enablement");
+    expect(ps).toEqual([
+      { t: "platform.cares_enablement", name: "customer_scope", cmd: "*", permissive: false, roles: ["public"], qual: NC, chk: NC },
+      { t: "platform.cares_enablement", name: "guest_scope", cmd: "*", permissive: false, roles: ["public"], qual: NG, chk: NG },
+      { t: "platform.cares_enablement", name: "operator_all", cmd: "*", permissive: true, roles: ["munim_platform"], qual: "true", chk: "true" },
+      { t: "platform.cares_enablement", name: "tenant_read", cmd: "r", permissive: true, roles: ["munim_core", "munim_svc"], qual: TENANT, chk: null },
     ]);
   });
 

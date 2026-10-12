@@ -1833,6 +1833,2626 @@
         }
       }
     },
+    "/v1/cares/profile": {
+      "get": {
+        "operationId": "getCaresProfile",
+        "summary": "The business's Munim Cares setup: availability, operator enablement, profile and outlet cities",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "setCaresProfile",
+        "summary": "cares.profile.set.v1 — opt in or pause, name the business, set each outlet's city, location and pickup hours",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresProfileSetV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.profile.set.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresProfileSetV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/recipients": {
+      "get": {
+        "operationId": "listCaresRecipients",
+        "summary": "Simulated recipients in the outlet's city",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "outlet",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresRecipients"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/listings": {
+      "get": {
+        "operationId": "listCaresListings",
+        "summary": "Surplus listings and their hand-overs, newest first",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "outlet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "donation",
+                "offer"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "published",
+                "allocated",
+                "closed",
+                "withdrawn"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresListings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "publishCaresListing",
+        "summary": "cares.listing.publish.v1 — publish a donation or an offer (owner or judge; intel may draft it, cooked lines only by the owner's own command)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresListingPublishV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.listing.publish.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresListingPublishV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/listings/{id}": {
+      "get": {
+        "operationId": "getCaresListing",
+        "summary": "One listing with its lines and hand-overs",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresListing"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/listings/{id}:withdraw": {
+      "post": {
+        "operationId": "withdrawCaresListing",
+        "summary": "cares.listing.withdraw.v1 — withdraw a published listing (not after an offer is allocated)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresListingWithdrawV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.listing.withdraw.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresListingWithdrawV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/handovers": {
+      "post": {
+        "operationId": "recordCaresHandover",
+        "summary": "cares.handover.record.v1 — record what was handed over; core derives the stock movements",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresHandoverRecordV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.handover.record.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresHandoverRecordV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/handovers/{id}:void": {
+      "post": {
+        "operationId": "voidCaresHandover",
+        "summary": "cares.handover.void.v1 — void a recorded hand-over with a reason; stock comes back (not after the buyer received)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresHandoverVoidV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.handover.void.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresHandoverVoidV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/market": {
+      "get": {
+        "operationId": "listCaresMarket",
+        "summary": "Other businesses' shared surplus offers in the caller's cities (needs B2B on)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "listing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresMarket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/claims": {
+      "get": {
+        "operationId": "listCaresClaims",
+        "summary": "The buyer's own claims with their outcome",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "outlet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresClaims"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCaresClaim",
+        "summary": "cares.claim.create.v1 — claim every line of an offer at the offered quantity (all-or-nothing); the price is recorded, never processed",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresClaimCreateV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.claim.create.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresClaimCreateV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/claims/{id}:cancel": {
+      "post": {
+        "operationId": "cancelCaresClaim",
+        "summary": "cares.claim.cancel.v1 — cancel a claim before any verdict",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresClaimCancelV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.claim.cancel.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresClaimCancelV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/claims/{id}:close": {
+      "post": {
+        "operationId": "closeCaresClaim",
+        "summary": "cares.claim.close.v1 — close a claim whose outcome is declined",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresClaimCloseV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.claim.close.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresClaimCloseV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/claims/{id}:receive": {
+      "post": {
+        "operationId": "receiveCaresClaim",
+        "summary": "cares.claim.receive.v1 — receive an accepted, handed-over claim into stock",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresClaimReceiveV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.claim.receive.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresClaimReceiveV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/listings/{id}/claims": {
+      "get": {
+        "operationId": "listCaresInboundClaims",
+        "summary": "Claims on the caller's own offer",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresInboundClaims"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares/listings/{id}:decide": {
+      "post": {
+        "operationId": "decideCaresClaim",
+        "summary": "cares.claim.decide.v1 — accept or decline one claim on the caller's offer (one accepted claim per offer)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "CaresClaimDecideV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "cares.claim.decide.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/CaresClaimDecideV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares-network/cities": {
+      "get": {
+        "operationId": "listCaresNetworkCities",
+        "summary": "Cities with surplus-sharing businesses (Simulated recipients; Check your local food-donation rules)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresNetworkCities"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares-network/listings": {
+      "get": {
+        "operationId": "listCaresNetworkListings",
+        "summary": "Live donation listings in a city to Simulated recipients",
+        "security": [],
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresNetworkListings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares-network/listings/{id}": {
+      "get": {
+        "operationId": "getCaresNetworkListing",
+        "summary": "One live donation listing (404 when not live)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresNetworkListing"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares-network/impact": {
+      "get": {
+        "operationId": "getCaresNetworkImpact",
+        "summary": "Meals shared across Munim to Simulated recipients: the latest published network snapshot, each value beside its ref",
+        "security": [],
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresNetworkImpact"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cares-network/snapshots/{id}": {
+      "get": {
+        "operationId": "getCaresNetworkSnapshot",
+        "summary": "A published network snapshot with its rows and sha256 (404 when unpublished)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1CaresNetworkSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/storefront/cares": {
+      "get": {
+        "operationId": "getStorefrontCares",
+        "summary": "The storefront key's own live donation listings (uncached; a bad key or a non-storefront channel is 404)",
+        "security": [
+          {
+            "storefrontKey": []
+          },
+          {
+            "storefrontKey": [],
+            "customerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1StorefrontCares"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/platform/v1/network-snapshots": {
+      "post": {
+        "operationId": "mintCaresNetworkSnapshot",
+        "summary": "Mint the network impact snapshot (operator template platform.cares_network_impact); nothing is public until a config draft publishes it",
+        "security": [
+          {
+            "operatorToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaresNetworkSnapshotMint"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformCaresNetworkSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listCaresNetworkSnapshots",
+        "summary": "Minted network snapshots with their publish state",
+        "security": [
+          {
+            "operatorToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformCaresNetworkSnapshots"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/catalogue/items": {
       "get": {
         "operationId": "listCatalogueItems",
@@ -12565,7 +15185,11 @@
                 "transfer_in",
                 "count_adjust",
                 "supplier_return",
-                "sale_return"
+                "sale_return",
+                "donation",
+                "surplus_out",
+                "surplus_in",
+                "cares_reversal"
               ]
             }
           },
@@ -27099,6 +29723,213 @@
                   {
                     "type": "object",
                     "properties": {
+                      "listing_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "outlet_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "donation",
+                          "offer"
+                        ]
+                      },
+                      "recipient_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "pickup_from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                      },
+                      "pickup_to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                      },
+                      "lines": {
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "line_id": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            "food_kind": {
+                              "type": "string",
+                              "enum": [
+                                "cooked",
+                                "raw",
+                                "packaged"
+                              ]
+                            },
+                            "item_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "ingredient_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "batch_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "qty_milli": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "typed_by": {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "typed_by"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "unit": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z_]{0,15}$"
+                            },
+                            "expires_on": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unit_price_minor": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "value": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0,
+                                          "maximum": 9007199254740991
+                                        },
+                                        "typed_by": {
+                                          "type": "string",
+                                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "typed_by"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "currency": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[A-Z]{3}$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "line_id",
+                            "food_kind",
+                            "item_id",
+                            "ingredient_id",
+                            "batch_id",
+                            "qty_milli",
+                            "unit",
+                            "expires_on",
+                            "unit_price_minor",
+                            "currency"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "listing_id",
+                      "outlet_id",
+                      "kind",
+                      "recipient_id",
+                      "pickup_from",
+                      "pickup_to",
+                      "lines"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
                       "coupon_id": {
                         "type": "string",
                         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -28345,6 +31176,18 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "cares_listing_id": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -29578,6 +32421,213 @@
           "payload": {
             "x-munim-draft-payload": "editable",
             "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "listing_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "outlet_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "donation",
+                      "offer"
+                    ]
+                  },
+                  "recipient_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pickup_from": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                  },
+                  "pickup_to": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                  },
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "line_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "food_kind": {
+                          "type": "string",
+                          "enum": [
+                            "cooked",
+                            "raw",
+                            "packaged"
+                          ]
+                        },
+                        "item_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "ingredient_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "batch_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "qty_milli": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "typed_by": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "typed_by"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z_]{0,15}$"
+                        },
+                        "expires_on": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "unit_price_minor": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "typed_by": {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "typed_by"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "currency": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-Z]{3}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "line_id",
+                        "food_kind",
+                        "item_id",
+                        "ingredient_id",
+                        "batch_id",
+                        "qty_milli",
+                        "unit",
+                        "expires_on",
+                        "unit_price_minor",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "listing_id",
+                  "outlet_id",
+                  "kind",
+                  "recipient_id",
+                  "pickup_from",
+                  "pickup_to",
+                  "lines"
+                ],
+                "additionalProperties": false
+              },
               {
                 "type": "object",
                 "properties": {
@@ -30818,6 +33868,18 @@
                     "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
                   },
                   "finding_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "cares_listing_id": {
+                    "default": null,
                     "anyOf": [
                       {
                         "type": "string",
@@ -32635,6 +35697,2764 @@
         },
         "required": [
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "CaresProfileSetV1": {
+        "title": "CaresProfileSetV1",
+        "x-munim-contract": "cares.profile.set.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          },
+          "public_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "b2b_enabled": {
+            "type": "boolean"
+          },
+          "outlets": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "city_code": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "lat_e6": {
+                  "type": "integer",
+                  "minimum": -90000000,
+                  "maximum": 90000000
+                },
+                "lng_e6": {
+                  "type": "integer",
+                  "minimum": -180000000,
+                  "maximum": 180000000
+                },
+                "pickup_from": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "pickup_to": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "outlet_id",
+                "city_code",
+                "lat_e6",
+                "lng_e6",
+                "pickup_from",
+                "pickup_to",
+                "active"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "status",
+          "public_name",
+          "b2b_enabled",
+          "outlets"
+        ],
+        "additionalProperties": false
+      },
+      "CaresListingPublishV1": {
+        "title": "CaresListingPublishV1",
+        "x-munim-contract": "cares.listing.publish.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "donation",
+              "offer"
+            ]
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_from": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "pickup_to": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "food_kind": {
+                  "type": "string",
+                  "enum": [
+                    "cooked",
+                    "raw",
+                    "packaged"
+                  ]
+                },
+                "item_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ingredient_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "batch_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "expires_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "unit_price_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "line_id",
+                "food_kind",
+                "item_id",
+                "ingredient_id",
+                "batch_id",
+                "qty_milli",
+                "unit",
+                "expires_on",
+                "unit_price_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "listing_id",
+          "outlet_id",
+          "kind",
+          "recipient_id",
+          "pickup_from",
+          "pickup_to",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "CaresListingWithdrawV1": {
+        "title": "CaresListingWithdrawV1",
+        "x-munim-contract": "cares.listing.withdraw.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "listing_id"
+        ],
+        "additionalProperties": false
+      },
+      "CaresHandoverRecordV1": {
+        "title": "CaresHandoverRecordV1",
+        "x-munim-contract": "cares.handover.record.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "handover_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "allocation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "listing_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "listing_line_id",
+                "qty_milli"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "handover_id",
+          "listing_id",
+          "allocation_id",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "CaresHandoverVoidV1": {
+        "title": "CaresHandoverVoidV1",
+        "x-munim-contract": "cares.handover.void.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "handover_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "reason_code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        },
+        "required": [
+          "handover_id",
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
+      "CaresClaimCreateV1": {
+        "title": "CaresClaimCreateV1",
+        "x-munim-contract": "cares.claim.create.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "offer_tenant_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "offer_listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "offer_line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "ingredient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              },
+              "required": [
+                "offer_line_id",
+                "ingredient_id"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "claim_id",
+          "outlet_id",
+          "offer_tenant_id",
+          "offer_listing_id",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "CaresClaimCancelV1": {
+        "title": "CaresClaimCancelV1",
+        "x-munim-contract": "cares.claim.cancel.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "claim_id"
+        ],
+        "additionalProperties": false
+      },
+      "CaresClaimCloseV1": {
+        "title": "CaresClaimCloseV1",
+        "x-munim-contract": "cares.claim.close.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "claim_id"
+        ],
+        "additionalProperties": false
+      },
+      "CaresClaimDecideV1": {
+        "title": "CaresClaimDecideV1",
+        "x-munim-contract": "cares.claim.decide.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "allocation_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "claim_tenant_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "claim_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "declined"
+            ]
+          }
+        },
+        "required": [
+          "allocation_id",
+          "listing_id",
+          "claim_tenant_id",
+          "claim_id",
+          "verdict"
+        ],
+        "additionalProperties": false
+      },
+      "CaresClaimReceiveV1": {
+        "title": "CaresClaimReceiveV1",
+        "x-munim-contract": "cares.claim.receive.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "claim_id"
+        ],
+        "additionalProperties": false
+      },
+      "ProposalCaresListingPublishV1": {
+        "title": "ProposalCaresListingPublishV1",
+        "x-munim-contract": "proposal.cares.listing.publish.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "donation",
+              "offer"
+            ]
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_from": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "pickup_to": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "food_kind": {
+                  "type": "string",
+                  "enum": [
+                    "cooked",
+                    "raw",
+                    "packaged"
+                  ]
+                },
+                "item_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ingredient_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "batch_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "qty_milli": {
+                  "$ref": "#/components/schemas/Ref"
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "expires_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "unit_price_minor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Ref"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "line_id",
+                "food_kind",
+                "item_id",
+                "ingredient_id",
+                "batch_id",
+                "qty_milli",
+                "unit",
+                "expires_on",
+                "unit_price_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "listing_id",
+          "outlet_id",
+          "kind",
+          "recipient_id",
+          "pickup_from",
+          "pickup_to",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "CaresNetworkSnapshotMint": {
+        "title": "CaresNetworkSnapshotMint",
+        "x-munim-contract": "cares.network-snapshot-mint",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "params": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "template_id",
+          "params"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresProfile": {
+        "title": "V1CaresProfile",
+        "x-munim-contract": "v1.cares.profile",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "paused"
+                    ]
+                  },
+                  "public_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "b2b_enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "status",
+                  "public_name",
+                  "b2b_enabled"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outlets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "city_code": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "lat_e6": {
+                  "type": "integer",
+                  "minimum": -90000000,
+                  "maximum": 90000000
+                },
+                "lng_e6": {
+                  "type": "integer",
+                  "minimum": -180000000,
+                  "maximum": 180000000
+                },
+                "pickup_from": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "pickup_to": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "outlet_id",
+                "city_code",
+                "lat_e6",
+                "lng_e6",
+                "pickup_from",
+                "pickup_to",
+                "active"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "available",
+          "enabled",
+          "profile",
+          "outlets"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresRecipients": {
+        "title": "V1CaresRecipients",
+        "x-munim-contract": "v1.cares.recipients",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipient_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "city_code": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "ngo",
+                    "food_bank"
+                  ]
+                },
+                "simulated": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "accepts_cooked": {
+                  "type": "boolean"
+                },
+                "accepts_raw": {
+                  "type": "boolean"
+                },
+                "accepts_packaged": {
+                  "type": "boolean"
+                },
+                "capacity_kg_per_day": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "capacity_portions_per_day": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "receiving_from": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "receiving_to": {
+                  "type": "string",
+                  "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                },
+                "lat_e6": {
+                  "type": "integer",
+                  "minimum": -90000000,
+                  "maximum": 90000000
+                },
+                "lng_e6": {
+                  "type": "integer",
+                  "minimum": -180000000,
+                  "maximum": 180000000
+                }
+              },
+              "required": [
+                "recipient_id",
+                "city_code",
+                "name",
+                "kind",
+                "simulated",
+                "accepts_cooked",
+                "accepts_raw",
+                "accepts_packaged",
+                "capacity_kg_per_day",
+                "capacity_portions_per_day",
+                "receiving_from",
+                "receiving_to",
+                "lat_e6",
+                "lng_e6"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresListings": {
+        "title": "V1CaresListings",
+        "x-munim-contract": "v1.cares.listings",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1CaresListing"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresListing": {
+        "title": "V1CaresListing",
+        "x-munim-contract": "v1.cares.listing",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "donation",
+              "offer"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "allocated",
+              "closed",
+              "withdrawn"
+            ]
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_from": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "pickup_to": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "pickup_on": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+          },
+          "published_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "published_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "line_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "food_kind": {
+                  "type": "string",
+                  "enum": [
+                    "cooked",
+                    "raw",
+                    "packaged"
+                  ]
+                },
+                "item_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ingredient_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "batch_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "expires_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "unit_price_minor": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "line_id",
+                "line_no",
+                "food_kind",
+                "item_id",
+                "ingredient_id",
+                "batch_id",
+                "qty_milli",
+                "unit",
+                "expires_on",
+                "unit_price_minor",
+                "currency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handovers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "handover_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "allocation_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "recorded",
+                    "voided"
+                  ]
+                },
+                "handed_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "recorded_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "voided_by": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "void_reason_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "listing_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "listing_line_id",
+                      "qty_milli"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "handover_id",
+                "allocation_id",
+                "status",
+                "handed_at",
+                "recorded_by",
+                "voided_by",
+                "void_reason_code",
+                "lines"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "listing_id",
+          "outlet_id",
+          "kind",
+          "status",
+          "recipient_id",
+          "pickup_from",
+          "pickup_to",
+          "pickup_on",
+          "published_by",
+          "published_at",
+          "lines",
+          "handovers"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresMarket": {
+        "title": "V1CaresMarket",
+        "x-munim-contract": "v1.cares.market",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "offer_tenant_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "listing_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "business_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "outlet_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "city_code": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "pickup_from": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "pickup_to": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "pickup_on": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "offer_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "food_kind": {
+                        "type": "string",
+                        "enum": [
+                          "cooked",
+                          "raw",
+                          "packaged"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z_]{0,15}$"
+                      },
+                      "expires_on": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unit_price_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    },
+                    "required": [
+                      "offer_line_id",
+                      "food_kind",
+                      "label",
+                      "qty_milli",
+                      "unit",
+                      "expires_on",
+                      "unit_price_minor",
+                      "currency"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "offer_tenant_id",
+                "listing_id",
+                "business_name",
+                "outlet_name",
+                "city_code",
+                "pickup_from",
+                "pickup_to",
+                "pickup_on",
+                "lines"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresClaims": {
+        "title": "V1CaresClaims",
+        "x-munim-contract": "v1.cares.claims",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "outlet_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "offer_tenant_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "offer_listing_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "allocation_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Uuid7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "requested",
+                    "cancelled",
+                    "closed",
+                    "received"
+                  ]
+                },
+                "total_minor": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "created_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "offer_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "ingredient_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z_]{0,15}$"
+                      },
+                      "unit_price_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "expires_on": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "received_qty_milli": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "offer_line_id",
+                      "ingredient_id",
+                      "qty_milli",
+                      "unit",
+                      "unit_price_minor",
+                      "expires_on",
+                      "received_qty_milli"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "outcome": {
+                  "type": "object",
+                  "properties": {
+                    "verdict": {
+                      "type": "string",
+                      "enum": [
+                        "accepted",
+                        "declined",
+                        "none"
+                      ]
+                    },
+                    "allocation_id": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/Uuid7"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decided_at": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/IsoDatetime"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "offer_line_id": {
+                            "$ref": "#/components/schemas/Uuid7"
+                          },
+                          "handed_qty_milli": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "offer_line_id",
+                          "handed_qty_milli"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "verdict",
+                    "allocation_id",
+                    "decided_at",
+                    "lines"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "claim_id",
+                "outlet_id",
+                "offer_tenant_id",
+                "offer_listing_id",
+                "allocation_id",
+                "status",
+                "total_minor",
+                "currency",
+                "created_by",
+                "created_at",
+                "lines",
+                "outcome"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresInboundClaims": {
+        "title": "V1CaresInboundClaims",
+        "x-munim-contract": "v1.cares.inbound-claims",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim_tenant_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "claim_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "buyer_public_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "requested",
+                    "cancelled",
+                    "closed",
+                    "received"
+                  ]
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "offer_line_id": {
+                        "$ref": "#/components/schemas/Uuid7"
+                      },
+                      "qty_milli": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "unit_price_minor": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "offer_line_id",
+                      "qty_milli",
+                      "unit_price_minor"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "claim_tenant_id",
+                "claim_id",
+                "buyer_public_name",
+                "status",
+                "created_at",
+                "lines"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresNetworkCities": {
+        "title": "V1CaresNetworkCities",
+        "x-munim-contract": "v1.cares-network.cities",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "country_code": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "code",
+                "country_code",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresNetworkListings": {
+        "title": "V1CaresNetworkListings",
+        "x-munim-contract": "v1.cares-network.listings",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1CaresNetworkListing"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresNetworkListing": {
+        "title": "V1CaresNetworkListing",
+        "x-munim-contract": "v1.cares-network.listing",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "listing_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "city_code": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "business_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "outlet_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "pickup_from": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "pickup_to": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "recipient_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "recipient_simulated": {
+            "type": "boolean",
+            "const": true
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line_no": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "food_kind": {
+                  "type": "string",
+                  "enum": [
+                    "cooked",
+                    "raw",
+                    "packaged"
+                  ]
+                },
+                "label_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "qty_milli": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "unit": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z_]{0,15}$"
+                },
+                "expires_on": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "line_no",
+                "food_kind",
+                "label_key",
+                "label",
+                "qty_milli",
+                "unit",
+                "expires_on"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "listing_id",
+          "city_code",
+          "business_name",
+          "outlet_name",
+          "pickup_from",
+          "pickup_to",
+          "recipient_name",
+          "recipient_simulated",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresNetworkImpact": {
+        "title": "V1CaresNetworkImpact",
+        "x-munim-contract": "v1.cares-network.impact",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "as_of": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "template_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "template_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 40,
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "businesses": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                },
+                "donations": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                },
+                "meals_portions_milli": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                },
+                "weight_g": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                },
+                "volume_ml": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                },
+                "all_synthetic": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "boolean"
+                    },
+                    "ref": {
+                      "$ref": "#/components/schemas/Ref"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "ref"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "city_code",
+                "businesses",
+                "donations",
+                "meals_portions_milli",
+                "weight_g",
+                "volume_ml",
+                "all_synthetic"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "as_of",
+          "template_id",
+          "template_version",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "V1CaresNetworkSnapshot": {
+        "title": "V1CaresNetworkSnapshot",
+        "x-munim-contract": "v1.cares-network.snapshot",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "template_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "template_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "params": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z_][a-z0-9_]*$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "integer",
+                    "numeric",
+                    "text",
+                    "date",
+                    "timestamptz",
+                    "boolean",
+                    "uuid"
+                  ]
+                },
+                "numeric_source": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "published_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "template_id",
+          "template_version",
+          "params",
+          "columns",
+          "rows",
+          "row_count",
+          "sha256",
+          "created_at",
+          "published_at"
+        ],
+        "additionalProperties": false
+      },
+      "V1StorefrontCares": {
+        "title": "V1StorefrontCares",
+        "x-munim-contract": "v1.storefront.cares",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/V1CaresNetworkListing"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformCaresNetworkSnapshot": {
+        "title": "PlatformCaresNetworkSnapshot",
+        "x-munim-contract": "platform.cares-network-snapshot",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "template_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+          },
+          "template_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "params": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z_][a-z0-9_]*$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "integer",
+                    "numeric",
+                    "text",
+                    "date",
+                    "timestamptz",
+                    "boolean",
+                    "uuid"
+                  ]
+                },
+                "numeric_source": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "minted_by_operator_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IsoDatetime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "publish_draft_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "template_id",
+          "template_version",
+          "params",
+          "columns",
+          "rows",
+          "row_count",
+          "sha256",
+          "created_at",
+          "minted_by_operator_id",
+          "published_at",
+          "publish_draft_id"
+        ],
+        "additionalProperties": false
+      },
+      "PlatformCaresNetworkSnapshots": {
+        "title": "PlatformCaresNetworkSnapshots",
+        "x-munim-contract": "platform.cares-network-snapshots",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformCaresNetworkSnapshot"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresListingPublishedV1": {
+        "title": "MunimCaresListingPublishedV1",
+        "x-munim-contract": "munim.cares.listing.published.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.listing.published.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "listing_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "donation",
+                  "offer"
+                ]
+              }
+            },
+            "required": [
+              "listing_id",
+              "outlet_id",
+              "kind"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresListingClosedV1": {
+        "title": "MunimCaresListingClosedV1",
+        "x-munim-contract": "munim.cares.listing.closed.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.listing.closed.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "listing_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "donation",
+                  "offer"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "closed",
+                  "withdrawn"
+                ]
+              }
+            },
+            "required": [
+              "listing_id",
+              "outlet_id",
+              "kind",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresHandoverRecordedV1": {
+        "title": "MunimCaresHandoverRecordedV1",
+        "x-munim-contract": "munim.cares.handover.recorded.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.handover.recorded.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "handover_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "listing_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "donation",
+                  "offer"
+                ]
+              }
+            },
+            "required": [
+              "handover_id",
+              "listing_id",
+              "outlet_id",
+              "kind"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresHandoverVoidedV1": {
+        "title": "MunimCaresHandoverVoidedV1",
+        "x-munim-contract": "munim.cares.handover.voided.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.handover.voided.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "handover_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "listing_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "donation",
+                  "offer"
+                ]
+              }
+            },
+            "required": [
+              "handover_id",
+              "listing_id",
+              "outlet_id",
+              "kind"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresClaimCreatedV1": {
+        "title": "MunimCaresClaimCreatedV1",
+        "x-munim-contract": "munim.cares.claim.created.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.claim.created.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              }
+            },
+            "required": [
+              "claim_id",
+              "outlet_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MunimCaresClaimDecidedV1": {
+        "title": "MunimCaresClaimDecidedV1",
+        "x-munim-contract": "munim.cares.claim.decided.v1",
+        "x-munim-module": "cares",
+        "type": "object",
+        "properties": {
+          "specversion": {
+            "type": "string",
+            "const": "1.0"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "time": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "datacontenttype": {
+            "type": "string",
+            "const": "application/json"
+          },
+          "tenantid": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "munimrun": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^\\/tenants\\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\/cares$"
+          },
+          "type": {
+            "type": "string",
+            "const": "munim.cares.claim.decided.v1"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "claim_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "listing_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "outlet_id": {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "declined"
+                ]
+              }
+            },
+            "required": [
+              "claim_id",
+              "listing_id",
+              "outlet_id",
+              "verdict"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "specversion",
+          "id",
+          "time",
+          "datacontenttype",
+          "tenantid",
+          "munimrun",
+          "source",
+          "type",
+          "subject",
+          "data"
         ],
         "additionalProperties": false
       },
@@ -37950,7 +43770,11 @@
                   "transfer_in",
                   "count_adjust",
                   "supplier_return",
-                  "sale_return"
+                  "sale_return",
+                  "donation",
+                  "surplus_out",
+                  "surplus_in",
+                  "cares_reversal"
                 ]
               },
               "ref_type": {
@@ -40444,6 +46268,17 @@
                 "type": "null"
               }
             ]
+          },
+          "cares_listing_id": {
+            "default": null,
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -40603,6 +46438,17 @@
             "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
           },
           "finding_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Uuid7"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cares_listing_id": {
+            "default": null,
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Uuid7"
@@ -42575,6 +48421,167 @@
               {
                 "type": "object",
                 "properties": {
+                  "listing_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "outlet_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "donation",
+                      "offer"
+                    ]
+                  },
+                  "recipient_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pickup_from": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                  },
+                  "pickup_to": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$"
+                  },
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "line_id": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                        },
+                        "food_kind": {
+                          "type": "string",
+                          "enum": [
+                            "cooked",
+                            "raw",
+                            "packaged"
+                          ]
+                        },
+                        "item_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "ingredient_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "batch_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "qty_milli": {
+                          "type": "string",
+                          "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                        },
+                        "unit": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z_]{0,15}$"
+                        },
+                        "expires_on": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "unit_price_minor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^(?:⟨snap:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}·(?:0|[1-9][0-9]*)·[a-z_][a-z0-9_]*⟩|⟨cite:(?:row:[a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|(?:doc|msg|claim|snapshot):[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:·(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*))?⟩)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "currency": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[A-Z]{3}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "line_id",
+                        "food_kind",
+                        "item_id",
+                        "ingredient_id",
+                        "batch_id",
+                        "qty_milli",
+                        "unit",
+                        "expires_on",
+                        "unit_price_minor",
+                        "currency"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "listing_id",
+                  "outlet_id",
+                  "kind",
+                  "recipient_id",
+                  "pickup_from",
+                  "pickup_to",
+                  "lines"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "coupon_id": {
                     "type": "string",
                     "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -43398,6 +49405,18 @@
                     "pattern": "^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$"
                   },
                   "finding_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "cares_listing_id": {
+                    "default": null,
                     "anyOf": [
                       {
                         "type": "string",
@@ -47120,7 +53139,11 @@
                     "transfer_in",
                     "count_adjust",
                     "supplier_return",
-                    "sale_return"
+                    "sale_return",
+                    "donation",
+                    "surplus_out",
+                    "surplus_in",
+                    "cares_reversal"
                   ]
                 },
                 "ref_type": {
@@ -52646,6 +58669,52 @@
               "additionalProperties": false
             }
           },
+          "cares": {
+            "type": "object",
+            "properties": {
+              "food_kinds": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "cooked",
+                    "raw",
+                    "packaged"
+                  ]
+                }
+              },
+              "offers_enabled": {
+                "type": "boolean"
+              },
+              "cooked_max_hold_min": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "min_days_left_at_pickup": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "_notes": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "food_kinds",
+              "offers_enabled",
+              "cooked_max_hold_min",
+              "min_days_left_at_pickup",
+              "_notes"
+            ],
+            "additionalProperties": false
+          },
           "_unverified": {
             "minItems": 1,
             "type": "array",
@@ -57110,7 +63179,24 @@
           "platform_budget_missing",
           "assignee_missing",
           "campaign_audience_unscoped",
-          "specialist_needed"
+          "specialist_needed",
+          "cares_not_available",
+          "cares_not_enabled",
+          "cares_not_opted_in",
+          "cares_city_mismatch",
+          "recipient_ineligible",
+          "listing_expired",
+          "qty_exceeds_on_hand",
+          "qty_exceeds_listed",
+          "cooked_hold_exceeded",
+          "line_expired",
+          "no_eligible_recipient",
+          "no_rostered_staff",
+          "offer_not_enabled",
+          "offer_closed",
+          "claim_decided",
+          "claim_received",
+          "rate_limited"
         ]
       },
       "AnswerEnvelope": {

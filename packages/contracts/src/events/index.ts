@@ -21,8 +21,8 @@ export const OrderPlacedV1 = cloudEvent(
   }),
 );
 
-/** The DB set (core.stock_movement.kind, 0005): returns are `supplier_return` / `sale_return` (W1 fix #42). */
-export const MovementKind = z.enum(["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return"]);
+/** The DB set (core.stock_movement.kind, 0005 widened by 0028 with the Cares kinds): returns are `supplier_return` / `sale_return` (W1 fix #42). */
+export const MovementKind = z.enum(["receipt", "sale_consumption", "waste", "transfer_out", "transfer_in", "count_adjust", "supplier_return", "sale_return", "donation", "surplus_out", "surplus_in", "cares_reversal"]);
 
 export const MovementRecordedV1 = cloudEvent(
   "munim.inventory.movement.recorded.v1",

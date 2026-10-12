@@ -254,6 +254,11 @@ describe("branch 3 — allow-listed derivation of an existing book row", () => {
       ["customers.claim_guest_token", "core.customer", "core.customer"],
       // 0021 (T-093): a submitted stock count's adjustment movements
       ["inventory.count_adjust", "core.stock_count", "core.stock_movement"],
+      // 0028 (ADR-015 §1.4): Munim Cares hand-overs, their voids, and a received B2B claim
+      ["inventory.cares_handover", "core.cares_handover", "core.stock_movement"],
+      ["inventory.cares_handover_void", "core.cares_handover", "core.stock_movement"],
+      ["inventory.cares_claim_receive", "core.cares_claim", "core.stock_movement"],
+      ["inventory.cares_claim_receive", "core.cares_claim", "core.batch"],
     ];
     const got = r.rows.map((x) => [x.rule_id, x.source_table, x.target_table, x.s, x.t]).sort((a, b) => a.join().localeCompare(b.join()));
     expect(got).toEqual(rules.map(([a, b, c]) => [a, b, c, "munim:book", "munim:book"]).sort((a, b) => a.join().localeCompare(b.join())));

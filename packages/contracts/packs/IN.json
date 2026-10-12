@@ -1,7 +1,7 @@
 {
   "code": "IN",
-  "version": 3,
-  "effective_from": "2026-10-11",
+  "version": 4,
+  "effective_from": "2026-10-12",
   "name": "India",
   "locale": "en-IN",
   "currency": {
@@ -764,6 +764,21 @@
         "INFERENCE: transcribed from docs/plan/packs/people.md §4 (D-1); no repo doc fixes these values"
       ]
     }
+  },
+  "cares": {
+    "food_kinds": [
+      "cooked",
+      "raw",
+      "packaged"
+    ],
+    "offers_enabled": true,
+    "cooked_max_hold_min": 120,
+    "min_days_left_at_pickup": 1,
+    "_notes": [
+      "INFERENCE: operating values only (ADR-015 section 6); no legal text or compliance claim is carried by this pack.",
+      "INFERENCE: cooked_max_hold_min is a limit on how long after approval a cooked pickup may start; it is never shown as a food-safety guarantee.",
+      "INFERENCE: a batch's single expires_on is treated as its last-use date, so min_days_left_at_pickup counts days from the pickup date."
+    ]
   },
   "chart_of_accounts": [
     {
