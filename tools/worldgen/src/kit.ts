@@ -100,12 +100,16 @@ export async function ingredient(c: Ctx, key: string, name: string, unit: string
 
 export interface Item { id: string; key: string; name: string }
 
-export async function item(c: Ctx, key: string, o: { category: string; kind?: "dish" | "sku"; stock?: Ingredient; barcode?: string; mrp?: { minor: number; currency: string }; brand?: string | null }): Promise<Item> {
+/** Owner-entered display text (0029, T-099): synthetic, original names; sent only when given (absent = unchanged). */
+export interface Display { name: string; description?: string; diet?: "veg" | "non_veg" | "egg" | "vegan" }
+
+export async function item(c: Ctx, key: string, o: { category: string; kind?: "dish" | "sku"; stock?: Ingredient; barcode?: string; mrp?: { minor: number; currency: string }; brand?: string | null; display?: Display }): Promise<Item> {
   const id = c.api.id(`item:${key}`);
   await c.api.cmd("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", `item:${key}`, {
     item_id: id, name_key: key.replaceAll(/[^a-z0-9]+/g, "_"), category: o.category, brand_id: o.brand ?? null, barcode: o.barcode ?? null,
     mrp_minor: o.mrp?.minor ?? null, currency: o.mrp?.currency ?? null, active: true, variants: [], option_groups: [],
     kind: o.kind ?? "dish", stock_ingredient_id: o.stock?.id ?? null,
+    ...(o.display ? { display_name: o.display.name, description: o.display.description ?? null, diet: o.display.diet ?? null } : {}),
   });
   return { id, key, name: key };
 }
@@ -401,13 +405,13 @@ const personaEmail = (c: Ctx, persona: string) => personaIdentity(c.world, perso
 
 // ---- the menu ---------------------------------------------------------------------------------------------------
 
-export interface MenuSpec { key: string; category: string; priceMinor: number; taxClass: string; recipe: Array<[Ingredient, number]>; brand?: string }
+export interface MenuSpec { key: string; category: string; priceMinor: number; taxClass: string; recipe: Array<[Ingredient, number]>; brand?: string; display?: Display }
 
 /** Items, recipes, and a price for every outlet x channel kind, all valid from `from`. */
 export async function menu(c: Ctx, biz: Business, specs: MenuSpec[], kinds: string[], from: string): Promise<Record<string, Item>> {
   const items: Record<string, Item> = {};
   for (const s of specs) {
-    const it = await item(c, s.key, { category: s.category, brand: s.brand ?? null });
+    const it = await item(c, s.key, { category: s.category, brand: s.brand ?? null, ...(s.display ? { display: s.display } : {}) });
     items[s.key] = it;
     // A dish with no recipe version is a plant (C5): sold, never costed.
     if (s.recipe.length > 0) await recipe(c, it, from, s.recipe.map(([ing, qtyMilli]) => ({ ing, qtyMilli })));

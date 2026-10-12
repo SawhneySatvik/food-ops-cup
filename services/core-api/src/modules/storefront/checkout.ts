@@ -3,9 +3,9 @@
 // the principal's — never a payload field. Guest checkout is ONE request and ONE transaction: the guest's own
 // storefront.guest.create.v1, then placeOrder; a refused placement leaves no guest row behind.
 import { createHash, randomBytes } from "node:crypto";
-import type { CommandEnvelope, ReasonCode } from "@munim/contracts";
-import { OrdersPreviewRequest, OrdersPreviewResponse as PreviewSchema } from "@munim/contracts/orders";
-import { StorefrontGuestCreateV1, StorefrontOrderPlaceRequest } from "@munim/contracts/storefront";
+import type { CommandEnvelope, ReasonCode, RefusalParams } from "@munim/contracts";
+import { OrdersPreviewRequest } from "@munim/contracts/orders";
+import { StorefrontGuestCreateV1, StorefrontOrderPlaceRequest, StorefrontPreviewResponse } from "@munim/contracts/storefront";
 import type { Principal } from "../../auth/resolve.ts";
 import { contextOf } from "../../auth/resolve.ts";
 import { executeCommand, publishCommitted, type CommandContext, type CommandHandler, type OutboxRow } from "../../commit/index.ts";
@@ -14,8 +14,9 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv, Deps } from "../../lib/types.ts";
 import type { Context } from "hono";
 import type { Queryable } from "../../runtoken/index.ts";
+import { priceLines, type PriceResult, tenantPack } from "../catalogue/index.ts";
 import { seam } from "./config.ts";
-import { channelKind, outletRow, ownRefusals, type StorefrontKind } from "./read.ts";
+import { channelKind, outletRow, ownRefusals, type PackRef, pricedPack, type StorefrontKind } from "./read.ts";
 
 export type CustomerPrincipal = Extract<Principal, { kind: "customer" }>;
 
@@ -51,8 +52,9 @@ function parse<T>(schema: { safeParse(v: unknown): { success: true; data: T } | 
   return r.data;
 }
 
-/** A refusal the shopper sees: the reason code rides on the ApiError; the copy is the web app's (contracts map). */
-export const refused = (reason_code: ReasonCode) => new ApiError("conflict", reason_code);
+/** A refusal the shopper sees: the reason code rides on the ApiError, with its typed parameters when it has any (G-11);
+ *  the copy is the web app's (contracts map). */
+export const refused = (reason_code: ReasonCode, params?: RefusalParams) => new ApiError("conflict", reason_code, params ? { params } : {});
 
 /** Kind must fit the key's channel: a table QR is dine-in with a table; the other shopper channels never dine in. */
 function kindFits(kind: string, table_ref: string | null, ck: StorefrontKind): boolean {
@@ -65,16 +67,64 @@ const cmdCtx = (p: CustomerPrincipal, c: Queryable): CommandContext => ({
   actor: { kind: "customer", id: p.customer_id, role: "customer" },
 });
 
-export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body: unknown): Promise<ReturnType<typeof PreviewSchema.parse>> {
+type CartLines = ReadonlyArray<{ item_id: string; variant_id: string | null; option_ids: readonly string[]; qty_milli: number }>;
+
+/** Catalogue's one pricing function (writes nothing) on the shopper's transaction, as placement prices the cart: at `at`,
+ *  for the principal's customer id, with the presented coupons. Storefront reads from it what the orders preview body
+ *  leaves out: per-line tax components, the order's component totals, and refusal parameters (G-03, G-11). */
+const priceDetail = (c: Queryable, p: CustomerPrincipal, o: { outlet_id: string; channel_kind: string; at: string; lines: CartLines; coupon_codes: string[] }) =>
+  priceLines(c, { outlet_id: o.outlet_id, channel_kind: o.channel_kind, at: o.at, coupon_codes: o.coupon_codes, customer_id: p.customer_id,
+    lines: o.lines.map((l) => ({ item_id: l.item_id, variant_id: l.variant_id, option_ids: l.option_ids, qty_milli: l.qty_milli })) });
+
+/** The parameters of a refusal: a line's item (from the cart as sent), else the pricing function's own (coupon code,
+ *  min-spend shortfall) for the next refusal of that code; none for whole-cart refusals (paused, window full). */
+const lineParams = (line_no: number, lines: CartLines): RefusalParams | undefined => {
+  const l = lines[line_no - 1];
+  return l ? { line_no, item_id: l.item_id, variant_id: l.variant_id } : undefined;
+};
+function withParams(refusals: ReadonlyArray<{ line_no: number | null; reason_code: ReasonCode }>, lines: CartLines, detail: PriceResult) {
+  const pool = detail.refusals.filter((r) => r.line_no === null && r.params);
+  const take = (code: ReasonCode) => {
+    const i = pool.findIndex((d) => d.reason_code === code);
+    return i < 0 ? undefined : pool.splice(i, 1)[0]!.params;
+  };
+  return refusals.map((r) => {
+    const params = r.line_no !== null ? lineParams(r.line_no, lines) : take(r.reason_code);
+    return params ? { ...r, params } : r;
+  });
+}
+
+async function windowStart(c: Queryable, id: string): Promise<string> {
+  const w = await c.query<{ starts_at: Date }>(`SELECT starts_at FROM core.pickup_window WHERE id = $1`, [id]);
+  if (!w.rows[0]) throw new ApiError("invalid_payload");
+  return w.rows[0].starts_at.toISOString();
+}
+
+export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body: unknown): Promise<ReturnType<typeof StorefrontPreviewResponse.parse>> {
   const req = parse(OrdersPreviewRequest, body);
   // Key's channel wins; the request's channel_id is overwritten. Redeeming points needs a signed-in profile.
   const request = { ...req, channel_id: principal.channel_id, loyalty_redeem_points: principal.profile ? req.loyalty_redeem_points : 0 };
   return withContext(deps.pools.core, contextOf(principal, { coupon_codes: request.coupon_codes }), async (c) => {
-    await channelKind(c, principal.channel_id); // a key on no shopper channel is no storefront: 404
+    const ck = await channelKind(c, principal.channel_id); // a key on no shopper channel is no storefront: 404
     const outlet = await outletRow(c, request.outlet_id);
-    const priced = await seam("previewOrder")(c, principal, request);
     const own = await ownRefusals(c, { outlet, pickup_window_id: request.pickup_window_id, promised_at: request.promised_at, lines: request.lines });
-    return { ...priced, refusals: [...own, ...priced.refusals] };
+    const priced = await seam("previewOrder")(c, principal, request);
+    // At the instant the preview priced the cart (priced_at), so both readings are of one pricing.
+    const detail = await priceDetail(c, principal, { outlet_id: request.outlet_id, channel_kind: ck, at: priced.priced_at, lines: request.lines, coupon_codes: request.coupon_codes });
+    const pack = await tenantPack(c);
+    const lines = priced.lines.map((l) => {
+      const d = detail.lines.find((x) => x.line_no === l.line_no);
+      const cls = pack.tax.classes.find((x) => x.code === l.tax_class);
+      // Two readings of the one pricing function disagreeing is a bug, never a figure to show.
+      if (!d || !cls || d.tax_minor !== l.tax_minor || d.tax_class !== l.tax_class) throw new ApiError("internal");
+      return { ...l, tax_rate_bp: cls.rate_bp, tax_components: d.components };
+    });
+    return {
+      ...priced, lines,
+      tax_components: lines.length ? detail.components : [],
+      prices_include_tax: pack.tax.price_display === "inclusive",
+      refusals: withParams([...own, ...priced.refusals], request.lines, detail),
+    };
   });
 }
 
@@ -83,6 +133,8 @@ export interface Placed {
   status: string;
   ticket_no: number;
   total_minor: number;
+  tax_minor: number;
+  prices_include_tax: boolean;
   currency: string;
   promised_at: string | null;
   pay_at_counter: true;
@@ -111,7 +163,15 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
     if (!kindFits(p.kind, p.table_ref, ck)) throw new ApiError("bad_request");
     const outlet = await outletRow(c, p.outlet_id);
     const own = await ownRefusals(c, { outlet, pickup_window_id: p.pickup_window_id, promised_at: p.promised_at, lines: p.lines });
-    if (own[0]) throw refused(own[0].reason_code);
+    if (own[0]) throw refused(own[0].reason_code, own[0].line_no === null ? undefined : lineParams(own[0].line_no, p.lines));
+    // G-11: the cart's own refusal, with its parameters, before anything is written — priced as placement will price it
+    // (at the promise, else the window's start, else now). Placement re-prices under its locks and stays the judge. Not
+    // for an order already placed (a replay returns the stored result, even once its own coupon use fills a cap).
+    if (!(await c.query(`SELECT 1 FROM core."order" WHERE id = $1`, [p.order_id])).rows[0]) {
+      const at = p.promised_at ?? (p.pickup_window_id ? await windowStart(c, p.pickup_window_id) : new Date().toISOString());
+      const pre = await priceDetail(c, who, { outlet_id: p.outlet_id, channel_kind: ck, at, lines: p.lines, coupon_codes: p.coupon_codes });
+      if (pre.refusals[0]) throw refused(pre.refusals[0].reason_code, pre.refusals[0].params);
+    }
 
     // Rewritten BEFORE executeCommand so the request hash covers what was actually placed. The channel is the
     // key's; there is no POS device or external order reference on a storefront order; points only for a
@@ -131,15 +191,15 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
     outbox.push(...out.outbox);
     await setRole(c, "customer");
     const row = (
-      await c.query<{ id: string; status: string; ticket_no: number; total_minor: string; currency: string; promised_at: Date | null; channel_id: string }>(
-        `SELECT id, status, ticket_no, total_minor, currency, promised_at, channel_id FROM core."order" WHERE id = $1`, [p.order_id])
+      await c.query<{ id: string; status: string; ticket_no: number; total_minor: string; tax_minor: string; currency: string; promised_at: Date | null; channel_id: string; pack: PackRef }>(
+        `SELECT id, status, ticket_no, total_minor, tax_minor, currency, promised_at, channel_id, pricing_snapshot -> 'pack' AS pack FROM core."order" WHERE id = $1`, [p.order_id])
     ).rows[0];
     if (!row) throw new ApiError("internal");
-    return { out, row };
+    return { out, row, inclusive: (await pricedPack(c, row.pack)).tax.price_display === "inclusive" };
   });
 
   if (deps.publish) await publishCommitted(deps.publish, principal.tenant_id, outbox);
-  const { out, row } = result;
+  const { out, row, inclusive } = result;
   return {
     replayed: out.replayed,
     placed: {
@@ -147,6 +207,8 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
       status: row.status,
       ticket_no: row.ticket_no,
       total_minor: Number(row.total_minor),
+      tax_minor: Number(row.tax_minor),
+      prices_include_tax: inclusive,
       currency: row.currency,
       promised_at: row.promised_at ? row.promised_at.toISOString() : null,
       pay_at_counter: true,

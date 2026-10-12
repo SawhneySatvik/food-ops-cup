@@ -1,7 +1,7 @@
 // The one error body (packages/contracts/src/shared/error.ts: {error: {code, message, reason_code}}).
 // `message` comes from the fixed table below, chosen by code — never from an exception, SQL error or model
 // output (One Guarantee: error channels carry no untrusted text).
-import { ERROR_CODES as CONTRACT_ERROR_CODES, type ErrorCode, type ErrorResponse, type ReasonCode } from "@munim/contracts";
+import { ERROR_CODES as CONTRACT_ERROR_CODES, type ErrorCode, type ErrorResponse, type ReasonCode, type RefusalParams } from "@munim/contracts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 // `Record<ErrorCode, string>` (the contracts enum): a code missing here, or one not in the enum, fails typecheck.
@@ -79,6 +79,8 @@ const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
   mode_above_ceiling: "Your role cannot use this investigation mode. The owner sets the highest mode for each role.",
   cap_above_platform_budget: "The monthly AI cap cannot be above the platform's AI budget for this month.",
   platform_budget_missing: "The platform has not set this month's AI budget in your business currency, so a cap cannot be set yet.",
+  // T-099 (G-12).
+  pickup_time_outside_window: "That pickup time is outside the pickup window you chose.",
 };
 export const ERROR_CODES: readonly ErrorCode[] = CONTRACT_ERROR_CODES;
 
@@ -118,7 +120,7 @@ const STATUS: Record<ErrorCode, ContentfulStatusCode> = {
 
 /** Fields a route's documented error schema adds beside `error` (e.g. `drafts.decision-error`: `changes`, `refs`).
  *  Core-composed ids and cells only — never exception or model text. */
-export type ErrorExtra = { changes?: unknown[]; refs?: string[] };
+export type ErrorExtra = { changes?: unknown[]; refs?: string[]; params?: RefusalParams };
 
 export class ApiError extends Error {
   override name = "ApiError";

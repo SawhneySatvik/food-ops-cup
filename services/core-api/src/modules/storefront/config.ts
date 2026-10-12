@@ -24,16 +24,25 @@ export interface SaleEntry {
   name_key: string;
   variant_name_key: string | null;
   category: string;
+  brand_id: string | null;
+  /** 0029 display text (plain text; null = not set) and diet mark. */
+  display_name: string | null;
+  description: string | null;
+  diet: "veg" | "non_veg" | "egg" | "vegan" | null;
+  variant_display_name: string | null;
+  variant_description: string | null;
   price_minor: number;
   currency: string;
   available: boolean;
   option_groups: Array<{
     option_group_id: string;
     name_key: string;
+    display_name: string | null;
+    description: string | null;
     min_select: number;
     max_select: number;
     required: boolean;
-    options: Array<{ option_id: string; name_key: string; price_delta_minor: number }>;
+    options: Array<{ option_id: string; name_key: string; display_name: string | null; description: string | null; price_delta_minor: number }>;
   }>;
 }
 

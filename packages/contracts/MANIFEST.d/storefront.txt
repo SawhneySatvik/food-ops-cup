@@ -10,3 +10,6 @@ storefront.pickup_windows.response
 storefront.order.place.request
 storefront.order.placed
 storefront.order.view
+storefront.preview.response
+storefront.refusal-error
+stream.event

@@ -19,7 +19,7 @@ import { availabilitySet, couponSet, dealEnd, dealUpsert, DRAFT_HANDLERS, itemUp
 import { itemsForSale, lookupBarcode } from "./menu.ts";
 import { readRoutes } from "./routes.ts";
 
-export { couponUses, priceLines, type PriceRequest, type PriceResult, type PricedLine, type PriceRefusal } from "./pricing.ts";
+export { couponUses, priceLines, tenantPack, type PriceRequest, type PriceResult, type PricedLine, type PriceRefusal } from "./pricing.ts";
 export { itemsForSale, type MenuEntry } from "./menu.ts";
 export { inWindows } from "./deals.ts";
 

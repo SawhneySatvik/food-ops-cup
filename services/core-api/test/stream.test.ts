@@ -20,8 +20,9 @@ import { buildWorld, type TestDb } from "@munim/db";
 import type { Hono } from "hono";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
+import { StreamEvent } from "@munim/contracts/storefront";
 import { createMunimClient } from "../../../packages/sdk/src/gen/client.ts";
-import { openStream, type StreamEvent } from "../../../packages/sdk/src/stream.ts";
+import { openStream, type StreamEvent as SdkStreamEvent } from "../../../packages/sdk/src/stream.ts";
 import { type AppEnv, contextOf, createApp, type Deps, requireMember, STOREFRONT_KEY_HEADER, TENANT_HEADER, withContext } from "../src/app.ts";
 import { GUEST_TOKEN_HEADER, type Storefront } from "../src/auth/resolve.ts";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
@@ -130,7 +131,7 @@ interface Instance {
   app: Hono<AppEnv>;
 }
 
-async function instance(name: string, opts: StreamOptions = {}): Promise<Instance> {
+async function instance(name: string, opts: StreamOptions = {}, corsOrigins: string[] = []): Promise<Instance> {
   const pools = { core: new pg.Pool({ ...login("munim_core"), max: 8 }), svc: new pg.Pool({ ...login("munim_svc"), max: 2 }) };
   const config = { nodeEnv: "test", redact: (s: string) => s };
   const deps: Deps = {
@@ -141,7 +142,7 @@ async function instance(name: string, opts: StreamOptions = {}): Promise<Instanc
     connect: () => new pg.Client({ ...login("munim_core"), application_name: `munim_stream_listen_${name}` }),
     ...opts,
   });
-  const app = await createApp(deps);
+  const app = await createApp(deps, { corsOrigins });
   // "Committed via instance #1": an outbox row written under the calling member's own context.
   app.post("/v1/_test/emit", requireMember, async (c) => {
     const p = c.var.principal as Extract<typeof c.var.principal, { kind: "member" }>;
@@ -261,7 +262,8 @@ class Raw {
           const f = Object.fromEntries(block.map((l) => [l.slice(0, l.indexOf(":")), l.slice(l.indexOf(":") + 2)]));
           if (f.id !== undefined) this.cursor = f.id;
           if (f.event) this.control.push({ event: f.event, data: f.data ?? "", id: f.id ?? null });
-          else this.msgs.push({ ...(JSON.parse(f.data!) as Omit<Msg, "cursor" | "at">), cursor: this.cursor, at: Date.now() });
+          // Every delivered event has the contract's shape (T-099 G-07: stream.event is documented in OpenAPI now).
+          else this.msgs.push({ ...(StreamEvent.parse(JSON.parse(f.data!)) as Omit<Msg, "cursor" | "at">), cursor: this.cursor, at: Date.now() });
         }
       }
     } catch {
@@ -449,6 +451,21 @@ describe("G3 · topic authorisation", () => {
     expect(await status([`order:${A.guestOrder}`], guest(A, randomBytes(24).toString("base64url")))).toBe(404);
     expect(await status([`order:${A.guestOrder}`], { [GUEST_TOKEN_HEADER]: A.guestToken })).toBe(404);
     expect(await status([`order:${A.guestOrder}`], guest(A), "o=1")).toBe(400);
+  });
+
+  it("T-099 G-09: over a real server, the 200 event stream carries the listed origin's CORS headers; a non-listed origin gets none", async () => {
+    const origin = "https://spice-route.example.test";
+    const cors = await instance("cors", {}, [origin]);
+    const open = async (o: string) => {
+      const ac = new AbortController();
+      const r = await fetch(`${cors.base}/v1/stream?topics=order:${A.guestOrder}`, { headers: { ...guest(A), Origin: o }, signal: ac.signal });
+      const h = [r.status, r.headers.get("content-type"), r.headers.get("access-control-allow-origin"), r.headers.get("access-control-expose-headers")];
+      ac.abort();
+      await r.body?.cancel().catch(() => {});
+      return h;
+    };
+    expect(await open(origin)).toEqual([200, "text/event-stream; charset=utf-8", origin, "X-Munim-Replayed, Retry-After"]);
+    expect(await open("https://evil.example.test")).toEqual([200, "text/event-stream; charset=utf-8", null, null]);
   });
 
   it("inbox:<tenant> owner/manager of that tenant only; bad input 400/401", async () => {
@@ -692,7 +709,7 @@ describe("G5 · SDK reader", () => {
     A = await world("g5");
   });
   const sdk = (inst: Instance, topics: string[], t: Tenant, sub: string) => {
-    const got: StreamEvent[] = [];
+    const got: SdkStreamEvent[] = [];
     const states: string[] = [];
     let tokens = 0;
     const handle = openStream({
@@ -790,7 +807,7 @@ describe("G5 · SDK reader", () => {
   });
 
   it("guest mode: follows its order with the guest token; a bad token or a 401 stops it (no retry, no Authorization)", async () => {
-    const got: StreamEvent[] = [];
+    const got: SdkStreamEvent[] = [];
     const g = openStream({
       baseUrl: two.base, topics: [`order:${A.guestOrder}`], guestToken: A.guestToken,
       headers: () => ({ [STOREFRONT_KEY_HEADER]: A.key }), onEvent: (e) => got.push(e), initialDelayMs: 50,

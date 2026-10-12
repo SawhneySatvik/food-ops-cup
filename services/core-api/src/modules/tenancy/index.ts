@@ -165,7 +165,7 @@ export const router = new Hono<AppEnv>()
     return c.json(row, 200);
   })
   .get("/v1/outlets", requireMember, list("outlet",
-    "id, name, kind, tz, address, tax_ids, accepting_orders, busy_extra_min, default_prep_min, cancel_window_min, reschedule_window_min, pickup_slot_min, pickup_lead_min, upi_vpa, business_day_cutoff"))
+    "id, name, kind, tz, address, tax_ids, accepting_orders, busy_extra_min, default_prep_min, cancel_window_min, reschedule_window_min, pickup_slot_min, pickup_lead_min, upi_vpa, business_day_cutoff, phone"))
   .get("/v1/brands", requireMember, list("brand", "id, name, outlet_ids, active"))
   .get("/v1/channels", requireMember, list("channel", "id, name, kind, active"))
   .get("/v1/devices", requireMember, list("device", "id, outlet_id, kind, invoice_series, last_seen_at"))

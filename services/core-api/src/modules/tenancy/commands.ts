@@ -102,9 +102,9 @@ export const outletCreateHandler: CommandHandler = {
     const t = await tenantOf(c);
     const d = KIND_DEFAULTS[p.kind === "store" ? "shop" : p.kind];
     await c.query(
-      `INSERT INTO core.outlet (tenant_id, id, name, kind, tz, address, tax_ids, default_prep_min, pickup_slot_min, pickup_lead_min, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, current_setting('app.member_id')::uuid)`,
-      [t, p.outlet_id, p.name, p.kind, p.tz, p.address, JSON.stringify(p.tax_ids), d.default_prep_min, d.pickup_slot_min, d.pickup_lead_min]);
+      `INSERT INTO core.outlet (tenant_id, id, name, kind, tz, address, tax_ids, default_prep_min, pickup_slot_min, pickup_lead_min, phone, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, current_setting('app.member_id')::uuid)`,
+      [t, p.outlet_id, p.name, p.kind, p.tz, p.address, JSON.stringify(p.tax_ids), d.default_prep_min, d.pickup_slot_min, d.pickup_lead_min, p.phone ?? null]);
     for (let weekday = 0; weekday < 7; weekday++) {
       await c.query(
         `INSERT INTO core.outlet_calendar (tenant_id, id, outlet_id, kind, weekday, opens_at, closes_at, created_by)
@@ -117,7 +117,7 @@ export const outletCreateHandler: CommandHandler = {
 
 const OUTLET_COLUMNS = [
   "name", "address", "accepting_orders", "busy_extra_min", "default_prep_min", "cancel_window_min", "reschedule_window_min",
-  "pickup_slot_min", "pickup_lead_min", "upi_vpa", "business_day_cutoff",
+  "pickup_slot_min", "pickup_lead_min", "upi_vpa", "business_day_cutoff", "phone",
 ] as const;
 
 export const outletUpdateHandler = (m: Member): CommandHandler => ({

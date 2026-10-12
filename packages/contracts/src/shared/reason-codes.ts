@@ -86,6 +86,9 @@ export const CARES_REASON_CODES = [
   "rate_limited",
 ] as const;
 
+/** T-099 (docs/kit/gaps.md G-12): a storefront order's `promised_at` that is not inside the pickup window it names. */
+export const STOREFRONT_T099_REASON_CODES = ["pickup_time_outside_window"] as const;
+
 export const REASON_CODES = [
   ...CORE_REASON_CODES,
   ...PACK_REASON_CODES,
@@ -95,6 +98,7 @@ export const REASON_CODES = [
   ...W2_REASON_CODES,
   ...W3_REASON_CODES,
   ...CARES_REASON_CODES,
+  ...STOREFRONT_T099_REASON_CODES,
 ] as const;
 export const ReasonCode = z.enum(REASON_CODES);
 export type ReasonCode = z.infer<typeof ReasonCode>;

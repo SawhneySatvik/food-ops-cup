@@ -28,6 +28,11 @@ export type Route = {
   conflict?: boolean;
   /** Schema name of this route's 409/422 body when it extends the shared `error` body. */
   errors?: string;
+  /** T-099 (G-07): the 200 body is a `text/event-stream` (server-sent events) whose each `data:` line is the JSON of
+   *  `response`; read it with the SDK's fetch-based reader (`openStream`), never EventSource (gotcha 23). */
+  stream?: true;
+  /** Further credentials the route also accepts besides `auth` (each documented as an alternative security entry). */
+  alsoAuth?: Auth[];
 };
 
 /** What every `src/<module>/index.ts` exports for the generator. */

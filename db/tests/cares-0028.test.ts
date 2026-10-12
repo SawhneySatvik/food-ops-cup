@@ -693,12 +693,20 @@ describe("DEF — the five definer functions", () => {
     expect(cost.rows.filter((x) => x.p)).toEqual([]);
   });
 
+  test("munim_crosstenant on core.outlet: exactly tenant_id, id, name (0028) + tz (0029, G-14: the network listing's outlet_tz)", async () => {
+    const r = await db.admin<{ c: string }>(`SELECT a.attname || ':' || x.privilege_type c FROM pg_attribute a, aclexplode(a.attacl) x
+      WHERE a.attrelid = 'core.outlet'::regclass AND x.grantee = 'munim_crosstenant'::regrole ORDER BY 1`);
+    expect(r.rows.map((x) => x.c)).toEqual(["id:SELECT", "name:SELECT", "tenant_id:SELECT", "tz:SELECT"]);
+  });
+
   test("network listings: exactly the 1 live donation (retired, judge, not enabled, paused, withdrawn, expired, retired recipient, offer absent)", async () => {
     const ids = (await run({}, `SELECT listing_id, recipient_simulated, lines FROM core.cares_network_listings(NULL, NULL, NULL, NULL, 50)`)).rows;
     console.log(`DEF network: ${ids.length} live listing(s)`);
     expect(ids.map((x) => x.listing_id)).toEqual([liveA]);
     expect(ids[0].recipient_simulated).toBe(true);
     expect(ids[0].lines).toEqual([{ line_no: 1, food_kind: "raw", label_key: null, label: "Paneer", qty_milli: 300000, unit: "g", expires_on: null }]);
+    // 0029 (G-14): the listing outlet's zone rides as the last column.
+    expect((await run({}, `SELECT outlet_tz FROM core.cares_network_listings(NULL, NULL, NULL, NULL, 50)`)).rows).toEqual([{ outlet_tz: "Asia/Kolkata" }]);
     // Storefront form: the tenant's own (1) and another tenant's (0); a city with none (0).
     expect((await run({}, `SELECT count(*)::int n FROM core.cares_network_listings(NULL, $1, NULL, NULL, 50)`, [A.tenant])).rows[0].n).toBe(1);
     expect((await run({}, `SELECT count(*)::int n FROM core.cares_network_listings(NULL, $1, NULL, NULL, 50)`, [P.tenant])).rows[0].n).toBe(0);

@@ -18,10 +18,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, storefrontResolver } from "../src/app.ts";
 import { configureStorefront, resetStorefront } from "../src/modules/storefront/index.ts";
-import { OrdersPreviewResponse } from "@munim/contracts/orders";
 import {
   StorefrontAccepting, StorefrontMenuResponse, StorefrontOrderPlaced, StorefrontOrderView, StorefrontOutletsResponse, StorefrontPickupWindowsResponse,
-  StorefrontReschedulePreviewResponse,
+  StorefrontPreviewResponse, StorefrontReschedulePreviewResponse,
 } from "@munim/contracts/storefront";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
@@ -246,7 +245,7 @@ describe("guest checkout", () => {
   });
 
   it("a refused placement leaves no guest customer behind (one transaction)", async () => {
-    const b = placeBody({ pickup_window_id: win.full });
+    const b = placeBody({ pickup_window_id: win.full, promised_at: ist(D1, "13:30") }); // G-12: the promise lies inside its window
     const before = Number((await db.admin(`SELECT count(*) AS n FROM core.customer WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n);
     expect((await call("POST", "/v1/storefront/orders", b.body)).status).toBe(409);
     expect(Number((await db.admin(`SELECT count(*) AS n FROM core.customer WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n)).toBe(before);
@@ -310,9 +309,10 @@ describe("refusals: each code, paired with an accept", () => {
 
   it("preview: same price, labelled preview, writes nothing, and carries the storefront's own refusals", async () => {
     const before = Number((await db.admin(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n);
-    const req = { outlet_id: OUT, channel_id: W.channel, brand_id: null, kind: "pickup", pickup_window_id: win.full, promised_at: P_1300, coupon_codes: [], loyalty_redeem_points: 0,
+    // G-12: the promise lies inside the (full) window it names; 13:30 is still in the 12:00–15:00 deal window.
+    const req = { outlet_id: OUT, channel_id: W.channel, brand_id: null, kind: "pickup", pickup_window_id: win.full, promised_at: ist(D1, "13:30"), coupon_codes: [], loyalty_redeem_points: 0,
       lines: [{ item_id: W.item, variant_id: VARIANT, option_ids: [], qty_milli: 1000, barcode: null }] };
-    const r = OrdersPreviewResponse.parse(await (await call("POST", "/v1/storefront/orders:preview", req)).json());
+    const r = StorefrontPreviewResponse.parse(await (await call("POST", "/v1/storefront/orders:preview", req)).json());
     expect(r).toMatchObject({ label: "preview", total_minor: 30240, tax_minor: 1440, discount_minor: 3200 });
     expect(r.refusals).toEqual([{ line_no: null, reason_code: "window_full" }]);
     expect(Number((await db.admin(`SELECT count(*) AS n FROM core."order" WHERE tenant_id = $1`, [W.tenant])).rows[0]!.n)).toBe(before);
@@ -433,7 +433,10 @@ describe("signed-in checkout, cancel, reschedule", () => {
       payload: { order_id: id, pickup_window_id: win.w1600, promised_at: P_1600, preview_total_minor: total } });
     const stale = await call("POST", `/v1/storefront/orders/${id}:reschedule`, body(30240), bearer(SUB));
     expect(stale.status).toBe(409);
-    expect(reason((await stale.json()) as any)).toBe("deal_rejudged");
+    const staleBody = (await stale.json()) as any;
+    expect(reason(staleBody)).toBe("deal_rejudged");
+    // G-11: the total the person saw and core's re-priced total (hand values above).
+    expect(staleBody.params).toEqual({ old_total_minor: 30240, new_total_minor: 33600, currency: "INR" });
     expect((await orderRow(id)).total_minor).toBe("30240");
     const ok = await call("POST", `/v1/storefront/orders/${id}:reschedule`, body(33600), bearer(SUB));
     expect(ok.status).toBe(200);

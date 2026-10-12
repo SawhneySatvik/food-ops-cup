@@ -20,7 +20,7 @@ import type { Queryable } from "../../runtoken/index.ts";
 import { advanceOrder, applyReprice, previewBody, quoteReprice, refuseIfTendered } from "../orders/index.ts";
 import { now } from "./config.ts";
 import { type CustomerPrincipal, refused } from "./checkout.ts";
-import { outletRow, ownRefusals } from "./read.ts";
+import { outletRow, ownRefusals, type PackRef, pricedPack } from "./read.ts";
 
 type Shopper = CustomerPrincipal | Extract<Principal, { kind: "guest" }>;
 
@@ -40,9 +40,11 @@ export async function getOrder(deps: Deps, who: Shopper, order_id: string) {
       await c.query<{
         id: string; outlet_id: string; kind: string; status: string; ticket_no: number; business_date: string; promised_at: Date | null;
         pickup_window_id: string | null; subtotal_minor: string; discount_minor: string; tax_minor: string; total_minor: string; currency: string; created_at: Date;
+        pack: PackRef; classes: Array<{ line_no?: unknown; tax_class?: unknown }> | null;
       }>(
         `SELECT id, outlet_id, kind, status, ticket_no, to_char(business_date, 'YYYY-MM-DD') AS business_date, promised_at, pickup_window_id,
-                subtotal_minor, discount_minor, tax_minor, total_minor, currency, created_at
+                subtotal_minor, discount_minor, tax_minor, total_minor, currency, created_at,
+                pricing_snapshot -> 'pack' AS pack, pricing_snapshot -> 'lines' AS classes
            FROM core."order" WHERE id = $1`, [order_id])
     ).rows[0];
     if (!o) throw new ApiError("not_found"); // RLS shows a shopper only their own order: someone else's looks absent
@@ -53,15 +55,24 @@ export async function getOrder(deps: Deps, who: Shopper, order_id: string) {
     // The outlet is public to a customer but not to a guest context; its two window columns are not secret.
     const w = await asSystem(c, async () =>
       (await c.query<{ cancel_window_min: number; reschedule_window_min: number }>(`SELECT cancel_window_min, reschedule_window_min FROM core.outlet WHERE id = $1`, [o.outlet_id])).rows[0]!);
+    // G-03: each line's tax class (as priced, in the order's snapshot) → that pack version's rate and component rates.
+    const pack = await pricedPack(c, o.pack);
+    const rates = (line_no: number) => {
+      const code = (Array.isArray(o.classes) ? o.classes : []).find((x) => x.line_no === line_no)?.tax_class;
+      const cls = pack.tax.classes.find((x) => x.code === code);
+      return { tax_rate_bp: cls ? cls.rate_bp : null, tax_component_rates: cls ? cls.components.map((k) => ({ code: k.code, rate_bp: k.rate_bp })) : [] };
+    };
     return {
       order_id: o.id, outlet_id: o.outlet_id, kind: o.kind, status: o.status, ticket_no: o.ticket_no, business_date: o.business_date,
       promised_at: o.promised_at ? iso(o.promised_at) : null, pickup_window_id: o.pickup_window_id,
       subtotal_minor: Number(o.subtotal_minor), discount_minor: Number(o.discount_minor), tax_minor: Number(o.tax_minor), total_minor: Number(o.total_minor),
       currency: o.currency, created_at: iso(o.created_at), cancel_window_min: w.cancel_window_min, reschedule_window_min: w.reschedule_window_min,
       pay_at_counter: true as const,
+      prices_include_tax: pack.tax.price_display === "inclusive",
       lines: lines.rows.map((l) => ({
         line_no: l.line_no, item_id: l.item_id, variant_id: l.variant_id, qty_milli: Number(l.qty_milli),
         unit_price_minor: Number(l.unit_price_minor), line_discount_minor: Number(l.line_discount_minor), tax_minor: Number(l.tax_minor),
+        ...rates(l.line_no),
       })),
       events: events.rows.map((e) => ({
         kind: e.kind, from_status: e.from_status, to_status: e.to_status,
@@ -151,7 +162,9 @@ export function rescheduleHandler(who: CustomerPrincipal, order_id: string): Com
       if (bad) throw refused(bad.reason_code);
       // The person confirms the re-priced total they saw; a deal that stopped (or started) applying at the new
       // time changes it, and nothing is written until they see the new figure (R4 §E 5).
-      if (quote.cart.totals.total_minor !== p.preview_total_minor) throw refused("deal_rejudged");
+      if (quote.cart.totals.total_minor !== p.preview_total_minor) {
+        throw refused("deal_rejudged", { old_total_minor: p.preview_total_minor, new_total_minor: quote.cart.totals.total_minor, currency: quote.cart.pack.doc.currency.code });
+      }
 
       if (p.pickup_window_id !== o.pickup_window_id) {
         if (p.pickup_window_id) {

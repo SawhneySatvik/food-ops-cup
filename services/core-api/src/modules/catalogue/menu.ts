@@ -16,6 +16,13 @@ export type MenuEntry = {
   name_key: string;
   variant_name_key: string | null;
   category: string;
+  brand_id: string | null;
+  /** 0029 owner-entered display text (plain text; null = show name_key). */
+  display_name: string | null;
+  description: string | null;
+  diet: "veg" | "non_veg" | "egg" | "vegan" | null;
+  variant_display_name: string | null;
+  variant_description: string | null;
   barcode: string | null;
   price_id: string;
   price_minor: number;
@@ -24,7 +31,8 @@ export type MenuEntry = {
   mrp_minor: number | null;
   available: boolean;
   option_groups: Array<{ option_group_id: string; name_key: string; min_select: number; max_select: number; required: boolean;
-    options: Array<{ option_id: string; name_key: string; price_delta_minor: number; currency: string }> }>;
+    display_name: string | null; description: string | null;
+    options: Array<{ option_id: string; name_key: string; price_delta_minor: number; currency: string; display_name: string | null; description: string | null }> }>;
   deals: Array<{ deal_id: string; name_key: string; kind: string; windows: DealWindow[] }>;
 };
 
@@ -34,7 +42,8 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
   const { business_date } = await outletClock(tx, outlet_id, opts.at ?? new Date());
   const rows = (await tx.query<EntryRow>(
     `WITH sellable AS (
-       SELECT i.id AS item_id, v.id AS variant_id, i.kind, i.name_key, v.name_key AS variant_name_key, i.category,
+       SELECT i.id AS item_id, v.id AS variant_id, i.kind, i.name_key, v.name_key AS variant_name_key, i.category, i.brand_id,
+              i.display_name, i.description, i.diet, v.display_name AS variant_display_name, v.description AS variant_description,
               CASE WHEN v.id IS NULL THEN i.barcode ELSE v.barcode END AS barcode, i.mrp_minor
          FROM core.item i
          LEFT JOIN core.variant v ON v.tenant_id = i.tenant_id AND v.item_id = i.id AND v.active
@@ -53,9 +62,11 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
 
   const itemIds = [...new Set(rows.map((r) => r.item_id))];
   const optionRows = (await tx.query<{ item_id: string; option_group_id: string; group_name_key: string; min_select: number; max_select: number; required: boolean;
-    option_id: string; name_key: string; price_delta_minor: string; currency: string }>(
+    group_display_name: string | null; group_description: string | null;
+    option_id: string; name_key: string; price_delta_minor: string; currency: string; display_name: string | null; description: string | null }>(
     `SELECT g.item_id, g.id AS option_group_id, g.name_key AS group_name_key, g.min_select, g.max_select, g.required,
-            o.id AS option_id, o.name_key, o.price_delta_minor, o.currency
+            g.display_name AS group_display_name, g.description AS group_description,
+            o.id AS option_id, o.name_key, o.price_delta_minor, o.currency, o.display_name, o.description
        FROM core.option_group g JOIN core.option o ON o.tenant_id = g.tenant_id AND o.option_group_id = g.id AND o.active
       WHERE g.item_id = ANY($1::uuid[]) ORDER BY g.name_key, g.id, o.name_key, o.id`, [itemIds])).rows;
   const deals = (await loadDeals(tx)).filter((d) =>
@@ -64,8 +75,9 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
   const entries: MenuEntry[] = rows.map((r) => {
     const groups = new Map<string, MenuEntry["option_groups"][number]>();
     for (const o of optionRows.filter((x) => x.item_id === r.item_id)) {
-      const g = groups.get(o.option_group_id) ?? { option_group_id: o.option_group_id, name_key: o.group_name_key, min_select: o.min_select, max_select: o.max_select, required: o.required, options: [] };
-      g.options.push({ option_id: o.option_id, name_key: o.name_key, price_delta_minor: Number(o.price_delta_minor), currency: o.currency });
+      const g = groups.get(o.option_group_id) ?? { option_group_id: o.option_group_id, name_key: o.group_name_key, min_select: o.min_select, max_select: o.max_select, required: o.required,
+        display_name: o.group_display_name, description: o.group_description, options: [] };
+      g.options.push({ option_id: o.option_id, name_key: o.name_key, price_delta_minor: Number(o.price_delta_minor), currency: o.currency, display_name: o.display_name, description: o.description });
       groups.set(o.option_group_id, g);
     }
     return {

@@ -17,6 +17,8 @@ export const TenancyProvisionV1 = z.strictObject({
 });
 
 export const OutletKind = z.enum(["restaurant", "cloud_kitchen", "store"]);
+/** The outlet's public phone number, E.164 (0029 core.outlet.phone; shown on the storefront, G-04). */
+export const OutletPhone = z.string().regex(/^\+[1-9][0-9]{6,14}$/);
 
 export const TenancyOutletCreateV1 = z.strictObject({
   outlet_id: Uuid7,
@@ -27,6 +29,8 @@ export const TenancyOutletCreateV1 = z.strictObject({
   address: z.string().min(1).max(500),
   /** Keyed by the pack's tax_ids[].code (e.g. GSTIN, FSSAI, ABN); values checked against its pattern. */
   tax_ids: z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().min(1).max(64)),
+  /** Optional (absent = none). */
+  phone: OutletPhone.nullable().optional(),
 });
 
 export const TenancyMemberInviteV1 = z.strictObject({
@@ -145,6 +149,8 @@ export const TenancyOutletUpdateV1 = z
     pickup_slot_min: Minutes(120, 5).optional(),
     pickup_lead_min: Minutes(1440).optional(),
     upi_vpa: z.string().regex(/^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9]{1,63}$/).nullable().optional(),
+    /** null clears it. */
+    phone: OutletPhone.nullable().optional(),
     business_day_cutoff: LocalTime.optional(),
     /** Replaces the weekly hours of all seven days. */
     hours: Hours.optional(),
@@ -246,6 +252,8 @@ export const OutletView = z.strictObject({
   pickup_lead_min: Minutes(1440),
   upi_vpa: z.string().nullable(),
   business_day_cutoff: ClockTime,
+  /** 0029: the outlet's public phone (E.164), null = none. */
+  phone: z.string().nullable(),
 });
 export const OutletsResponse = z.strictObject({ outlets: z.array(OutletView) });
 export const BrandsResponse = z.strictObject({ brands: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, outlet_ids: z.array(Uuid7), active: z.boolean() })) });

@@ -819,8 +819,25 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
 - **Gates:** `tests/cares-0028.test.ts` (incl. two-connection tests: concurrent hand-overs serialised by the listing lock; a
   withdraw committed mid-hand-over); the G2 case table of `tests/mc1d.test.ts` (each rule: matching row admitted, mismatches
   MB001, incl. a kg movement against a g line and UPDATEs of an existing batch); `db/tests/redproof-0028.sh` (one plant per
-  gate; `check name pattern [test file]`). Red-proof scripts plant `0029_redproof_plant.sql` now; `grants.test.ts` plants
-  `0029_planted.sql`.
+  gate; `check name pattern [test file]`). Red-proof scripts plant `0030_redproof_plant.sql` now (bumped by 0029);
+  `grants.test.ts` plants `0030_planted.sql`.
+
+**Storefront display text, outlet phone, the network listing's zone (0029, T-099; docs/kit/gaps.md G-01, G-04, G-14).**
+The header of 0029 is the full list. Additive: no row written, no table, policy, trigger, command type or derivation rule added.
+- **Display text (book columns):** `display_name` (1–120 chars) and `description` (1–500) on `core.item`, `core.variant`,
+  `core.option_group`, `core.option`; `core.item.diet` ∈ veg / non_veg / egg / vegan (a CHECK — the packs carry no diet
+  list). NULL = not set; a client shows `name_key`. Written only under `catalogue.item.upsert.v1` (its target_tables already
+  list the four tables; the guard binds them as any other column). Plain text — nothing renders them as HTML (gotcha 15).
+  There is no category table: `core.item.category` is already the owner's own text.
+- **`core.outlet.phone`:** E.164 CHECK `outlet_phone_check`; written under `tenancy.outlet.create.v1` / `.update.v1`. Which
+  tax ids the storefront shows is the pack's `tax_ids[].on_receipt`, not a column.
+- **Grants:** munim_core's UPDATE lists on the five tables are revoked and re-granted (prior lists + the new columns); no
+  other role gains a privilege on the new columns (munim_svc keeps its table-level SELECT and no write).
+- **`core.cares_network_listings`** returns a 10th column `outlet_tz` (= `core.outlet.tz`; G-14). Dropped and re-created
+  (the OUT list is its result type), owned by munim_crosstenant, EXECUTE munim_core only; munim_crosstenant now reads
+  `core.outlet` (tenant_id, id, name, tz). Same signature, so `assert_catalog`'s definer list is unchanged.
+- **Gates:** `tests/storefront-0029.test.ts` (D1 / D2 / GUARD / G / ISO / X1), the 0028 crosstenant assertion grown by
+  `tz`; `db/tests/redproof-0029.sh` (one plant per gate, plus 0029's own post-conditions re-run after each perturbation).
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

@@ -28,9 +28,10 @@ export const couponSet = {
 };
 const menuEntry = {
   item_id: u(20), variant_id: u(24), kind: "dish", name_key: "dish.paneer_tikka", variant_name_key: "dish.paneer_tikka.half", category: "starters",
+  brand_id: null, display_name: "Paneer Tikka (synthetic)", description: "Charred cottage cheese", diet: "veg", variant_display_name: "Half plate", variant_description: null,
   barcode: null, price_id: u(30), price_minor: 24900, currency: "INR", tax_class: "restaurant_5", mrp_minor: null, available: true,
-  option_groups: [{ option_group_id: u(25), name_key: "opt.extras", min_select: 0, max_select: 2, required: false,
-    options: [{ option_id: u(23), name_key: "opt.extra_paneer", price_delta_minor: 3000, currency: "INR" }] }],
+  option_groups: [{ option_group_id: u(25), name_key: "opt.extras", min_select: 0, max_select: 2, required: false, display_name: "Extras", description: null,
+    options: [{ option_id: u(23), name_key: "opt.extra_paneer", price_delta_minor: 3000, currency: "INR", display_name: "Extra paneer", description: null }] }],
   deals: [{ deal_id: u(50), name_key: "deal.tea_time_2for1", kind: "buy_x_get_y", windows: dealUpsert.windows }],
 };
 

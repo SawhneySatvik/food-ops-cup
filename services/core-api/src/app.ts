@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { CommandTypeMismatch, IdempotencyConflict } from "./commit/index.ts";
 import { ApiError, errorBody, fromSqlState } from "./lib/errors.ts";
 import { loadContracts } from "./lib/contracts.ts";
+import { cors } from "./lib/cors.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
 import { health } from "./health/index.ts";
 import { probe } from "./health/probe.ts";
@@ -15,6 +16,7 @@ export type { AppEnv, Deps } from "./lib/types.ts";
 export type { AppContext, Pools } from "./lib/db.ts";
 export { asSystem, createPool, withContext } from "./lib/db.ts";
 export { ApiError, errorBody, fromSqlState } from "./lib/errors.ts";
+export { parseCorsOrigins } from "./lib/cors.ts";
 export type { Identity, IdP } from "./auth/port.ts";
 export { IdpError } from "./auth/port.ts";
 export type { Principal, ShopperExtras, Storefront, StorefrontResolver } from "./auth/resolve.ts";
@@ -22,9 +24,17 @@ export {
   contextOf, GUEST_TOKEN_HEADER, requireCustomer, requireGuest, requireMember, requireOperator, STOREFRONT_KEY_HEADER, storefrontResolver, TENANT_HEADER,
 } from "./auth/resolve.ts";
 
-export async function createApp(deps: Deps): Promise<Hono<AppEnv>> {
+export interface AppOptions {
+  /** Exact browser origins allowed to call the public storefront / stream / Cares-network routes (lib/cors.ts, G-09);
+   *  the composition root passes `parseCorsOrigins(MUNIM_CORS_ORIGINS)`. Absent or empty = no CORS headers at all. */
+  corsOrigins?: readonly string[];
+}
+
+export async function createApp(deps: Deps, opts: AppOptions = {}): Promise<Hono<AppEnv>> {
   await loadContracts();
   const app = new Hono<AppEnv>();
+  // First: a preflight is answered before any router (and its rate limiter) sees it.
+  app.use(cors(opts.corsOrigins ?? []));
   app.use(async (c, next) => {
     c.set("deps", deps);
     await next();

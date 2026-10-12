@@ -20,7 +20,7 @@
 // sold at all); a sold-out line is priced and refused. Malformed requests (unknown item, an option that is
 // not the item's, a group's min/max broken) throw ApiError; an inactive item or variant, or one with no price
 // in force, is `conflict` / `item_unavailable` (it went off sale since the menu was read).
-import { citeRef, type ReasonCode } from "@munim/contracts";
+import { citeRef, type ReasonCode, type RefusalParams } from "@munim/contracts";
 import { DealRule, DealWindow } from "@munim/contracts/catalogue";
 import { CountryPack } from "@munim/contracts/packs";
 import { allocate, mulDiv } from "@munim/core-domain/money";
@@ -72,7 +72,8 @@ export type PricedLine = {
   coupon_refs: string[];
 };
 
-export type PriceRefusal = { line_no: number | null; reason_code: ReasonCode; code?: string };
+/** `params` (T-099, G-11): the refusal's typed parameters — the line's item, the coupon code, a min-spend shortfall. */
+export type PriceRefusal = { line_no: number | null; reason_code: ReasonCode; code?: string; params?: RefusalParams };
 
 export type PriceResult = {
   currency: string;
@@ -86,6 +87,8 @@ export type PriceResult = {
   discount_minor: number;
   tax_minor: number;
   total_minor: number;
+  /** The order's tax per pack component (e.g. CGST + SGST, or GST), summed over the lines by the pack engine. */
+  components: TaxAmount[];
   /** Tax the merchant owes vs. what an aggregator pays (pack tax_treatment). */
   own_liability_minor: number;
   operator_liability_minor: number;
@@ -211,7 +214,7 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
   const at = typeof req.at === "string" ? new Date(req.at) : req.at;
   const empty = (refusals: PriceRefusal[]): PriceResult => ({
     currency: pack.currency.code, business_date, tax_rule: { pack_code: pack.code, pack_version: pack.version }, lines: [], coupons: [],
-    subtotal_minor: 0, discount_minor: 0, tax_minor: 0, total_minor: 0, own_liability_minor: 0, operator_liability_minor: 0, refusals,
+    subtotal_minor: 0, discount_minor: 0, tax_minor: 0, total_minor: 0, components: [], own_liability_minor: 0, operator_liability_minor: 0, refusals,
   });
   // The channel itself (an aggregator the pack does not list) refuses the whole cart.
   const probe = orderTax(pack, { channel_kind: req.channel_kind, lines: [] });
@@ -224,13 +227,14 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
   for (const [i, l] of req.lines.entries()) {
     const f = await lineFacts(tx, req, l, business_date);
     const line_no = i + 1;
-    if (f.sold_out) refusals.push({ line_no, reason_code: "item_sold_out" });
+    const lineParams = { line_no, item_id: l.item_id, variant_id: l.variant_id };
+    if (f.sold_out) refusals.push({ line_no, reason_code: "item_sold_out", params: lineParams });
     const unit = f.price.amount_minor + f.options.reduce((a, o) => a + o.delta, 0);
     // MRP is checked by orderTax itself (pack rule) on the undiscounted unit; a line it refuses is not priced.
     const mrp = orderTax(pack, { channel_kind: req.channel_kind, lines: [{ name: l.item_id, qty_milli: l.qty_milli, unit_price_minor: f.price.amount_minor,
       option_delta_minor: unit - f.price.amount_minor, tax_class: f.price.tax_class, mrp_minor: f.mrp_minor }] });
     if (!mrp.ok) {
-      refusals.push({ line_no, reason_code: mrp.refusal.reason_code });
+      refusals.push({ line_no, reason_code: mrp.refusal.reason_code, params: lineParams });
       continue;
     }
     const amount = mulDiv(l.qty_milli, unit, 1000);
@@ -254,7 +258,7 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
     const seen = new Set<string>();
     for (const code of codes) {
       const c = rows.find((r) => r.code === code);
-      const refuse = (reason_code: ReasonCode) => refusals.push({ line_no: null, reason_code, code });
+      const refuse = (reason_code: ReasonCode, extra: RefusalParams = {}) => refusals.push({ line_no: null, reason_code, code, params: { code, ...extra } });
       if (!c || seen.has(code) || !c.active) {
         refuse("coupon_invalid");
         continue;
@@ -274,7 +278,7 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
         continue;
       }
       if (afterDeals < Number(c.min_spend_minor)) {
-        refuse("coupon_min_spend");
+        refuse("coupon_min_spend", { min_spend_minor: Number(c.min_spend_minor), shortfall_minor: Number(c.min_spend_minor) - afterDeals, currency: pack.currency.code });
         continue;
       }
       const left = work.map((w) => w.amount - w.deal - w.coupon);
@@ -314,7 +318,7 @@ export async function priceLines(tx: Queryable, req: PriceRequest): Promise<Pric
   const discount = lines.reduce((a, l) => a + l.line_discount_minor, 0);
   return {
     currency: t.currency, business_date, tax_rule: { pack_code: pack.code, pack_version: pack.version }, lines, coupons,
-    subtotal_minor: t.total_minor - t.tax_minor + discount, discount_minor: discount, tax_minor: t.tax_minor, total_minor: t.total_minor,
+    subtotal_minor: t.total_minor - t.tax_minor + discount, discount_minor: discount, tax_minor: t.tax_minor, total_minor: t.total_minor, components: t.components,
     own_liability_minor: t.own_liability_minor, operator_liability_minor: t.operator_liability_minor, refusals,
   };
 }

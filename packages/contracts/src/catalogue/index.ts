@@ -10,6 +10,17 @@ import { READ_ROUTES, READ_SCHEMAS } from "./read-routes.ts";
 export const ItemKind = z.enum(["dish", "sku", "combo"]);
 const Barcode = z.string().regex(/^[0-9A-Za-z-]{4,32}$/);
 
+// ── Owner-entered display text (0029, docs/kit/gaps.md G-01). Plain text: every client renders it as text, never as
+// HTML (gotcha 15); core stores it as typed. NULL = not set — a client shows the row's `name_key` (its i18n string, or a
+// title-cased slug). On an upsert an ABSENT field leaves the stored value as it is; `null` clears it.
+/** A display name as the owner typed it (core: 1–120 characters). */
+export const DisplayName = z.string().min(1).max(120);
+/** A short description as the owner typed it (core: 1–500 characters). */
+export const DisplayDescription = z.string().min(1).max(500);
+/** Diet mark of a dish or product (core CHECK; the country packs carry no diet list). */
+export const Diet = z.enum(["veg", "non_veg", "egg", "vegan"]);
+const display = { display_name: DisplayName.nullable().optional(), description: DisplayDescription.nullable().optional() };
+
 /** What choosing an option adds to (negative: removes from) the recipe's consumption. `unit` must equal
  *  the ingredient's base unit (refused with `unit_mismatch`, W1 fix #50). */
 export const OptionIngredientDelta = z.strictObject({
@@ -29,6 +40,7 @@ export const ItemOption = z
     currency: CurrencyCode,
     active: z.boolean(),
     ingredient_deltas: z.array(OptionIngredientDelta).max(50),
+    ...display,
   })
   .superRefine((o, ctx) => {
     const ids = o.ingredient_deltas.map((d) => d.ingredient_id);
@@ -43,13 +55,14 @@ export const OptionGroup = z
     max_select: z.int().min(1),
     required: z.boolean(),
     options: z.array(ItemOption).min(1).max(50),
+    ...display,
   })
   .superRefine((g, ctx) => {
     if (g.max_select < g.min_select) ctx.addIssue({ code: "custom", path: ["max_select"], message: "max_select ≥ min_select" });
     if (g.required && g.min_select < 1) ctx.addIssue({ code: "custom", path: ["min_select"], message: "a required group selects at least one" });
   });
 
-export const ItemVariant = z.strictObject({ variant_id: Uuid7, name_key: Slug, barcode: Barcode.nullable(), active: z.boolean() });
+export const ItemVariant = z.strictObject({ variant_id: Uuid7, name_key: Slug, barcode: Barcode.nullable(), active: z.boolean(), ...display });
 
 const itemFields = {
   item_id: Uuid7,
@@ -66,6 +79,8 @@ const itemFields = {
   active: z.boolean(),
   variants: z.array(ItemVariant).max(50),
   option_groups: z.array(OptionGroup).max(20),
+  ...display,
+  diet: Diet.nullable().optional(),
 };
 
 const mrpPair = (i: { mrp_minor: number | null; currency: string | null }, ctx: z.RefinementCtx) => {
@@ -203,7 +218,9 @@ export const COUPON_SET_DRAFT = defineDraftable("catalogue.coupon.set.v1", Catal
 // ── Reads. Every number is a row's own field (R26): price ← core.price.amount_minor, option delta ←
 // core.option.price_delta_minor, MRP ← core.item.mrp_minor. No totals here — carts are priced by the
 // pricing function (orders preview / place).
-export const MenuOption = z.strictObject({ option_id: Uuid7, name_key: Slug, price_delta_minor: MinorAmount, currency: CurrencyCode });
+/** The stored display text (0029): plain text, null when the owner set none (show `name_key`). */
+const shown = { display_name: z.string().nullable(), description: z.string().nullable() };
+export const MenuOption = z.strictObject({ option_id: Uuid7, name_key: Slug, price_delta_minor: MinorAmount, currency: CurrencyCode, ...shown });
 export const MenuOptionGroup = z.strictObject({
   option_group_id: Uuid7,
   name_key: Slug,
@@ -211,6 +228,7 @@ export const MenuOptionGroup = z.strictObject({
   max_select: z.int().min(1),
   required: z.boolean(),
   options: z.array(MenuOption),
+  ...shown,
 });
 /** One sellable (item, variant) at an outlet and channel, with the price row in force now. */
 export const MenuEntry = z.strictObject({
@@ -220,6 +238,15 @@ export const MenuEntry = z.strictObject({
   name_key: Slug,
   variant_name_key: Slug.nullable(),
   category: z.string(),
+  /** core.item.brand_id (multi-brand kitchens); null = no brand. */
+  brand_id: Uuid7.nullable(),
+  /** The item's display text and diet mark (0029); null = not set. */
+  display_name: z.string().nullable(),
+  description: z.string().nullable(),
+  diet: Diet.nullable(),
+  /** The variant's display text; null for an item sold as itself, or not set. */
+  variant_display_name: z.string().nullable(),
+  variant_description: z.string().nullable(),
   barcode: z.string().nullable(),
   price_id: Uuid7,
   price_minor: MinorAmount,
