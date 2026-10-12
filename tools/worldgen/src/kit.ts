@@ -75,7 +75,9 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
   // R47 D2: no budget row means AI declines. The operator proposes this month's row and approves it, the way budgets are set (R24).
   // The month is the timeline's last (the real current month when as-of is today). Skipped, loudly in the CLI, when no operator is signed in.
   if (api.hasOperator) {
-    const draft = api.id("config_draft:llm_budget");
+    // The draft id is global (platform.config_draft), so it carries the tenant: without it a second business with the same seed
+    // and world replays/collides with the first's draft. Logged under an alias because the tenant id is server-minted.
+    const draft = api.alias(api.id(`config_draft:llm_budget:${api.tenantId}`), "draft:llm_budget");
     await api.post("operator", "/platform/v1/config-drafts", {
       draft_id: draft, target: `llm_budget:${api.tenantId}`, patch: { month: `${c.asOf.slice(0, 7)}-01`, limit_minor: 500000, currency },
     }, { noTenant: true });
