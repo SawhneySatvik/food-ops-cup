@@ -39,7 +39,8 @@ stock count per outlet per instant, A2A endpoints only on simulated suppliers, q
 the `ingest` run trigger, `finance.settlement_vs_orders` v3), 0025 W3 close (`intel.investigation_cost_estimate` v2 per
 remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`), 0026 W3 founder decisions (R47: per-role AI
 prices on `platform.model_role`, negotiation bounds on `core.business_policy`, `people.labour_vs_demand` v2 at the extra staff's
-rate, `purchasing.deal_inputs` v3 with shop SKU margins) — gates see 25 applied.
+rate, `purchasing.deal_inputs` v3 with shop SKU margins), 0027 T-098 (stop reason `ceiling`: a lowered ceiling downgrades a
+running Auto investigation to Plan; Auto entered only with the plan approval) — gates see 26 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -717,6 +718,24 @@ snapshot of these is v2 — **callers below must change**). The formula notes ar
   per-row rate against the hand derivation above, with the two-bill slot-days counted from `core.order` directly; the store's
   atta 1,115 / sugar 1,458 / carry bag NULL-and-false); `db/tests/redproof-0026.sh`. Red-proof scripts plant
   `0027_redproof_plant.sql` now; `grants.test.ts` plants `0027_planted.sql`.
+
+**Auto downgraded to Plan on a lowered ceiling (0027, T-098; ledger R45 F10).**
+- **`stop_reason` gains `ceiling`** (CHECK `investigation_stop_reason_check`, re-added under its 0020 name).
+- **A ceiling stop is the downgrade.** An UPDATE that sets `stop_reason = 'ceiling'` on an `auto` row without touching `mode`
+  also sets `mode = 'plan'` (BEFORE UPDATE trigger `ceiling_downgrade`). core-worker (`munim_svc`) writes
+  `SET stop_reason = 'ceiling'` alone. **`munim_svc` still holds no UPDATE on `mode`** (0020's five columns, asserted again by
+  0027): it can write no mode itself, so plan/step → auto and auto → step are refused by privilege (42501). CHECK
+  `investigation_ceiling_not_auto` (no `ceiling` on an `auto` row) makes a missing trigger fail closed. A later step clears
+  the reason; the row stays `plan`.
+- **Auto is entered only with the plan approval** (trigger `auto_entry`, MB004 `illegal_transition`): an UPDATE moving
+  `mode` into `auto` must set `plan_approved_by` from NULL in the same row write — exactly core-api's approveAuto. A plan is
+  approved once (0020), so a downgraded (or otherwise de-Auto'd) investigation never re-enters Auto by any role, and its
+  unrevoked grant stays inert. The condition reads `plan_approved_by`: `plan_approved_at` is stamped by
+  `investigation_rules`, which fires after `auto_entry` (trigger name order).
+- **The standing grant is not revoked** (`munim_svc` cannot: grant_rules needs the signed-in member). It is inert: an auto
+  step and an `auto_step` run both need `mode = 'auto'` (MB015 after the downgrade, gated).
+- **Gates:** `tests/ceiling-0027.test.ts` (each refusal paired with an accept); `db/tests/redproof-0027.sh`. Red-proof
+  scripts plant `0028_redproof_plant.sql` now; `grants.test.ts` plants `0028_planted.sql`.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

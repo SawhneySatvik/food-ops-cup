@@ -5,7 +5,8 @@
 //     (loadSnapshots), shows as `restricted`: no verdict, no refs, no narration segment;
 //   - the investigation's own status (view, list, SSE `inbox.investigation`) is `restricted` unless the viewer can open
 //     every template the playbook judges on (its items and its residual) — `done` or `no_driver_found` would otherwise
-//     tell them the verdict.
+//     tell them the verdict. Its stop reason is hidden with it, except `ceiling` to the investigation's creator (T-098
+//     ruling): it says only that the owner lowered their role's ceiling, so their Auto run is now Plan — no verdict, no data.
 import { PLAYBOOKS } from "@munim/core-domain/investigations";
 import type { Queryable } from "../../runtoken/index.ts";
 import { TEMPLATE_RANK } from "../approvals/index.ts";
@@ -32,6 +33,10 @@ export async function statusVisible(q: Queryable, role: string, playbookIds: rea
   const mins = await minRoles(q, ids.flatMap(templatesOf));
   return new Set(ids.filter((p) => templatesOf(p).length > 0 && templatesOf(p).every((t) => roleOpens(role, mins.get(t)))));
 }
+
+/** The stop reason shown beside a `restricted` status: `ceiling` to the investigation's creator, otherwise none. */
+export const restrictedStopReason = (stopReason: string | null, createdBy: string, viewerId: string | undefined): "ceiling" | null =>
+  stopReason === "ceiling" && viewerId !== undefined && createdBy === viewerId ? "ceiling" : null;
 
 /** Every playbook id this module knows: the list's status filter is limited to the ones the viewer may read. */
 export const PLAYBOOK_IDS = Object.keys(PLAYBOOKS);

@@ -26,7 +26,7 @@ import { contextOf, type Principal } from "../auth/resolve.ts";
 import { type AppContext, withContext } from "../lib/db.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { Deps } from "../lib/types.ts";
-import { statusVisible } from "../modules/investigations/redact.ts";
+import { restrictedStopReason, statusVisible } from "../modules/investigations/redact.ts";
 import type { Channel, Hub, Listener } from "./hub.ts";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -407,8 +407,8 @@ export class Feed implements Listener {
       const rows = await this.read(async (db) => {
         const common = [floor, page.ts, page.id, upTo?.ts ?? null, upTo?.id ?? null];
         if (part === "v") {
-          const rows = (await db.query<Row & { status: string; mode: string; stop_reason: string | null; playbook_id: string; outlet_scope: string[] }>(
-            `SELECT id, status, mode, stop_reason, playbook_id, outlet_scope::text[] AS outlet_scope, ${tsSql("updated_at")} AS ts
+          const rows = (await db.query<Row & { status: string; mode: string; stop_reason: string | null; playbook_id: string; outlet_scope: string[]; created_by: string }>(
+            `SELECT id, status, mode, stop_reason, playbook_id, outlet_scope::text[] AS outlet_scope, created_by, ${tsSql("updated_at")} AS ts
                FROM core.investigation
               WHERE updated_at > $1::timestamptz - interval '${LOOKBACK_S} seconds'
                 AND (updated_at, id) > ($2::timestamptz, $3::uuid)
@@ -417,9 +417,10 @@ export class Feed implements Listener {
             common,
           )).rows;
           // R-D: the status (and the stop reason, which can name the verdict) is `restricted` / null unless this
-          // subscriber may open every template the playbook judges on.
+          // subscriber may open every template the playbook judges on (the creator still sees `ceiling`, redact.ts).
           const visible = await statusVisible(db, this.ctx.role ?? "", rows.map((x) => x.playbook_id));
-          return rows.map((x) => (visible.has(x.playbook_id) ? x : { ...x, status: "restricted", stop_reason: null }));
+          return rows.map((x) => (visible.has(x.playbook_id) ? x
+            : { ...x, status: "restricted", stop_reason: restrictedStopReason(x.stop_reason, x.created_by, this.ctx.member_id) }));
         }
         if (part === "f") {
           return (await db.query<Row & { status: string; pack: string; type: string; severity: string; outlet_ids: string[] }>(

@@ -5,7 +5,9 @@
 //           0 narration segments and 0 resolved refs (finance.close_status / finance.margin_bridge are advisor+); the
 //           manager's list shows `restricted` and ?status= never matches a restricted row; on SSE the manager's
 //           `inbox.investigation` events carry `restricted`, the owner's the real status; stop_reason (which can name the
-//           verdict: `waiting`) is null wherever the status is restricted, checked on a Plan run stopped at waiting
+//           verdict: `waiting`) is null wherever the status is restricted, checked on a Plan run stopped at waiting;
+//           T-098: `ceiling` alone is shown to the investigation's creator beside a restricted status (SSE: the creating
+//           manager's events read restricted/ceiling, a second outlet-1 manager's restricted/null, the owner's the real status)
 //   item 4  the ceiling is re-checked before every plan step: the owner's ceiling lowered to `step` mid-plan, or the
 //           member demoted to staff mid-plan → 1 step, stop_reason scope (paired: unchanged → 2 steps)
 //   item 5  linking the narration moves the investigation (updated_at ≥ the answer's time, so SSE re-reads it); a step's
@@ -203,6 +205,34 @@ describe("R-D item 2: verdicts redacted per viewer", () => {
     expect(new Set(mgr.events.filter(mine).map((e) => `${e.data.status}/${e.data.stop_reason}`))).toEqual(new Set(["restricted/null"]));
     owner.close();
     mgr.close();
+  });
+
+  it("T-098 SSE: a ceiling stop reads restricted/ceiling to the creating manager, restricted/null to another manager, the real status to the owner", async () => {
+    const mgr2Sub = `manager2-${uuidv7()}`;
+    await db.withContext("munim_core", { tenant_id: A.tenant, outlet_ids: "*", role: "owner", member_id: A.owner, command_type: "tenancy.member.invite.v1" }, async (c) => {
+      const mgr2 = uuidv7();
+      await c.query(`INSERT INTO core.member (tenant_id, id, idp_sub, name, email) VALUES ($1, $2, $3, 'Second Manager', $4)`, [A.tenant, mgr2, mgr2Sub, `${mgr2Sub}@example.test`]);
+      await c.query(`INSERT INTO core.membership (tenant_id, member_id, role, outlet_ids) VALUES ($1, $2, 'manager', $3)`, [A.tenant, mgr2, [A.outlets[0]]]);
+    });
+    const server = await new Promise<{ port: number }>((ok) => { servers.push(serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, (i) => ok({ port: i.port }))); });
+    const owner = await subscribe(A, A.ownerSub, server.port);
+    const mgr = await subscribe(A, A.managerSub, server.port);
+    const other = await subscribe(A, mgr2Sub, server.port);
+    await Promise.all([owner.ready, mgr.ready, other.ready]);
+    const cid = await create(A, A.managerSub, "plan");
+    // core-worker's ceiling stop, as auto.ts writes it (a plan row keeps its mode; 0027).
+    await db.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, (c) =>
+      c.query(`UPDATE core.investigation SET stop_reason = 'ceiling' WHERE id = $1`, [cid]));
+    const mine = (e: Ev) => e.type === "inbox.investigation" && e.id === cid && e.data.stop_reason !== null;
+    const ceil = (e: Ev) => e.type === "inbox.investigation" && e.id === cid && e.data.status === "restricted";
+    expect(await until(() => mgr.events.some(mine) && owner.events.some(mine) && other.events.filter(ceil).length >= 2, 5_000)).toBe(true);
+    const shown = (s: { events: Ev[] }) => [...new Set(s.events.filter((e) => e.type === "inbox.investigation" && e.id === cid).map((e) => `${e.data.status}/${e.data.stop_reason}`))].sort();
+    expect(shown(mgr)).toEqual(["restricted/ceiling", "restricted/null"]);
+    expect(shown(other)).toEqual(["restricted/null"]);
+    expect(shown(owner)).toEqual(["open/ceiling", "open/null"]);
+    owner.close();
+    mgr.close();
+    other.close();
   });
 });
 

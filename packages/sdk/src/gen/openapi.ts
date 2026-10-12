@@ -7125,7 +7125,7 @@ export interface components {
             mode: "step" | "plan" | "auto";
             /** @enum {string} */
             status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted" | "restricted";
-            stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
+            stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting" | "ceiling") | null;
             created_by: components["schemas"]["Uuid7"];
             steps_done: number;
             max_steps: number;
@@ -7223,7 +7223,7 @@ export interface components {
                 mode: "step" | "plan" | "auto";
                 /** @enum {string} */
                 status: "open" | "waiting" | "done" | "no_driver_found" | "cannot_verify" | "cancelled" | "exhausted" | "restricted";
-                stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting") | null;
+                stop_reason: ("draft" | "abstain" | "budget" | "scope" | "waiting" | "ceiling") | null;
                 created_by: components["schemas"]["Uuid7"];
                 steps_done: number;
                 max_steps: number;

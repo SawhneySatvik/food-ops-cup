@@ -12,7 +12,12 @@
 //   (3)  outlet narrowed → the {o1,o2} investigation is cancelled, 0 new snapshots; the {o1} one steps and its new
 //        snapshots count 0 outlet-2 trading days, where the un-narrowed step counted 1 (the planted outlet-2 day)
 //   (4)  at the cap → 0 resumptions, stop_reason budget, 0 model calls; the limit raised → 1 step (paired)
-//   (5)  ceiling lowered → 0 auto steps, stop_reason scope (paired: the owner's resumes in the same pass)
+//   (5)  ceiling lowered → 0 auto steps, downgraded to Plan: mode plan, stop_reason ceiling (paired: the owner's resumes in
+//        the same pass)
+//   T-098 ceiling lowered with no new data → the same day: mode plan, stop_reason ceiling, 0 steps, 1 inbox NOTIFY, grant
+//        unrevoked but no longer resumed (paired: the owner's Auto stays Auto); the creator's `:continue` then steps once.
+//        The creating manager's own view and list keep status `restricted` and every item as before, and now show
+//        stop_reason `ceiling` (null before the downgrade, where the reason was `waiting`)
 //   role a manager's Auto step mints no template above the manager's role (0 advisor-level snapshots; the owner's > 0)
 // Hand counts: on this world the margin_fall gate (data_complete) waits only on `bank_imported` for September and August
 // 2026 (no bank lines; no completed orders, so pos_days_closed and settlements_imported are done), so every step ends
@@ -374,7 +379,7 @@ describe("T-089b (4): at the cap", () => {
 });
 
 describe("T-089b (5) ceiling lowered, and the creator's role on Auto snapshots", () => {
-  it("a manager's Auto step mints no advisor-level template (the owner's does); the manager's ceiling lowered → 0 auto steps, stop_reason scope; the owner's resumes", async () => {
+  it("a manager's Auto step mints no advisor-level template (the owner's does); the manager's ceiling lowered → 0 auto steps, downgraded to Plan (stop_reason ceiling); the owner's resumes", async () => {
     const A = await tenant("ceiling");
     expect((await ceiling(A, "manager", "auto")).status).toBe(200);
     const mgr = await approved(A, A.managerSub, "auto");
@@ -391,7 +396,60 @@ describe("T-089b (5) ceiling lowered, and the creator's role on Auto snapshots",
     await arrive(A);
     expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 0, budget: 0, ceiling: 1 });
     expect(await steps(mgr)).toEqual([{ step_no: 1, triggered_by: "plan" }, { step_no: 2, triggered_by: "auto" }]);
-    expect(await row(mgr)).toMatchObject({ mode: "auto", status: "waiting", stop_reason: "scope", steps_done: 2 });
+    expect(await row(mgr)).toMatchObject({ mode: "plan", status: "waiting", stop_reason: "ceiling", steps_done: 2 });
     expect((await steps(own)).length).toBe(3);
+  });
+});
+
+describe("T-098 ceiling lowered → downgraded to Plan", () => {
+  it("no new data: mode plan, stop_reason ceiling, 0 steps, 1 inbox NOTIFY, grant unrevoked and not resumed; the owner's stays Auto; the creator's :continue steps once", async () => {
+    const A = await tenant("downgrade");
+    expect((await ceiling(A, "manager", "auto")).status).toBe(200);
+    const mgr = await approved(A, A.managerSub, "auto");
+    const own = await approved(A, A.ownerSub, "auto");
+    const mgrView = async () => InvestigationView.parse(await (await call(A, A.managerSub, `/v1/investigations/${mgr}`)).json());
+    const before = await mgrView();
+    expect([before.status, before.stop_reason]).toEqual(["restricted", null]);
+    expect((await ceiling(A, "manager", "plan")).status).toBe(200);
+    const listen = await db.connect("admin");
+    const got: string[] = [];
+    listen.on("notification", (n) => { if (n.channel === "munim_inbox") got.push(n.payload ?? ""); });
+    await listen.query("LISTEN munim_inbox");
+    let tally: Awaited<ReturnType<typeof daily>> | undefined;
+    try {
+      calls.length = 0;
+      tally = await daily(A, later());
+      await new Promise((r) => setTimeout(r, 300));
+    } finally {
+      await listen.end();
+    }
+    expect(tally).toEqual({ resumed: 0, steps: 0, cancelled: 0, budget: 0, ceiling: 1 });
+    expect(calls.length).toBe(0);
+    expect(await row(mgr)).toMatchObject({ mode: "plan", status: "waiting", stop_reason: "ceiling", steps_done: 1 });
+    expect(await steps(mgr)).toEqual([{ step_no: 1, triggered_by: "plan" }]);
+    expect(got.filter((p) => p === `${A.tenant}:${mgr}`).length).toBe(1);
+    expect(await row(own)).toMatchObject({ mode: "auto", status: "waiting", stop_reason: "waiting", steps_done: 1 });
+    expect(await count(`SELECT count(*) n FROM core.investigation_grant WHERE investigation_id = $1 AND revoked_at IS NULL`, [mgr])).toBe(1);
+    // The view carries the new reason (contracts StopReason): to the owner with the status; to the creating manager beside a
+    // status still `restricted`, every item as before (T-098 ruling: `ceiling` names only the owner's change).
+    const v = InvestigationView.parse(await (await call(A, A.ownerSub, `/v1/investigations/${mgr}`)).json());
+    expect([v.mode, v.status, v.stop_reason]).toEqual(["plan", "waiting", "ceiling"]);
+    const after = await mgrView();
+    expect([after.mode, after.status, after.stop_reason]).toEqual(["plan", "restricted", "ceiling"]);
+    expect(after.checklist).toEqual(before.checklist);
+    expect(after.resolved_refs).toEqual(before.resolved_refs);
+    const list = (await (await call(A, A.managerSub, "/v1/investigations")).json()) as { items: Array<{ investigation_id: string; status: string; stop_reason: string | null }> };
+    expect(list.items.filter((x) => x.investigation_id === mgr).map((x) => [x.status, x.stop_reason])).toEqual([["restricted", "ceiling"]]);
+    // Downgraded: no later pass resumes it, new data or not.
+    await arrive(A);
+    expect(await daily(A, later())).toEqual({ resumed: 1, steps: 1, cancelled: 0, budget: 0, ceiling: 0 });
+    expect(await steps(mgr)).toEqual([{ step_no: 1, triggered_by: "plan" }]);
+    expect((await steps(own)).length).toBe(2);
+    // The creator steps it under Plan.
+    const r = await call(A, A.managerSub, `/v1/investigations/${mgr}:continue`, { step_no: 2 });
+    expect(r.status).toBe(200);
+    InvestigationView.parse(await r.json());
+    expect(await steps(mgr)).toEqual([{ step_no: 1, triggered_by: "plan" }, { step_no: 2, triggered_by: "member" }]);
+    expect(await row(mgr)).toMatchObject({ mode: "plan", status: "waiting", stop_reason: null, steps_done: 2 });
   });
 });

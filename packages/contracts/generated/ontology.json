@@ -22011,7 +22011,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "b8d8e32b64fa5a01c79a72d70ff352507d84b2bc4bb04d40f0af683c7be5d0ad",
+      "sha256": "a4cd4e9463aaf48d4387b5ecb2fced0c833aa64596400762beb2d68108edb3b3",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -22039,6 +22039,7 @@
         "db/migrations/0024_w32_review_fixes.sql": "542c06a388851d28213590315aadc943a746042d367792dc2429e29a14ad8d9e",
         "db/migrations/0025_w3_close.sql": "f8f4905e79d0075f17e83dbaaf16ee13974a9ee3a8079b9bd3944cd71c15f044",
         "db/migrations/0026_w3_founder_decisions.sql": "630263c2987034b46683c3d78ef64ce662af12a09a238dc71b227fe99f2bc7bf",
+        "db/migrations/0027_t098_auto_ceiling_downgrade.sql": "6ccaf968169f7bcb98b920846d900c78bdefcf7a321cf0a562b1b214cc1dd861",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "ece9e7887aafb6e07cf090e916693d32549f9423b1620651cd3a2b5474408779",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -22063,7 +22064,7 @@
         "packages/contracts/src/internal/index.ts": "e39f052df45c7605f29571eac69469d2f5e0470cb2f28190e4a0d8ac8ae9cc95",
         "packages/contracts/src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
         "packages/contracts/src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
-        "packages/contracts/src/investigations/index.ts": "f6ce47fd1c3a022b6633dfd4189bdf917c1dc7842d4ada3206efe7a8a4f40901",
+        "packages/contracts/src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
         "packages/contracts/src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
         "packages/contracts/src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
         "packages/contracts/src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",

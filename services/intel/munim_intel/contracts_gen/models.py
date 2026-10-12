@@ -9470,7 +9470,7 @@ class V1Investigation(BaseModel):
     outlet_scope: OutletScope | OutletScope1
     mode: Literal['step', 'plan', 'auto']
     status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted', 'restricted']
-    stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting'] | None
+    stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting', 'ceiling'] | None
     created_by: Uuid7
     steps_done: Annotated[int, Field(ge=0, le=9007199254740991)]
     max_steps: Annotated[int, Field(ge=1, le=10)]
@@ -9492,7 +9492,7 @@ class Item19(BaseModel):
     outlet_scope: OutletScope | OutletScope1
     mode: Literal['step', 'plan', 'auto']
     status: Literal['open', 'waiting', 'done', 'no_driver_found', 'cannot_verify', 'cancelled', 'exhausted', 'restricted']
-    stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting'] | None
+    stop_reason: Literal['draft', 'abstain', 'budget', 'scope', 'waiting', 'ceiling'] | None
     created_by: Uuid7
     steps_done: Annotated[int, Field(ge=0, le=9007199254740991)]
     max_steps: Annotated[int, Field(ge=1, le=10)]

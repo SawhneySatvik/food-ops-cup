@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "73d0ecd21a81e7520090513339f83e3d61110bf6e492625d1721a1d2cb800645",
+    "sha256": "f3ec6e71dd2b4168a96d3d02a541c520ffcaba8612b2c3d4604bb2031dd88261",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "7ef211308a14666fb9e14238d265da0c390d5f3a9d346eb76b888959119f9c8c",
@@ -30,7 +30,7 @@
       "src/internal/index.ts": "e39f052df45c7605f29571eac69469d2f5e0470cb2f28190e4a0d8ac8ae9cc95",
       "src/inventory/index.ts": "5e86ebde9c1ba8abdbe145767a2c2749d148e17142d61c8a3392958367175dd9",
       "src/inventory/read-routes.ts": "4bc4a105e8ee2e1c698ce8c41e42547254d4c03c95c08e0618c42001cba8c67a",
-      "src/investigations/index.ts": "f6ce47fd1c3a022b6633dfd4189bdf917c1dc7842d4ada3206efe7a8a4f40901",
+      "src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
       "src/kitchen/events.ts": "51e30a07a598aba795460c02cdfa82664edb796fe5a6f9922e3605a36c513447",
       "src/kitchen/index.ts": "e7e7d0d31a5f4c5c5799afa9d787835bc7dca47b7cf824d1386a765cc9d4667e",
       "src/lineage/index.ts": "838d8f3cab96374678cf65c2d94443dcd11336c220ba7d24e64a8be4e8c65694",
@@ -73,7 +73,7 @@
     }
   },
   "outputs": {
-    "sha256": "42085ce5c7c06e1d169f12c066abf9a78147d2570e679635bc6ca0b6bec0acd4",
+    "sha256": "5d9baedafae3b9d4927559d454c6d754deaf443304cb706696f63823233e0609",
     "files": {
       "packages/contracts/generated/json-schema/ai_policy.cap.set.v1.schema.json": "228d897944481f937931e9b4ae34e80c21c534892a782c25aa1202cbbc374a83",
       "packages/contracts/generated/json-schema/ai_policy.ceiling.set.v1.schema.json": "9d5c5260af71c0a0cb09f5a29fc98f1456aff30fe2daad1785bf98f0f034eeaf",
@@ -384,8 +384,8 @@
       "packages/contracts/generated/json-schema/v1.investigation.cancel.request.schema.json": "1b14e8be6b9c2fbc0b551f5e3150c772d3c74061bfe4bc725d3ef54d9293e620",
       "packages/contracts/generated/json-schema/v1.investigation.continue.request.schema.json": "2075a6970f01322a68f53e9f1d725bdc9e118d6a1c7c94f7e935184ce0d3d87d",
       "packages/contracts/generated/json-schema/v1.investigation.create.request.schema.json": "7dd9c003c4a0b3024743f2ad948a610efc36200d4576eca9caba765991ecc7b7",
-      "packages/contracts/generated/json-schema/v1.investigation.schema.json": "495c32f44455b567bb91eec3bdeb7d7519f73b874eab563b15840fb3573e8c06",
-      "packages/contracts/generated/json-schema/v1.investigations.response.schema.json": "0bcad5ec5efdf64d6ebe3fad9282e37144c96be852245e932b3ed46095da8e51",
+      "packages/contracts/generated/json-schema/v1.investigation.schema.json": "5cb0cadec7a8690a0c108b6e04fe7be6cb2eaf566a8c48976234e19d19d313e6",
+      "packages/contracts/generated/json-schema/v1.investigations.response.schema.json": "d66f6163b4a24ef628f46c9c869f6468c0caada3e872c8702f747227afe14a5b",
       "packages/contracts/generated/json-schema/v1.kds.board.schema.json": "d78e0502b43a69cab74fd34c464803ac66f56849aa01415ed5d455c8497d7c38",
       "packages/contracts/generated/json-schema/v1.kitchen.prep_list.schema.json": "f5cd7e554f02b4dd92964ee75e2e9cbcac7fe3f546a8ef15db09bff7678f047f",
       "packages/contracts/generated/json-schema/v1.lineage.draft.schema.json": "094aa69778836deba644c102e22345024e8c3e395d3d152f7536005ca618cb2c",
@@ -432,12 +432,12 @@
       "packages/contracts/generated/json-schema/v1.wiki.page.schema.json": "ecc53d79b450ef1be0ef23cea8f1871dd62b01ab584ed2ecf7154813820457ee",
       "packages/contracts/generated/json-schema/v1.wiki.pages.schema.json": "09d6180befde63a25f3e761415a6272019b5dd806eb84c87c490776c0e63cd02",
       "packages/contracts/generated/json-schema/v1.wiki.versions.schema.json": "42aa36edb9167c1a83959039d5fdd48678ec7780cecadeb6462effae9cbb8b52",
-      "packages/contracts/generated/openapi/internal.json": "6e6ddadf370c1c56bfd869515ba19098ba1866bc8f0b4d084b46290d99b0eb51",
-      "packages/contracts/generated/openapi/public.json": "3ff509a859e7bbd12501ded08422b7ca45041f142bc1bad38bfd64fd9961f5ca",
+      "packages/contracts/generated/openapi/internal.json": "357ae83658c082a99ce64af5ac39e08b06a897131b7b8f8980224f11d2c58b5e",
+      "packages/contracts/generated/openapi/public.json": "0b7827962d1f5efd104807aab9e81c0c17abafa2e89db346bf839dbb17302887",
       "packages/sdk/src/gen/client.ts": "f6a1cc0e9de4db74f7867746f6e8e987db5eda5939eb1f6ed0bf739b1b03dd40",
-      "packages/sdk/src/gen/openapi.ts": "d021a3ee89f026300713453b5b639e30a88ec3eea67d6a8f87ea2dae8cefc3ed",
+      "packages/sdk/src/gen/openapi.ts": "8770087cd42252935a20852e672f512534e07df0ac518fb1c09faff252dc576c",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "2b9fa1f03af5d3f559a83826a1cc8cee73b08dec49c0b9cb62b3901adb0652ed",
+      "services/intel/munim_intel/contracts_gen/models.py": "71587953386051ec164595ebbe4e7ddb4ee494ee0f3fdcdf281345a288b4b60c",
       "services/intel/munim_intel/contracts_gen/names.py": "7be8a3fe0684f74653f620fcdc9ebea6791991327b02e5290366d8b548f4f338"
     }
   }

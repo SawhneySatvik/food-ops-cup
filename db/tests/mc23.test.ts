@@ -505,7 +505,8 @@ describe("F11 the standing grant behind Auto", () => {
     const live = (await db.admin(`SELECT id FROM core.investigation_grant WHERE tenant_id = $1 AND investigation_id = $2 AND revoked_at IS NULL`, [A.tenant, inv])).rows[0]!.id;
     await db.withContext("munim_core", mctx(), (c) => c.query(`UPDATE core.investigation SET mode = 'plan' WHERE tenant_id = $1 AND id = $2`, [A.tenant, inv]));
     const planMode = await attempt(db, "munim_svc", svc(), ...autoStep(live));
-    await db.withContext("munim_core", mctx(), (c) => c.query(`UPDATE core.investigation SET mode = 'auto' WHERE tenant_id = $1 AND id = $2`, [A.tenant, inv]));
+    // Back to auto as a plant: since 0027 (A1) no role re-enters auto outside the plan approval (tests/ceiling-0027.test.ts).
+    await db.admin(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE core.investigation SET mode = 'auto' WHERE tenant_id = '${A.tenant}' AND id = '${inv}'; COMMIT;`);
     await db.withContext("munim_svc", svc(), (c) => c.query(`UPDATE core.investigation SET status = 'cancelled' WHERE tenant_id = $1 AND id = $2`, [A.tenant, inv]));
     const cancelled = await attempt(db, "munim_svc", svc(), ...autoRun(live, [A.outlets[0]]));
     expect([planMode?.code, cancelled?.code]).toEqual(["MB015", "MB015"]);

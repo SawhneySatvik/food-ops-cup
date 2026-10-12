@@ -12,11 +12,13 @@
 //       2. the creator's CURRENT membership covers the stored scope — otherwise `cancelled`, stop_reason `scope` (review
 //          M7, F11 "cancelled when access changes"; 0020 refuses a narrowed grant, so a narrowing that touches the stored
 //          scope cancels rather than steps on a smaller scope);
-//       3. the ceiling of the creator's current role still allows `auto` — otherwise 0 steps and stop_reason `scope`
-//          (the R-D ruling for Plan: a lowered ceiling or a demoted member stops the run as a scope change). Schema gap:
-//          F10 says "downgrade to plan", but 0020 gives munim_svc no UPDATE on `mode` (asserted in its post-conditions)
-//          and stop_reason has no ceiling value, so the mode stays `auto`, stopped; the creator's `:continue` still works.
-//          The downgrade is requested from the migrator (lane report);
+//       3. the ceiling of the creator's current role still allows `auto` — otherwise 0 steps and the run is downgraded to
+//          Plan (F10; T-098): `SET stop_reason = 'ceiling'`, and 0027's trigger sets `mode = 'plan'` in the same row write
+//          (munim_svc holds no UPDATE on `mode`, so it can write no other mode). Checked before new data, like the access
+//          check: a lowered ceiling or a demoted member downgrades the same day, data or not. The standing grant stays
+//          unrevoked (only its member can revoke it) but steps nothing: Auto steps and auto_step runs need `mode = 'auto'`,
+//          and 0027 auto_entry admits `auto` only in the plan-approving update, which a plan gets once. The creator's
+//          `:continue` steps it from there, and sees why it stopped (redact.ts: `ceiling` is shown to the creator);
 //       4. the month's AI budget (`effectiveCap`: the lower of the owner's cap and the operator's limit) — none set or
 //          none left → stop_reason `budget` and 0 steps (the Plan ruling: no budget row fails closed);
 //     then mints the step's `auto_step` run (actor = the creator, grant_id = the grant, scope = the stored scope; 0020
@@ -238,14 +240,15 @@ async function autoStep(q: Queryable, keys: RunTokenKeys, tenantId: string, id: 
     await notifyInbox(q, tenantId, id);
     return { kind: "stopped", stop: "cancelled" };
   }
-  // After the access check (a removed creator is cancelled the same day, data or not), before ceiling and budget: those stop a
-  // run that would step, and with nothing new it would not.
-  if (gate.kind === "since" && gate.needsNewData && !(await newData(q, inv.params, since))) return none;
   if (RANK[await ceilingFor(q, m.role)] < RANK.auto) {
-    await q.query(`UPDATE core.investigation SET stop_reason = 'scope' WHERE id = $1`, [id]);
+    // 0027 ceiling_downgrade: this write also sets mode = 'plan'.
+    await q.query(`UPDATE core.investigation SET stop_reason = 'ceiling' WHERE id = $1`, [id]);
     await notifyInbox(q, tenantId, id);
     return { kind: "stopped", stop: "ceiling" };
   }
+  // After access and ceiling (both act the same day, data or not), before the budget: that stops a run that would step, and
+  // with nothing new it would not.
+  if (gate.kind === "since" && gate.needsNewData && !(await newData(q, inv.params, since))) return none;
   const cap = await effectiveCap(q);
   if (!cap || cap.left_minor <= 0) {
     const u = await q.query(`UPDATE core.investigation SET stop_reason = 'budget' WHERE id = $1 AND stop_reason IS DISTINCT FROM 'budget'`, [id]);

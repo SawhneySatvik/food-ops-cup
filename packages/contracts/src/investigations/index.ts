@@ -40,8 +40,10 @@ export const InvestigationMode = z.enum(["step", "plan", "auto"]);
 export const ShownItemStatus = z.enum([...ItemStatus.options, "restricted"]);
 export const ShownInvestigationStatus = z.enum([...InvestigationStatus.options, "restricted"]);
 /** Why a Plan (or Auto) run stopped; null while it runs, or when it ended in a terminal status. `draft` is reserved:
- *  investigations create no drafts and no draft linking exists in v1 (ADR-014 §7.2), so nothing records it yet. */
-export const StopReason = z.enum(["draft", "abstain", "budget", "scope", "waiting"]);
+ *  investigations create no drafts and no draft linking exists in v1 (ADR-014 §7.2), so nothing records it yet.
+ *  `ceiling`: the creator's role ceiling no longer allows Auto, so core-worker downgraded the run to Plan (0027; mode
+ *  reads `plan`, and the creator's `:continue` steps it). */
+export const StopReason = z.enum(["draft", "abstain", "budget", "scope", "waiting", "ceiling"]);
 
 /** A month is named by its first day. */
 const Month = IsoDate.refine((d) => d.endsWith("-01"), "the first day of a month");

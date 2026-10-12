@@ -16,7 +16,7 @@
 //     to the investigation's outlets gone → cancelled, stop_reason `scope` (review M7, F10); and the month's AI budget
 //     (T-090 effectiveCap): none set or none left → stop_reason `budget` before the step, so no further model call.
 //     The role's ceiling is re-checked too (R-D): lowered below `plan`, or the member demoted to such a role → the run
-//     stops with stop_reason `scope` (0020's CHECK has no ceiling value) before the step.
+//     stops with stop_reason `scope` before the step (`ceiling`, 0027, is Auto's downgrade to Plan; Plan → Step is not ruled).
 //   - After each step: an abstained narration → `abstain`; `waiting` → `waiting`; any terminal status ends the run.
 //     Investigations create no drafts and nothing links one in v1 (ADR-014 §7.2), so `draft` is never recorded here.
 //   - `mode: "auto"` (T-089b) approves the same plan as Auto: the mode and the creator's standing grant are written in the

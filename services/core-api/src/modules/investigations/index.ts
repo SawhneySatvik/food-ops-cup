@@ -39,7 +39,7 @@ import { assertModeAllowed } from "../ai_policy/index.ts";
 import { cellOf, loadSnapshots, type Member } from "../approvals/index.ts";
 import { CURSOR_SQL, makeCursor, parseCursor, parseLimit } from "../findings/index.ts";
 import { approvePlan, mintEstimate, type PlanRow, planPreview } from "./plan.ts";
-import { minRoles, PLAYBOOK_IDS, RESTRICTED, roleOpens, statusVisible } from "./redact.ts";
+import { minRoles, PLAYBOOK_IDS, RESTRICTED, restrictedStopReason, roleOpens, statusVisible } from "./redact.ts";
 import {
   type ChecklistEntry, freshChecklist, INVESTIGATION_COLS, type InvestigationRow, type ItemUpdate, notifyInbox, runStep, type StepResult, templateSegments,
 } from "./step.ts";
@@ -129,8 +129,10 @@ export async function investigationView(q: Queryable, m: Member, id: string) {
       status: shown ? c.status : RESTRICTED, frozen: shown && c.frozen, snapshot_ids: shown ? c.snapshot_ids : [], refs: shown ? c.refs : [],
     };
   });
-  // stop_reason `waiting` would name the gate's verdict: hidden with the status.
-  if (!(await statusVisible(q, m.role, [inv.playbook_id])).has(inv.playbook_id)) Object.assign(inv, { status: RESTRICTED, stop_reason: null });
+  // stop_reason `waiting` would name the gate's verdict: hidden with the status (the creator still sees `ceiling`, redact.ts).
+  if (!(await statusVisible(q, m.role, [inv.playbook_id])).has(inv.playbook_id)) {
+    Object.assign(inv, { status: RESTRICTED, stop_reason: restrictedStopReason(inv.stop_reason, inv.created_by, m.member_id) });
+  }
   const plan = inv.mode === "step" ? null : await planPreview(q, m, inv, pb);
   const refs = new Set<string>([...checklist.flatMap((c) => c.refs), ...stepViews.flatMap((s) => s.item_updates.flatMap((u) => u.refs))]);
   for (const ref of [plan?.estimate.estimate_ref, plan?.estimate.currency_ref]) if (ref) refs.add(ref);
@@ -285,7 +287,7 @@ export const router = new Hono<AppEnv>()
             AND ($2::timestamptz IS NULL OR (i.updated_at, i.id) < ($2::timestamptz, $3::uuid))
           ORDER BY i.updated_at DESC, i.id DESC LIMIT $4`,
         [q.status ?? null, after?.[0] ?? null, after?.[1] ?? null, limit + 1, visible]);
-      const page = r.rows.slice(0, limit).map((x) => (visible.includes(x.playbook_id) ? x : { ...x, status: RESTRICTED, stop_reason: null }));
+      const page = r.rows.slice(0, limit).map((x) => (visible.includes(x.playbook_id) ? x : { ...x, status: RESTRICTED, stop_reason: restrictedStopReason(x.stop_reason, x.created_by, m.member_id) }));
       return { items: page.map(itemView), next_cursor: r.rows.length > limit ? makeCursor(page.at(-1)!.cursor) : null };
     }), 200);
   })
