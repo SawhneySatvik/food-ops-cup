@@ -70,6 +70,8 @@ export const TaskView = z.strictObject({
   assignee_member_id: Uuid7,
   due_on: IsoDate,
   finding_id: Uuid7.nullable(),
+  /** ADR-015: the Munim Cares listing a pack-and-hand-over task is for (null for every other task). */
+  cares_listing_id: Uuid7.nullable(),
   status: z.enum(["open", "done", "cancelled"]),
   done_at: IsoDateTime.nullable(),
   done_by: Uuid7.nullable(),

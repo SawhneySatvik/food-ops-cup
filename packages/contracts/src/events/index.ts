@@ -4,6 +4,9 @@ import { z } from "zod";
 import { cloudEvent } from "../shared/cloudevents.ts";
 import { IsoDateTime, Uuid7 } from "../shared/primitives.ts";
 import type { Route } from "../shared/routes.ts";
+import {
+  CARES_EVENT_SCHEMAS, CaresClaimCreatedV1, CaresClaimDecidedV1, CaresHandoverRecordedV1, CaresHandoverVoidedV1, CaresListingClosedV1, CaresListingPublishedV1,
+} from "../cares/events.ts";
 import { KitchenTicketAdvancedV1, KitchenTicketCreatedV1 } from "../kitchen/events.ts";
 import {
   ORDER_EVENT_SCHEMAS, OrderPromiseChangedV1, OrderStatusChangedV1, RefundRecordedV1, ShiftClosedV1, ShiftOpenedV1, TenderRecordedV1, VoidRecordedV1,
@@ -52,10 +55,12 @@ export const PoCommittedV1 = cloudEvent(
   }),
 );
 
-/** Every W1 event, discriminated on `type` (what intel `/events` accepts). */
+/** Every domain event, discriminated on `type` (what intel `/events` accepts). The Munim Cares events (ADR-015 §5) are
+ *  registered here, not in the cares module, because core-api's outbox parses each stored row against this registry. */
 export const MunimEvent = z.discriminatedUnion("type", [
   OrderPlacedV1, MovementRecordedV1, PoCommittedV1, KitchenTicketCreatedV1, KitchenTicketAdvancedV1,
   OrderStatusChangedV1, OrderPromiseChangedV1, TenderRecordedV1, VoidRecordedV1, RefundRecordedV1, ShiftOpenedV1, ShiftClosedV1,
+  CaresListingPublishedV1, CaresListingClosedV1, CaresHandoverRecordedV1, CaresHandoverVoidedV1, CaresClaimCreatedV1, CaresClaimDecidedV1,
 ]);
 export type MunimEvent = z.infer<typeof MunimEvent>;
 
@@ -66,6 +71,7 @@ export const SCHEMAS = {
   "munim.kitchen.ticket.created.v1": KitchenTicketCreatedV1,
   "munim.kitchen.ticket.advanced.v1": KitchenTicketAdvancedV1,
   ...ORDER_EVENT_SCHEMAS,
+  ...CARES_EVENT_SCHEMAS,
   "munim-event": MunimEvent,
 };
 export const ROUTES: readonly Route[] = [];

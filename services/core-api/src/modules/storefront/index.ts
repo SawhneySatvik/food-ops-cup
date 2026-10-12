@@ -18,6 +18,8 @@ import type { AppEnv } from "../../lib/types.ts";
 import { type CustomerPrincipal, placeFlow, previewFlow } from "./checkout.ts";
 import { accepting, channelKind, menu, outletRow, outlets, pickupWindows } from "./read.ts";
 import { cancelHandler, getOrder, rescheduleHandler, reschedulePreview, runShopperCommand } from "./orders.ts";
+import { router as caresSection } from "./cares.ts";
+import { router as caresNetwork } from "../cares-network/index.ts";
 
 export { configureStorefront, resetStorefront } from "./config.ts";
 export type { SaleEntry, Seams } from "./config.ts";
@@ -70,7 +72,7 @@ const action = (c: Context<AppEnv>, suffix: string) => c.req.param("action")!.sl
 export const router = new Hono<AppEnv>()
   .get("/v1/storefront/outlets", requireCustomer, async (c) => c.json(await read(c, (q) => outlets(q)), 200))
   .get(`/v1/storefront/outlets/:id{${ID}}/menu`, requireCustomer, async (c) =>
-    c.json(await read(c, async (q, p) => menu(q, await outletRow(q, c.req.param("id")), await channelKind(q, p.channel_id))), 200))
+    c.json(await read(c, async (q, p) => menu(q, await outletRow(q, c.req.param("id")), await channelKind(q, p.channel_id), p.channel_id)), 200))
   .get(`/v1/storefront/outlets/:id{${ID}}/state`, requireCustomer, async (c) =>
     c.json(await read(c, async (q, p) => (await channelKind(q, p.channel_id), accepting(q, await outletRow(q, c.req.param("id"))))), 200))
   .get(`/v1/storefront/outlets/:id{${ID}}/pickup-windows`, requireCustomer, async (c) =>
@@ -98,3 +100,7 @@ export const router = new Hono<AppEnv>()
     const out = await runShopperCommand(c.var.deps, customer(c), await command(c), rescheduleHandler(customer(c), id));
     return c.body(out.body, 200, { "Content-Type": "application/json", ...replayHeaders(out) });
   });
+// T-095b: the storefront's Cares section, and the public Cares network pages (mounted here so modules/index.ts, owned by
+// T-004, is unchanged).
+router.route("/", caresSection);
+router.route("/", caresNetwork);

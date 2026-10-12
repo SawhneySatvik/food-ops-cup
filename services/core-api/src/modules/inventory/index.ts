@@ -13,7 +13,8 @@
 //   GET  /v1/inventory/batches?outlet=&ingredient=
 //   GET  /v1/inventory/reorder-levels?outlet=&ingredient=
 // Seams (W2 lane brief): pickSaleBatches, deriveOrderConsumption, deriveGoodsReceipt; also consumeExpiredOverrides
-// and deriveSaleReturn for orders (T-022), onNegativeOnHand for the alert path.
+// and deriveSaleReturn for orders (T-022), onNegativeOnHand for the alert path; deriveCaresHandover, reverseCaresHandover and
+// deriveCaresReceive for Munim Cares (T-095a, cares.ts).
 import { commandEnvelopeOf, type CommandEnvelope } from "@munim/contracts";
 import {
   InventoryBatchUpdateV1, InventoryCountSubmitV1, InventoryExpiredSaleOverrideV1, InventoryIngredientUpsertV1, InventoryReorderLevelSetV1,
@@ -34,7 +35,8 @@ import { readRoutes } from "./routes.ts";
 
 export { consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, pickSaleBatches, reverseOrderConsumption } from "./seams.ts";
 export type { ConsumptionResult, DerivationResult, SaleLineIn, SalePick, SalePickRefusal, SalePicks } from "./seams.ts";
-export { onNegativeOnHand, type NegativeOnHand } from "./stock.ts";
+export { deriveCaresHandover, deriveCaresReceive, reverseCaresHandover } from "./cares.ts";
+export { onHand, onNegativeOnHand, type NegativeOnHand, tenantPack } from "./stock.ts";
 export { bindingMrp, fefoPick } from "./fefo.ts";
 
 // Draftable commands (pack §6): approvals runs these under the approver's decision. Once per process even when

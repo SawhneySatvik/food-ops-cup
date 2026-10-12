@@ -14,6 +14,8 @@ const reg = await loadRegistry();
 const SAMPLES = await loadSamples();
 const cares = reg.routes.filter((r) => /^\/(v1\/cares|v1\/cares-network|v1\/storefront\/cares|platform\/v1\/network-snapshots)/.test(r.path));
 const openapi = JSON.parse(readFileSync(join(PKG, "generated", "openapi", "public.json"), "utf8"));
+/** internal.json carries every component (public.json only those its operations reach — no events, proposals or pack). */
+const allComponents = JSON.parse(readFileSync(join(PKG, "generated", "openapi", "internal.json"), "utf8")).components.schemas;
 
 // ADR-015 §1.3, by hand (the names 0028 registers in command_authority).
 const COMMANDS = [
@@ -70,8 +72,8 @@ describe("Munim Cares contracts (ADR-015 §5)", () => {
       if (Array.isArray(n)) n.forEach(walk);
       else if (n && typeof n === "object") for (const [k, v] of Object.entries(n)) (k === "properties" ? names.push(...Object.keys(v as object)) : null, walk(v));
     };
-    for (const [n, s] of Object.entries(openapi.components.schemas)) if (/cares/i.test(n)) walk(s);
-    walk(openapi.components.schemas.CountryPack.properties.cares); // the rest of the pack has its own compliance calendar
+    for (const [n, s] of Object.entries(allComponents)) if (/cares/i.test(n)) walk(s);
+    walk(allComponents.CountryPack.properties.cares); // the rest of the pack has its own compliance calendar
     expect(names.length).toBeGreaterThan(100);
     expect(names).toContain("cooked_max_hold_min");
     expect(names.filter((k) => /legal|licen[cs]e|compliance|regulation|fssai|disclaimer/i.test(k))).toEqual([]);

@@ -1,11 +1,85 @@
 // Platform config drafts (R24, R27): propose -> (approve | reject). Applying a patch happens only inside
 // approve, in the same munim_platform transaction as the status flip and the hash-chained platform_audit entry.
+// Munim Cares targets (ADR-015 §1.1, §2.3): `cares_city:<code>`, `cares_recipient:<id>` (simulated only), `cares_enablement:
+// <tenant>` and `cares_public_impact:<network snapshot id>`. 0028's deferred trigger requires the enablement row and the
+// publish to name a draft applied in that same transaction — which approve is (write the target, then flip the draft).
 // An operator's own command is its approval (R27): the proposer may approve. Writes use the operator's own id,
 // taken from the verified token, never from the body.
 import { uuidv7 } from "../commit/index.ts";
 import { ApiError } from "../lib/errors.ts";
 import type { Queryable } from "../runtoken/index.ts";
-import { type Parsed, parsePatch, type Patch } from "./validate.ts";
+import { type Parsed as ConfigParsed, parsePatch, type Patch } from "./validate.ts";
+
+type CaresParsed =
+  | { kind: "cares_city"; code: string; country_code: string; name: string; status: "active" | "retired" }
+  | { kind: "cares_recipient"; id: string; city_code: string; name: string; recipient_kind: "ngo" | "food_bank"; accepts_cooked: boolean; accepts_raw: boolean;
+      accepts_packaged: boolean; capacity_kg_per_day: number; capacity_portions_per_day: number; receiving_from: string; receiving_to: string;
+      lat_e6: number; lng_e6: number; status: "active" | "retired" }
+  | { kind: "cares_enablement"; tenant_id: string; enabled: boolean }
+  | { kind: "cares_public_impact"; snapshot_id: string };
+type Parsed = ConfigParsed | CaresParsed;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TIME = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+const bad = () => new ApiError("invalid_payload");
+const keys = (patch: Patch, want: string[]) => {
+  if (Object.keys(patch).length !== want.length || want.some((k) => !(k in patch))) throw bad();
+};
+const int = (v: unknown, min: number, max: number) => {
+  if (!Number.isSafeInteger(v) || (v as number) < min || (v as number) > max) throw bad();
+  return v as number;
+};
+const bool = (v: unknown) => {
+  if (typeof v !== "boolean") throw bad();
+  return v;
+};
+
+/** A Cares target's patch, checked when proposed and again when applied (as parsePatch). Recipients are simulated only:
+ *  the name must say "(simulated)" (the table CHECKs, refused here first so the answer is a 422, not a 23514). */
+function parseCares(target: string, patch: Patch): CaresParsed {
+  const [kind, id] = target.split(":") as [string, string | undefined];
+  const status = (v: unknown) => {
+    if (v !== "active" && v !== "retired") throw bad();
+    return v;
+  };
+  switch (kind) {
+    case "cares_city": {
+      if (!id || !/^[a-z][a-z0-9_]*$/.test(id) || id.length > 40) throw bad();
+      keys(patch, ["country_code", "name", "status"]);
+      const { country_code, name } = patch;
+      if (typeof country_code !== "string" || !/^[A-Z]{2}$/.test(country_code) || typeof name !== "string" || name.length < 1 || name.length > 200) throw bad();
+      return { kind, code: id, country_code, name, status: status(patch.status) };
+    }
+    case "cares_recipient": {
+      if (!id || !UUID.test(id)) throw bad();
+      keys(patch, ["city_code", "name", "kind", "accepts_cooked", "accepts_raw", "accepts_packaged", "capacity_kg_per_day", "capacity_portions_per_day",
+        "receiving_from", "receiving_to", "lat_e6", "lng_e6", "status"]);
+      const p = patch as Record<string, unknown>;
+      if (typeof p.city_code !== "string" || !/^[a-z][a-z0-9_]*$/.test(p.city_code)) throw bad();
+      if (typeof p.name !== "string" || p.name.length > 200 || !p.name.includes("(simulated)")) throw bad();
+      if (p.kind !== "ngo" && p.kind !== "food_bank") throw bad();
+      if (typeof p.receiving_from !== "string" || typeof p.receiving_to !== "string" || !TIME.test(p.receiving_from) || !TIME.test(p.receiving_to)
+          || p.receiving_to <= p.receiving_from) throw bad();
+      return { kind, id, city_code: p.city_code, name: p.name, recipient_kind: p.kind, accepts_cooked: bool(p.accepts_cooked), accepts_raw: bool(p.accepts_raw),
+        accepts_packaged: bool(p.accepts_packaged), capacity_kg_per_day: int(p.capacity_kg_per_day, 0, 2_000_000_000),
+        capacity_portions_per_day: int(p.capacity_portions_per_day, 0, 2_000_000_000), receiving_from: p.receiving_from, receiving_to: p.receiving_to,
+        lat_e6: int(p.lat_e6, -90_000_000, 90_000_000), lng_e6: int(p.lng_e6, -180_000_000, 180_000_000), status: status(p.status) };
+    }
+    case "cares_enablement":
+      if (!id || !UUID.test(id)) throw bad();
+      keys(patch, ["enabled"]);
+      return { kind, tenant_id: id, enabled: bool(patch.enabled) };
+    case "cares_public_impact":
+      if (!id || !UUID.test(id)) throw bad();
+      keys(patch, []);
+      return { kind, snapshot_id: id };
+    default:
+      throw bad();
+  }
+}
+
+const parseTarget = (target: string, patch: Patch, today?: string): Parsed =>
+  target.startsWith("cares_") ? parseCares(target, patch) : parsePatch(target, patch, today);
 
 export interface DraftRow {
   id: string; target: string; patch: Patch; before: Record<string, unknown> | null; status: string;
@@ -45,6 +119,25 @@ export async function currentOf(c: Queryable, p: Parsed): Promise<Record<string,
       const r = await c.query(`SELECT code, name, limits, status FROM platform.plan WHERE code = $1`, [p.code]);
       return r.rows[0] ?? null;
     }
+    case "cares_city": {
+      const r = await c.query(`SELECT code, country_code, name, status FROM platform.cares_city WHERE code = $1`, [p.code]);
+      return r.rows[0] ?? null;
+    }
+    case "cares_recipient": {
+      const r = await c.query(
+        `SELECT id, city_code, name, kind, simulated, accepts_cooked, accepts_raw, accepts_packaged, capacity_kg_per_day, capacity_portions_per_day,
+                to_char(receiving_from, 'HH24:MI') AS receiving_from, to_char(receiving_to, 'HH24:MI') AS receiving_to, lat_e6, lng_e6, status
+           FROM platform.cares_recipient WHERE id = $1`, [p.id]);
+      return r.rows[0] ?? null;
+    }
+    case "cares_enablement": {
+      const r = await c.query(`SELECT tenant_id, enabled, config_draft_id FROM platform.cares_enablement WHERE tenant_id = $1`, [p.tenant_id]);
+      return r.rows[0] ?? null;
+    }
+    case "cares_public_impact": {
+      const r = await c.query(`SELECT id, published_at IS NOT NULL AS published, publish_draft_id FROM platform.network_snapshot WHERE id = $1`, [p.snapshot_id]);
+      return r.rows[0] ?? null;
+    }
   }
 }
 
@@ -53,7 +146,7 @@ async function hydrate(c: Queryable, rows: Array<Omit<DraftRow, "before">>): Pro
   for (const r of rows) {
     let before: Record<string, unknown> | null = null;
     if (r.status === "proposed") {
-      try { before = await currentOf(c, parsePatch(r.target, r.patch, "0000-00-00")); } catch { before = null; }
+      try { before = await currentOf(c, parseTarget(r.target, r.patch, "0000-00-00")); } catch { before = null; }
     } else {
       const a = await c.query(`SELECT before FROM platform.platform_audit WHERE config_draft_id = $1 AND action = 'config_draft.apply' ORDER BY seq DESC LIMIT 1`, [r.id]);
       before = (a.rows[0]?.before as Record<string, unknown> | null | undefined) ?? null;
@@ -83,7 +176,7 @@ async function audit(c: Queryable, operatorId: string, action: string, entity: s
 
 /** Inserts a proposed draft after validating its patch. The same client id and body replays the original. */
 export async function propose(c: Queryable, operatorId: string, body: { draft_id?: string | undefined; target: string; patch: Patch }): Promise<{ draft: DraftRow; replayed: boolean }> {
-  parsePatch(body.target, body.patch); // refusals leave no row
+  parseTarget(body.target, body.patch); // refusals leave no row
   const id = body.draft_id ?? uuidv7();
   const proposedBy = `operator:${operatorId}`;
   if (body.draft_id) {
@@ -107,8 +200,8 @@ function sortKeys(v: unknown): unknown {
   return v;
 }
 
-/** Writes the validated patch to its target table. Runs only inside approve. */
-async function apply(c: Queryable, p: Parsed): Promise<void> {
+/** Writes the validated patch to its target table. Runs only inside approve (`draftId`: the draft being applied). */
+async function apply(c: Queryable, p: Parsed, draftId: string): Promise<void> {
   switch (p.kind) {
     case "model_role":
       // A new model has not been probed: probed_at resets when provider or model change (a price-only change keeps the probe).
@@ -155,6 +248,40 @@ async function apply(c: Queryable, p: Parsed): Promise<void> {
          ON CONFLICT (code) DO UPDATE SET name = excluded.name, limits = excluded.limits, status = excluded.status`,
         [p.code, p.name, JSON.stringify(p.limits), p.status]);
       return;
+    case "cares_city": {
+      const have = await c.query<{ country_code: string }>(`SELECT country_code FROM platform.cares_city WHERE code = $1 FOR UPDATE`, [p.code]);
+      // A city's country is fixed once listed (R30: a business's cities are in its own country).
+      if (have.rows[0] && have.rows[0].country_code !== p.country_code) throw new ApiError("conflict");
+      await c.query(`INSERT INTO platform.cares_city (code, country_code, name, status) VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (code) DO UPDATE SET name = excluded.name, status = excluded.status`, [p.code, p.country_code, p.name, p.status]);
+      return;
+    }
+    case "cares_recipient":
+      if (!(await c.query(`SELECT 1 FROM platform.cares_city WHERE code = $1`, [p.city_code])).rows[0]) throw new ApiError("not_found");
+      await c.query(
+        `INSERT INTO platform.cares_recipient (id, city_code, name, kind, simulated, accepts_cooked, accepts_raw, accepts_packaged, capacity_kg_per_day,
+                                               capacity_portions_per_day, receiving_from, receiving_to, lat_e6, lng_e6, status)
+         VALUES ($1, $2, $3, $4, true, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         ON CONFLICT (id) DO UPDATE SET city_code = excluded.city_code, name = excluded.name, kind = excluded.kind, accepts_cooked = excluded.accepts_cooked,
+           accepts_raw = excluded.accepts_raw, accepts_packaged = excluded.accepts_packaged, capacity_kg_per_day = excluded.capacity_kg_per_day,
+           capacity_portions_per_day = excluded.capacity_portions_per_day, receiving_from = excluded.receiving_from, receiving_to = excluded.receiving_to,
+           lat_e6 = excluded.lat_e6, lng_e6 = excluded.lng_e6, status = excluded.status`,
+        [p.id, p.city_code, p.name, p.recipient_kind, p.accepts_cooked, p.accepts_raw, p.accepts_packaged, p.capacity_kg_per_day, p.capacity_portions_per_day,
+         p.receiving_from, p.receiving_to, p.lat_e6, p.lng_e6, p.status]);
+      return;
+    case "cares_enablement":
+      if (!(await c.query(`SELECT 1 FROM platform.tenant_registry WHERE tenant_id = $1`, [p.tenant_id])).rows[0]) throw new ApiError("not_found");
+      await c.query(`INSERT INTO platform.cares_enablement (tenant_id, enabled, config_draft_id) VALUES ($1, $2, $3)
+                     ON CONFLICT (tenant_id) DO UPDATE SET enabled = excluded.enabled, config_draft_id = excluded.config_draft_id`, [p.tenant_id, p.enabled, draftId]);
+      return;
+    case "cares_public_impact": {
+      // Published once, never re-published or changed (0028 snapshot_rules); nothing is public until this applies.
+      const s = await c.query<{ published: boolean }>(`SELECT published_at IS NOT NULL AS published FROM platform.network_snapshot WHERE id = $1 FOR UPDATE`, [p.snapshot_id]);
+      if (!s.rows[0]) throw new ApiError("not_found");
+      if (s.rows[0].published) throw new ApiError("conflict");
+      await c.query(`UPDATE platform.network_snapshot SET published_at = now(), publish_draft_id = $2 WHERE id = $1`, [p.snapshot_id, draftId]);
+      return;
+    }
   }
 }
 
@@ -162,12 +289,12 @@ export async function approve(c: Queryable, operatorId: string, id: string, reas
   const d = await getDraftRow(c, id, true);
   if (!d) throw new ApiError("not_found");
   if (d.status !== "proposed") throw new ApiError("already_decided");
-  const parsed = parsePatch(d.target, d.patch); // re-validated: apply never trusts what was stored
+  const parsed = parseTarget(d.target, d.patch); // re-validated: apply never trusts what was stored
   const before = await currentOf(c, parsed);
-  await apply(c, parsed);
+  await apply(c, parsed, id);
   const after = await currentOf(c, parsed);
   await c.query(`UPDATE platform.config_draft SET status = 'applied', decided_by = $2, decided_at = now(), reason = $3 WHERE id = $1`, [id, operatorId, reason]);
-  await audit(c, operatorId, "config_draft.apply", `platform.${parsed.kind}`, d.target, before, after, id);
+  await audit(c, operatorId, "config_draft.apply", `platform.${parsed.kind === "cares_public_impact" ? "network_snapshot" : parsed.kind}`, d.target, before, after, id);
   return (await getDraftRow(c, id))!;
 }
 

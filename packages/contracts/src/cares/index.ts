@@ -9,7 +9,6 @@ import { CurrencyCode, IsoDate, IsoDateTime, LocalTime, MinorAmount, NonEmpty, Q
 import { Ref } from "../shared/refs.ts";
 import type { QueryParam, Route } from "../shared/routes.ts";
 import { Cell, SnapshotColumn, TemplateParams } from "../shared/snapshot.ts";
-import { CARES_EVENT_SCHEMAS } from "./events.ts";
 
 export const CityCode = z.string().regex(/^[a-z][a-z0-9_]*$/).max(40);
 /** = core.cares_handover.void_reason_code CHECK (no dots, unlike Slug). */
@@ -111,6 +110,14 @@ export const CaresClaimDecideV1 = z.strictObject({
 export const CaresClaimReceiveV1 = z.strictObject({ claim_id: Uuid7 });
 
 // ---- Member read models (ADR §1.2, §1.5). Every number is a row's own field.
+/** Hard rule 5 (DECISIONS 12 Oct 2026): every member Cares view and every public impact response carries both labels
+ *  unconditionally — `all_synthetic` does not gate them — and the one generic note key (no legal text). B2B prices also
+ *  carry "Recorded, never processed". */
+const CaresLabels = {
+  labels: z.strictObject({ data: z.literal("Measured on synthetic data"), recipients: z.literal("to simulated recipients") }),
+  note_key: z.literal("cares.note.check_local_rules"),
+};
+const MoneyLabel = { money_label: z.literal("Recorded, never processed") };
 const ListingLine = z.strictObject({
   line_id: Uuid7,
   line_no: z.int().min(1),
@@ -148,7 +155,8 @@ export const CaresListingView = z.strictObject({
   lines: z.array(ListingLine),
   handovers: z.array(HandoverView),
 });
-export const CaresListingsResponse = z.strictObject({ items: z.array(CaresListingView), next_cursor: Uuid7.nullable() });
+export const CaresListingsResponse = z.strictObject({ items: z.array(CaresListingView), next_cursor: Uuid7.nullable(), ...CaresLabels });
+export const CaresListingResponse = z.strictObject({ ...CaresListingView.shape, ...CaresLabels });
 
 export const CaresProfileResponse = z.strictObject({
   /** The country pack carries a `cares` block (else Cares is off: `cares_not_available`). */
@@ -159,6 +167,7 @@ export const CaresProfileResponse = z.strictObject({
   outlets: z.array(
     z.strictObject({ outlet_id: Uuid7, city_code: CityCode, lat_e6: LatE6, lng_e6: LngE6, pickup_from: LocalTime, pickup_to: LocalTime, active: z.boolean() }),
   ),
+  ...CaresLabels,
 });
 
 export const CaresRecipientsResponse = z.strictObject({
@@ -181,6 +190,7 @@ export const CaresRecipientsResponse = z.strictObject({
       lng_e6: LngE6,
     }),
   ),
+  ...CaresLabels,
 });
 
 /** `core.cares_market_offers`: other businesses' published offers in the caller's opted-in cities. */
@@ -209,6 +219,8 @@ export const CaresMarketResponse = z.strictObject({
       ),
     }),
   ),
+  ...CaresLabels,
+  ...MoneyLabel,
 });
 
 /** `core.cares_claim_outcome` for the buyer's own claim. "declined" also covers withdrawn and allocated elsewhere. */
@@ -246,6 +258,8 @@ export const CaresClaimsResponse = z.strictObject({
       outcome: ClaimOutcome,
     }),
   ),
+  ...CaresLabels,
+  ...MoneyLabel,
 });
 
 /** `core.cares_inbound_claims`: claims on the caller's own offer. */
@@ -260,6 +274,8 @@ export const CaresInboundClaimsResponse = z.strictObject({
       lines: z.array(z.strictObject({ offer_line_id: Uuid7, qty_milli: QtyMilli, unit_price_minor: MinorAmount })),
     }),
   ),
+  ...CaresLabels,
+  ...MoneyLabel,
 });
 
 // ---- Public read models (ADR §2.1, §2.3): no credential. Recipients always read "Simulated recipient".
@@ -312,6 +328,7 @@ export const CaresNetworkImpactResponse = z.strictObject({
       all_synthetic: ImpactFact(z.boolean()),
     }),
   ),
+  ...CaresLabels,
 });
 
 const NetworkSnapshotBase = {
@@ -326,9 +343,11 @@ const NetworkSnapshotBase = {
   created_at: IsoDateTime,
 };
 /** A published network snapshot opened publicly (404 when unpublished). */
-export const CaresNetworkSnapshotResponse = z.strictObject({ ...NetworkSnapshotBase, published_at: IsoDateTime });
+export const CaresNetworkSnapshotResponse = z.strictObject({ ...NetworkSnapshotBase, published_at: IsoDateTime, ...CaresLabels });
 /** Operator view: who minted it and whether/how it was published. */
 export const CaresNetworkSnapshotMint = z.strictObject({ template_id: Slug, params: TemplateParams });
+/** `params` of a `platform.cares_network_impact` mint (= the template's params_schema, 0028): city_code null = every city. */
+export const CaresNetworkImpactParams = z.strictObject({ from: IsoDate, to: IsoDate, city_code: CityCode.nullable() });
 export const CaresOperatorNetworkSnapshot = z.strictObject({
   ...NetworkSnapshotBase,
   minted_by_operator_id: Uuid7,
@@ -353,7 +372,7 @@ export const SCHEMAS = {
   "v1.cares.profile": CaresProfileResponse,
   "v1.cares.recipients": CaresRecipientsResponse,
   "v1.cares.listings": CaresListingsResponse,
-  "v1.cares.listing": CaresListingView,
+  "v1.cares.listing": CaresListingResponse,
   "v1.cares.market": CaresMarketResponse,
   "v1.cares.claims": CaresClaimsResponse,
   "v1.cares.inbound-claims": CaresInboundClaimsResponse,
@@ -365,7 +384,6 @@ export const SCHEMAS = {
   "v1.storefront.cares": CaresStorefrontResponse,
   "platform.cares-network-snapshot": CaresOperatorNetworkSnapshot,
   "platform.cares-network-snapshots": CaresOperatorNetworkSnapshotsResponse,
-  ...CARES_EVENT_SCHEMAS,
 };
 
 // ---- Routes (ADR §5). The mounted side is T-095a (member), T-095b (public, storefront, operator).

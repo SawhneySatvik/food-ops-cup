@@ -13,6 +13,7 @@ and no row is added. New-entity ids inside the payload are sha256(draft id ‖ J
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -92,7 +93,8 @@ class Proposal:
     based_on: list[str]
     #: The existing entity ids the proposal acts on (they key the draft id).
     targets: list[str]
-    #: Top-level payload keys that take a minted new-entity id.
+    #: Payload keys that take a minted new-entity id: a top-level key, or a relative JSON pointer into an array element
+    #: (`lines/0/line_id`). Same seed form as the generated tools (`<draft id>/<pointer>`), so flat keys keep their ids.
     minted: list[str] = field(default_factory=list)
     #: The draft's target outlets when they are not the detection's outlet (a coupon's own outlet list; `[]` = tenant-wide,
     #: which only an owner approves). None → `[detection outlet]`.
@@ -109,9 +111,13 @@ def draft_id(finding_id: str, p: Proposal) -> str:
 def draft_body(pack: str, finding_id: str, d: Detection, p: Proposal) -> dict[str, Any]:
     """The `internal.drafts.request` body (a dict; the caller validates it against the generated model)."""
     did = draft_id(finding_id, p)
-    payload = dict(p.payload)
+    payload = deepcopy(p.payload)  # a nested minted id is set in place; the proposal stays as the mapping built it
     for key in p.minted:
-        payload[key] = uuid7(uuid7_ms(did), f"{did}/{key}")
+        *path, leaf = key.split("/")
+        box: Any = payload
+        for step in path:
+            box = box[int(step)] if isinstance(box, list) else box[step]
+        box[leaf] = uuid7(uuid7_ms(did), f"{did}/{key}")
     evidence: list[str] = []
     for r in p.based_on:
         sid = "snap:" + r[len(SNAP_OPEN) + len("snap:") :].split(DOT)[0]

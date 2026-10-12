@@ -74,6 +74,9 @@ class OutletFrame:
     business_date: date
     #: The pack's licence kinds that apply to this outlet's kind (run-frame `licence_kinds`, rule 7: never named in code).
     licence_kinds: tuple[LicenceKind, ...] = ()
+    #: Munim Cares is on for this outlet: enablement, active profile, active outlet (ADR-015 §4; core computes it in the
+    #: run-frame). False when the frame says nothing, so a tenant that is not opted in mints no Cares snapshot at all.
+    cares_active: bool = False
 
 
 @dataclass(frozen=True)

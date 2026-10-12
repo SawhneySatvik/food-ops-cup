@@ -283,6 +283,9 @@ export const RunFrameOutlet = z.strictObject({
   tz: IanaZone,
   /** The outlet's business date at the frame's instant (core's one tz module, the outlet's cutoff). */
   business_date: IsoDate,
+  /** ADR-015 §4: Munim Cares is on for this outlet — operator enablement on, the business's profile active, the outlet
+   *  opted in and active. Absent (older frames) = false. */
+  cares_active: z.boolean().default(false),
 });
 /** The month's AI budget (UTC month, F11 O-2; T-090's effectiveCap). effective cap = the lower of the owner's cap (when set, in the budget's currency)
  *  and the operator's limit; hard_left = effective cap − spent (≤ 0 = `hard`: rules only). No soft threshold is decided yet

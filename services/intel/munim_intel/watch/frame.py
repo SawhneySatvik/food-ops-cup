@@ -64,6 +64,7 @@ def _outlet(o: Mapping[str, Any], kinds: Sequence[Mapping[str, Any]]) -> OutletF
         o["kind"],
         date.fromisoformat(o["business_date"]),
         tuple(LicenceKind(k["code"], k["holder"], bool(k["unverified"])) for k in kinds if o["kind"] in k["outlet_kinds"]),
+        o.get("cares_active") is True,
     )
 
 

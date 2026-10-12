@@ -40,7 +40,7 @@ export async function goals(c: Queryable, raw: Record<string, string | undefined
 export async function tasks(c: Queryable, raw: Record<string, string | undefined>) {
   const q = query({ outlet: "uuid", assignee: "uuid", status: ["open", "done", "cancelled"], due_before: "date" }, raw);
   const r = await c.query(
-    `SELECT id, outlet_id, title_key, assignee_member_id, due_on::text, finding_id, status, done_at, done_by
+    `SELECT id, outlet_id, title_key, assignee_member_id, due_on::text, finding_id, cares_listing_id, status, done_at, done_by
        FROM core.task WHERE ${inScope("outlet_id")} AND ($1::uuid IS NULL OR outlet_id = $1) AND ($2::uuid IS NULL OR assignee_member_id = $2)
         AND ($3::text IS NULL OR status = $3) AND ($4::date IS NULL OR due_on <= $4) ORDER BY due_on, id`,
     [q.outlet ?? null, q.assignee ?? null, q.status ?? null, q.due_before ?? null]);

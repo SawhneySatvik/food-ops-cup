@@ -280,7 +280,8 @@ class WatchRun:
         a cell it was promised)."""
         out: dict[str, Minted] = {}
         for f in spec.follow_ups:
-            params = f.params(d)
+            # A later follow-up reads the earlier ones (cares.pickup_crew needs the listing cares.listings named).
+            params = f.params(replace(d, follow=dict(out)))
             if params is None:
                 continue
             body = await self._mint(spec, "follow_up", f.template, params)

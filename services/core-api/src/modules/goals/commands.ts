@@ -56,12 +56,16 @@ export const taskCreate: CommandHandler = {
     if (!(await one(c, `SELECT 1 FROM core.member WHERE id = $1`, [p.assignee_member_id]))) throw new ApiError("not_found");
     // A task cites the finding that prompted it; a finding this tenant cannot see is not a citation.
     if (p.finding_id !== null && !(await one(c, `SELECT 1 FROM intel.finding WHERE id = $1`, [p.finding_id]))) throw new ApiError("not_found");
+    // ADR-015 §4: a pack-and-hand-over task names a Munim Cares listing of its own outlet (the FK pins the tenant).
+    if (p.cares_listing_id !== null && !(await one(c, `SELECT 1 FROM core.cares_listing WHERE id = $1 AND ($2::uuid IS NULL OR outlet_id = $2)`,
+      [p.cares_listing_id, p.outlet_id]))) throw new ApiError("not_found");
     const r = await c.query(
-      `INSERT INTO core.task (tenant_id, id, outlet_id, title_key, assignee_member_id, due_on, finding_id, created_by)
-       VALUES (${TENANT}, $1, $2, $3, $4, $5, $6, ${ME}) ON CONFLICT DO NOTHING`,
-      [p.task_id, p.outlet_id, p.title_key, p.assignee_member_id, p.due_on, p.finding_id]);
+      `INSERT INTO core.task (tenant_id, id, outlet_id, title_key, assignee_member_id, due_on, finding_id, cares_listing_id, created_by)
+       VALUES (${TENANT}, $1, $2, $3, $4, $5, $6, $7, ${ME}) ON CONFLICT DO NOTHING`,
+      [p.task_id, p.outlet_id, p.title_key, p.assignee_member_id, p.due_on, p.finding_id, p.cares_listing_id]);
     if (r.rowCount !== 1) throw new ApiError("conflict");
-    return { entityId: p.task_id, audit: [{ entity: "core.task", entityId: p.task_id, after: { title_key: p.title_key, assignee_member_id: p.assignee_member_id, finding_id: p.finding_id } }] };
+    return { entityId: p.task_id, audit: [{ entity: "core.task", entityId: p.task_id,
+      after: { title_key: p.title_key, assignee_member_id: p.assignee_member_id, finding_id: p.finding_id, cares_listing_id: p.cares_listing_id } }] };
   },
 };
 

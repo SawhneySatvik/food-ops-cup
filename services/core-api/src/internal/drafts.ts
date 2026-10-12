@@ -9,6 +9,7 @@
 //      Campaign and coupon drafts are no specialist's draftable (R-B S1-B / S1-D ruling, 11 Oct: an approved campaign must
 //      never reach customers outside the finding; coupon.set waits for pack §6's executable tightening), so check 0 refuses them.
 //  0b. A payroll draft outside the pack's `payroll_scope` → 422 `payroll_out_of_scope` (W3.2; nothing stored).
+//  0c. A goals.task.create.v1 draft naming a Cares listing from any pack but people → 422 (ADR-015 §4; nothing stored).
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
 //      every ref and every based_on cell resolves for this run → else `abstained` + reason, nothing stored.
 //   2b. The number grammar over the payload's PROSE leaves (T-040b, T-080's finding): a model-typed string a person
@@ -170,6 +171,11 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   // Payroll is drafted only where the country pack prepares it (`payroll_scope = drafts`, packs/people.md §6); elsewhere
   // the proposal is refused before anything is resolved or stored (P6), as the member route refuses it.
   if (PAYROLL.has(req.command_type) && (await payrollScope(c)) !== "drafts") throw new ApiError("out_of_pack_scope", "payroll_out_of_scope");
+  // ADR-015 §4: a task naming a Munim Cares listing comes only from the people pack's overstaffed_slot mapping (deterministic
+  // code); any other proposer of goals.task.create.v1 sends null (ontology `fixed`), so a listing id from it is refused.
+  if (req.command_type === "goals.task.create.v1" && (req.payload as { cares_listing_id?: unknown }).cares_listing_id != null && req.pack !== "people") {
+    throw new ApiError("invalid_payload");
+  }
   const answer = (b: Body) => JSON.stringify(b);
   // A run proposes only inside its own scope; a tenant-wide draft ([]) needs a run over every outlet.
   if (run.scope[0] !== "*" && (req.outlet_ids.length === 0 || req.outlet_ids.some((o) => !(run.scope as string[]).includes(o)))) throw new ApiError("forbidden");

@@ -13,6 +13,7 @@ import type { AppEnv } from "../lib/types.ts";
 import { approve, getDraftRow, listDrafts, propose, reject } from "./drafts.ts";
 import { provision } from "./provision.ts";
 import * as read from "./read.ts";
+import { listNetworkSnapshots, mintNetworkSnapshot } from "./network-snapshots.ts";
 import { mintOperatorSnapshot } from "./snapshots.ts";
 
 export { setProvisionTenant } from "./provision.ts";
@@ -96,6 +97,8 @@ router
     return c.json(await asOperator(c, (db) => reject(db, operatorId(c), id, body.reason)), 200);
   })
   .post("/platform/v1/snapshots", async (c) => c.json(await mintOperatorSnapshot(c, operatorId(c), await json(c)), 201))
+  .post("/platform/v1/network-snapshots", async (c) => c.json(await mintNetworkSnapshot(c, operatorId(c), await json(c)), 201))
+  .get("/platform/v1/network-snapshots", async (c) => c.json(await listNetworkSnapshots(c, operatorId(c)), 200))
   .post("/platform/v1/:seg{tenants:provision}", async (c) => {
     const out = await provision(c, operatorId(c), await json(c));
     return c.body(out.body, 201, { "Content-Type": "application/json", ...replayHeaders(out) });

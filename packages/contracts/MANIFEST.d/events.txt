@@ -11,3 +11,9 @@ munim.orders.void.recorded.v1
 munim.orders.refund.recorded.v1
 munim.orders.shift.opened.v1
 munim.orders.shift.closed.v1
+munim.cares.listing.published.v1
+munim.cares.listing.closed.v1
+munim.cares.handover.recorded.v1
+munim.cares.handover.voided.v1
+munim.cares.claim.created.v1
+munim.cares.claim.decided.v1

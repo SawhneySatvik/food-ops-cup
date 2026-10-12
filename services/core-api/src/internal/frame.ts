@@ -10,7 +10,8 @@
 //     Run tokens are never refused for budget: at the cap a run still gets its frame and runs rules only;
 //   - the owner's negotiation bounds (R47 D7): the tenant-wide business policy in force on the frame's UTC date, each bound
 //     defaulting to 9500 / 11000 bp of the reference price when unset. Outlet-level overrides are not served: the bound is per business;
-//   - the pack's `licence_kinds` (code, holder, outlet kinds, `_unverified` as a flag) and `payroll_scope` (W3.2).
+//   - the pack's `licence_kinds` (code, holder, outlet kinds, `_unverified` as a flag) and `payroll_scope` (W3.2);
+//   - per outlet, `cares_active` (ADR-015 §4): the Munim Cares mappings run only where it is set.
 // No thread block: an ask's thread excerpt travels only in core's `/ask` body (T-088a `threadBlock`), which core binds
 // to the run it mints — a run-frame `?thread_id=` would let intel name a thread nothing ties to the run (ruling, 11 Oct).
 // No soft threshold is decided (ADR-014 §3.4 names a soft cap, no document sets it): the level is ok | hard.
@@ -41,10 +42,15 @@ export async function runFrame(c: Queryable, run: Run, at: Date) {
   if (!pack) throw new ApiError("unavailable");
   const ladder = pack.doc.severity_ladder;
 
-  const o = await c.query<{ id: string; name: string; kind: "restaurant" | "cloud_kitchen" | "store"; tz: string; cutoff: string }>(
-    `SELECT id, name, kind, tz, to_char(business_day_cutoff, 'HH24:MI') AS cutoff FROM core.outlet ORDER BY id`);
+  // cares_active (ADR-015 §4): operator enablement on, the business's Cares profile active, the outlet opted in and active.
+  const o = await c.query<{ id: string; name: string; kind: "restaurant" | "cloud_kitchen" | "store"; tz: string; cutoff: string; cares: boolean }>(
+    `SELECT o.id, o.name, o.kind, o.tz, to_char(o.business_day_cutoff, 'HH24:MI') AS cutoff,
+            EXISTS (SELECT 1 FROM platform.cares_enablement en JOIN core.cares_profile pr ON pr.tenant_id = en.tenant_id AND pr.status = 'active'
+                      JOIN core.cares_outlet co ON co.tenant_id = en.tenant_id AND co.outlet_id = o.id AND co.active
+                     WHERE en.tenant_id = o.tenant_id AND en.enabled) AS cares
+       FROM core.outlet o ORDER BY o.id`);
   const inScope = run.scope[0] === "*" ? o.rows : o.rows.filter((r) => (run.scope as string[]).includes(r.id));
-  const outlets = inScope.map((r) => ({ id: r.id, name: r.name, kind: r.kind, tz: r.tz, business_date: businessDate(at, r.tz, r.cutoff) }));
+  const outlets = inScope.map((r) => ({ id: r.id, name: r.name, kind: r.kind, tz: r.tz, business_date: businessDate(at, r.tz, r.cutoff), cares_active: r.cares }));
 
   // T-090's helper runs the `intel.ai_budget_left` template itself, so these numbers equal any snapshot a person sees.
   const cap = await effectiveCap(c, budgetMonth(at));

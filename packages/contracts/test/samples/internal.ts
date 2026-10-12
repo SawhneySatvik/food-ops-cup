@@ -50,7 +50,7 @@ export const SAMPLES: Record<string, unknown> = {
     pack: { code: "IN", version: 2 }, currency: "INR",
     severity_ladder: { critical_minor_gte: 5000000, high_minor_gte: 1000000, medium_minor_gte: 200000 },
     detectors: { "catalogue.cost_drift": { thresholds: { cost_change_bp_gte: 800, cost_increase_minor_gte: 500 } } },
-    outlets: [{ id: u(2), name: "Indiranagar", kind: "restaurant", tz: "Asia/Kolkata", business_date: "2026-10-09" }],
+    outlets: [{ id: u(2), name: "Indiranagar", kind: "restaurant", tz: "Asia/Kolkata", business_date: "2026-10-09", cares_active: true }],
     budget: { month: "2026-10-01", currency: "INR", owner_cap_minor: 300000, operator_limit_minor: 500000, effective_cap_minor: 300000, spent_minor: 7515,
       hard_left_minor: 292485, level: "ok" },
     narration: "model",
