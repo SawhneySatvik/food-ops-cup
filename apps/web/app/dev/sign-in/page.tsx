@@ -1,23 +1,18 @@
 import { Button, Card, StateError } from "@munim/ui";
 import { notFound } from "next/navigation";
-import { serverClient } from "../../../lib/core.ts";
 import { t } from "../../../lib/i18n/index.ts";
-import { tokenClaims } from "../../../lib/session/port.ts";
-import { DEV_WORLDS, devSignInAvailable, mintPersonaTokens, type DevWorld } from "../../../lib/session/dev-local.ts";
+import { requestHostAllowed } from "../../../lib/origins.ts";
+import { DEV_PERSONAS, DEV_WORLDS, devSignInAvailable, type DevWorld } from "../../../lib/session/dev-local.ts";
 import { signInAs } from "./actions.ts";
 
 export const dynamic = "force-dynamic";
 
-/** Dev-only persona picker: a 404 unless NODE_ENV is not production AND core's /health reports idp "local". */
+/** Dev-only persona picker: a 404 unless the Host is a local name (DNS rebinding), NODE_ENV is not production AND core's
+ *  /health reports idp "local". Lists personas without minting: the POST action mints one token for the chosen one. */
 export default async function DevSignIn({ searchParams }: { searchParams: Promise<{ world?: string; failed?: string }> }) {
-  if (!(await devSignInAvailable())) notFound();
+  if (!(await requestHostAllowed()) || !(await devSignInAvailable())) notFound();
   const q = await searchParams;
   const world = ((DEV_WORLDS as readonly string[]).includes(q.world ?? "") ? q.world : "restaurant_group") as DevWorld;
-  const tokens = await mintPersonaTokens(world);
-  const personas = await Promise.all(Object.entries(tokens).map(async ([persona, token]) => {
-    const { data } = await serverClient(token).GET("/v1/me/tenants");
-    return { persona, email: tokenClaims(token).email ?? "", tenant: data?.tenants[0] ?? null };
-  }));
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "var(--space-8) var(--space-6)", display: "grid", gap: "var(--space-7)" }}>
       <header style={{ display: "grid", gap: "var(--space-3)" }}>
@@ -31,17 +26,13 @@ export default async function DevSignIn({ searchParams }: { searchParams: Promis
         ))}
       </nav>
       {q.failed && <StateError detail={t("dev.sign_in.failed")} />}
-      {personas.length === 0 && <p>{t("dev.sign_in.empty", { world })}</p>}
-      {personas.map((p) => (
-        <Card key={p.persona} data-persona={p.persona}>
-          <h2>{p.persona}</h2>
-          <p style={{ margin: "0 0 var(--space-4)", color: "var(--text-secondary)" }}>
-            {p.email}{p.tenant ? ` · ${p.tenant.tenant_name} · ${t(`chrome.role.${p.tenant.role}`)}` : ` · ${t("chrome.no_tenant")}`}
-          </p>
+      {DEV_PERSONAS[world].map((persona) => (
+        <Card key={persona} data-persona={persona}>
+          <h2>{persona}</h2>
           <form action={signInAs}>
             <input type="hidden" name="world" value={world} />
-            <input type="hidden" name="persona" value={p.persona} />
-            <Button type="submit" variant="primary" disabled={!p.tenant}>{t("dev.sign_in.as", { persona: p.persona })}</Button>
+            <input type="hidden" name="persona" value={persona} />
+            <Button type="submit" variant="primary">{t("dev.sign_in.as", { persona })}</Button>
           </form>
         </Card>
       ))}

@@ -14,6 +14,14 @@ import { COOKIE, cookieOptions, tokenClaims, type TokenSource } from "./port.ts"
 /** The dev worlds `make seed` / `make demo` know (Makefile); the minter validates the name again. */
 export const DEV_WORLDS = ["restaurant_group", "cloud_kitchen", "store", "au_outlet"] as const;
 export type DevWorld = (typeof DEV_WORLDS)[number];
+/** Each world's sign-in personas (worldgen `meta.personas`), listed without minting; test/dev-sign-in.test.tsx fails if
+ *  this drifts from tools/worldgen/src/worlds/<world>.ts. */
+export const DEV_PERSONAS: Readonly<Record<DevWorld, readonly string[]>> = {
+  restaurant_group: ["owner", "manager"],
+  cloud_kitchen: ["owner", "cashier", "manager"],
+  store: ["owner"],
+  au_outlet: ["owner"],
+};
 
 const repoRoot = () => resolve(process.env.MUNIM_REPO_ROOT || join(process.cwd(), "../.."));
 const minter = () => join(repoRoot(), "adapters/dev/idp-local/mint-seed-tokens.ts");

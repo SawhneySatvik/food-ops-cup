@@ -38,3 +38,11 @@ test("demo badge follows tenant.is_demo", () => {
   expect(render({})).not.toContain("Sample data — synthetic, for demonstration");
   expect(render({ tenant: { ...base.tenant, isDemo: true } })).toContain("Sample data — synthetic, for demonstration");
 });
+
+test("no live pill for roles core will not stream the inbox to (never a stuck \"Reconnecting…\")", () => {
+  for (const role of ["advisor", "judge", "staff"] as const) {
+    const html = render({ member: { name: "x", role } });
+    expect(html, role).not.toContain("mu-live");
+  }
+  expect(render({})).toContain("mu-live");
+});

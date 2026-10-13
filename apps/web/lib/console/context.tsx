@@ -25,7 +25,8 @@ export interface ConsoleSession {
 }
 
 interface ConsoleValue extends ConsoleSession {
-  live: LiveState;
+  /** null: this member has no live stream (core streams inbox:<tenant> to owners and managers only). */
+  live: LiveState | null;
   refreshInbox: () => Promise<void>;
   setAiOff: () => void;
 }
@@ -43,22 +44,22 @@ const INBOX_LIMIT = 50;
 export function ConsoleProvider({ session, children }: { session: ConsoleSession; children: ReactNode }) {
   const [inbox, setInbox] = useState(session.inbox);
   const [aiEnabled, setAiEnabled] = useState(session.aiEnabled);
-  const canReadInbox = session.inbox !== null;
+  // core refuses inbox:<tenant> to every role but owner and manager (core-api stream/feed.ts authorise).
+  const streamsInbox = session.inbox !== null && (session.member.role === "owner" || session.member.role === "manager");
 
   const refreshInbox = useCallback(async () => {
     const { data } = await api.GET("/v1/inbox", { params: { query: { limit: INBOX_LIMIT } } });
     if (data) setInbox({ items: data.items, nextCursor: data.next_cursor });
   }, []);
 
-  // inbox:<tenant> is readable by owners and managers only (core stream authorise); others get no stream.
-  const topics = useMemo(() => (canReadInbox ? [`inbox:${session.tenant.id}`] : null), [canReadInbox, session.tenant.id]);
+  const topics = useMemo(() => (streamsInbox ? [`inbox:${session.tenant.id}`] : null), [streamsInbox, session.tenant.id]);
   const live = useStream(topics, () => void refreshInbox());
 
   const value = useMemo<ConsoleValue>(() => ({
     ...session,
     inbox,
     aiEnabled,
-    live: topics ? live : "closed",
+    live: topics ? live : null,
     refreshInbox,
     setAiOff: () => setAiEnabled(false),
   }), [session, inbox, aiEnabled, live, topics, refreshInbox]);

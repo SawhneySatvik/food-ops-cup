@@ -21,5 +21,4 @@ export const chrome = {
   "chrome.role.staff": "Staff",
   "chrome.role.advisor": "Advisor",
   "chrome.role.judge": "Judge",
-  "chrome.no_tenant": "This person is not a member of any business yet.",
 } as const;

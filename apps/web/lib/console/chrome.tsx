@@ -38,7 +38,7 @@ export function ConsoleChrome() {
         </label>
         {c.tenant.isDemo && <SyntheticBadge />}
         <span className="console-spacer" />
-        <LivePill state={c.live} />
+        {c.live !== null && <LivePill state={c.live} />}
         {inboxCount !== null && (
           <Link href="/console/inbox" className="mu-btn" data-variant="ghost" data-size="sm" aria-label={t("chrome.inbox.count", { count: inboxCount })}>
             <IconInbox size={18} />{t("chrome.inbox")}<Badge tone="accent">{inboxCount}</Badge>

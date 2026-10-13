@@ -1,9 +1,11 @@
 // Same-origin proxy: browser code calls /api/v1/…; this forwards to core-api's /v1/… with the member's bearer token
 // and tenant from httpOnly cookies, so no token ever reaches browser JavaScript. Responses stream through unbuffered
-// (SSE /v1/stream included) and are never cached. Storefront calls (X-Munim-Storefront-Key present) go through
-// without any member credential. Nothing here logs a header, a token or a storefront key.
+// (SSE /v1/stream included) and are never cached. Storefront calls (X-Munim-Storefront-Key present) and public routes
+// go through without any member credential. Origins and hosts are checked against an explicit allow-list
+// (lib/origins.ts), never against the request's own Host. Nothing here logs a header, a token or a storefront key.
 import type { NextRequest } from "next/server";
 import { coreUrl } from "../../../../lib/core.ts";
+import { hostAllowed, originAllowed } from "../../../../lib/origins.ts";
 import { getSession } from "../../../../lib/session/index.ts";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,10 @@ const REQUEST_HEADERS = ["accept", "content-type", "idempotency-key", "last-even
 // content-encoding / -length are dropped: fetch has already decoded the body, and the length is the stream's.
 const RESPONSE_HEADERS = ["content-type", "cache-control", "content-disposition", "retry-after", "x-munim-replayed", "x-accel-buffering"];
 
+// Public routes never carry a member's credentials, whatever headers arrive: the storefront (key-scoped) and the Munim
+// Cares network pages (auth "public").
+const PUBLIC = /^\/v1\/(?:storefront|cares-network)\//;
+
 const refusal = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, reason_code: null } }, { status, headers: { "cache-control": "no-store" } });
 
@@ -22,9 +28,13 @@ async function proxy(req: NextRequest): Promise<Response> {
   // The raw path, not rebuilt from [...path] segments (that would percent-encode the ':' of /v1/drafts/{id}:approve).
   const path = url.pathname.slice("/api".length);
   if (!path.startsWith("/v1/") || path.includes("..") || path.includes("//")) return refusal(404, "not_found", "Not found.");
+  // DNS rebinding: a rebound name (evil.example → 127.0.0.1) is refused for reads and writes alike. Dev only — in
+  // production a front end may rewrite Host, so the Origin allow-list below carries the check.
+  if (!hostAllowed(req.headers.get("host") ?? url.host)) return refusal(403, "forbidden", "Request refused.");
   if (req.method !== "GET" && req.method !== "HEAD") {
+    // Browsers send Origin on every credentialed write; "null" (a sandboxed frame) is not an allowed origin.
     const origin = req.headers.get("origin");
-    if (origin && new URL(origin).host !== url.host) return refusal(403, "forbidden", "Cross-site request refused.");
+    if (origin !== null && !originAllowed(origin)) return refusal(403, "forbidden", "Cross-site request refused.");
   }
 
   const headers = new Headers();
@@ -32,7 +42,7 @@ async function proxy(req: NextRequest): Promise<Response> {
     const v = req.headers.get(h);
     if (v !== null) headers.set(h, v);
   }
-  if (!headers.has("x-munim-storefront-key")) {
+  if (!headers.has("x-munim-storefront-key") && !PUBLIC.test(path)) {
     const session = await getSession();
     if (session) {
       headers.set("authorization", `Bearer ${session.token}`);

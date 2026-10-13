@@ -82,6 +82,74 @@ test("a cross-site POST is refused before it reaches core", async () => {
   expect(seen).toHaveLength(0);
 });
 
+test("a same-origin POST from 127.0.0.1 passes even though next dev reports the URL as localhost", async () => {
+  seen = [];
+  const res = await POST(req("/api/v1/snapshots", { method: "POST", headers: { origin: "http://127.0.0.1:3160", host: "127.0.0.1:3160" }, body: "{}" }));
+  expect(res.status).toBe(200);
+  expect(seen).toHaveLength(1);
+});
+
+test("a cross-site POST is refused even when it claims the page's host header", async () => {
+  seen = [];
+  const res = await POST(req("/api/v1/snapshots", { method: "POST", headers: { origin: "https://evil.example", host: "127.0.0.1:3160" }, body: "{}" }));
+  expect(res.status).toBe(403);
+  expect(seen).toHaveLength(0);
+});
+
+test("DNS rebinding: Origin and Host both evil.example is refused, writes and reads", async () => {
+  seen = [];
+  const evil = { origin: "http://evil.example:3160", host: "evil.example:3160" };
+  expect((await POST(req("/api/v1/drafts/x:approve", { method: "POST", headers: evil, body: "{}" }))).status).toBe(403);
+  expect((await GET(req("/api/v1/tenant", { headers: { host: "evil.example:3160" } }))).status).toBe(403);
+  expect(seen).toHaveLength(0);
+});
+
+test("Origin: null (sandboxed iframe) is a 403 refusal, not a crash", async () => {
+  seen = [];
+  const res = await POST(req("/api/v1/snapshots", { method: "POST", headers: { origin: "null", host: "127.0.0.1:3160" }, body: "{}" }));
+  expect(res.status).toBe(403);
+  expect(seen).toHaveLength(0);
+});
+
+test("[::1] and localhost on any port are dev origins", async () => {
+  seen = [];
+  for (const o of ["http://[::1]:3161", "http://localhost:3999"]) {
+    const res = await POST(req("/api/v1/snapshots", { method: "POST", headers: { origin: o, host: new URL(o).host }, body: "{}" }));
+    expect(res.status).toBe(200);
+  }
+  expect(seen).toHaveLength(2);
+});
+
+test("production: only MUNIM_WEB_ORIGINS pass, whatever Host says (front ends rewrite it)", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubEnv("MUNIM_WEB_ORIGINS", "https://app.munim.example, https://demo.munim.example:8443");
+  try {
+    seen = [];
+    const post = (origin: string, host: string) => POST(req("/api/v1/snapshots", { method: "POST", headers: { origin, host }, body: "{}" }));
+    expect((await post("https://app.munim.example", "internal-run-app:8080")).status).toBe(200);
+    expect((await post("https://demo.munim.example:8443", "x")).status).toBe(200);
+    expect((await post("https://demo.munim.example", "demo.munim.example")).status).toBe(403);
+    expect((await post("http://127.0.0.1:3160", "127.0.0.1:3160")).status).toBe(403);
+    expect((await post("http://evil.example", "evil.example")).status).toBe(403);
+    expect(seen).toHaveLength(2);
+  } finally {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("MUNIM_WEB_ORIGINS", "");
+  }
+});
+
+test("public routes never carry member credentials, with or without a storefront key", async () => {
+  seen = [];
+  await GET(req("/api/v1/cares-network/impact"));
+  await GET(req("/api/v1/cares-network/snapshots/0199e7a0-0000-7000-8000-00000000000a"));
+  await GET(req("/api/v1/storefront/outlets"));
+  expect(seen).toHaveLength(3);
+  for (const s of seen) {
+    expect(s.headers.authorization).toBeUndefined();
+    expect(s.headers["x-munim-tenant"]).toBeUndefined();
+  }
+});
+
 test("SSE streams through unbuffered: the first event arrives before core ends the response", async () => {
   const res = await GET(req("/api/v1/stream?topics=inbox:x", { headers: { "last-event-id": "o=3" } }));
   expect(res.headers.get("content-type")).toBe("text/event-stream");
