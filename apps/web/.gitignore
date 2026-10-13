@@ -1,2 +1,0 @@
-# Sibling dist dirs (NEXT_DIST_DIR=.next-<port>), if anyone uses them; lanes should use .next/lane-<port> (ignored at the root).
-.next-*/

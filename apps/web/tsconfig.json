@@ -10,10 +10,9 @@
     "declaration": false,
     "sourceMap": false,
     "esModuleInterop": true,
-    "allowImportingTsExtensions": true,
     "types": ["node"],
     "plugins": [{ "name": "next" }]
   },
-  "include": ["web-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "next-env.d.ts", ".next", ".next-*"]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

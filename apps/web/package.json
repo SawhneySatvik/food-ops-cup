@@ -10,9 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@munim/contracts": "workspace:*",
-    "@munim/sdk": "workspace:*",
-    "@munim/ui": "workspace:*",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
