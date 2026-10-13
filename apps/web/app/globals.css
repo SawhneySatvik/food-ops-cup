@@ -1,26 +1,287 @@
+/* Cobnut Bakehouse: warm patisserie. Cream paper, hazelnut brown, rose-berry and blush; soft rounded cards with a
+   fine cocoa outline; a serif display face. Contrast for every pair is measured in the README (all ≥ 4.5 : 1 for
+   text, ≥ 3 : 1 for borders and focus). Written for this project. */
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #fbf4ea;
+  --bg-deep: #f3e6d3;
+  --card: #ffffff;
+  --ink: #2a1a12;
+  --muted: #6a5040;
+  --line: #8c6e5a;
+  --primary: #7b3f1d;
+  --on-primary: #ffffff;
+  --secondary: #9e2f4e;
+  --on-secondary: #ffffff;
+  --accent: #f6d9c8;
+  --on-accent: #2a1a12;
+  --veg: #2e6b34;
+  --nonveg: #a3361c;
+  --danger: #b42318;
+  --ok: #2e6b34;
+  --focus: #9e2f4e;
+
+  --radius-card: 22px;
+  --radius-field: 14px;
+  --radius-pill: 9999px;
+  --shadow: 0 1px 0 rgb(42 26 18 / 0.06), 0 10px 28px -16px rgb(42 26 18 / 0.35);
+  --shadow-lift: 0 2px 0 rgb(42 26 18 / 0.06), 0 18px 36px -18px rgb(42 26 18 / 0.45);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-veg: var(--veg);
+  --color-nonveg: var(--nonveg);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --font-display: var(--font-display-face), Georgia, serif;
+  --font-sans: var(--font-body-face), system-ui, sans-serif;
+  --radius-card: 22px;
+  --radius-pill: 9999px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body-face), system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
   }
+  body {
+    min-height: 100dvh;
+    font-size: 1rem;
+    line-height: 1.5;
+    background: var(--bg);
+  }
+  h1, h2, h3, .display {
+    font-family: var(--font-display-face), Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+  a { color: var(--primary); text-underline-offset: 3px; }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font: inherit;
+    font-size: max(16px, 1rem); /* below 16px, iOS Safari zooms the page */
+    min-height: 48px;
+    width: 100%;
+    background: var(--card);
+    color: var(--ink);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-field);
+    padding: 0 14px;
+  }
+  textarea { padding: 12px 14px; resize: vertical; }
+  input[type="checkbox"], input[type="radio"] {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    accent-color: var(--primary);
+  }
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+  .num { font-variant-numeric: tabular-nums; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .wrap { width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 16px; }
+  @media (min-width: 640px) { .wrap { padding-inline: 24px; } }
+
+  .card {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow);
+  }
+  .card-link { transition: transform 180ms ease-out, box-shadow 180ms ease-out; }
+  .card-link:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    min-width: 48px;
+    padding: 0 22px;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-pill);
+    font-weight: 650;
+    line-height: 1.1;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn:active { transform: translateY(1px); box-shadow: none; }
+  .btn:disabled, .btn[aria-disabled="true"] {
+    background: var(--bg-deep);
+    color: var(--muted);
+    border-color: var(--line);
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+  }
+  .btn-primary { background: var(--primary); color: var(--on-primary); }
+  .btn-secondary { background: var(--secondary); color: var(--on-secondary); }
+  .btn-plain { background: var(--card); color: var(--ink); border-color: var(--line); }
+  .btn-ghost { background: transparent; color: var(--primary); text-decoration: underline; padding-inline: 12px; }
+  .btn-round { padding: 0; width: 48px; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 18px;
+    white-space: nowrap;
+    background: var(--card);
+    color: var(--ink);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .chip[aria-current="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+  /* Section titles: serif with a hand-drawn swash underneath (an inline SVG background drawn for this project). */
+  .section-title {
+    display: inline-block;
+    padding-bottom: 10px;
+    font-size: clamp(28px, 5vw, 36px);
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10'%3E%3Cpath d='M2 7c18-6 34-6 52-1s36 4 64-3' fill='none' stroke='%239e2f4e' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") left bottom / 120px 10px no-repeat;
+  }
+
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 14px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-field);
+    background: var(--card);
+    cursor: pointer;
+  }
+  .choice:has(input:checked) { background: var(--accent); border-color: var(--primary); color: var(--on-accent); }
+  .choice:has(input:disabled) { color: var(--muted); cursor: not-allowed; background: var(--bg); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 10px;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-accent { background: var(--accent); color: var(--on-accent); border-color: var(--primary); }
+
+  /* A scalloped edge, like the paper doily under a cake. */
+  .scallop {
+    height: 16px;
+    background: radial-gradient(circle at 12px 0, transparent 11px, var(--bg-deep) 12px) 0 0 / 24px 16px repeat-x;
+  }
+  .scallop-up { transform: scaleY(-1); }
+
+  .rail {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 6px 2px 10px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail > * { scroll-snap-align: start; }
+
+  .ribbon {
+    overflow: hidden;
+    background: var(--secondary);
+    color: var(--on-secondary);
+  }
+  .ribbon-track {
+    display: flex;
+    width: max-content;
+    gap: 32px;
+    padding: 10px 0;
+    animation: ribbon 36s linear infinite;
+  }
+  .ribbon:hover .ribbon-track { animation-play-state: paused; }
+
+  .bob { animation: bob 6s ease-in-out infinite; }
+
+  .soldout-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--ink);
+    color: #ffffff;
+    border-radius: var(--radius-pill);
+    transform: rotate(-3deg);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .skeleton { background: var(--bg-deep); border-radius: 10px; }
+
+  dialog.modal, dialog.drawer {
+    background: var(--card);
+    color: var(--ink);
+    border: 1.5px solid var(--line);
+    box-shadow: var(--shadow-lift);
+    padding: 0;
+  }
+  dialog.modal {
+    width: min(560px, calc(100vw - 24px));
+    max-height: 90dvh;
+    border-radius: var(--radius-card);
+    overflow: auto;
+  }
+  dialog.drawer {
+    margin: 0 0 0 auto;
+    width: min(420px, 100vw);
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: var(--radius-card) 0 0 var(--radius-card);
+  }
+  dialog.drawer[open] { animation: slide-in 220ms ease-out; }
+  dialog::backdrop { background: rgb(42 26 18 / 0.45); }
+
+  .toast { animation: fade-in 150ms ease-out; }
+  .step-now { animation: pop 300ms ease-out; }
+}
+
+@keyframes ribbon { to { transform: translateX(-50%); } }
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+@keyframes slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ribbon-track { flex-wrap: wrap; width: auto; justify-content: center; }
 }

@@ -2,7 +2,7 @@
 // switches as the Munim mock (https://munim-rho.example.app/mock), over this bakery's synthetic data.
 import { createHash } from "node:crypto";
 import type { Schemas } from "@munim/sdk";
-import { BRAND, CHANNEL_ID, DEALS, ITEMS, OUTLETS, PREP_MIN, STOREFRONT_KEY, TZ, TZ_OFFSET_MIN, OPEN_FROM_MIN, groupId, itemId, optionId, variantId, type MockOutlet } from "./data";
+import { BRAND, CHANNEL_ID, DEALS, ITEMS, OUTLETS, PREP_MIN, STOREFRONT_KEY, TZ, TZ_OFFSET_MIN, OPEN_FROM_MIN, OPEN_TO_MIN, groupId, itemId, optionId, variantId, type MockOutlet } from "./data";
 import { BadRequest, localClock, outletById, price, type Accepting } from "./pricing";
 import { book, openWindows } from "./windows";
 import { eventsUntil, issueToken, readToken, recordFrom, viewOf } from "./orders";
@@ -113,8 +113,12 @@ function menu(o: MockOutlet, req: Request, now: Date): Schemas["StorefrontMenuRe
 }
 
 function cares(now: Date): Schemas["V1StorefrontCares"] {
-  const from = new Date(now.getTime() + 2 * 3600_000);
-  const to = new Date(from.getTime() + 2 * 3600_000);
+  // Surplus is handed over at closing: the next 21:00 outlet time, for ninety minutes.
+  const local = new Date(now.getTime() + TZ_OFFSET_MIN * 60_000);
+  local.setUTCHours(0, 0, 0, 0);
+  let from = new Date(local.getTime() + (OPEN_TO_MIN - TZ_OFFSET_MIN) * 60_000);
+  if (from.getTime() + 90 * 60_000 < now.getTime()) from = new Date(from.getTime() + 86_400_000);
+  const to = new Date(from.getTime() + 90 * 60_000);
   const day = new Date(now.getTime() + TZ_OFFSET_MIN * 60_000 + 2 * 86_400_000).toISOString().slice(0, 10);
   const base = { city_code: "lucknow", business_name: "Cobnut Bakehouse (synthetic)", tz: TZ, pickup_from: from.toISOString(), pickup_to: to.toISOString(), recipient_simulated: true as const };
   return {
