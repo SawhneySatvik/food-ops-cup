@@ -1,0 +1,15 @@
+/* Munim Cares screen (T-100). Tokens only. */
+.cares { display: grid; gap: var(--space-6); }
+.cares-head { display: grid; gap: var(--space-3); }
+.cares-labels { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.cares-enrolment ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.cares-tabs, .cares-filter, .cares-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.cares-listing { display: grid; gap: var(--space-3); }
+.cares-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.cares-lines, .cares-handovers, .cares-drafts ul, .cares-claims ul { margin: 0; padding-left: var(--space-6); display: grid; gap: var(--space-1); }
+.cares-panel { display: grid; gap: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
+.cares-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); }
+.cares-form { display: grid; gap: var(--space-4); }
+.cares-recipient { display: inline-flex; align-items: center; gap: var(--space-2); }
+.cares-scroll { overflow-x: auto; max-width: 100%; }
+.cares-scroll table { width: 100%; }
