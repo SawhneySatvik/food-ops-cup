@@ -16,7 +16,7 @@ type Outlet = Schemas["StorefrontOutletsResponse"]["outlets"][number];
 
 export function SiteHeader({ count, onCart }: { count?: number; onCart?: () => void }) {
   return (
-    <header className="sticky top-0 z-30 border-b-[1.5px] border-line bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b-[1.5px] border-line bg-bg">
       <div className="wrap flex min-h-[64px] items-center justify-between gap-3">
         <Link href="/" className="text-ink no-underline" aria-label={`${SITE.name}, home`}>
           <Wordmark />
@@ -70,9 +70,9 @@ export function StateIcon({ state }: { state: Accepting["state"] }) {
 export function OfflineBanner({ show, text }: { show: boolean; text: string }) {
   if (!show) return null;
   return (
-    <div className="border-b-[1.5px] border-line bg-ink text-white" role="status">
+    <div className="sticky top-[65px] z-30 border-b-[1.5px] border-line bg-ink text-white" role="status">
       <div className="wrap flex min-h-12 items-center gap-2 py-2 font-semibold">
-        <OfflineIcon size={20} /> {text}
+        <OfflineIcon size={20} className="flex-none" /> {text}
       </div>
     </div>
   );
@@ -96,7 +96,7 @@ export function DietBadge({ diet }: { diet: string | null }) {
 
 export function FullPage({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="wrap grid place-items-center py-16">
+    <div className="wrap grid min-h-[100dvh] content-start justify-items-center py-16">
       <div className="card w-full max-w-[520px] p-8 text-center">
         <h1 className="text-[34px]">{title}</h1>
         <div className="mt-3 space-y-2 text-muted">{children}</div>
@@ -178,7 +178,7 @@ export function MockPanel({ onChange }: { onChange?: () => void }) {
     onChange?.();
   };
   return (
-    <div className="fixed right-3 top-[132px] z-40">
+    <div className="fixed bottom-24 right-3 z-40 lg:bottom-4">
       {open ? (
         <div className="card w-[240px] space-y-3 p-4 text-[14px]">
           <p className="font-bold">Mock test controls (dev only)</p>

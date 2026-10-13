@@ -198,11 +198,21 @@ function CheckoutView({ outletId }: { outletId: string }) {
   }
 
   const header = <SiteHeader />;
-  if (ready && cart.lines.length === 0 && !placing) {
+  // Until the cart has been read from storage and the menu has loaded, hold one full-height blank area: the page
+  // then lays out once, and nothing visible shifts.
+  if (!ready || (!menu && !loadError && cart.lines.length > 0)) {
     return (
       <>
         {header}
-        <div className="wrap grid place-items-center py-16">
+        <div className="min-h-[100dvh]" aria-busy="true" />
+      </>
+    );
+  }
+  if (cart.lines.length === 0 && !placing) {
+    return (
+      <>
+        {header}
+        <div className="wrap grid min-h-[100dvh] content-start justify-items-center py-16">
           <div className="card w-full max-w-[520px] p-8 text-center">
             <h1 className="text-[34px]">Your order</h1>
             <p className="mt-3 font-semibold">Your cart is empty.</p>

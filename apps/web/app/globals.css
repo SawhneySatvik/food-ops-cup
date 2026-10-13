@@ -25,8 +25,8 @@
   --radius-card: 22px;
   --radius-field: 14px;
   --radius-pill: 9999px;
-  --shadow: 0 1px 0 rgb(42 26 18 / 0.06), 0 10px 28px -16px rgb(42 26 18 / 0.35);
-  --shadow-lift: 0 2px 0 rgb(42 26 18 / 0.06), 0 18px 36px -18px rgb(42 26 18 / 0.45);
+  --shadow: 0 1px 0 rgb(42 26 18 / 0.06), 0 6px 14px -10px rgb(42 26 18 / 0.35);
+  --shadow-lift: 0 2px 0 rgb(42 26 18 / 0.06), 0 12px 22px -12px rgb(42 26 18 / 0.45);
 }
 
 @theme inline {

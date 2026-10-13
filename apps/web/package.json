@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "smoke": "tsx scripts/smoke.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@munim/sdk": "https://munim-rho.example.app/downloads/munim-sdk.tgz",

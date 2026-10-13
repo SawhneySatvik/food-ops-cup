@@ -40,7 +40,9 @@ function MenuView({ outletId }: { outletId: string }) {
   const [toast, showToast] = useToast();
 
   const load = useCallback(async () => {
-    const r = await munim.getMenu(outletId);
+    // Menu and outlet details arrive together, so the page lays out once (no shift when the address lands).
+    const [r, o] = await Promise.all([munim.getMenu(outletId), munim.listOutlets()]);
+    if (o.ok) setOutlet(o.data.outlets.find((x) => x.outlet_id === outletId) ?? null);
     if (!r.ok) {
       if (r.error.kind === "not_found") return router.replace("/not-valid");
       setError(r.error);
@@ -55,7 +57,6 @@ function MenuView({ outletId }: { outletId: string }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; state is set after the response
     void load();
-    void munim.listOutlets().then((r) => r.ok && setOutlet(r.data.outlets.find((o) => o.outlet_id === outletId) ?? null));
     // Refresh when the tab regains focus and every 60 s while visible.
     const onFocus = () => document.visibilityState === "visible" && void load();
     const t = setInterval(onFocus, 60_000);
@@ -66,7 +67,7 @@ function MenuView({ outletId }: { outletId: string }) {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [load, outletId]);
+  }, [load]);
   const seconds = useCountdown(retryAt, () => void load());
 
   const ordering = menu ? canOrder(menu.accepting) : false;
@@ -92,14 +93,16 @@ function MenuView({ outletId }: { outletId: string }) {
       <StateBanner accepting={menu?.accepting ?? null} />
       <OfflineBanner show={showOffline} text="You're offline. Your cart is kept on this phone." />
 
-      <div className="wrap pt-6">
-        <p className="display text-[clamp(30px,6vw,44px)]">{outlet?.name ?? (menu ? "" : " ")}</p>
-        {outlet && <p className="mt-1 text-muted">{outlet.address}</p>}
-        <Link href="/" className="mt-2 inline-flex min-h-12 items-center font-semibold">Change bakehouse</Link>
-      </div>
+      {menu && (
+        <div className="wrap pt-6">
+          <p className="display text-[clamp(30px,6vw,44px)]">{outlet?.name}</p>
+          {outlet && <p className="mt-1 text-muted">{outlet.address}</p>}
+          <Link href="/" className="mt-2 inline-flex min-h-12 items-center font-semibold">Change bakehouse</Link>
+        </div>
+      )}
 
       {!menu ? (
-        <div className="wrap mt-6" aria-busy={!error}>
+        <div className="wrap min-h-[100dvh] pt-6" aria-busy={!error}>
           {error && error.kind !== "network" ? (
             <div className="card p-6">
               <p className="font-semibold">{errorText(error, "menu")}</p>
@@ -220,7 +223,7 @@ function CategoryRail({ categories, deals }: { categories: string[]; deals: bool
     railRef.current?.querySelector(`[data-cat="${active}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [active]);
   return (
-    <nav ref={railRef} aria-label="Menu categories" className="sticky top-[65px] z-20 mt-4 border-b-[1.5px] border-line bg-bg/95 backdrop-blur">
+    <nav ref={railRef} aria-label="Menu categories" className="sticky top-[65px] z-20 mt-4 border-b-[1.5px] border-line bg-bg">
       <div className="wrap rail">
         {all.map((c) => (
           <a key={c} data-cat={c} href={`#category-${c}`} className="chip" aria-current={active === c ? "true" : undefined}>

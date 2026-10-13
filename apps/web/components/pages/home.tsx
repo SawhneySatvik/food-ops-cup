@@ -37,12 +37,13 @@ export function HomePage() {
       if (r.error.kind === "rate_limited") setRetryAt(Date.now() + (r.error.retryAfterMs ?? 5000));
       return;
     }
-    setRetryAt(null);
-    setOutlets(r.data);
-    setCounts(Object.fromEntries(r.data.outlets.map((o) => [o.outlet_id, cartCount(loadCart(o.outlet_id) ?? { outletId: o.outlet_id, lines: [], slot: { pickupWindowId: null, promisedAt: null }, couponCodes: [] })])));
-    // Each state call fails on its own: a failed one just leaves that card without a badge.
+    // Each state call fails on its own: a failed one just leaves that card without a badge. Cards render once,
+    // with their badges, so nothing shifts when a state arrives.
     const pairs = await Promise.all(r.data.outlets.map(async (o) => [o.outlet_id, await munim.getState(o.outlet_id)] as const));
+    setRetryAt(null);
     setStates(Object.fromEntries(pairs.flatMap(([id, s]) => (s.ok ? [[id, s.data]] : []))));
+    setCounts(Object.fromEntries(r.data.outlets.map((o) => [o.outlet_id, cartCount(loadCart(o.outlet_id) ?? { outletId: o.outlet_id, lines: [], slot: { pickupWindowId: null, promisedAt: null }, couponCodes: [] })])));
+    setOutlets(r.data);
   }, [router]);
 
   useEffect(() => {
