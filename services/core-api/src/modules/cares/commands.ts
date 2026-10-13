@@ -2,8 +2,10 @@
 // the derivation bindings). Each handler is bound to one command type and runs inside executeCommand (idempotency, audit
 // chain, outbox after commit). The database is the backstop for every rule here; these checks exist to answer with a typed
 // reason before a trigger would refuse, and to read the row first so an outlet outside the caller's scope is 404 (RLS).
-// Lock order, every handler: command_log (executeCommand) → the listing row FOR UPDATE → the claim lock → audit. The claim
-// lock key is the claim's own tenant and id, byte-identical on both sides: 'cares_claim:<claim tenant>:<claim id>'.
+// Lock order: command_log (executeCommand) first. Offerer paths (withdraw, hand-over record and void, decide): the listing
+// row FOR UPDATE → the claim lock (hand-over of an offer, decide) → audit. Buyer paths (cancel, close, receive): the claim
+// lock → audit. Profile set, publish and claim create take neither. The claim lock key is the claim's own tenant and id,
+// byte-identical on both sides: 'cares_claim:<claim tenant>:<claim id>'.
 import {
   CaresClaimCancelV1, CaresClaimCloseV1, CaresClaimCreateV1, CaresClaimDecideV1, CaresClaimReceiveV1, CaresHandoverRecordV1, CaresHandoverVoidV1,
   CaresListingPublishV1, CaresListingWithdrawV1, CaresProfileSetV1,
@@ -100,13 +102,17 @@ export const profileSet: CommandHandler = {
     }
     const audit: AuditEntry[] = [{ entity: "core.cares_profile", entityId: id, before: prior ? { status: prior.status, public_name: prior.public_name, b2b_enabled: prior.b2b_enabled } : null,
       after: { status: p.status, public_name: p.public_name, b2b_enabled: p.b2b_enabled } }];
+    const priorOutlets = (await c.query<{ outlet_id: string; city_code: string; active: boolean }>(
+      `SELECT outlet_id, city_code, active FROM core.cares_outlet WHERE outlet_id = ANY ($1::uuid[])`, [ids])).rows;
     for (const o of p.outlets) {
       await c.query(
         `INSERT INTO core.cares_outlet (tenant_id, outlet_id, city_code, lat_e6, lng_e6, pickup_from, pickup_to, active) VALUES (${T}, $1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (tenant_id, outlet_id) DO UPDATE SET city_code = excluded.city_code, lat_e6 = excluded.lat_e6, lng_e6 = excluded.lng_e6,
            pickup_from = excluded.pickup_from, pickup_to = excluded.pickup_to, active = excluded.active`,
         [o.outlet_id, o.city_code, o.lat_e6, o.lng_e6, o.pickup_from, o.pickup_to, o.active]);
-      audit.push({ entity: "core.cares_outlet", entityId: o.outlet_id, after: { city_code: o.city_code, active: o.active } });
+      const was = priorOutlets.find((x) => x.outlet_id === o.outlet_id);
+      audit.push({ entity: "core.cares_outlet", entityId: o.outlet_id, before: was ? { city_code: was.city_code, active: was.active } : null,
+        after: { city_code: o.city_code, active: o.active } });
     }
     return { entityId: id, audit };
   },
@@ -232,7 +238,9 @@ async function inboundClaim(c: Queryable, listingId: string, claimTenant: string
  *  line trigger is the backstop, MB001). The hand-over that completes every line closes the listing — header, lines,
  *  then the close (0028: closed only by a hand-over with a line recorded in this transaction). Stock leaves through
  *  inventory.cares_handover. An offer's hand-over names the accepted allocation and waits on the claim lock, so it is
- *  judged before or after the buyer's receive, never during it. */
+ *  judged before or after the buyer's receive, never during it; it is all-or-nothing (orchestrator ruling 2-B, v1):
+ *  every line at exactly its accepted qty, else `handover_must_be_complete`. App-level only: 0028's triggers admit a
+ *  partial one. */
 export const handoverRecord: CommandHandler = {
   type: "cares.handover.record.v1",
   async run(c, cmd) {
@@ -240,6 +248,7 @@ export const handoverRecord: CommandHandler = {
     const l = await lockListing(c, p.listing_id);
     if (l.kind === "donation" ? l.status !== "published" : l.status !== "allocated") throw new ApiError("illegal_transition");
     if (l.kind === "donation" && p.allocation_id !== null) throw invalid();
+    let accepted: Array<{ offer_line_id: string; qty_milli: number }> | null = null;
     if (l.kind === "offer") {
       const a = await first<{ claim_tenant_id: string; claim_id: string }>(c,
         `SELECT claim_tenant_id, claim_id FROM core.cares_allocation WHERE id = $1 AND listing_id = $2 AND verdict = 'accepted'`, [p.allocation_id, l.id]);
@@ -248,6 +257,7 @@ export const handoverRecord: CommandHandler = {
       const claim = await inboundClaim(c, l.id, a.claim_tenant_id, a.claim_id);
       if (claim?.status === "received") throw conflict("claim_received");
       if (claim?.status !== "requested") throw conflict("offer_closed");
+      accepted = claim.lines;
     }
     const lines = (await c.query<{ id: string; qty: string; handed: string }>(
       `SELECT ll.id, ll.qty_milli::text AS qty,
@@ -260,6 +270,10 @@ export const handoverRecord: CommandHandler = {
     for (const x of p.lines) {
       const line = lines.find((y) => y.id === x.listing_line_id)!;
       if (Number(line.handed) + x.qty_milli > Number(line.qty)) throw conflict("qty_exceeds_listed");
+    }
+    if (accepted && (p.lines.length !== accepted.length
+      || !accepted.every((a) => p.lines.some((x) => x.listing_line_id === a.offer_line_id && x.qty_milli === a.qty_milli)))) {
+      throw conflict("handover_must_be_complete");
     }
 
     const ins = await c.query(
@@ -284,21 +298,17 @@ export const handoverRecord: CommandHandler = {
   },
 };
 
-/** recorded → voided with a reason; its stock comes back (inventory.cares_handover_void). Refused once the buyer received
- *  an offer's hand-over (`claim_received`) — the void and the receive take the same claim lock. The listing is not
- *  reopened (no editing: void, then publish again). */
+/** A donation's hand-over: recorded → voided with a reason; its stock comes back (inventory.cares_handover_void). The
+ *  listing is not reopened (no editing: void, then publish again). An offer's hand-over is final in v1 (orchestrator
+ *  ruling 2-B): `offer_handover_final`, whether or not the buyer has received it. */
 export const handoverVoid: CommandHandler = {
   type: "cares.handover.void.v1",
   async run(c, cmd) {
     const p = parse(CaresHandoverVoidV1, cmd.payload);
-    const h = await first<{ listing_id: string; allocation_id: string | null }>(c, `SELECT listing_id, allocation_id FROM core.cares_handover WHERE id = $1`, [p.handover_id]);
+    const h = await first<{ listing_id: string }>(c, `SELECT listing_id FROM core.cares_handover WHERE id = $1`, [p.handover_id]);
     if (!h) throw new ApiError("not_found");
     const l = await lockListing(c, h.listing_id);
-    if (h.allocation_id !== null) {
-      const a = (await first<{ claim_tenant_id: string; claim_id: string }>(c, `SELECT claim_tenant_id, claim_id FROM core.cares_allocation WHERE id = $1`, [h.allocation_id]))!;
-      await claimLock(c, a.claim_tenant_id, a.claim_id);
-      if ((await inboundClaim(c, l.id, a.claim_tenant_id, a.claim_id))?.status === "received") throw conflict("claim_received");
-    }
+    if (l.kind === "offer") throw conflict("offer_handover_final");
     const upd = await c.query(`UPDATE core.cares_handover SET status = 'voided', voided_by = ${ME}, void_reason_code = $2 WHERE id = $1 AND status = 'recorded'`,
       [p.handover_id, p.reason_code]);
     if (upd.rowCount !== 1) throw new ApiError("illegal_transition");
@@ -433,7 +443,7 @@ export const claimDecide: CommandHandler = {
 
 /** Buyer. Accepted and handed over: the claim takes the offerer's accepted allocation and each line the quantity the
  *  offerer handed over (core.cares_claim_outcome, this transaction; the triggers re-check both), then the stock comes in
- *  through inventory.cares_claim_receive. Under the claim lock, so an offerer's void waits or is refused. */
+ *  through inventory.cares_claim_receive. Under the claim lock, so the offerer's hand-over is judged wholly before or after. */
 export const claimReceive: CommandHandler = {
   type: "cares.claim.receive.v1",
   async run(c, cmd) {

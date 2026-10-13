@@ -48,14 +48,13 @@ export async function outletRow(c: Queryable, outlet_id: string): Promise<Outlet
 /** `core.order.pricing_snapshot.pack`: the pack version that priced an order. */
 export type PackRef = { code?: unknown; version?: unknown } | null;
 
-/** The pack version that priced an order (its snapshot), else the tenant's active pack (an order with no snapshot pack). */
-export async function pricedPack(c: Queryable, ref: PackRef): Promise<CountryPack> {
-  if (ref && typeof ref.code === "string" && typeof ref.version === "number") {
-    const r = await c.query<{ doc: unknown }>(`SELECT doc FROM platform.country_pack WHERE code = $1 AND version = $2`, [ref.code, ref.version]);
-    const p = CountryPack.safeParse(r.rows[0]?.doc);
-    if (p.success) return p.data;
-  }
-  return tenantPack(c);
+/** The pack version that priced an order (its snapshot). Null — "cannot verify" — when the order names none or that
+ *  version's row is missing or does not parse: never the tenant's current pack, which may not be the one that priced it. */
+export async function pricedPack(c: Queryable, ref: PackRef): Promise<CountryPack | null> {
+  if (!ref || typeof ref.code !== "string" || typeof ref.version !== "number") return null;
+  const r = await c.query<{ doc: unknown }>(`SELECT doc FROM platform.country_pack WHERE code = $1 AND version = $2`, [ref.code, ref.version]);
+  const p = CountryPack.safeParse(r.rows[0]?.doc);
+  return p.success ? p.data : null;
 }
 
 /** The pay-at-counter methods the tenant's active pack lists (`pay_at_counter_methods`, G-13), else null. Read from the

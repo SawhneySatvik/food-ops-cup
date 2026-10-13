@@ -5,7 +5,7 @@
 // Money on a claim is "Recorded, never processed" — nothing here posts to a ledger.
 import { z } from "zod";
 import { defineDraftable } from "../shared/draftables.ts";
-import { CurrencyCode, IsoDate, IsoDateTime, LocalTime, MinorAmount, NonEmpty, QtyMilli, Slug, Unit, Uuid7 } from "../shared/primitives.ts";
+import { CurrencyCode, IanaZone, IsoDate, IsoDateTime, LocalTime, MinorAmount, NonEmpty, QtyMilli, Slug, Unit, Uuid7 } from "../shared/primitives.ts";
 import { Ref } from "../shared/refs.ts";
 import type { QueryParam, Route } from "../shared/routes.ts";
 import { Cell, SnapshotColumn, TemplateParams } from "../shared/snapshot.ts";
@@ -84,9 +84,11 @@ export const CaresHandoverRecordV1 = z.strictObject({
   /** Offers: the accepted allocation. Donations: null. */
   allocation_id: Uuid7.nullable(),
   /** No handed_at: core stamps it (a client-chosen time would select the recipe version). */
-  /** Σ over non-voided hand-overs per listing line may not exceed that line's qty (`qty_exceeds_listed`). */
+  /** Σ over non-voided hand-overs per listing line may not exceed that line's qty (`qty_exceeds_listed`). An offer's
+   *  hand-over is all-or-nothing: every line at exactly its accepted qty, else 409 `handover_must_be_complete`. */
   lines: z.array(z.strictObject({ listing_line_id: Uuid7, qty_milli: QtyMilli.positive() })).min(1).max(50),
 });
+/** A donation's hand-over only: an offer's hand-over is final in v1 (409 `offer_handover_final`). */
 export const CaresHandoverVoidV1 = z.strictObject({ handover_id: Uuid7, reason_code: ReasonCode });
 
 /** Buyer. Claims every line of the offer at the offered qty and price (all-or-nothing); core re-derives them from
@@ -288,6 +290,8 @@ export const CaresNetworkListing = z.strictObject({
   outlet_name: NonEmpty,
   pickup_from: IsoDateTime,
   pickup_to: IsoDateTime,
+  /** The outlet's IANA time zone: render pickup_from / pickup_to in it (G-14). */
+  tz: IanaZone,
   recipient_name: NonEmpty,
   recipient_simulated: z.literal(true),
   lines: z.array(

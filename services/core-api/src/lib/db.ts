@@ -35,12 +35,13 @@ const COUPON_CODE = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
  * BEGIN; set_config('app.<k>', v, true) for every key (the parameterised SET LOCAL — never session-level,
  * gotcha 2: the transaction pooler would leak it to the next client); fn; COMMIT. ROLLBACK and rethrow on
  * error; a client whose ROLLBACK also failed is destroyed rather than returned to the pool.
+ * `snapshot`: one REPEATABLE READ, READ ONLY transaction, so every read in `fn` sees the same committed state.
  */
-export async function withContext<T>(pool: pg.Pool, ctx: AppContext, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function withContext<T>(pool: pg.Pool, ctx: AppContext, fn: (c: pg.PoolClient) => Promise<T>, opts: { snapshot?: boolean } = {}): Promise<T> {
   const c = await pool.connect();
   let broken: Error | undefined;
   try {
-    await c.query("BEGIN");
+    await c.query(opts.snapshot ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" : "BEGIN");
     try {
       for (const [k, v] of Object.entries(ctx)) {
         if (v === undefined) continue;

@@ -3,7 +3,9 @@
 // data only. Expected values are hand-typed from the fixtures (this file's live listings; the canonical world's Cares rows,
 // db/src/world.ts addCares: per world, two recorded donation hand-overs of one 200000 milli-g line each, in mumbai).
 //   rate limit: injected clock 60th → 200, 61st → 429 + Retry-After, after the window → 200; X-Forwarded-For with
-//     HOPS = 1 keys the right-most entry (a spoofed left entry has no effect); storefront limit per (IP, key)
+//     HOPS = 1 keys the right-most entry (a spoofed left entry has no effect); storefront limit per IP across keys (70 junk
+//     keys from one IP → exactly 60 past the limiter), then per (IP, key); a key-spraying IP never resets another IP's
+//     window; at the key cap the oldest window is evicted, never all of them
 //   allow-list: every response's keys = the hand-typed list (a planted column fails)
 //   storefront: key A shows A's listings and 0 of B's; a bad key and a counter-channel key → 404; never cached
 //   network: retired, judge and not-enabled tenants absent; cached 30 s
@@ -27,6 +29,7 @@ import { type AppEnv, createApp, type Deps, storefrontResolver, TENANT_HEADER } 
 import { canonicalJson, sha256Hex } from "../src/commit/index.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";
 import { configureInternal } from "../src/internal/index.ts";
+import { FixedWindow } from "../src/lib/ratelimit.ts";
 import { configureCaresNetwork } from "../src/modules/cares-network/index.ts";
 import { mintRunToken } from "../src/runtoken/index.ts";
 import { openDb } from "./db.ts";
@@ -47,7 +50,7 @@ let KEY_A: string, KEY_B: string;
 const live: { A1: string; A2: string; B1: string; R1: string; J1: string; N1: string } = { A1: "", A2: "", B1: "", R1: "", J1: "", N1: "" };
 
 // Hand-typed allow-lists (= the contract's public shapes; never read from the code under test).
-const LISTING_KEYS = ["business_name", "city_code", "lines", "listing_id", "outlet_name", "pickup_from", "pickup_to", "recipient_name", "recipient_simulated"];
+const LISTING_KEYS = ["business_name", "city_code", "lines", "listing_id", "outlet_name", "pickup_from", "pickup_to", "recipient_name", "recipient_simulated", "tz"];
 const LINE_KEYS = ["expires_on", "food_kind", "label", "label_key", "line_no", "qty_milli", "unit"];
 const IMPACT_KEYS = ["as_of", "labels", "note_key", "rows", "snapshot_id", "template_id", "template_version"];
 const IMPACT_ROW_KEYS = ["all_synthetic", "businesses", "city_code", "donations", "meals_portions_milli", "volume_ml", "weight_g"];
@@ -70,7 +73,7 @@ const operator = (method: string, path: string, body?: unknown) => asSub(method,
 
 let clock = Date.UTC(2026, 9, 13, 6, 0, 0);
 /** Fresh limiter windows and cache, on the injected clock. */
-const reset = (hops = 0) => configureCaresNetwork({ now: () => clock, trustedProxyHops: hops });
+const reset = (hops = 0, maxKeys?: number) => configureCaresNetwork({ now: () => clock, trustedProxyHops: hops, ...(maxKeys === undefined ? {} : { maxKeys }) });
 
 /** A live donation (one raw line of the world's ingredient, 300000 g-milli) whose pickup starts `hours` from now. */
 async function publishLive(w: World, hours: number): Promise<string> {
@@ -189,14 +192,46 @@ describe("rate limit: 60 a minute per client (ADR-015 §2.2)", () => {
     expect((await pub("/v1/cares-network/cities", { ip: "10.9.9.8", xff: "203.0.113.200" })).status).toBe(200);
   });
 
-  it("the storefront section is limited per (IP, key): another key or another IP is admitted", async () => {
+  it("the storefront section is limited per IP across keys, then per (IP, key): another key on the same IP → 429, another IP → 200", async () => {
     reset();
     for (let i = 1; i <= 60; i++) expect((await pub("/v1/storefront/cares", { ip: "198.51.100.30", key: KEY_A })).status, `request ${i}`).toBe(200);
     const r = await pub("/v1/storefront/cares", { ip: "198.51.100.30", key: KEY_A });
     expect(r.status).toBe(429);
     expect(r.headers.get("Retry-After")).toBe("60");
-    expect((await pub("/v1/storefront/cares", { ip: "198.51.100.30", key: KEY_B })).status).toBe(200);
+    expect((await pub("/v1/storefront/cares", { ip: "198.51.100.30", key: KEY_B })).status).toBe(429);
     expect((await pub("/v1/storefront/cares", { ip: "198.51.100.31", key: KEY_A })).status).toBe(200);
+  });
+
+  it("70 requests with 70 different junk keys from one IP → exactly 60 past the limiter (404), 10 → 429", async () => {
+    reset();
+    const got: number[] = [];
+    for (let i = 1; i <= 70; i++) got.push((await pub("/v1/storefront/cares", { ip: "198.51.100.40", key: `sfk_junk_${i}_${randomBytes(8).toString("hex")}` })).status);
+    expect([got.filter((s) => s !== 429).length, got.filter((s) => s === 404).length, got.filter((s) => s === 429).length]).toEqual([60, 60, 10]);
+  });
+
+  it("one IP spraying keys past the key cap does not reset another IP's window", async () => {
+    reset(0, 50); // a cap below one IP's 60, so the spray would overflow the per-(IP, key) map
+    for (let i = 1; i <= 60; i++) expect((await pub("/v1/storefront/cares", { ip: "198.51.100.50", key: KEY_A })).status, `request ${i}`).toBe(200);
+    expect((await pub("/v1/storefront/cares", { ip: "198.51.100.50", key: KEY_A })).status).toBe(429);
+    for (let i = 1; i <= 70; i++) await pub("/v1/storefront/cares", { ip: "198.51.100.51", key: `sfk_spray_${i}_${randomBytes(8).toString("hex")}` });
+    expect((await pub("/v1/storefront/cares", { ip: "198.51.100.50", key: KEY_A })).status).toBe(429);
+    expect((await pub("/v1/storefront/cares", { ip: "198.51.100.52", key: KEY_A })).status).toBe(200);
+  });
+
+  it("FixedWindow at its key cap evicts the oldest open window, never all of them; a restarted window counts as new", () => {
+    let t = 0;
+    const w = new FixedWindow(2, 60_000, () => t, 2);
+    const run = (k: string, n: number) => Array.from({ length: n }, () => w.hit(k));
+    expect(run("A", 3)).toEqual([null, null, 60]); // A exhausted
+    t = 1_000;
+    expect(run("B", 3)).toEqual([null, null, 60]); // B exhausted
+    t = 2_000;
+    expect(w.hit("C")).toBeNull(); // a third key at the cap of 2: only A (the oldest) goes
+    expect(w.hit("B")).toBe(59); // B is still refused
+    // Restart order: A restarts at 60 s, so B (opened at 1 s) is the oldest when C arrives, and A stays refused.
+    t = 0;
+    const r = new FixedWindow(1, 60_000, () => t, 2);
+    expect([r.hit("A"), ((t = 1_000), r.hit("B")), ((t = 60_000), r.hit("A")), ((t = 60_500), r.hit("C")), r.hit("A")]).toEqual([null, null, null, null, 60]);
   });
 });
 
@@ -221,7 +256,7 @@ describe("network listings (ADR-015 §2.1)", () => {
       expect(sorted(item)).toEqual(LISTING_KEYS);
       expect(item.lines).toHaveLength(1);
       for (const l of item.lines) expect(sorted(l)).toEqual(LINE_KEYS);
-      expect(item).toMatchObject({ city_code: "mumbai", recipient_name: "Lotus Lane Food Bank (simulated)", recipient_simulated: true });
+      expect(item).toMatchObject({ city_code: "mumbai", tz: "Asia/Kolkata", recipient_name: "Lotus Lane Food Bank (simulated)", recipient_simulated: true });
       expect(item.lines[0]).toMatchObject({ line_no: 1, food_kind: "raw", qty_milli: 300000, unit: "g" });
     }
     expect(CaresNetworkListingsResponse.parse(await (await pub("/v1/cares-network/listings?city=melbourne")).json()).items).toEqual([]);
@@ -277,7 +312,10 @@ describe("storefront Cares section (ADR-015 §2.1)", () => {
     const a = CaresStorefrontResponse.parse(rawA).items.map((x) => x.listing_id).sort();
     expect(a).toEqual([live.A1, live.A2].sort());
     expect(a.filter((id) => id === live.B1)).toHaveLength(0);
-    for (const item of rawA.items) expect(sorted(item)).toEqual(LISTING_KEYS);
+    for (const item of rawA.items) {
+      expect(sorted(item)).toEqual(LISTING_KEYS);
+      expect(item.tz).toBe("Asia/Kolkata"); // the outlet's zone (buildTenant: IN)
+    }
     const b = CaresStorefrontResponse.parse(await (await pub("/v1/storefront/cares", { key: KEY_B })).json()).items.map((x) => x.listing_id);
     expect(b).toEqual([live.B1]);
   });

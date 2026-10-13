@@ -24,29 +24,33 @@ export const NETWORK_IMPACT_TEMPLATE = "platform.cares_network_impact";
 export const IMPACT_LABELS = { data: "Measured on synthetic data", recipients: "to simulated recipients" } as const;
 export const NOTE_KEY = "cares.note.check_local_rules";
 
-// ---- wiring (server.ts passes the proxy hops from the config module, MUNIM_TRUSTED_PROXY_HOPS; a gate injects the clock
-// and the hops; state resets with it)
+// ---- wiring (server.ts passes the proxy hops from the config module, MUNIM_TRUSTED_PROXY_HOPS; a gate injects the clock,
+// the hops and the key cap; state resets with it)
 let hops = 0;
 let now: Clock = Date.now;
-let networkLimiter = new FixedWindow(60, 60_000, () => now());
-let storefrontLimiter = new FixedWindow(60, 60_000, () => now());
+const limiter = (maxKeys?: number) => new FixedWindow(60, 60_000, () => now(), maxKeys);
+let networkLimiter = limiter();
+let storefrontIpLimiter = limiter();
+let storefrontLimiter = limiter();
 const cache = new Map<string, { expires: number; body: unknown }>();
 
-export function configureCaresNetwork(o: { now?: Clock; trustedProxyHops?: number } = {}): void {
+export function configureCaresNetwork(o: { now?: Clock; trustedProxyHops?: number; maxKeys?: number } = {}): void {
   now = o.now ?? Date.now;
   if (o.trustedProxyHops !== undefined) hops = o.trustedProxyHops;
-  networkLimiter = new FixedWindow(60, 60_000, () => now());
-  storefrontLimiter = new FixedWindow(60, 60_000, () => now());
+  networkLimiter = limiter(o.maxKeys);
+  storefrontIpLimiter = limiter(o.maxKeys);
+  storefrontLimiter = limiter(o.maxKeys);
   cache.clear();
 }
 
 /** Per client address, across all network routes. */
-const networkLimit = rateLimit(() => networkLimiter, (c) => clientIp(c, hops));
-/** Per (client address, sha256 of the storefront key); the key itself is never kept or logged. */
-export const storefrontCaresLimit = rateLimit(() => storefrontLimiter, (c) => {
-  const key = c.req.header(STOREFRONT_KEY_HEADER) ?? "";
-  return `${clientIp(c, hops)}|${createHash("sha256").update(key, "utf8").digest("hex")}`;
-});
+const networkLimit = rateLimit([() => networkLimiter, (c) => clientIp(c, hops)]);
+/** Per client address first (so keys made up per request cannot multiply one address's budget, nor flood the key map
+ *  past its cap), then per (client address, sha256 of the storefront key); the key itself is never kept or logged. */
+export const storefrontCaresLimit = rateLimit(
+  [() => storefrontIpLimiter, (c) => clientIp(c, hops)],
+  [() => storefrontLimiter, (c) => `${clientIp(c, hops)}|${createHash("sha256").update(c.req.header(STOREFRONT_KEY_HEADER) ?? "", "utf8").digest("hex")}`],
+);
 
 async function cached(c: Context<AppEnv>, key: string, load: () => Promise<unknown>) {
   const t = now();
@@ -63,7 +67,7 @@ async function cached(c: Context<AppEnv>, key: string, load: () => Promise<unkno
 
 // ---- listings (also the storefront section)
 type ListingRow = {
-  listing_id: string; city_code: string; business_name: string; outlet_name: string; pickup_from: Date; pickup_to: Date;
+  listing_id: string; city_code: string; business_name: string; outlet_name: string; pickup_from: Date; pickup_to: Date; outlet_tz: string;
   recipient_name: string; recipient_simulated: boolean;
   lines: Array<{ line_no: number; food_kind: string; label_key: string | null; label: string | null; qty_milli: number; unit: string; expires_on: string | null }> | null;
 };
@@ -77,6 +81,7 @@ function listingOf(r: ListingRow) {
     outlet_name: r.outlet_name,
     pickup_from: r.pickup_from.toISOString(),
     pickup_to: r.pickup_to.toISOString(),
+    tz: r.outlet_tz,
     recipient_name: r.recipient_name,
     recipient_simulated: r.recipient_simulated,
     lines: (r.lines ?? []).map((l) => ({
@@ -88,7 +93,7 @@ function listingOf(r: ListingRow) {
 /** Live donations from the network function (≤ 50 a call). `tenant` is only ever a storefront key's verified tenant. */
 export async function networkListings(q: Queryable, o: { city?: string | null; tenant?: string | null; listing?: string | null; after?: string | null; limit?: number }) {
   const r = await q.query<ListingRow>(
-    `SELECT listing_id, city_code, business_name, outlet_name, pickup_from, pickup_to, recipient_name, recipient_simulated, lines
+    `SELECT listing_id, city_code, business_name, outlet_name, pickup_from, pickup_to, outlet_tz, recipient_name, recipient_simulated, lines
        FROM core.cares_network_listings($1, $2, $3, $4, $5)`,
     [o.city ?? null, o.tenant ?? null, o.listing ?? null, o.after ?? null, o.limit ?? 50]);
   return r.rows.map(listingOf);

@@ -127,6 +127,17 @@ describe("setup through operator config drafts and the owner's profile command",
     await twice(A, "/v1/cares/profile", "owner", "cares.profile.set.v1", set("mumbai"));
     expect(await e.one(`SELECT to_char(pickup_to, 'HH24:MI') AS t FROM core.cares_outlet WHERE outlet_id = $1`, [A.w.outlets[0]])).toEqual({ t: "22:00" });
     await refused(await A.cmd("/v1/cares/profile", "mgr1", "cares.profile.set.v1", set("mumbai")), 403, "book_write_refused", "authority_denied");
+    // The outlet row's audit entry carries the prior row as `before`: opt out, then back in (state restored).
+    const off = { ...set("mumbai"), outlets: outlets("mumbai").map((o) => ({ ...o, active: false })) };
+    expect((await A.cmd("/v1/cares/profile", "owner", "cares.profile.set.v1", off)).status).toBe(200);
+    expect((await A.cmd("/v1/cares/profile", "owner", "cares.profile.set.v1", set("mumbai"))).status).toBe(200);
+    const trail = (await e.db.admin(`SELECT before, after FROM core.audit_log WHERE tenant_id = $1 AND entity = 'core.cares_outlet' AND entity_id = $2 ORDER BY seq`,
+      [A.w.tenant, A.w.outlets[0]])).rows.slice(-3);
+    expect(trail).toEqual([
+      { before: { city_code: "mumbai", active: true }, after: { city_code: "mumbai", active: true } },
+      { before: { city_code: "mumbai", active: true }, after: { city_code: "mumbai", active: false } },
+      { before: { city_code: "mumbai", active: false }, after: { city_code: "mumbai", active: true } },
+    ]);
   });
 
   it("not enabled: the operator's approved draft turns Cares off → publish 409 cares_not_enabled, 0 listings; a second draft turns it on → 200", async () => {
@@ -355,9 +366,14 @@ describe("B2B: a 20 kg onion offer from A, claimed by B", () => {
     expect(mine.items.filter((c) => c.claim_id === claim1).map((c) => [c.outcome.verdict, c.outcome.allocation_id])).toEqual([["accepted", allocation]]);
   });
 
-  it("A's staff hand over 20 kg (Σ surplus_out = −20000); B's staff receive it (Σ surplus_in = +20000); then A's void → claim_received", async () => {
+  it("A's staff hand over 20 kg (Σ surplus_out = −20000); B's staff receive it (Σ surplus_in = +20000); then A's void → offer_handover_final", async () => {
     // Staff outside the claim's outlet: B's outlet-1 staff cannot receive an outlet-2 claim (404).
     await refused(await B.cmd(`/v1/cares/claims/${claim2}:receive`, "staff", "cares.claim.receive.v1", { claim_id: claim2 }), 404, "not_found");
+    // Ruling 2-B: an offer's hand-over is all-or-nothing — 10 of the accepted 20 kg → 409 handover_must_be_complete, nothing written.
+    await refused(await A.cmd("/v1/cares/handovers", "staff", "cares.handover.record.v1",
+      { handover_id: uuidv7(), listing_id: offer.listing_id, allocation_id: allocation, lines: [{ listing_line_id: offer.line, qty_milli: 10000 }] }),
+      409, "conflict", "handover_must_be_complete");
+    expect(await e.count(`SELECT count(*) n FROM core.cares_handover WHERE listing_id = $1`, [offer.listing_id])).toBe(0);
     const h = await twice(A, "/v1/cares/handovers", "staff", "cares.handover.record.v1",
       { handover_id: uuidv7(), listing_id: offer.listing_id, allocation_id: allocation, lines: [{ listing_line_id: offer.line, qty_milli: 20000 }] });
     handoverId = h.entity_id;
@@ -367,7 +383,7 @@ describe("B2B: a 20 kg onion offer from A, claimed by B", () => {
     expect(await e.one(`SELECT sum(qty_milli)::text AS s FROM core.stock_movement WHERE tenant_id = $1 AND kind = 'surplus_in'`, [B.w.tenant])).toEqual({ s: "20000" });
     expect(await e.one(`SELECT c.status, c.allocation_id, l.received_qty_milli::text AS got FROM core.cares_claim c JOIN core.cares_claim_line l ON l.claim_id = c.id WHERE c.id = $1`, [claim1]))
       .toEqual({ status: "received", allocation_id: allocation, got: "20000" });
-    await refused(await A.cmd(`/v1/cares/handovers/${handoverId}:void`, "owner", "cares.handover.void.v1", { handover_id: handoverId, reason_code: "late" }), 409, "conflict", "claim_received");
+    await refused(await A.cmd(`/v1/cares/handovers/${handoverId}:void`, "owner", "cares.handover.void.v1", { handover_id: handoverId, reason_code: "late" }), 409, "conflict", "offer_handover_final");
   });
 
   it("cancel before any verdict → 200 (a second offer)", async () => {
@@ -383,7 +399,7 @@ describe("B2B: a 20 kg onion offer from A, claimed by B", () => {
 });
 
 // ---- the claim lock, named batches and tracked receipts ------------------------------------------------------------
-describe("B2B: void vs receive, named batches, tracked receipts", () => {
+describe("B2B: a final offer hand-over, named batches, tracked receipts", () => {
   /** A 1-line offer from A's outlet 1, claimed by B's outlet 1 with `ingredient`, accepted and handed over in full. */
   async function handedOffer(kg: number, ingredient: string) {
     const o = { listing_id: uuidv7(), line: uuidv7(), claim: uuidv7(), allocation: uuidv7(), handover: uuidv7() };
@@ -399,31 +415,12 @@ describe("B2B: void vs receive, named batches, tracked receipts", () => {
     return o;
   }
 
-  it("an offerer's void waits for the buyer's receive on the claim lock, then is refused (claim_received); the stock stays out and in", async () => {
+  it("an offer's hand-over is final: the owner's void before the buyer receives → 409 offer_handover_final; the stock stays out, then comes in", async () => {
     const o = await handedOffer(1, onionB);
-    let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
-    let held!: () => void;
-    const holding = new Promise<void>((r) => (held = r));
-    const receiving: CoreTx = (fn) => e.db.withContext("munim_core", { tenant_id: B.w.tenant, outlet_ids: [B.w.outlets[0]], role: "staff", member_id: B.w.staff }, async (c) => {
-      const out = await fn(c);
-      held();
-      await gate;
-      return out;
-    });
-    const voiding: CoreTx = (fn) => e.db.withContext("munim_core", { tenant_id: A.w.tenant, outlet_ids: "*", role: "owner", member_id: A.w.owner }, fn);
-    const env = (type: string, payload: Record<string, unknown>) => CommandEnvelope.parse({ command_id: uuidv7(), idempotency_key: `k-${uuidv7()}`, type, payload });
-    const receive = executeCommand({ tx: receiving, tenantId: B.w.tenant, actor: { kind: "member", id: B.w.staff, role: "staff" } },
-      env("cares.claim.receive.v1", { claim_id: o.claim }), handlers.claimReceive);
-    await holding;
-    const voided = executeCommand({ tx: voiding, tenantId: A.w.tenant, actor: { kind: "member", id: A.w.owner, role: "owner" } },
-      env("cares.handover.void.v1", { handover_id: o.handover, reason_code: "late" }), handlers.handoverVoid).then(() => "voided", (err) => err);
-    await new Promise((r) => setTimeout(r, 300));
-    release();
-    await receive;
-    const lost = await voided;
-    expect([lost instanceof ApiError, (lost as ApiError).code, (lost as ApiError).reason_code]).toEqual([true, "conflict", "claim_received"]);
+    await refused(await A.cmd(`/v1/cares/handovers/${o.handover}:void`, "owner", "cares.handover.void.v1", { handover_id: o.handover, reason_code: "late" }),
+      409, "conflict", "offer_handover_final");
     expect(await e.one(`SELECT status FROM core.cares_handover WHERE id = $1`, [o.handover])).toEqual({ status: "recorded" });
+    expect((await B.cmd(`/v1/cares/claims/${o.claim}:receive`, "staff", "cares.claim.receive.v1", { claim_id: o.claim })).status).toBe(200);
     expect([(await moves(o.handover)).map((m) => m.qty), (await moves(o.claim)).map((m) => m.qty)]).toEqual([["-1000"], ["1000"]]);
   });
 

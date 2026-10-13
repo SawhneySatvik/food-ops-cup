@@ -9,7 +9,7 @@ import { StorefrontGuestCreateV1, StorefrontOrderPlaceRequest, StorefrontPreview
 import type { Principal } from "../../auth/resolve.ts";
 import { contextOf } from "../../auth/resolve.ts";
 import { executeCommand, publishCommitted, type CommandContext, type CommandHandler, type OutboxRow } from "../../commit/index.ts";
-import { withContext } from "../../lib/db.ts";
+import { asSystem, withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv, Deps } from "../../lib/types.ts";
 import type { Context } from "hono";
@@ -104,6 +104,8 @@ export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body
   const req = parse(OrdersPreviewRequest, body);
   // Key's channel wins; the request's channel_id is overwritten. Redeeming points needs a signed-in profile.
   const request = { ...req, channel_id: principal.channel_id, loyalty_redeem_points: principal.profile ? req.loyalty_redeem_points : 0 };
+  // One snapshot (REPEATABLE READ, READ ONLY): the preview and the detail read the same committed rows, so a price or
+  // coupon committed between them cannot trip the mismatch guard below.
   return withContext(deps.pools.core, contextOf(principal, { coupon_codes: request.coupon_codes }), async (c) => {
     const ck = await channelKind(c, principal.channel_id); // a key on no shopper channel is no storefront: 404
     const outlet = await outletRow(c, request.outlet_id);
@@ -125,7 +127,7 @@ export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body
       prices_include_tax: pack.tax.price_display === "inclusive",
       refusals: withParams([...own, ...priced.refusals], request.lines, detail),
     };
-  });
+  }, { snapshot: true });
 }
 
 export interface Placed {
@@ -134,7 +136,8 @@ export interface Placed {
   ticket_no: number;
   total_minor: number;
   tax_minor: number;
-  prices_include_tax: boolean;
+  /** Null: the order's pack version cannot be read (cannot verify). */
+  prices_include_tax: boolean | null;
   currency: string;
   promised_at: string | null;
   pay_at_counter: true;
@@ -162,12 +165,19 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
     const p = req.order.payload;
     if (!kindFits(p.kind, p.table_ref, ck)) throw new ApiError("bad_request");
     const outlet = await outletRow(c, p.outlet_id);
-    const own = await ownRefusals(c, { outlet, pickup_window_id: p.pickup_window_id, promised_at: p.promised_at, lines: p.lines });
+    // A key already used goes straight to executeCommand: the stored result for the same body, 409 idempotency_conflict
+    // for another. No refusal is judged first, so a retry is never answered by what changed since (the window it filled,
+    // a pause, an item taken off sale, a coupon cap its own use reached). command_log is not the shopper's to read (0014).
+    // executeCommand's own key lock, taken first (it is re-entrant in this transaction): a retry racing its original waits
+    // for it to commit, then reads its key here.
+    await c.query(`SELECT pg_advisory_xact_lock(hashtextextended('core.command_log:' || $1 || ':' || $2, 0))`, [who.tenant_id, key]);
+    const placed = await asSystem(c, async () =>
+      (await c.query(`SELECT 1 FROM core.command_log WHERE tenant_id = $1 AND idempotency_key = $2`, [who.tenant_id, key])).rows.length > 0);
+    const own = placed ? [] : await ownRefusals(c, { outlet, pickup_window_id: p.pickup_window_id, promised_at: p.promised_at, lines: p.lines });
     if (own[0]) throw refused(own[0].reason_code, own[0].line_no === null ? undefined : lineParams(own[0].line_no, p.lines));
     // G-11: the cart's own refusal, with its parameters, before anything is written — priced as placement will price it
-    // (at the promise, else the window's start, else now). Placement re-prices under its locks and stays the judge. Not
-    // for an order already placed (a replay returns the stored result, even once its own coupon use fills a cap).
-    if (!(await c.query(`SELECT 1 FROM core."order" WHERE id = $1`, [p.order_id])).rows[0]) {
+    // (at the promise, else the window's start, else now). Placement re-prices under its locks and stays the judge.
+    if (!placed) {
       const at = p.promised_at ?? (p.pickup_window_id ? await windowStart(c, p.pickup_window_id) : new Date().toISOString());
       const pre = await priceDetail(c, who, { outlet_id: p.outlet_id, channel_kind: ck, at, lines: p.lines, coupon_codes: p.coupon_codes });
       if (pre.refusals[0]) throw refused(pre.refusals[0].reason_code, pre.refusals[0].params);
@@ -182,7 +192,9 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
     };
     const ctx = cmdCtx(who, c);
 
-    if (req.guest) {
+    // A placed key's guest row exists already: the order command alone decides (a retry that re-minted its guest envelope
+    // would otherwise re-insert the same derived customer id → 500).
+    if (req.guest && !placed) {
       const g = await executeCommand(ctx, req.guest, guestCreate);
       outbox.push(...g.outbox);
       await setRole(c, "customer"); // executeCommand clears the shopper role after its bookkeeping
@@ -195,7 +207,8 @@ export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipa
         `SELECT id, status, ticket_no, total_minor, tax_minor, currency, promised_at, channel_id, pricing_snapshot -> 'pack' AS pack FROM core."order" WHERE id = $1`, [p.order_id])
     ).rows[0];
     if (!row) throw new ApiError("internal");
-    return { out, row, inclusive: (await pricedPack(c, row.pack)).tax.price_display === "inclusive" };
+    const pack = await pricedPack(c, row.pack);
+    return { out, row, inclusive: pack ? pack.tax.price_display === "inclusive" : null };
   });
 
   if (deps.publish) await publishCommitted(deps.publish, principal.tenant_id, outbox);

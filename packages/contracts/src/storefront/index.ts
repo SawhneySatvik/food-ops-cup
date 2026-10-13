@@ -174,8 +174,9 @@ export const StorefrontOrderPlaced = z.strictObject({
   total_minor: MinorAmount,
   /** core.order.tax_minor (G-03). */
   tax_minor: MinorAmount,
-  /** The pack (the version that priced the order) displays prices tax-inclusive: "includes GST" vs "+ GST". */
-  prices_include_tax: z.boolean(),
+  /** The pack (the version that priced the order) displays prices tax-inclusive: "includes GST" vs "+ GST". Null =
+   *  cannot verify (that pack version's row is missing or unreadable; core never substitutes the current pack). */
+  prices_include_tax: z.boolean().nullable(),
   currency: CurrencyCode,
   promised_at: IsoDateTime.nullable(),
   pay_at_counter: z.literal(true),
@@ -193,7 +194,8 @@ export const StorefrontOrderLine = z.strictObject({
   line_discount_minor: MinorAmount,
   tax_minor: MinorAmount,
   /** The line's tax class rate and its pack components' rates (e.g. CGST 250 + SGST 250), from the pack version that
-   *  priced the order (G-03); null / [] when the order carries no tax class for the line (an imported order). */
+   *  priced the order (G-03); null / [] when the order carries no tax class for the line (an imported order) or that
+   *  pack version cannot be read (cannot verify). */
   tax_rate_bp: BasisPoints.nullable(),
   tax_component_rates: z.array(z.strictObject({ code: z.string(), rate_bp: BasisPoints })),
 });
@@ -226,8 +228,8 @@ export const StorefrontOrderView = z.strictObject({
   cancel_window_min: z.int().min(0),
   reschedule_window_min: z.int().min(0),
   pay_at_counter: z.literal(true),
-  /** As StorefrontOrderPlaced.prices_include_tax. */
-  prices_include_tax: z.boolean(),
+  /** As StorefrontOrderPlaced.prices_include_tax (null = cannot verify). */
+  prices_include_tax: z.boolean().nullable(),
   lines: z.array(StorefrontOrderLine),
   events: z.array(StorefrontOrderEvent),
 });

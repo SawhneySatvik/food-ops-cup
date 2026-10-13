@@ -280,6 +280,8 @@
                               "claim_decided",
                               "claim_received",
                               "rate_limited",
+                              "handover_must_be_complete",
+                              "offer_handover_final",
                               "pickup_time_outside_window"
                             ]
                           },

@@ -111,7 +111,10 @@
       "const": true
     },
     "prices_include_tax": {
-      "type": "boolean"
+      "type": [
+        "boolean",
+        "null"
+      ]
     },
     "lines": {
       "type": "array",

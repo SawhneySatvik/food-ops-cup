@@ -5265,6 +5265,7 @@ export interface components {
             outlet_name: string;
             pickup_from: components["schemas"]["IsoDatetime"];
             pickup_to: components["schemas"]["IsoDatetime"];
+            tz: string;
             recipient_name: string;
             /** @constant */
             recipient_simulated: true;
@@ -8402,7 +8403,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited" | "pickup_time_outside_window";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited" | "handover_must_be_complete" | "offer_handover_final" | "pickup_time_outside_window";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -8715,7 +8716,7 @@ export interface components {
             ticket_no: number;
             total_minor: number;
             tax_minor: number;
-            prices_include_tax: boolean;
+            prices_include_tax: boolean | null;
             currency: string;
             promised_at: components["schemas"]["IsoDatetime"] | null;
             /** @constant */
@@ -8745,7 +8746,7 @@ export interface components {
             reschedule_window_min: number;
             /** @constant */
             pay_at_counter: true;
-            prices_include_tax: boolean;
+            prices_include_tax: boolean | null;
             lines: {
                 line_no: number;
                 item_id: components["schemas"]["Uuid7"];

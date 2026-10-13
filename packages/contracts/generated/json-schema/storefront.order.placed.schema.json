@@ -37,7 +37,10 @@
       "maximum": 9007199254740991
     },
     "prices_include_tax": {
-      "type": "boolean"
+      "type": [
+        "boolean",
+        "null"
+      ]
     },
     "currency": {
       "type": "string",

@@ -1,6 +1,6 @@
 // The storefront's Munim Cares section (T-095b; ADR-015 §2.1): the key's own tenant's live donation listings, from the
 // same network function with p_tenant = the key's verified tenant. A bad key or a key on a non-storefront channel is
-// 404 (gotcha 16, as the menu routes). Rate-limited per (client address, key hash); never cached.
+// 404 (gotcha 16, as the menu routes). Rate-limited per client address, then per (client address, key hash); never cached.
 //   GET /v1/storefront/cares
 import { Hono } from "hono";
 import { contextOf, requireCustomer } from "../../auth/resolve.ts";

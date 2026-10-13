@@ -59,7 +59,7 @@ export async function getOrder(deps: Deps, who: Shopper, order_id: string) {
     const pack = await pricedPack(c, o.pack);
     const rates = (line_no: number) => {
       const code = (Array.isArray(o.classes) ? o.classes : []).find((x) => x.line_no === line_no)?.tax_class;
-      const cls = pack.tax.classes.find((x) => x.code === code);
+      const cls = pack?.tax.classes.find((x) => x.code === code);
       return { tax_rate_bp: cls ? cls.rate_bp : null, tax_component_rates: cls ? cls.components.map((k) => ({ code: k.code, rate_bp: k.rate_bp })) : [] };
     };
     return {
@@ -68,7 +68,7 @@ export async function getOrder(deps: Deps, who: Shopper, order_id: string) {
       subtotal_minor: Number(o.subtotal_minor), discount_minor: Number(o.discount_minor), tax_minor: Number(o.tax_minor), total_minor: Number(o.total_minor),
       currency: o.currency, created_at: iso(o.created_at), cancel_window_min: w.cancel_window_min, reschedule_window_min: w.reschedule_window_min,
       pay_at_counter: true as const,
-      prices_include_tax: pack.tax.price_display === "inclusive",
+      prices_include_tax: pack ? pack.tax.price_display === "inclusive" : null,
       lines: lines.rows.map((l) => ({
         line_no: l.line_no, item_id: l.item_id, variant_id: l.variant_id, qty_milli: Number(l.qty_milli),
         unit_price_minor: Number(l.unit_price_minor), line_discount_minor: Number(l.line_discount_minor), tax_minor: Number(l.tax_minor),

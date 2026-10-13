@@ -27,6 +27,8 @@ const CODES = [
   "cares_not_available", "cares_not_enabled", "cares_not_opted_in", "cares_city_mismatch",
   "recipient_ineligible", "listing_expired", "qty_exceeds_on_hand", "qty_exceeds_listed", "cooked_hold_exceeded", "line_expired", "no_eligible_recipient", "no_rostered_staff",
   "offer_not_enabled", "offer_closed", "claim_decided", "claim_received", "rate_limited",
+  // Orchestrator ruling 2-B (fix cycle W1): an offer's hand-over is all-or-nothing and final.
+  "handover_must_be_complete", "offer_handover_final",
 ];
 const PUBLIC_PATHS = ["/v1/cares-network/cities", "/v1/cares-network/impact", "/v1/cares-network/listings", "/v1/cares-network/listings/{id}", "/v1/cares-network/snapshots/{id}"];
 

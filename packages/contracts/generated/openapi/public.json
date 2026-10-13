@@ -37752,6 +37752,10 @@
           "pickup_to": {
             "$ref": "#/components/schemas/IsoDatetime"
           },
+          "tz": {
+            "type": "string",
+            "pattern": "^[A-Za-z]+\\/[A-Za-z_]+$"
+          },
           "recipient_name": {
             "type": "string",
             "minLength": 1,
@@ -37833,6 +37837,7 @@
           "outlet_name",
           "pickup_from",
           "pickup_to",
+          "tz",
           "recipient_name",
           "recipient_simulated",
           "lines"
@@ -55657,6 +55662,8 @@
           "claim_decided",
           "claim_received",
           "rate_limited",
+          "handover_must_be_complete",
+          "offer_handover_final",
           "pickup_time_outside_window"
         ]
       },
@@ -57508,7 +57515,10 @@
             "maximum": 9007199254740991
           },
           "prices_include_tax": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "currency": {
             "type": "string",
@@ -57654,7 +57664,10 @@
             "const": true
           },
           "prices_include_tax": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "lines": {
             "type": "array",

@@ -9,6 +9,10 @@
 // contract types it as plain string); G-02 channel / brands; G-03 tax fields IN + AU (preview, place, order view);
 // G-04 phone + the pack's on-receipt tax ids; G-11 coupon_min_spend params (preview and place); G-12 a promise outside its
 // window → 422 pickup_time_outside_window, inside → 201; G-13 methods null while the pack lists none.
+// Fix cycle W1: 2-A a placed order's key replays the stored result before any refusal (capacity-1 window, paused outlet, item
+// off sale) and another body under it stays 409 idempotency_conflict; an order whose pack version is missing or unparseable
+// shows null rates and prices_include_tax (cannot verify); the preview reads one snapshot (a price committed between its two
+// readings → 200 with the first, not 500). Red-proof: test/redproof-t099.sh.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -23,6 +27,8 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, storefrontResolver, TENANT_HEADER } from "../src/app.ts";
+import { previewIn } from "../src/modules/orders/index.ts";
+import { configureStorefront, resetStorefront } from "../src/modules/storefront/index.ts";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 
@@ -253,6 +259,113 @@ describe("G-12 promised_at for a chosen window", () => {
     for (const promised_at of [win.starts, at(10 * 60_000), null]) {
       const res = await sf(IN, "POST", "/v1/storefront/orders", placeBody(IN, { pickup_window_id: win.id, promised_at }).body);
       expect(res.status).toBe(201);
+    }
+  });
+});
+
+describe("2-A replay of a placed order (fix cycle W1)", () => {
+  it("capacity-1 window: place 201; the identical replay → the stored 201 (replayed, same order, no token), not window_full; another body under the key → 409 idempotency_conflict; paused outlet / item off sale → still the stored result", async () => {
+    const starts = new Date(Date.now() + DAY + 3 * 3_600_000);
+    const one = uuidv7();
+    await db.withContext("munim_core", ownerCtx(W), (c) =>
+      c.query(`INSERT INTO core.pickup_window (tenant_id, id, outlet_id, starts_at, ends_at, capacity_orders) VALUES ($1, $2, $3, $4, $5, 1)`,
+        [W.tenant, one, IN.outlet, starts.toISOString(), new Date(starts.getTime() + 30 * 60_000).toISOString()]));
+    const b = placeBody(IN, { pickup_window_id: one, promised_at: null });
+    const first = await sf(IN, "POST", "/v1/storefront/orders", b.body);
+    expect(first.status).toBe(201);
+    const placed = StorefrontOrderPlaced.parse(await first.json());
+    expect(placed.guest_access_token).not.toBeNull();
+    expect(await count(`SELECT booked AS n FROM core.pickup_window WHERE id = $1`, [one])).toBe(1); // the window is now full
+    const replay = async () => {
+      const r = await sf(IN, "POST", "/v1/storefront/orders", b.body);
+      const body = (await r.json()) as { order_id?: string; ticket_no?: number; guest_access_token?: string | null; error?: { reason_code: string | null } };
+      return [r.status, r.headers.get("X-Munim-Replayed"), body.order_id, body.ticket_no, body.guest_access_token, body.error?.reason_code ?? null];
+    };
+    const stored = [201, "true", placed.order_id, placed.ticket_no, null, null];
+    expect(await replay()).toEqual(stored);
+    // A retry that re-minted its guest envelope (new key and command id): the order key decides → the stored result, not 500.
+    const remint = { ...b.body, guest: { ...b.body.guest, command_id: uuidv7(), idempotency_key: `k-${uuidv7()}` } };
+    const rr = await sf(IN, "POST", "/v1/storefront/orders", remint);
+    expect([rr.status, rr.headers.get("X-Munim-Replayed"), ((await rr.json()) as { order_id: string }).order_id]).toEqual([201, "true", placed.order_id]);
+    // Control: a fresh key into the full window → 409 window_full.
+    const fresh = await sf(IN, "POST", "/v1/storefront/orders", placeBody(IN, { pickup_window_id: one, promised_at: null }).body);
+    expect([fresh.status, ((await fresh.json()) as { error: { reason_code: string } }).error.reason_code]).toEqual([409, "window_full"]);
+    // Another body under the same key: the key's verdict, not the full window's.
+    const other = { ...b.body, order: { ...b.body.order, payload: { ...(b.body.order.payload as Record<string, unknown>), order_id: uuidv7() } } };
+    const conflict = await sf(IN, "POST", "/v1/storefront/orders", other);
+    expect([conflict.status, ((await conflict.json()) as { error: { code: string } }).error.code]).toEqual([409, "idempotency_conflict"]);
+    // The outlet paused after placement.
+    const accepting = (await db.admin<{ a: string }>(`SELECT accepting_orders AS a FROM core.outlet WHERE id = $1`, [IN.outlet])).rows[0]!.a;
+    const setAccepting = (v: string) => db.withContext("munim_core", ownerCtx(W, { command_type: "tenancy.outlet.create.v1" }), (c) =>
+      c.query(`UPDATE core.outlet SET accepting_orders = $2 WHERE id = $1`, [IN.outlet, v]));
+    await setAccepting("paused");
+    try {
+      expect(await replay()).toEqual(stored);
+    } finally {
+      await setAccepting(accepting);
+    }
+    // The item taken off sale after placement.
+    await db.withContext("munim_core", ownerCtx(W, { command_type: "catalogue.availability.set.v1" }), (c) =>
+      c.query(`INSERT INTO core.item_availability (tenant_id, id, outlet_id, item_id, available, updated_by) VALUES ($1, $2, $3, $4, false, $5)`, [W.tenant, uuidv7(), IN.outlet, IN.item, W.owner]));
+    try {
+      expect(await replay()).toEqual(stored);
+    } finally {
+      await db.admin(`DELETE FROM core.item_availability WHERE item_id = $1`, [IN.item]);
+    }
+    expect(await count(`SELECT count(*) AS n FROM core."order" WHERE pickup_window_id = $1`, [one])).toBe(1);
+  });
+});
+
+describe("pricedPack: an order's pack version that cannot be read (fix cycle W1)", () => {
+  it("missing pack row and an unparseable one → prices_include_tax null and every line's rate null / [] (cannot verify); control: the intact order shows false and 500", async () => {
+    const placeOne = async () => {
+      const b = placeBody(IN);
+      const r = await sf(IN, "POST", "/v1/storefront/orders", b.body);
+      expect(r.status).toBe(201);
+      return { id: b.order_id, token: StorefrontOrderPlaced.parse(await r.json()).guest_access_token! };
+    };
+    const view = async (o: { id: string; token: string }) => {
+      const v = StorefrontOrderView.parse(await (await sf(IN, "GET", `/v1/storefront/orders/${o.id}`, undefined, { [GUEST_TOKEN_HEADER]: o.token })).json());
+      return [v.prices_include_tax, v.lines.map((l) => [l.tax_rate_bp, l.tax_component_rates])];
+    };
+    const [intact, missing, corrupt] = [await placeOne(), await placeOne(), await placeOne()];
+    // The order snapshot is a book column (the guard would refuse an edit): forged with triggers off, as a corruption would be.
+    const repoint = (id: string, version: number) =>
+      db.admin(`SET session_replication_role = replica; UPDATE core."order" SET pricing_snapshot = jsonb_set(pricing_snapshot, '{pack,version}', '${version}') WHERE id = '${id}'; SET session_replication_role = origin`);
+    await db.admin(`INSERT INTO platform.country_pack (code, version, effective_from, doc, status) VALUES ('IN', 998, '2026-01-01', '{"code": "IN", "version": 998}', 'retired')`);
+    try {
+      await repoint(missing.id, 999);
+      await repoint(corrupt.id, 998);
+      expect(await view(intact)).toEqual([false, [[500, [{ code: "CGST", rate_bp: 250 }, { code: "SGST", rate_bp: 250 }]]]]);
+      expect(await view(missing)).toEqual([null, [[null, []]]]);
+      expect(await view(corrupt)).toEqual([null, [[null, []]]]);
+    } finally {
+      await db.admin(`SET session_replication_role = replica; DELETE FROM platform.country_pack WHERE code = 'IN' AND version = 998; SET session_replication_role = origin`);
+    }
+  });
+});
+
+describe("previewFlow reads one snapshot (fix cycle W1)", () => {
+  it("a price committed between the preview and the detail read → 200 with the first reading (tax 1600, total 33600), not 500; the change did commit", async () => {
+    const priceId = (await db.admin<{ id: string }>(`SELECT id FROM core.price WHERE item_id = $1 AND outlet_id = $2 AND channel_kind = 'pickup'`, [IN.item, IN.outlet])).rows[0]!.id;
+    const setAmount = (n: number) =>
+      db.admin(`SET session_replication_role = replica; UPDATE core.price SET amount_minor = ${n} WHERE id = '${priceId}'; SET session_replication_role = origin`);
+    let raced = 0;
+    configureStorefront({ seams: { previewOrder: async (c, p, req) => {
+      const out = await previewIn(c, p, req);
+      await setAmount(64000); // another connection, committed before storefront's second reading
+      raced++;
+      return out;
+    } } });
+    try {
+      const r = await sf(IN, "POST", "/v1/storefront/orders:preview", cart(IN));
+      const committed = Number((await db.admin<{ a: string }>(`SELECT amount_minor AS a FROM core.price WHERE id = $1`, [priceId])).rows[0]!.a);
+      expect([r.status, raced, committed]).toEqual([200, 1, 64000]);
+      const p = StorefrontPreviewResponse.parse(await r.json());
+      expect([p.tax_minor, p.total_minor]).toEqual([1600, 33600]);
+    } finally {
+      resetStorefront();
+      await setAmount(32000);
     }
   });
 });

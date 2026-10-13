@@ -84,6 +84,8 @@ export const CARES_REASON_CODES = [
   "no_eligible_recipient", "no_rostered_staff",
   "offer_not_enabled", "offer_closed", "claim_decided", "claim_received",
   "rate_limited",
+  // Fix cycle W1 (orchestrator ruling 2-B): an offer's hand-over is all-or-nothing and final in v1.
+  "handover_must_be_complete", "offer_handover_final",
 ] as const;
 
 /** T-099 (docs/kit/gaps.md G-12): a storefront order's `promised_at` that is not inside the pickup window it names. */

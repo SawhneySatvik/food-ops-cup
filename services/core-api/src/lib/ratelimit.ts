@@ -7,18 +7,21 @@ import type { AppEnv } from "./types.ts";
 
 export type Clock = () => number;
 
-/** Keys held before expired windows are swept; the key space is client-chosen, so memory stays bounded. */
-const MAX_KEYS = 10_000;
+/** Keys held at most; the key space is client-chosen, so memory stays bounded. */
+export const MAX_KEYS = 10_000;
 
 export class FixedWindow {
+  /** In window-start order: a restarted window is deleted and re-set, so the first entry always ends first. */
   private readonly windows = new Map<string, { start: number; count: number }>();
   private readonly limit: number;
   private readonly windowMs: number;
   private readonly now: Clock;
-  constructor(limit: number, windowMs: number, now: Clock = Date.now) {
+  private readonly maxKeys: number;
+  constructor(limit: number, windowMs: number, now: Clock = Date.now, maxKeys = MAX_KEYS) {
     this.limit = limit;
     this.windowMs = windowMs;
     this.now = now;
+    this.maxKeys = maxKeys;
   }
 
   /** Counts one request for `key`: null when admitted, else the whole seconds until its window ends (≥ 1). */
@@ -26,7 +29,8 @@ export class FixedWindow {
     const t = this.now();
     let w = this.windows.get(key);
     if (!w || t - w.start >= this.windowMs) {
-      if (!w && this.windows.size >= MAX_KEYS) this.sweep(t);
+      if (w) this.windows.delete(key);
+      else if (this.windows.size >= this.maxKeys) this.evict(t);
       w = { start: t, count: 0 };
       this.windows.set(key, w);
     }
@@ -35,10 +39,13 @@ export class FixedWindow {
     return null;
   }
 
-  private sweep(t: number) {
-    for (const [k, w] of this.windows) if (t - w.start >= this.windowMs) this.windows.delete(k);
-    // Every window still open: drop them all rather than grow without bound (the limit resets early, never wrongly refuses).
-    if (this.windows.size >= MAX_KEYS) this.windows.clear();
+  /** Expired windows go; then, at the cap, the oldest open ones (each resets one key early) — never all of them, so a
+   *  burst of new keys cannot reset every other client's window. */
+  private evict(t: number) {
+    for (const [k, w] of this.windows) {
+      if (this.windows.size < this.maxKeys && t - w.start < this.windowMs) break;
+      this.windows.delete(k);
+    }
   }
 }
 
@@ -56,11 +63,16 @@ export function clientIp(c: Context<AppEnv>, hops: number): string {
   return env?.incoming?.socket?.remoteAddress ?? "unknown";
 }
 
-/** 429 `rate_limited` (reason code) with Retry-After once `limiter` refuses the request's key. */
-export function rateLimit(limiter: () => FixedWindow, key: (c: Context<AppEnv>) => string): MiddlewareHandler<AppEnv> {
+export type Bucket = [limiter: () => FixedWindow, key: (c: Context<AppEnv>) => string];
+
+/** 429 `rate_limited` (reason code) with Retry-After at the first bucket that refuses the request's key; later buckets are
+ *  not counted (a refused request never enters them). */
+export function rateLimit(...buckets: Bucket[]): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const wait = limiter().hit(key(c));
-    if (wait !== null) return c.json(errorBody("unavailable", "rate_limited"), 429, { "Retry-After": String(wait) });
+    for (const [limiter, key] of buckets) {
+      const wait = limiter().hit(key(c));
+      if (wait !== null) return c.json(errorBody("unavailable", "rate_limited"), 429, { "Retry-After": String(wait) });
+    }
     await next();
   };
 }

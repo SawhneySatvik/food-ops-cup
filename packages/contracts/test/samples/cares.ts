@@ -9,7 +9,7 @@ const listing = {
   handovers: [{ handover_id: u(1320), allocation_id: null, status: "recorded", handed_at: T, recorded_by: u(8), voided_by: null, void_reason_code: null, lines: [{ listing_line_id: u(1301), qty_milli: 40000 }] }],
 };
 const netListing = {
-  listing_id: u(1300), city_code: "pune", business_name: "Demo Kitchen", outlet_name: "Koregaon Park", pickup_from: T, pickup_to: T_Z, recipient_name: "Anna Daan (simulated)", recipient_simulated: true,
+  listing_id: u(1300), city_code: "pune", business_name: "Demo Kitchen", outlet_name: "Koregaon Park", pickup_from: T, pickup_to: T_Z, tz: "Asia/Kolkata", recipient_name: "Anna Daan (simulated)", recipient_simulated: true,
   lines: [{ line_no: 1, food_kind: "packaged", label_key: null, label: "Yoghurt cup", qty_milli: 40000, unit: "unit", expires_on: "2026-10-15" }],
 };
 const fact = (col: string, value: number | boolean) => ({ value, ref: snapRef(S1, 0, col) });
