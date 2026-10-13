@@ -1,5 +1,7 @@
 # Cobnut Bakehouse
 
+**Live:** https://cobnut-bakehouse.example.app (runs on its built-in mock; Mock controls panel enabled for testing)
+
 A pickup-ordering storefront for **Cobnut Bakehouse**, a synthetic bakery with two outlets in Lucknow, built on
 **Munim's storefront API** with **Munim's TypeScript SDK** (`@munim/sdk`). Next.js 16 (App Router) + TypeScript +
 Tailwind v4.
