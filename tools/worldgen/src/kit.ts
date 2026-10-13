@@ -584,3 +584,69 @@ export async function customer(c: Ctx, key: string, name: string, phone: string,
     await c.api.cmd("owner", "/v1/loyalty:adjust", "customers.loyalty.adjust.v1", `loyalty:${key}`, { customer_id: c.api.id(`customer:${key}`), points, note: "synthetic welcome points" });
   }
 }
+
+// ---- Munim Cares (ADR-015; R46/R48) -----------------------------------------------------------------------------
+
+/** An operator-proposed, operator-approved platform config draft (R24). The draft id is global, so it carries the tenant (as the AI budget's does);
+ *  it is logged under an alias because the tenant id is server-minted. */
+export async function platformDraft(c: Ctx, key: string, target: string, patch: J): Promise<void> {
+  const draft = c.api.alias(c.api.id(`config_draft:${key}:${c.api.tenantId}`), `draft:${key}`);
+  await c.api.post("operator", "/platform/v1/config-drafts", { draft_id: draft, target, patch }, { noTenant: true });
+  await c.api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true });
+}
+
+export interface CaresRecipient { key: string; name: string; kind: "ngo" | "food_bank"; cooked: boolean; raw: boolean; packaged: boolean; kg: number; portions: number; lat: number; lng: number }
+
+/** The operator side: one city, simulated recipients (every name says so), and this tenant's enablement. Each is an approved config draft. */
+export async function caresOperator(c: Ctx, city: { code: string; country: string; name: string }, recipients: CaresRecipient[]): Promise<Record<string, string>> {
+  await platformDraft(c, "cares_city", `cares_city:${city.code}`, { country_code: city.country, name: city.name, status: "active" });
+  const ids: Record<string, string> = {};
+  for (const r of recipients) {
+    const id = (ids[r.key] = c.api.id(`cares:recipient:${r.key}`));
+    await platformDraft(c, `cares_recipient:${r.key}`, `cares_recipient:${id}`, {
+      city_code: city.code, name: r.name, kind: r.kind, accepts_cooked: r.cooked, accepts_raw: r.raw, accepts_packaged: r.packaged,
+      capacity_kg_per_day: r.kg, capacity_portions_per_day: r.portions, receiving_from: "09:00", receiving_to: "19:00", lat_e6: r.lat, lng_e6: r.lng, status: "active",
+    });
+  }
+  await platformDraft(c, "cares_enablement", `cares_enablement:${c.api.tenantId}`, { enabled: true });
+  return ids;
+}
+
+/** The owner enrols outlets in Cares (their own command). */
+export async function caresProfile(c: Ctx, publicName: string, b2b: boolean, outlets: Array<{ outlet: OutletInfo; city: string; lat: number; lng: number; from: string; to: string }>) {
+  await c.api.cmd("owner", "/v1/cares/profile", "cares.profile.set.v1", "cares:profile", {
+    status: "active", public_name: publicName, b2b_enabled: b2b,
+    outlets: outlets.map((o) => ({ outlet_id: o.outlet.id, city_code: o.city, lat_e6: o.lat, lng_e6: o.lng, pickup_from: o.from, pickup_to: o.to, active: true })),
+  });
+}
+
+export interface CaresLine { key: string; ing: Ingredient; batch: string; qtyMilli: number; expires: string; priceMinor?: number }
+
+/** The owner publishes a raw-food listing (a donation to a simulated recipient, or a priced offer to other businesses). Returns the listing id and each line's id. */
+export async function caresListing(c: Ctx, key: string, outlet: OutletInfo, o: { recipient?: string; pickupFrom: string; pickupTo: string; lines: CaresLine[] }) {
+  const id = c.api.id(`cares:listing:${key}`);
+  const offer = o.recipient === undefined;
+  await c.api.cmd("owner", "/v1/cares/listings", "cares.listing.publish.v1", `cares:listing:${key}`, {
+    listing_id: id, outlet_id: outlet.id, kind: offer ? "offer" : "donation", recipient_id: o.recipient ?? null, pickup_from: o.pickupFrom, pickup_to: o.pickupTo,
+    lines: o.lines.map((l) => ({
+      line_id: c.api.id(`cares:line:${key}:${l.key}`), food_kind: "raw", item_id: null, ingredient_id: l.ing.id, batch_id: c.api.id(`batch:${l.batch}`), qty_milli: l.qtyMilli,
+      unit: l.ing.unit, expires_on: l.expires, unit_price_minor: l.priceMinor ?? null, currency: offer ? c.s.currency : null,
+    })),
+  });
+  return { id, lineIds: o.lines.map((l) => c.api.id(`cares:line:${key}:${l.key}`)) };
+}
+
+/** The owner records the hand-over of every line of a donation, in full (core stamps the time). */
+export async function caresHandover(c: Ctx, key: string, listingId: string, lines: Array<{ lineId: string; qtyMilli: number }>) {
+  await c.api.cmd("owner", "/v1/cares/handovers", "cares.handover.record.v1", `cares:handover:${key}`, {
+    handover_id: c.api.id(`cares:handover:${key}`), listing_id: listingId, allocation_id: null, lines: lines.map((l) => ({ listing_line_id: l.lineId, qty_milli: l.qtyMilli })),
+  });
+}
+
+/** The operator mints the network impact total over [from, to] and publishes it by an approved draft (R24): nothing is public before that. */
+export async function caresNetworkImpact(c: Ctx, from: string, to: string): Promise<string> {
+  const s = await c.api.post("operator", "/platform/v1/network-snapshots", { template_id: "platform.cares_network_impact", params: { from, to, city_code: null } }, { noTenant: true });
+  const id = c.api.alias(String(s.snapshot_id ?? c.api.id("cares:snapshot")), "cares_network_snapshot");
+  await platformDraft(c, "cares_public_impact", `cares_public_impact:${id}`, {});
+  return id;
+}
