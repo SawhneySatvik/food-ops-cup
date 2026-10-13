@@ -24,38 +24,92 @@ export interface OnboardSpec {
   more?: Array<{ name: string; address: string; kind: "restaurant" | "cloud_kitchen" | "store"; taxIds: Record<string, string> }>;
 }
 
-/** ON1–ON3 as the owner: one onboarding call, then the extra outlets, each with its POS device. */
+/** The pack values a seed run mirrors for the operator-provisioned path, where core's self-serve defaults do not apply (what the packs list; a
+ *  mismatch is refused by core: a channel outside the pack's aggregators is `out_of_pack_scope`, a zone outside its timezones likewise). */
+const COUNTRY = {
+  IN: { tz: "Asia/Kolkata", aggregators: [["swiggy", "Swiggy"], ["zomato", "Zomato"]] },
+  AU: { tz: "Australia/Melbourne", aggregators: [["ubereats", "Uber Eats"], ["doordash", "DoorDash"]] },
+} as const;
+/** The own channels core gives each kind of business (modules/tenancy/defaults.ts). */
+const OWN_CHANNELS = {
+  restaurant: [["counter", "Counter"], ["table_qr", "Table QR"], ["pickup", "Pickup"], ["own_site", "Own site"]],
+  cloud_kitchen: [["pickup", "Pickup"], ["own_site", "Own site"]],
+  shop: [["counter", "Counter"], ["pickup", "Pickup"], ["own_site", "Own site"]],
+} as const;
+
+/** ON1–ON3. Hard rule 5: every world is a demo tenant (`is_demo`, which drives the "Sample data" badge). Only the operator route can create one
+ *  with the owner we need, so with an operator: the operator provisions the tenant with the owner member, the owner binds (their first sign-in),
+ *  then creates every outlet, the brand, the channels and the devices and completes onboarding, all as the owner. Without an operator the world is
+ *  onboarded self-serve (a real, not-demo tenant) and the CLI says so. */
 export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
   const { api } = c;
-  const tenant = api.id("tenant"); // sent for the envelope shape only
-  const first = api.id("outlet:1");
-  // R1-m6: the payload's tenant_id is ignored; core mints the tenant and returns it as entity_id. Logged under an alias.
-  const minted = await api.cmd("owner", "/v1/onboarding", "tenancy.onboard.v1", "onboard", {
-    tenant_id: tenant, owner_member_id: api.id("member:owner"), outlet_id: first, owner_name: spec.ownerName, business_name: spec.business,
-    kind: spec.kind, country_code: spec.country,
-    outlet: { name: spec.outlet.name, address: spec.outlet.address, ...(spec.outlet.tz ? { tz: spec.outlet.tz } : {}), tax_ids: spec.outlet.taxIds },
-  }, { noTenant: true });
-  api.tenantId = api.alias(String(minted.body.entity_id), "tenant");
-  const [defaultTz] = ((await api.get("owner", "/v1/outlets")).outlets as J[]).map((o) => o.tz as string);
-  const outlets: OutletInfo[] = [{ id: first, name: spec.outlet.name, tz: defaultTz!, device: null }];
-  for (const [i, o] of (spec.more ?? []).entries()) {
-    const id = api.id(`outlet:${i + 2}`);
-    await api.cmd("owner", "/v1/outlets", "tenancy.outlet.create.v1", `outlet:${i + 2}`, {
-      outlet_id: id, name: o.name, kind: o.kind, tz: defaultTz, address: o.address, tax_ids: o.taxIds,
-    });
-    await api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", `device:${i + 2}`, {
-      device_id: api.id(`device:${i + 2}`), outlet_id: id, kind: "pos", invoice_series: `POS${i + 2}`,
-    });
-    outlets.push({ id, name: o.name, tz: defaultTz!, device: api.id(`device:${i + 2}`) });
-  }
+  const outlets: OutletInfo[] = [];
   const channels: Record<string, string> = {};
-  for (const ch of (await api.get("owner", "/v1/channels")).channels as J[]) {
-    channels[ch.kind as string] = api.alias(ch.id as string, `channel:${ch.kind}`);
-  }
-  for (const d of (await api.get("owner", "/v1/devices")).devices as J[]) {
-    if (d.kind === "pos" && d.outlet_id === first) {
-      outlets[0]!.device = api.alias(d.id as string, "device:1");
-    } else if (d.kind === "kds") api.alias(d.id as string, `kds:${(d.outlet_id as string).slice(0, 8)}`);
+  let defaultTz: string;
+  if (api.hasOperator) {
+    const country = COUNTRY[spec.country];
+    defaultTz = spec.outlet.tz ?? country.tz;
+    const tenant = api.id("tenant");
+    const ownerMember = api.id("member:owner");
+    const idp = personaIdentity(c.world, "owner");
+    await api.cmd("operator", "/platform/v1/tenants:provision", "tenancy.provision.v1", "provision", {
+      tenant_id: tenant, name: spec.business, country_code: spec.country, is_demo: true, owner: { member_id: ownerMember, name: spec.ownerName, email: idp.email },
+    }, { noTenant: true });
+    api.tenantId = tenant;
+    await api.cmd("owner", "/v1/members:bind", "tenancy.member.bind.v1", "bind:owner", { member_id: ownerMember });
+    const all = [{ name: spec.outlet.name, address: spec.outlet.address, kind: spec.kind === "shop" ? "store" : spec.kind, taxIds: spec.outlet.taxIds }, ...(spec.more ?? [])];
+    for (const [i, o] of all.entries()) {
+      const id = api.id(`outlet:${i + 1}`);
+      await api.cmd("owner", "/v1/outlets", "tenancy.outlet.create.v1", `outlet:${i + 1}`, { outlet_id: id, name: o.name, kind: o.kind, tz: defaultTz, address: o.address, tax_ids: o.taxIds });
+      outlets.push({ id, name: o.name, tz: defaultTz, device: null });
+    }
+    await api.cmd("owner", "/v1/brands", "tenancy.brand.create.v1", "brand:1", { brand_id: api.id("brand:1"), name: spec.business, outlet_ids: outlets.map((o) => o.id) });
+    const kinds: Array<[string, string]> = [...OWN_CHANNELS[spec.kind].map(([k, n]) => [k, n] as [string, string]),
+      ...(spec.kind === "shop" ? [] : country.aggregators.map(([code, n]) => [`aggregator:${code}`, n] as [string, string]))];
+    for (const [kind, name] of kinds) {
+      const id = api.id(`channel:${kind}`);
+      await api.cmd("owner", "/v1/channels", "tenancy.channel.create.v1", `channel:${kind}`, { channel_id: id, name, kind });
+      channels[kind] = api.alias(id, `channel:${kind}`);
+    }
+    for (const [i, o] of outlets.entries()) {
+      const id = api.id(`device:${i + 1}`);
+      await api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", `device:${i + 1}`, { device_id: id, outlet_id: o.id, kind: "pos", invoice_series: `POS${i + 1}` });
+      o.device = api.alias(id, `device:${i + 1}`);
+    }
+    if (spec.kind !== "shop") {
+      await api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", "kds:1", { device_id: api.id("kds:1"), outlet_id: outlets[0]!.id, kind: "kds", invoice_series: null });
+    }
+    await api.cmd("owner", "/v1/tenant:update", "tenancy.tenant.update.v1", "onboarding:complete", { complete_onboarding: true });
+  } else {
+    const tenant = api.id("tenant"); // sent for the envelope shape only
+    const first = api.id("outlet:1");
+    // R1-m6: the payload's tenant_id is ignored; core mints the tenant and returns it as entity_id. Logged under an alias.
+    const minted = await api.cmd("owner", "/v1/onboarding", "tenancy.onboard.v1", "onboard", {
+      tenant_id: tenant, owner_member_id: api.id("member:owner"), outlet_id: first, owner_name: spec.ownerName, business_name: spec.business,
+      kind: spec.kind, country_code: spec.country,
+      outlet: { name: spec.outlet.name, address: spec.outlet.address, ...(spec.outlet.tz ? { tz: spec.outlet.tz } : {}), tax_ids: spec.outlet.taxIds },
+    }, { noTenant: true });
+    api.tenantId = api.alias(String(minted.body.entity_id), "tenant");
+    [defaultTz] = ((await api.get("owner", "/v1/outlets")).outlets as J[]).map((o) => o.tz as string) as [string];
+    outlets.push({ id: first, name: spec.outlet.name, tz: defaultTz, device: null });
+    for (const [i, o] of (spec.more ?? []).entries()) {
+      const id = api.id(`outlet:${i + 2}`);
+      await api.cmd("owner", "/v1/outlets", "tenancy.outlet.create.v1", `outlet:${i + 2}`, {
+        outlet_id: id, name: o.name, kind: o.kind, tz: defaultTz, address: o.address, tax_ids: o.taxIds,
+      });
+      await api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", `device:${i + 2}`, {
+        device_id: api.id(`device:${i + 2}`), outlet_id: id, kind: "pos", invoice_series: `POS${i + 2}`,
+      });
+      outlets.push({ id, name: o.name, tz: defaultTz, device: api.id(`device:${i + 2}`) });
+    }
+    for (const ch of (await api.get("owner", "/v1/channels")).channels as J[]) {
+      channels[ch.kind as string] = api.alias(ch.id as string, `channel:${ch.kind}`);
+    }
+    for (const d of (await api.get("owner", "/v1/devices")).devices as J[]) {
+      if (d.kind === "pos" && d.outlet_id === first) {
+        outlets[0]!.device = api.alias(d.id as string, "device:1");
+      } else if (d.kind === "kds") api.alias(d.id as string, `kds:${(d.outlet_id as string).slice(0, 8)}`);
+    }
   }
   // Synthetic outlets are open all day: the storefront refuses an order when the outlet's hours exclude the real now (409
   // outlet_paused), and a seed run must work at any wall-clock time. LocalTime caps at 23:59, so that one minute stays closed;
