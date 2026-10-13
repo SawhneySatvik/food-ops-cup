@@ -56,7 +56,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Waste on this dish's ingredients ran at {observed_waste_bp} basis points against the recipe's allowance of "
+            "Waste on this dish's ingredients ran at {observed_waste_bp} against the recipe's allowance of "
             "{recipe_waste_bp}: over {units_sold} units sold the extra waste cost {excess_waste_minor}."
         ),
         outlet_kinds=frozenset({"restaurant", "cloud_kitchen"}),

@@ -49,7 +49,7 @@ SPEC = register(
         tenant_level=True,
         narration=(
             "This supplier's price for this ingredient has crept up from {baseline_minor} to {latest_minor} per unit, "
-            "up {creep_bp} basis points: invoices above the earlier level cost {creep_impact_minor} more."
+            "up {creep_bp}: invoices above the earlier level cost {creep_impact_minor} more."
         ),
     )
 )

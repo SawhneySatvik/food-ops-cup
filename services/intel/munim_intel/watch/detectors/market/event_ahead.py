@@ -74,7 +74,7 @@ SPEC = register(
         dedupe=dedupe,
         # forecast_units is not slotted: it is null whenever no forecast covers the day.
         narration=(
-            "An imported event is coming up that moved this outlet's orders by {hist_uplift_bp} basis points on its "
+            "An imported event is coming up that moved this outlet's orders by {hist_uplift_bp} on its "
             "{occurrences} past occurrences; a usual day like it sells {baseline_sales_minor}, so expect "
             "{expected_extra_sales_minor} of sales above or below that."
         ),

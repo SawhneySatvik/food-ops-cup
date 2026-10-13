@@ -65,7 +65,7 @@ SPEC = register(
         severity=severity,
         dedupe=dedupe,
         narration=(
-            "Labour cost in week {iso_week} was {labour_bp} basis points of net sales against a target of {target_bp}, "
+            "Labour cost in week {iso_week} was {labour_bp} of net sales against a target of {target_bp}, "
             "and the week before was over target too: {excess_labour_minor} above the target that week."
         ),
         select=select,

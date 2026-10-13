@@ -61,7 +61,7 @@ SPEC = DetectorSpec(
     severity=severity,
     dedupe=dedupe,
     narration=(
-        "This goal is behind pace: {actual_value} so far against a target of {target_value}, with {elapsed_bp} basis points "
+        "This goal is behind pace: {actual_value} so far against a target of {target_value}, with {elapsed_bp} "
         "of its time gone; at this pace it ends {projected_miss_value} short."
     ),
     driver=DRIVER,
