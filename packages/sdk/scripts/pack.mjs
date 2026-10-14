@@ -1,5 +1,7 @@
 // Builds the publishable @munim/sdk (ESM JS + .d.ts from ./src) into a stage dir, then `npm pack`s it.
-//   node scripts/pack.mjs            -> apps/site/public/downloads/munim-sdk.tgz + munim-sdk.tgz.sha256
+//   node scripts/pack.mjs            -> apps/site/public/downloads/munim-sdk-<VERSION>.tgz + .sha256
+// Every contract change ships under a new VERSION and file name; a published tarball is never overwritten, because a
+// consumer's lockfile pins its integrity (R53 H-5). munim-sdk.tgz is 0.1.0, kept byte-identical for that reason.
 //   node scripts/pack.mjs --out DIR  -> same, into DIR
 // Reproducible: npm pins tar entry mtimes and writes no gzip timestamp, and every input is a committed file, so the same
 // source gives the same sha256 (check-pack.mjs asserts it by packing twice).
@@ -13,6 +15,8 @@ import { fileURLToPath } from "node:url";
 const sdk = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repo = resolve(sdk, "../..");
 const tsc = join(sdk, "node_modules/typescript/bin/tsc");
+export const VERSION = "0.2.0";
+export const FILE = `munim-sdk-${VERSION}.tgz`;
 
 /** The only files a consumer gets; check-pack.mjs compares `npm pack --dry-run` to this list. */
 export const WHITELIST = [
@@ -43,7 +47,7 @@ export function stage() {
   cpSync(join(sdk, "README.md"), join(dir, "README.md"));
   const pkg = {
     name: "@munim/sdk",
-    version: "0.1.0",
+    version: VERSION,
     description: "Typed client, storefront-key auth and fetch-based SSE reader for the Munim /v1 API (synthetic data in the mock).",
     license: "UNLICENSED",
     type: "module",
@@ -65,10 +69,10 @@ export function pack(dir, outDir) {
   const out = execFileSync("npm", ["pack", "--json", "--pack-destination", dest], { cwd: dir, encoding: "utf8" });
   const file = join(dest, JSON.parse(out)[0].filename);
   mkdirSync(outDir, { recursive: true });
-  const tgz = join(outDir, "munim-sdk.tgz");
+  const tgz = join(outDir, FILE);
   cpSync(file, tgz); // copy, not rename: tmp and the repo may be different filesystems
   const sha = createHash("sha256").update(readFileSync(tgz)).digest("hex");
-  writeFileSync(`${tgz}.sha256`, `${sha}  munim-sdk.tgz\n`);
+  writeFileSync(`${tgz}.sha256`, `${sha}  ${FILE}\n`);
   rmSync(dest, { recursive: true, force: true });
   return { tgz, sha };
 }

@@ -9,7 +9,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pack, stage, WHITELIST } from "./pack.mjs";
+import { FILE, pack, stage, WHITELIST } from "./pack.mjs";
 
 const sdk = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ts = createRequire(join(sdk, "package.json"))("typescript");
@@ -49,10 +49,10 @@ try {
   const a = pack(dir, join(dir, "out-a"));
   const b = pack(dir, join(dir, "out-b"));
   if (a.sha !== b.sha) fail(`pack is not reproducible: ${a.sha} vs ${b.sha}`);
-  const shipped = resolve(sdk, "../../apps/site/public/downloads/munim-sdk.tgz");
+  const shipped = resolve(sdk, `../../apps/site/public/downloads/${FILE}`);
   if (existsSync(shipped)) {
     const sha = createHash("sha256").update(readFileSync(shipped)).digest("hex");
-    if (!readFileSync(`${shipped}.sha256`, "utf8").startsWith(sha)) fail("shipped tarball does not match munim-sdk.tgz.sha256");
+    if (!readFileSync(`${shipped}.sha256`, "utf8").startsWith(sha)) fail(`shipped tarball does not match ${FILE}.sha256`);
     if (sha !== a.sha) fail(`shipped tarball is stale: ${sha} vs fresh build ${a.sha}`);
   }
   console.log(`files: ${got.length}  exports: ${exported.size}  readme symbols checked: ${covered.length}  sha256: ${a.sha}`);
