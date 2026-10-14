@@ -10,6 +10,10 @@ Tailwind v4.
 > Cobnut Bakehouse, its outlets, phone numbers, tax ids, orders and donation recipients are all invented. It is
 > not affiliated with any real bakery.
 
+The same app also carries the **bakery's own staff screens** at `/staff` (the till, the kitchen display, owner home
+and the approvals inbox, Ask Munim, Munim Cares and Suppliers), built from the second spec pack against the member half
+of the same mock. See [Staff screens](#staff-screens).
+
 Shoppers browse the menu, build a cart (including cakes with a piped message and build-your-own gift boxes), see a
 **server-priced** preview, pick a pickup time, check out as a guest, place the order, follow it live, and see the
 bakery's Munim Cares donations. Payment happens at the counter and is only recorded there.
@@ -27,8 +31,9 @@ npm run dev                      # http://localhost:3000
 | Script | What |
 |---|---|
 | `npm run dev` / `npm run build && npm start` | Develop / production (`next build && next start` runs unchanged on Cloud Run; no platform-only APIs) |
-| `npm run smoke` | The 01-api-client smoke test (needs absolute env vars, see below) |
-| `npm test` | Unit tests (29): refusal copy, error parsing, tracker copy, phone numbers, notes and attempts, mock pricing |
+| `npm run smoke` | The storefront smoke test (needs absolute env vars, see below) |
+| `npm run staff-smoke` | The staff smoke test: `NEXT_PUBLIC_MUNIM_API=http://localhost:3000/mock npm run staff-smoke` |
+| `npm test` | Unit tests (47): storefront (refusal copy, error parsing, tracker copy, phones, attempts, mock pricing) and staff (refs and "Cannot verify", staff copy, kitchen news, Cares gate, the mock's member rules: roles, Cares approval, hand-over limits, PO approval with a typed price, goods received) |
 | `npm run typecheck`, `npx eslint .` | Both clean |
 
 ### Environment variables
@@ -116,6 +121,132 @@ paused, closed, 429, recovered, offline, sold out, coupon refusals (min spend, c
 cart, paused checkout, tracker without a token and not-valid. Taken with the browser timezone set to
 `America/New_York` to show that times use the outlet's zone (Asia/Kolkata). None shows a key or a token.
 
+## Staff screens
+
+All under `/staff`, in the same app, with the same look and the same env vars (no new ones). The storefront keeps
+its URLs; its pages moved into the `app/(shop)` route group so only the shop shows the site footer.
+
+| Route | Screen | Who |
+|---|---|---|
+| `/staff/sign-in` | "Demo sign-in" picker (mock only) | anyone |
+| `/staff/counter`, `/staff/counter/orders/[orderId]` | The till: tiles, cart rail priced by the preview, place, record cash / card / UPI (recorded only), steps, receipt; today's orders | owner, manager, staff |
+| `/staff/kitchen` | Kitchen display: Now / Later lanes, station chips, one 64 px step button per ticket, "Not paid yet" check | owner, manager, staff |
+| `/staff/home`, `/staff/inbox`, `/staff/inbox/[draftId]` | Owner home (figures minted as snapshots, each with a source chip) and the approvals inbox | owner, manager |
+| `/staff/ask`, `/staff/ask/[threadId]` | Ask Munim: cited answers or "Cannot verify" | everyone signed in |
+| `/staff/cares` | Food at risk, the AI's donation proposals, own listings, hand-overs, food shared this month | owner (all), manager (no decisions), staff (listings and hand-overs) |
+| `/staff/suppliers`, `/staff/suppliers/[supplierId]`, `/staff/purchase-orders/[poId]` | Running low, PO proposals with simulated quotes (the price is always typed by the approver), own POs, goods received | owner, manager |
+
+**Sign in on the mock:** open `/staff/sign-in` and pick one of three invented people. Their tokens are public mock
+values (like the storefront key) and the tenant id is `019a0c5e-7e11-7a00-8c0b-0000000c0b17`.
+
+| Demo person | Role | Outlets | Lands on |
+|---|---|---|---|
+| Nandini Mehrotra (demo) | owner | both | `/staff/home` |
+| Imran Siddiqui (demo) | staff (counter) | Cobnut Hazratganj | `/staff/counter` |
+| Kavya Tandon (demo) | staff (kitchen) | Cobnut Hazratganj | `/staff/kitchen` |
+
+The Mock controls panel (bottom right) adds "Next approve" (normal / stale / already decided / can't apply) and "AI"
+(normal / off / abstain) to the storefront's two switches. The till and the kitchen have "Simulate a web order".
+
+**The mock's member half** (`mock-server/staff.ts`, `mock-server/staff-data.ts`) keeps its books in memory per server
+instance, seeded from the clock on the first request. Every flow works end to end on `npm run dev`. On the deploy platform each
+request can reach another instance, so a placed counter order or an approval can vanish on the next request; the
+seeded day is the same everywhere, so every screen always has data. A shopper's storefront order cannot reach this
+mock kitchen (it lives in the shopper's signed token); use "Simulate a web order".
+
+**Staff smoke** (`scripts/staff-smoke.ts`, unchanged from 01, against `npm run dev`):
+
+```
+ok   me (owner): owner, outlets all
+ok   me (scoped): staff, 1 outlet(s)
+ok   outlets: Cobnut Hazratganj (restaurant), Cobnut Gomti Nagar (restaurant)
+ok   counter channel: 2 channel(s)
+ok   counter menu: 18 entries, business date 2026-10-14, first simple item Hazelnut Croissant
+ok   preview: total ₹189.00
+ok   place: entity is the order, status 201
+ok   replay: replayed=true
+ok   same key, new body is 409: key_reused 409 idempotency_conflict
+ok   read order: ticket 8, placed, remaining = total
+ok   board: 7 live ticket(s), ours queued, normal, lane now
+ok   advance ticket: queued -> preparing
+ok   live event: 1 wake-up(s) after the move
+ok   stale advance is 409: invalid 409 illegal_transition
+ok   tender: status preparing, remaining 0
+ok   inbox: 7 item(s), 4 draft(s)
+ok   draft detail: cares.listing.publish.v1, 0 unverified ref(s), 1 history row(s)
+ok   approve with a wrong draft_id is 422: invalid 422 invalid_payload
+ok   mint snapshot: Tickets today: 11
+ok   open snapshot: 1 row(s)
+ok   free digits are not shown
+ok   unknown snapshot is 404: not_found 404 not_found
+ok   ask: 2 segment(s), 5 cited value(s)
+ok   thread: 1 turn(s)
+ok   cares profile: available true, enabled true
+ok   suppliers: 2 supplier(s), 2 simulated, all labelled
+ok   no token is 401: auth 401 unauthenticated
+ok   wrong tenant is 404: not_found 404 not_found
+ok   board outside scope is 404: not_found 404 not_found
+staff smoke: all ok
+```
+
+The storefront smoke still prints "smoke: all ok" against the extended mock. Before the 14 / 15 additions below, the
+staff smoke matched 01 §10's expected output line for line ("inbox: 5 item(s), 3 draft(s)"); with them it reads
+"7 item(s), 4 draft(s)", as 14 §10 says it should.
+
+**End-to-end flows** (headless Chrome, browser time zone `America/New_York`, all passing on a fresh mock day): the
+counter places an order and records a cash payment ("Change to give: ₹311.00"); the kitchen starts ticket 6 and, after
+"Ready", "Handed over" on unpaid ticket 4 asks "₹546.00 is still to pay on order #4. Send the customer to the counter
+first."; the inbox approves the prep-time draft; Ask answers with cited values; Cares approves the donation proposal
+and records the hand-over; Suppliers approves the hazelnut PO with a typed price (Munim works out ₹12,600.00) and the
+goods are received ("Received").
+
+**Screenshots:** `docs/screenshots/staff-<screen>-<state>-<width>.png`: sign-in, owner home and its source drawer,
+inbox and a draft (before and after approval), Ask (start and an answer), the till (empty, priced cart, a paid order),
+the kitchen board and "Not paid yet", Cares (owner at 1024 / 1280, staff, after a hand-over), Suppliers (owner at
+1024 / 1280, a PO being edited, a received PO). None shows a token or a tenant id. Not every state named in the screen
+files has its own screenshot yet; the rest are reachable on the mock as each screen file describes.
+
+### What I changed from the staff pack, and why
+
+1. **SDK stays 0.1.0, with a type shim for `GET /v1/me`.** `munim-sdk-0.2.0.tgz` answers 404 at
+   `https://munim-rho.example.app/downloads/` (checked 14 Oct 2026); only `munim-sdk.tgz` (0.1.0) is published.
+   0.1.0 already has every other member route and type, so `lib/munim/types.ts` declares `V1Me` and the `/v1/me`
+   path exactly as 01 §5 documents them, and the staff client is typed with that path set. Delete the shim when 0.2.0
+   installs. The mock files import `Schemas` from `lib/munim/types` for the same reason.
+2. **The pieces the pack's "orchestrator" was meant to merge, written here** (14 §10, 15 §10, 11 §7):
+   - mock: the `inventory.expiry_risk` and `cares.recipient_match` templates, the expiry finding, the Cares donation
+     draft, approving it creates the listing under the approver, a Cares draft is owner / judge only, `recipient_ineligible`
+     and `listing_expired` are 422 `invalid_payload`, `GET /v1/drafts?outlet=` filters, and the goods-received routes
+     with core's rules plus a seeded note for last week's butter order;
+   - client: `listGoodsReceived`, `getGoodsReceived`, `receiveGoods` and `ReceiveGoodsCommand`;
+   - `TicketCard` takes the `sizeOf` prop the kitchen page passes ("1× Hazelnut Praline Cake · 1 kg (serves 8–10)");
+   - the inbox hides "Approve" from managers on a Cares draft (`drafts.ts`), as core would refuse it;
+   - the template words for the two Cares templates, and the finding title for `inventory.expiry_risk`.
+3. **Pages the pack left to me:** `components/staff/pages/cares.tsx` (14 §2–§6) and
+   `components/staff/pages/suppliers.tsx` (the three screens of 15 §2), with their thin route files.
+4. **Next 16 fixes:** every staff route file wraps its client page in `Suspense` and exports `instant = false`, and
+   the staff layout wraps the shell in `Suspense`. The shell renders a page only after the browser has read the
+   session, so Next cannot prerender a staff page; without these the build failed and dev logged
+   "Could not validate that a segment in your UI has instant navigation". `app/staff/page.tsx`'s redirect moved to
+   `components/staff/staff-index.tsx`, because a client file cannot export `instant`.
+5. The Mock controls panel shows on staff pages too (with the two new selects); owner home's "Low stock" card keeps its
+   own height.
+
+### Where the staff pack, the API or the mock was unclear
+
+1. **SDK 0.2.0 is not downloadable** (above). 00 §3 and 01 §1 both say to install it.
+2. **The pack assumes merges that were not in it.** 14 §10 and 15 §10 say "the pack's orchestrator merges these
+   additions into 01–03", but 01–03 as sent do not have them. I wrote them from 14 / 15's descriptions; the column sets
+   of `inventory.expiry_risk` and `cares.recipient_match` are inferred from what `cares-flow.ts` reads, so please send
+   core's real columns.
+3. **11 says `TicketCard` has a `sizeOf` prop (02 §7), but 02 §7's code has none.** Added.
+4. **Pages 12 / 13 and `app/staff/page.tsx` do not build under Next 16 with Cache Components** as printed (no
+   Suspense around `useParams` / `usePathname`). Wrapped.
+5. Everything in 00 §7 still stands (member-route CORS, no "sales today", quoted prices never trace, orders complete
+   unpaid, no line notes on order views, `GET /v1/outlets` lists every outlet, Ask has no progress stream).
+6. **Staff receiving goods:** core lets staff record goods received, but `CAN.suppliers` hides the screens from them
+   (15 §10's open question). Kept as written: owners and managers only.
+
 ## Changes from the spec, and why
 
 1. **SDK instead of the hand-written client.** 01 says "no SDK", but Munim's developer portal now ships
@@ -171,5 +302,7 @@ third-party art.
 | 2026-10-14 | `components/icons.tsx` | Bag, plus, minus, close, clock, phone, pin, check, alert, offline, leaf, chevron, moon, pause, gift — drawn by hand for this project |
 | 2026-10-14 | `components/ui.tsx` | Diet marks (square + circle / triangle / oval, leaf) — drawn by hand for this project |
 | 2026-10-14 | `app/globals.css` | Section-title swash (inline SVG), scalloped doily edge (CSS gradient) — drawn by hand for this project |
+| 2026-10-14 | `components/staff/source.tsx` | Ledger-stamp mark in the source chip (rounded square, two ruled lines) — drawn by hand for this project |
+| 2026-10-14 | `app/staff/staff.css` | Staff pills, source and "Cannot verify" chips, ticket heads and edges (CSS only, no images) — drawn by hand for this project |
 
 Fonts: Fraunces and Inter (both SIL OFL), served through `next/font`.

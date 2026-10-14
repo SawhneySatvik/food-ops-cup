@@ -6,6 +6,7 @@ import { BRAND, CHANNEL_ID, DEALS, ITEMS, OUTLETS, PREP_MIN, STOREFRONT_KEY, TZ,
 import { BadRequest, localClock, outletById, price, type Accepting } from "./pricing";
 import { book, openWindows } from "./windows";
 import { eventsUntil, issueToken, readToken, recordFrom, viewOf } from "./orders";
+import { handleStaff, isStaffRequest } from "./staff";
 
 type ReasonCode = Schemas["ReasonCode"];
 type ErrorCode = Schemas["Error"]["error"]["code"];
@@ -16,7 +17,7 @@ const IDEMPOTENCY = /^[A-Za-z0-9_.:-]{8,100}$/;
 export const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Munim-Storefront-Key, X-Munim-Guest-Token, Last-Event-ID, X-Mock-Force-Accepting, X-Mock-Force-429",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Munim-Tenant, X-Munim-Storefront-Key, X-Munim-Guest-Token, Last-Event-ID, X-Mock-Force-Accepting, X-Mock-Force-429, X-Mock-Force-Decision, X-Mock-Force-Ai",
   "Access-Control-Expose-Headers": "X-Munim-Mock, X-Munim-Replayed, Retry-After",
   "X-Munim-Mock": "true",
   "Cache-Control": "no-store",
@@ -252,6 +253,14 @@ export async function handle(req: Request, segments: string[]): Promise<Response
   const now = new Date();
   const m = (re: RegExp) => re.exec(path);
 
+  // Member (staff) routes: Authorization + X-Munim-Tenant instead of the storefront key (mock-server/staff.ts).
+  if (isStaffRequest(req, path)) {
+    if (req.headers.get("X-Mock-Force-429") === "1") return error(429, "unavailable", "rate_limited", undefined, { "Retry-After": "5" });
+    const res = await handleStaff(req, path, url, now);
+    for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
+    return res;
+  }
+
   // The network total is not served by the mock (as on Munim's mock): the page hides it.
   if (path === "/v1/cares-network/impact") return notFound();
   if (req.headers.get("X-Munim-Storefront-Key") !== STOREFRONT_KEY) return notFound();
@@ -261,7 +270,7 @@ export async function handle(req: Request, segments: string[]): Promise<Response
     if (req.method === "GET") {
       if (path === "/v1/storefront/outlets") {
         const body: Schemas["StorefrontOutletsResponse"] = {
-          outlets: OUTLETS.map((o) => ({ outlet_id: o.outlet_id, name: o.name, kind: "store", tz: TZ, address: o.address, phone: o.phone, tax_ids: o.tax_ids })),
+          outlets: OUTLETS.map((o) => ({ outlet_id: o.outlet_id, name: o.name, kind: "restaurant", tz: TZ, address: o.address, phone: o.phone, tax_ids: o.tax_ids })),
           pay_at_counter_methods: ["cash", "card", "upi"],
         };
         return json(200, body);

@@ -84,7 +84,7 @@ export function parseError(res: Response, body: unknown): MunimError {
 
 type SdkAnswer<T> = { data?: T; error?: unknown; response: Response };
 
-async function settle<T>(call: () => Promise<SdkAnswer<T>>): Promise<Result<T>> {
+export async function settle<T>(call: () => Promise<SdkAnswer<T>>): Promise<Result<T>> {
   let r: SdkAnswer<T>;
   try {
     r = await call();

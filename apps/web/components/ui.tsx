@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { acceptingText, readyInMinutes } from "@/lib/munim/copy";
 import { formatWhen } from "@/lib/munim/format";
-import { MOCK_CONTROLS_ENABLED, readMockControls, writeMockControls, type ForcedAccepting } from "@/lib/munim/mock-controls";
+import { MOCK_CONTROLS_ENABLED, readMockControls, writeMockControls, type ForcedAccepting, type ForcedAi, type ForcedDecision, type MockControls } from "@/lib/munim/mock-controls";
 import { IS_MOCK } from "@/lib/munim";
 import type { Schemas } from "@/lib/munim/types";
 import { DIET_WORD, SITE } from "@/lib/site";
@@ -166,8 +166,8 @@ export function OutletContact({ outlet }: { outlet: Outlet | null }) {
 }
 
 /** Dev-only switches for the mock's X-Mock-Force-* headers. Never rendered against the real API. */
-export function MockPanel({ onChange }: { onChange?: () => void }) {
-  const [c, setC] = useState(() => ({ accepting: null as ForcedAccepting | null, force429: false }));
+export function MockPanel({ onChange, staff = false }: { onChange?: () => void; /** Staff screens add "Next approve" and "AI" (03 §6). */ staff?: boolean }) {
+  const [c, setC] = useState<MockControls>(() => ({ accepting: null, force429: false, decision: null, ai: null }));
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after hydration
   useEffect(() => setC(readMockControls()), []);
@@ -199,6 +199,27 @@ export function MockPanel({ onChange }: { onChange?: () => void }) {
               <option value="on">on</option>
             </select>
           </label>
+          {staff && (
+            <>
+              <label className="block">
+                Next approve
+                <select value={c.decision ?? ""} onChange={(e) => update({ ...c, decision: (e.target.value || null) as ForcedDecision | null })}>
+                  <option value="">normal</option>
+                  <option value="stale">stale</option>
+                  <option value="already_decided">already decided</option>
+                  <option value="execution_failed">can&apos;t apply</option>
+                </select>
+              </label>
+              <label className="block">
+                AI
+                <select value={c.ai ?? ""} onChange={(e) => update({ ...c, ai: (e.target.value || null) as ForcedAi | null })}>
+                  <option value="">normal</option>
+                  <option value="off">off</option>
+                  <option value="abstain">abstain</option>
+                </select>
+              </label>
+            </>
+          )}
           <button type="button" className="btn btn-plain w-full" onClick={() => setOpen(false)}>Hide</button>
         </div>
       ) : (
