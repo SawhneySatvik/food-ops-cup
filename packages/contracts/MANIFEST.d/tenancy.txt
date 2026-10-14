@@ -19,6 +19,7 @@ tenancy.storefront-key.revoked
 tenancy.me.tenants
 v1.tenant
 v1.outlets
+v1.me
 v1.brands
 v1.channels
 v1.devices

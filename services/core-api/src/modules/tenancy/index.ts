@@ -1,6 +1,7 @@
 // Tenancy module (T-020). Mounted by modules/index.ts; exports `router` (full paths) and the provisionTenant seam.
 //   POST /v1/onboarding                      tenancy.onboard.v1   signed-in person → owner of a new tenant (id minted by core)
 //   GET  /v1/me/tenants                      where this sign-in is an active member
+//   GET  /v1/me                              the caller's own member id, name, role and outlet scope (R51 A-2)
 //   GET  /v1/tenant · /v1/outlets · /v1/brands · /v1/channels · /v1/devices · /v1/members   (reads, own fields)
 //   POST /v1/tenant:update                   tenancy.tenant.update.v1   (country locked after onboarding, R30)
 //   POST /v1/outlets · /v1/outlets/{id}:update · /v1/brands · /v1/channels · /v1/devices
@@ -155,6 +156,14 @@ export const router = new Hono<AppEnv>()
         ...(deps.publish ? { publish: deps.publish } : {}) },
       env, bindHandler({ sub: who.sub, email: who.email }));
     return reply(c, out);
+  })
+  // ---- the caller's own membership: everything but the name is the principal requireMember resolved ----
+  .get("/v1/me", requireMember, async (c) => {
+    const m = memberOf(c);
+    const row = await withContext(c.var.deps.pools.core, contextOf(m), async (db) =>
+      (await db.query<{ name: string }>(`SELECT name FROM core.member WHERE id = $1`, [m.member_id])).rows[0]);
+    if (!row) throw new ApiError("not_found");
+    return c.json({ member_id: m.member_id, tenant_id: m.tenant_id, name: row.name, role: m.role, outlet_ids: m.outlet_ids }, 200);
   })
   // ---- settings (members) ----
   .get("/v1/tenant", requireMember, async (c) => {

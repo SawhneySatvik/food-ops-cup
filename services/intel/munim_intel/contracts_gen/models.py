@@ -5991,6 +5991,17 @@ class V1Outlets(BaseModel):
     outlets: list[Outlet5]
 
 
+class V1Me(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    member_id: Uuid7
+    tenant_id: Uuid7
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    role: Literal['owner', 'manager', 'staff', 'advisor', 'judge']
+    outlet_ids: Literal['*'] | list[Uuid7]
+
+
 class Brand1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',

@@ -256,6 +256,16 @@ export const OutletView = z.strictObject({
   phone: z.string().nullable(),
 });
 export const OutletsResponse = z.strictObject({ outlets: z.array(OutletView) });
+/** `GET /v1/me` (R51 A-2): the caller's own membership, as core resolved it from the verified token. `outlet_ids` is the
+ *  scope every read and command is judged under: `"*"` = every outlet (owner, advisor, judge with no outlet list), else
+ *  exactly these outlets (possibly none). */
+export const MeResponse = z.strictObject({
+  member_id: Uuid7,
+  tenant_id: Uuid7,
+  name: NonEmpty,
+  role: MemberRole,
+  outlet_ids: z.union([z.literal("*"), z.array(Uuid7)]),
+});
 export const BrandsResponse = z.strictObject({ brands: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, outlet_ids: z.array(Uuid7), active: z.boolean() })) });
 export const ChannelsResponse = z.strictObject({ channels: z.array(z.strictObject({ id: Uuid7, name: NonEmpty, kind: ChannelKind, active: z.boolean() })) });
 export const DevicesResponse = z.strictObject({
@@ -289,6 +299,7 @@ export const SCHEMAS = {
   "tenancy.me.tenants": MeTenantsResponse,
   "v1.tenant": TenantView,
   "v1.outlets": OutletsResponse,
+  "v1.me": MeResponse,
   "v1.brands": BrandsResponse,
   "v1.channels": ChannelsResponse,
   "v1.devices": DevicesResponse,
@@ -323,6 +334,7 @@ export const ROUTES: readonly Route[] = [
   { surface: "public", method: "post", path: "/v1/onboarding", operationId: "onboard", summary: "tenancy.onboard.v1 — a signed-in person with no tenant creates one: tenant, first outlet, owner membership, pack defaults. The owner's email is the verified IdP email; the same envelope twice makes one tenant", auth: "identity", command: "tenancy.onboard.v1", response: "command-result", status: 201, conflict: true },
   { surface: "public", method: "get", path: "/v1/me/tenants", operationId: "listMyTenants", summary: "Where this sign-in is an active member", auth: "identity", response: "tenancy.me.tenants", status: 200 },
   { surface: "public", method: "post", path: "/v1/members:bind", operationId: "bindMember", summary: "tenancy.member.bind.v1 — the invitee's first sign-in binds the IdP subject to the invited member, once. Tenant from the invite link (X-Munim-Tenant); the email must match the invite AND be verified by the IdP, else 404", auth: "member", command: "tenancy.member.bind.v1", response: "command-result", status: 200, conflict: true },
+  { surface: "public", method: "get", path: "/v1/me", operationId: "getMe", summary: "The caller's own member id, name, role and outlet scope in this tenant (read-only)", auth: "member", response: "v1.me", status: 200 },
   { surface: "public", method: "get", path: "/v1/tenant", operationId: "getTenant", summary: "The business's settings row", auth: "member", response: "v1.tenant", status: 200 },
   { surface: "public", method: "get", path: "/v1/outlets", operationId: "listOutlets", summary: "Outlets in the caller's scope", auth: "member", response: "v1.outlets", status: 200 },
   { surface: "public", method: "get", path: "/v1/brands", operationId: "listBrands", summary: "Brands", auth: "member", response: "v1.brands", status: 200 },

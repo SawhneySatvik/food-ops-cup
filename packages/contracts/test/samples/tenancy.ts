@@ -22,6 +22,7 @@ export const SAMPLES: Record<string, unknown> = {
   "tenancy.me.tenants": { tenants: [{ tenant_id: u(1), tenant_name: "Meena's Kitchens (synthetic)", role: "owner" }] },
   "v1.tenant": { tenant_id: u(1), name: "Meena's Kitchens (synthetic)", country_code: "IN", base_currency: "INR", fy_start_month: 4, status: "active", is_demo: false, onboarded_at: "2026-10-09T04:45:00.123Z", home_tz: null },
   "v1.outlets": { outlets: [{ id: u(2), name: "Indiranagar", kind: "restaurant", tz: "Asia/Kolkata", address: "12 Example Road, Bengaluru (synthetic)", tax_ids: { FSSAI: "12345678901234" }, accepting_orders: "open", busy_extra_min: 0, default_prep_min: 15, cancel_window_min: 5, reschedule_window_min: 30, pickup_slot_min: 15, pickup_lead_min: 20, upi_vpa: null, business_day_cutoff: "04:00:00", phone: "+918041234567" }] },
+  "v1.me": { member_id: u(8), tenant_id: u(1), name: "Ravi (synthetic)", role: "manager", outlet_ids: [u(2)] },
   "v1.brands": { brands: [{ id: u(3), name: "Meena's Grill", outlet_ids: [u(2)], active: true }] },
   "v1.channels": { channels: [{ id: u(4), name: "Swiggy", kind: "aggregator:swiggy", active: true }] },
   "v1.devices": { devices: [{ id: u(5), outlet_id: u(2), kind: "pos", invoice_series: "IND-POS1", last_seen_at: null }] },

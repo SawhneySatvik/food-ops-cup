@@ -384,6 +384,7 @@ CONTRACTS: dict[str, str] = {
     "tenancy.me.tenants": "TenancyMeTenants",
     "v1.tenant": "V1Tenant",
     "v1.outlets": "V1Outlets",
+    "v1.me": "V1Me",
     "v1.brands": "V1Brands",
     "v1.channels": "V1Channels",
     "v1.devices": "V1Devices",

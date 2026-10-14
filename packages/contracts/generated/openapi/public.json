@@ -27429,6 +27429,80 @@
         }
       }
     },
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "summary": "The caller's own member id, name, role and outlet scope in this tenant (read-only)",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V1Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tenant": {
       "get": {
         "operationId": "getTenant",
@@ -59502,6 +59576,57 @@
         },
         "required": [
           "outlets"
+        ],
+        "additionalProperties": false
+      },
+      "V1Me": {
+        "title": "V1Me",
+        "x-munim-contract": "v1.me",
+        "x-munim-module": "tenancy",
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "manager",
+              "staff",
+              "advisor",
+              "judge"
+            ]
+          },
+          "outlet_ids": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "*"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Uuid7"
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "member_id",
+          "tenant_id",
+          "name",
+          "role",
+          "outlet_ids"
         ],
         "additionalProperties": false
       },

@@ -599,6 +599,55 @@ describe("demo.session.start.v1 (operator)", () => {
   });
 });
 
+// R51 A-2: GET /v1/me returns the caller's own membership. Expected values are the ids and scopes this test created.
+describe("GET /v1/me (the caller's own member id, name, role and outlet scope)", () => {
+  it("owner '*'; manager exactly their outlet; advisor invited with [] = '*'; staff with no outlets []; judge; other tenant 404; no token 401", async () => {
+    const a = await onboard();
+    const b = await onboard();
+    const outletB = uuidv7();
+    expect((await call("POST", "/v1/outlets", a.token, env("tenancy.outlet.create.v1",
+      { outlet_id: outletB, name: "Second outlet", kind: "restaurant", tz: "Asia/Kolkata", address: "2 Synthetic Street", tax_ids: {} }), a.tenant)).status).toBe(200);
+    const me = async (token: string, tenant: string) => {
+      const r = await call("GET", "/v1/me", token, undefined, tenant);
+      expect(r.status).toBe(200);
+      return SCHEMAS["v1.me"].parse(await r.json());
+    };
+    const invite = async (role: string, name: string, outlet_ids: string[]) => {
+      const id = uuidv7(), sub = `${role}-${uuidv7()}`, email = `${sub}@example.test`;
+      expect((await call("POST", "/v1/members:invite", a.token, env("tenancy.member.invite.v1", { member_id: id, name, email, role, outlet_ids }), a.tenant)).status).toBe(200);
+      expect((await call("POST", "/v1/members:bind", tok(sub, email), env("tenancy.member.bind.v1", { member_id: id }), a.tenant)).status).toBe(200);
+      return { token: tok(sub, email), id };
+    };
+
+    expect(await me(a.token, a.tenant)).toEqual({ member_id: a.owner, tenant_id: a.tenant, name: "Synthetic Owner", role: "owner", outlet_ids: "*" });
+    const mgr = await invite("manager", "Outlet B Manager", [outletB]);
+    expect(await me(mgr.token, a.tenant)).toEqual({ member_id: mgr.id, tenant_id: a.tenant, name: "Outlet B Manager", role: "manager", outlet_ids: [outletB] });
+    const adv = await invite("advisor", "Advisor", []);
+    expect(await me(adv.token, a.tenant)).toEqual({ member_id: adv.id, tenant_id: a.tenant, name: "Advisor", role: "advisor", outlet_ids: "*" });
+    // A staff membership with no outlets cannot be made by command (invite refuses it); planted, it reads as no outlets, never '*'.
+    const staff = await invite("staff", "Staff", [a.outlet]);
+    await db.admin(`SET session_replication_role = replica; UPDATE core.membership SET outlet_ids = '{}' WHERE tenant_id = '${a.tenant}' AND member_id = '${staff.id}'; SET session_replication_role = origin`);
+    expect(await me(staff.token, a.tenant)).toEqual({ member_id: staff.id, tenant_id: a.tenant, name: "Staff", role: "staff", outlet_ids: [] });
+
+    // A judge of a demo session (operator-made, with a sign-in) sees their label and the whole demo tenant.
+    const op = uuidv7(), opSub = `op-${uuidv7()}`, judgeSub = `judge-${uuidv7()}`;
+    await db.admin(`INSERT INTO platform.operator (id, idp_sub, email) VALUES ($1, $2, 'op-me@example.test')`, [op, opSub]);
+    const T = uuidv7(), judge = uuidv7();
+    expect((await call("POST", "/platform/v1/demo-sessions", tok(opSub, "op-me@example.test"), env("demo.session.start.v1",
+      { tenant_id: T, member_id: judge, outlet_id: uuidv7(), kind: "restaurant", country_code: "IN", idp_sub: judgeSub, judge_label: "Judge 9c1d (demo)" }))).status).toBe(201);
+    expect(await me(tok(judgeSub), T)).toEqual({ member_id: judge, tenant_id: T, name: "Judge 9c1d (demo)", role: "judge", outlet_ids: "*" });
+
+    // Tenant only from the verified membership: A's owner naming B is 404 (B exists), as is a stranger; no token is 401.
+    expect((await call("GET", "/v1/me", a.token, undefined, b.tenant)).status).toBe(404);
+    expect((await call("GET", "/v1/me", mgr.token, undefined, b.tenant)).status).toBe(404);
+    expect((await call("GET", "/v1/me", tok(`nobody-${uuidv7()}`), undefined, a.tenant)).status).toBe(404);
+    expect((await call("GET", "/v1/me", null, undefined, a.tenant)).status).toBe(401);
+    // A deactivated member stops resolving.
+    expect((await call("POST", `/v1/members/${mgr.id}:deactivate`, a.token, env("tenancy.member.deactivate.v1", { member_id: mgr.id }), a.tenant)).status).toBe(200);
+    expect((await call("GET", "/v1/me", mgr.token, undefined, a.tenant)).status).toBe(404);
+  });
+});
+
 // B12: the published read schemas (strict) accept what the routes really return.
 describe("read shapes parse with the published contracts", () => {
   it("tenant, outlets, brands, channels, devices, members, my tenants", async () => {

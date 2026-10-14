@@ -23585,7 +23585,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "80aab19df54b21c566bdfaa955d6cd526c4a5d263a081a0ca604ba025c45f770",
+      "sha256": "98f9d198e6d2969fe72507af7c28a802a3517941d622c7b32c89b7613845bf11",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23679,7 +23679,7 @@
         "packages/contracts/src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
         "packages/contracts/src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
         "packages/contracts/src/storefront/index.ts": "7eca651618a1f5eef459b4ee767000d3417f259c91c1ccc6af7300ecdfb5156c",
-        "packages/contracts/src/tenancy/index.ts": "cb759b97f329257aa6d74d7d4dabf76820aaea1eb53dafcaa5d5d022606c5e7d",
+        "packages/contracts/src/tenancy/index.ts": "d2c466a6fd8c464f4549e9ac512ef1881e92019b654759114309c2034d1c9985",
         "packages/contracts/src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }

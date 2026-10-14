@@ -301,6 +301,7 @@ export const OPERATIONS = [
   "POST /v1/onboarding",
   "GET /v1/me/tenants",
   "POST /v1/members:bind",
+  "GET /v1/me",
   "GET /v1/tenant",
   "GET /v1/outlets",
   "GET /v1/brands",

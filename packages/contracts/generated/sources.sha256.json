@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "40e24675330eb90904f0c321f6264027d1df2be77b21993b9cc02bed4bbbeae3",
+    "sha256": "6a2a0aedcb211b7f0cfcee7ddbfbe9a8680f53c7c2a1c8c37f954d4b1ef94630",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "10706811f9b0d09ce96ede6d854e2269aef0f93f572829dcd46a1fe11a279e5f",
@@ -69,13 +69,13 @@
       "src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
       "src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
       "src/storefront/index.ts": "7eca651618a1f5eef459b4ee767000d3417f259c91c1ccc6af7300ecdfb5156c",
-      "src/tenancy/index.ts": "cb759b97f329257aa6d74d7d4dabf76820aaea1eb53dafcaa5d5d022606c5e7d",
+      "src/tenancy/index.ts": "d2c466a6fd8c464f4549e9ac512ef1881e92019b654759114309c2034d1c9985",
       "src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
       "src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
     }
   },
   "outputs": {
-    "sha256": "6eff337c6d8d3824fa35fd2a8a33c40d1217e5b2e5355f5db15ffd71b68c20c5",
+    "sha256": "2d5924ec9586536a9711c318a7f5b42d16d1969f1dc4e7be1c69811a9ee7f259",
     "files": {
       "packages/contracts/generated/json-schema/ai_policy.cap.set.v1.schema.json": "228d897944481f937931e9b4ae34e80c21c534892a782c25aa1202cbbc374a83",
       "packages/contracts/generated/json-schema/ai_policy.ceiling.set.v1.schema.json": "9d5c5260af71c0a0cb09f5a29fc98f1456aff30fe2daad1785bf98f0f034eeaf",
@@ -428,6 +428,7 @@
       "packages/contracts/generated/json-schema/v1.lineage.draft.schema.json": "094aa69778836deba644c102e22345024e8c3e395d3d152f7536005ca618cb2c",
       "packages/contracts/generated/json-schema/v1.lineage.row.schema.json": "5345d310f43f22d6a9515545e1f73d4eacaaee05fb0141424161f31384dad13e",
       "packages/contracts/generated/json-schema/v1.loyalty-entry.schema.json": "450f2b81f83ac02f08ff64de7b49e3a9360973fe91ef64a615cad1d9f823e637",
+      "packages/contracts/generated/json-schema/v1.me.schema.json": "b45f8f72d2631d800013f0f6fdc90b153c3f55aa046d5363e93bb4ade94e8bf4",
       "packages/contracts/generated/json-schema/v1.members.schema.json": "13cd6aa942874a6f1049b061d2bf1c2b33de3e92da87b1ebe94abecb046dc39b",
       "packages/contracts/generated/json-schema/v1.order.receipt.schema.json": "83700b2c161d4f43b766dc4a8ad8c8caeb1b7886c6cf2c44a433c326ae93dab0",
       "packages/contracts/generated/json-schema/v1.order.schema.json": "9bc4f7ea66799781545135f279ca114cb4edc4fc799e487837a3de54969429fd",
@@ -470,13 +471,13 @@
       "packages/contracts/generated/json-schema/v1.wiki.page.schema.json": "ecc53d79b450ef1be0ef23cea8f1871dd62b01ab584ed2ecf7154813820457ee",
       "packages/contracts/generated/json-schema/v1.wiki.pages.schema.json": "09d6180befde63a25f3e761415a6272019b5dd806eb84c87c490776c0e63cd02",
       "packages/contracts/generated/json-schema/v1.wiki.versions.schema.json": "42aa36edb9167c1a83959039d5fdd48678ec7780cecadeb6462effae9cbb8b52",
-      "packages/contracts/generated/openapi/internal.json": "05e209111e7facb0cb370f80970a66b5c1f4a7a3a85ad48bf5a7c612778ac05f",
-      "packages/contracts/generated/openapi/public.json": "b2dfeb656de86353e3444f7a0155bea6e65120912b6adf441ca7313085ee3e43",
-      "packages/sdk/src/gen/client.ts": "79abdc818d10097bea247c10b5f84101e3c524690ac5d49f94663910b6326793",
-      "packages/sdk/src/gen/openapi.ts": "4f5ce14f5f6b6530092b513bd7934debffb0e9cfc4618036e4590c48074e73c1",
+      "packages/contracts/generated/openapi/internal.json": "56fd846604baa4892f6fc26e3f4720e03143d7ccdd44e06db7833c50fb319799",
+      "packages/contracts/generated/openapi/public.json": "38a5c2f5feea5f193a957c651af2957195614e0f1c8da748780ac3d833238936",
+      "packages/sdk/src/gen/client.ts": "8f77d455d3d8472a8ff1489424e469e8604185d60e3d2a19329d6821118117c2",
+      "packages/sdk/src/gen/openapi.ts": "114075583f9f246027a69f43c6e5486c83aa2d34a058eebea1cf67b9165d1eee",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "f041dc2017c6df2772ea8ec1059fbff1699fc60648d2ef141c1fb1399b5e3aec",
-      "services/intel/munim_intel/contracts_gen/names.py": "3e61c1d6faef8fe81c0903ef63cc546d56a850907e694b1e461d81f39f4ed90c"
+      "services/intel/munim_intel/contracts_gen/models.py": "2f5e32ec5f9c142960cda8dfc5bfd24b776a4d09fc24c560cef534184e3db314",
+      "services/intel/munim_intel/contracts_gen/names.py": "a849f7864ee6c2c2319c6d44bee28256d9f25ba91001542f71dd1241e640198a"
     }
   }
 }
