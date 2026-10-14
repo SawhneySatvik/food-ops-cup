@@ -101,7 +101,7 @@ export function CaresPage() {
             ))
           )}
         </div>
-        <p className="mt-8 font-semibold">Check your local food-donation rules</p>
+        <p className="mt-8 rounded-[14px] border-[1.5px] border-dashed border-line px-4 py-3 text-[15px] text-muted">Check your local food-donation rules</p>
       </main>
     </>
   );

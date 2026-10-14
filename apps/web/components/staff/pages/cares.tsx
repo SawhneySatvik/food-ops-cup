@@ -243,7 +243,6 @@ function Cares({ outlet }: { outlet: Outlet }) {
               <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
             </div>
           </div>
-          <div className="scallop" aria-hidden="true" />
           <p className="font-semibold">Surplus food to simulated recipients · Measured on synthetic data · Check your local food-donation rules</p>
           {failed(profile) && retryLine(profile, () => void loadAll())}
         </header>
@@ -306,14 +305,17 @@ function Cares({ outlet }: { outlet: Outlet }) {
             )}
 
             {gate === "on" && caresCan(role, "publish") && fmt && (
-              <section ref={ownRef} aria-labelledby="own-title" className="scroll-mt-36 space-y-3">
-                <h2 id="own-title" className="text-[26px]">List food yourself</h2>
+              <section ref={ownRef} aria-labelledby={own ? "own-listing" : "own-title"} className="scroll-mt-36 space-y-3">
+                {!own && <h2 id="own-title" className="text-[26px]">List food yourself</h2>}
                 {own ? (
                   <OwnListingForm key={`${own.prefill?.batchId ?? "blank"}:${own.n}`} outletId={outlet.id} prefill={own.prefill} menu={menu} ingredients={ingredients}
                     session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onAuth={handleAuth}
                     onPublished={(text) => { say(text); setOwn(null); afterCommand(); }} />
                 ) : (
-                  <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>List food yourself</button>
+                  <div className="card flex flex-wrap items-center justify-between gap-3 p-5">
+                    <p className="max-w-[48ch] text-muted">Have something left that Munim didn&apos;t spot? List it for a simulated recipient to collect.</p>
+                    <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>Start a listing</button>
+                  </div>
                 )}
               </section>
             )}

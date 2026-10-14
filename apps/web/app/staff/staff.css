@@ -3,6 +3,8 @@
    staff see. Imported once by app/staff/layout.tsx. Contrast of every new pair is measured in 02 §2. Written for this
    project. */
 :root {
+  --staff-max: 1240px;   /* one content width for the bar and every screen, so their left edges line up */
+  --staff-gutter: 20px;
   --warn: #7a4b00;      /* "Due soon": text and edge on --warn-bg or card */
   --warn-bg: #fde7b8;
   --late: #9b1c12;      /* "Late": text and edge on --late-bg or card */
@@ -15,12 +17,19 @@
 @layer components {
   /* ---- shell ---- */
   .staff-bar { position: sticky; top: 0; z-index: 30; background: var(--bg); border-bottom: 1.5px solid var(--line); }
-  .staff-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 64px; padding: 8px 16px; }
-  .staff-nav { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 10px; scrollbar-width: none; }
+  .staff-bar-row, .staff-nav { max-width: var(--staff-max); margin-inline: auto; padding-inline: var(--staff-gutter); }
+  .staff-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 64px; padding-block: 8px; }
+  .staff-bar-row select { min-height: 44px; padding-right: 36px; font-weight: 600; }
+  .staff-nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
   .staff-nav::-webkit-scrollbar { display: none; }
+  /* Quiet tabs: only the current screen is filled, so the bar reads as navigation, not as a row of buttons. */
+  .staff-nav .chip { min-height: 44px; padding: 0 16px; border-color: transparent; background: transparent; font-size: 16px; }
+  .staff-nav .chip:hover { background: var(--bg-deep); }
   .staff-nav .chip[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-  .staff-main { padding: 16px; }
-  .staff-main-wide { padding: 12px 16px; max-width: none; }
+  .staff-main { padding-block: 20px; }
+  .staff-main.wrap { max-width: var(--staff-max); padding-inline: var(--staff-gutter); }
+  .staff-main-wide { padding: 16px var(--staff-gutter); max-width: none; }
+  .staff-main .section-title { font-size: clamp(28px, 4vw, 34px); }
 
   /* ---- source chip, Cannot verify, snapshot drawer ---- */
   .src-value { font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
@@ -48,6 +57,8 @@
     background: var(--card); color: var(--ink); border: 1.5px dashed var(--ink); border-radius: var(--radius-pill);
     font-size: 14px; font-weight: 650; white-space: nowrap;
   }
+  .snap-table .sim-badge, .snap-table .pill { min-height: 24px; padding: 0 8px; font-size: 12.5px; }
+  .snap-table th { font-size: 13px; color: var(--muted); font-weight: 700; vertical-align: bottom; }
   .pill {
     display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: var(--radius-pill);
     border: 1.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 650; white-space: nowrap;
@@ -61,9 +72,11 @@
   .pill-late { background: var(--late-bg); color: var(--late); border-color: var(--late); }
 
   /* ---- stat card (owner home) ---- */
-  .stat { display: grid; gap: 6px; padding: 18px 20px; }
-  .stat-label { color: var(--muted); font-size: 15px; font-weight: 600; }
-  .stat-value { font-size: clamp(28px, 4vw, 36px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 22px; }
+  .stat-label { color: var(--muted); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat-value { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: clamp(28px, 4vw, 34px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat-value .src-chip { margin-inline: 2px 0; }
+  .stat > p:last-child:not(.stat-value):not(.stat-label) { margin-top: auto; }
 
   /* ---- draft card ---- */
   .draft-field { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr; gap: 6px 14px; padding: 10px 0; border-bottom: 1px solid var(--bg-deep); }
@@ -77,7 +90,14 @@
   .ticket-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1.5px solid var(--bg-deep); }
   .ticket-no { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
   .ticket-timer { font-size: 22px; font-weight: 750; font-variant-numeric: tabular-nums; }
-  .ticket-lines { padding: 10px 16px 14px; display: grid; gap: 10px; }
+  .ticket-lines { padding: 10px 16px 14px; display: grid; gap: 10px; justify-items: start; }
+  .ticket-lines > :not(.pill) { justify-self: stretch; }
+  .ticket { container-type: inline-size; }
+  .ticket-meta { text-align: right; }
+  @container (max-width: 340px) {
+    .ticket-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .ticket-meta { text-align: left; }
+  }
   .ticket-line { font-size: 22px; font-weight: 650; line-height: 1.25; }
   .ticket-qty { display: inline-block; min-width: 2.2ch; font-weight: 800; }
   .ticket-options { font-size: 18px; font-weight: 600; color: var(--ink); padding-left: 2.6ch; }
@@ -95,7 +115,7 @@
 
   /* ---- till (POS) ---- */
   .pos { display: grid; gap: 16px; grid-template-columns: 1fr minmax(320px, 380px); align-items: start; }
-  .tile-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .tile-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
   .tile {
     display: grid; align-content: space-between; gap: 6px; min-height: 104px; padding: 14px; text-align: left;
     background: var(--card); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow);
@@ -103,6 +123,7 @@
   }
   .tile:active { transform: translateY(1px); box-shadow: none; }
   .tile[aria-disabled="true"] { background: var(--bg-deep); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+  .tile-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
   .tile-price { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary); }
   .cart-rail { position: sticky; top: 132px; display: grid; gap: 12px; padding: 16px; max-height: calc(100dvh - 148px); overflow: auto; }
   .cart-line { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--bg-deep); }

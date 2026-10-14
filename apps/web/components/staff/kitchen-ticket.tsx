@@ -35,7 +35,7 @@ export function TicketCard({ ticket, asOf, tz, locale, names, sizeOf, busy, onAd
           <p className="ticket-no">#{ticket.ticket_no}</p>
           <p className="text-[15px] font-semibold">{kind} · {ticket.channel_kind === "counter" ? "Counter" : "Web"}</p>
         </div>
-        <div className="text-right">
+        <div className="ticket-meta">
           <p className="ticket-timer">{elapsedMin(ticket, asOf)} min</p>
           <p className="text-[15px] font-bold">{TICKET_COLOUR[ticket.colour]}{ticket.due_at ? ` · due ${formatTime(ticket.due_at, tz, locale)}` : ""}</p>
         </div>

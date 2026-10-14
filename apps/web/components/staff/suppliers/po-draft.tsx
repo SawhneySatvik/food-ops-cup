@@ -58,7 +58,6 @@ export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName
         <h3 className="text-[22px]">Order from {supplier?.name ?? "a supplier no longer listed"}</h3>
         <SimulatedSupplier />
         <StatusPill tone={DRAFT_TONE[d.status] ?? "new"}>{DRAFT_STATUS[d.status] ?? d.status}</StatusPill>
-        <span className="text-muted">· {proposer}</span>
       </header>
       <div className="draft-field"><p className="font-semibold">For</p><p>{d.payload.outlet_ids.map(outletName).join(", ")}</p></div>
       <div className="draft-field"><p className="font-semibold">Expected</p><p>{d.payload.expected_on ? formatDate(d.payload.expected_on, fmt.locale) : "Not set"}</p></div>
@@ -77,7 +76,7 @@ export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName
       })}
       <p className="text-[14px] text-muted">Munim works out the total when it is approved. Recorded only — Munim does not process payments. Simulated supplier: nothing is sent to a real business.</p>
       <details open>
-        <summary className="min-h-12 cursor-pointer font-semibold">Quotes from simulated suppliers</summary>
+        <summary className="min-h-12 cursor-pointer font-semibold">Compare the quotes</summary>
         <div className="mt-3">
           {quotes === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
             : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>

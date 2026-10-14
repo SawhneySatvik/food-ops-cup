@@ -192,7 +192,6 @@ export function AskPage() {
     <main className="wrap staff-main space-y-4">
       {!online && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
       <h1 className="section-title">Ask Munim</h1>
-      <div className="scallop" aria-hidden="true" />
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside aria-labelledby="threads-title" className={`order-2 space-y-3 lg:order-1 ${threadId ? "hidden lg:block" : ""}`}>
           <div className="flex items-center justify-between gap-2">

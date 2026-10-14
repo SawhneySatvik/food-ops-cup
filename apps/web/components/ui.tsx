@@ -18,7 +18,7 @@ export function SiteHeader({ count, onCart }: { count?: number; onCart?: () => v
   return (
     <header className="sticky top-0 z-30 border-b-[1.5px] border-line bg-bg">
       <div className="wrap flex min-h-[64px] items-center justify-between gap-3">
-        <Link href="/" className="text-ink no-underline" aria-label={`${SITE.name}, home`}>
+        <Link href="/" className="shrink-0 whitespace-nowrap text-ink no-underline" aria-label={`${SITE.name}, home`}>
           <Wordmark />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1">
@@ -181,7 +181,7 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
     onChange?.();
   };
   return (
-    <div className="fixed bottom-24 right-3 z-40 lg:bottom-4">
+    <div className="fixed bottom-24 left-3 z-40 lg:bottom-4">
       {open ? (
         <div className="card w-[240px] space-y-3 p-4 text-[14px]">
           <p className="font-bold">Mock test controls (dev only)</p>
@@ -226,7 +226,7 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
           <button type="button" className="btn btn-plain w-full" onClick={() => setOpen(false)}>Hide</button>
         </div>
       ) : (
-        <button type="button" className="btn btn-plain min-h-12 px-4 text-[14px] opacity-90" onClick={() => setOpen(true)}>Mock controls</button>
+        <button type="button" className="btn min-h-10 bg-ink px-4 text-[13px] text-white opacity-80 shadow-md hover:opacity-100" onClick={() => setOpen(true)}>Mock controls</button>
       )}
     </div>
   );

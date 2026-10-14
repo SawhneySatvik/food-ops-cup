@@ -23,10 +23,10 @@ export function Tile({ entry, onAdd }: { entry: Entry; onAdd: (e: Entry) => void
         {entryName(entry)}
         {entryVariant(entry) && <span className="block text-[15px] font-normal text-muted">{entryVariant(entry)}</span>}
       </span>
-      <span className="flex items-center justify-between gap-2">
+      <span className="tile-foot">
         {/* The price row's own amount, for the person choosing: never added up here. */}
         <span className="tile-price">{formatMoney(entry.price_minor, entry.currency, SITE.locale)}</span>
-        {soldOut ? <span className="soldout-pill">Sold out</span> : entry.option_groups.some((g) => g.required) ? <span className="badge">Choose</span> : null}
+        {soldOut ? <span className="soldout-pill">Sold out</span> : entry.option_groups.some((g) => g.required) ? <span className="badge min-h-[26px] text-[13px]">Choose</span> : null}
       </span>
     </button>
   );

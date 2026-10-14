@@ -206,7 +206,6 @@ export function InboxPage() {
         <h1 className="section-title">Inbox</h1>
         <LiveLine state={live} onRefresh={() => void load()} />
       </div>
-      <div className="scallop" aria-hidden="true" />
       <div className="flex gap-2" role="tablist" aria-label="Inbox">
         <button type="button" role="tab" aria-selected={tab === "waiting"} className="chip" aria-current={tab === "waiting" ? "page" : undefined} onClick={() => setTab("waiting")}>
           Waiting for you{items ? ` · ${waiting}${cursor ? "+" : ""}` : ""}

@@ -42,8 +42,8 @@ export default function StoryPage() {
             <ul className="mt-6 grid gap-4 md:grid-cols-3">
               {PROMISES.map((p) => (
                 <li key={p.title} className="card p-6">
-                  <CategoryMotif slug={p.motif} size={40} />
-                  <h3 className="mt-3 text-[24px]">{p.title}</h3>
+                  <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent"><CategoryMotif slug={p.motif} size={28} /></span>
+                  <h3 className="mt-4 text-[24px]">{p.title}</h3>
                   <p className="mt-2 text-muted">{p.body}</p>
                 </li>
               ))}

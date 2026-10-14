@@ -17,22 +17,26 @@ export function DemoBar() {
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t-[1.5px] border-line bg-card">
-      <div className="wrap grid gap-6 py-10 sm:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-2">
+      <div className="wrap grid gap-8 pt-10 pb-6 sm:grid-cols-[1fr_auto] sm:items-start">
+        <div className="max-w-[46ch] space-y-2">
           <p className="display flex items-center gap-2 text-[22px]">
             <Hazelnut size={26} /> Cobnut Bakehouse
           </p>
-          <p className="text-[14px] text-muted">A synthetic bakehouse built on Munim&apos;s storefront API.</p>
-          <p className="text-[14px] font-semibold">{DEMO_TOP}</p>
-          <p className="text-[14px] font-semibold">{DEMO_FOOT}</p>
-          <p className="text-[14px]">{RECORDED_ONLY}</p>
+          <p className="text-muted">A synthetic bakehouse built on Munim&apos;s storefront API.</p>
         </div>
-        <nav aria-label="Footer" className="flex flex-wrap content-start gap-x-6 gap-y-1 text-[16px]">
-          <Link className="inline-flex min-h-12 items-center" href="/">Menu</Link>
-          <Link className="inline-flex min-h-12 items-center" href="/story">Our story</Link>
-          <Link className="inline-flex min-h-12 items-center" href="/cares">Munim Cares</Link>
-          <Link className="inline-flex min-h-12 items-center" href="/staff/sign-in">Staff sign-in</Link>
+        <nav aria-label="Footer" className="grid grid-cols-2 gap-x-10 text-[16px] font-semibold sm:flex sm:gap-x-8">
+          <Link className="inline-flex min-h-12 items-center no-underline hover:underline" href="/">Menu</Link>
+          <Link className="inline-flex min-h-12 items-center no-underline hover:underline" href="/story">Our story</Link>
+          <Link className="inline-flex min-h-12 items-center no-underline hover:underline" href="/cares">Munim Cares</Link>
+          <Link className="inline-flex min-h-12 items-center no-underline hover:underline" href="/staff/sign-in">Staff sign-in</Link>
         </nav>
+      </div>
+      <div className="wrap border-t border-bg-deep py-5">
+        <ul className="flex flex-wrap gap-x-6 gap-y-1 text-[14px] text-muted">
+          <li>{DEMO_TOP}</li>
+          <li>{DEMO_FOOT}</li>
+          <li>{RECORDED_ONLY}</li>
+        </ul>
       </div>
     </footer>
   );

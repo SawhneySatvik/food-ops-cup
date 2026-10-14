@@ -228,7 +228,7 @@ function CheckoutView({ outletId }: { outletId: string }) {
       {header}
       <StateBanner accepting={menu?.accepting ?? null} />
       <OfflineBanner show={!online || previewError?.kind === "network" || loadError?.kind === "network"} text="You're offline. Your cart is kept on this phone." />
-      <main className="wrap max-w-[688px] pb-10 pt-8">
+      <main className="wrap max-w-[688px] pb-10 pt-8 lg:max-w-[1120px]">
         <Link href={`/o/${outletId}`} className="inline-flex min-h-12 items-center font-semibold">← Back to menu</Link>
         <h1 className="mt-2 text-[clamp(36px,7vw,52px)]">Your order</h1>
         {outlet && <p className="mt-1 text-muted">Pickup from {outlet.name}</p>}
@@ -239,7 +239,10 @@ function CheckoutView({ outletId }: { outletId: string }) {
           </div>
         )}
 
-        <fieldset className="card mt-8 p-6" disabled={placing}>
+        {/* Phones keep the four steps in order; from 1024 px the review and Place sit in a sticky column on the right. */}
+        <div className="mt-8 flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
+        <div className="contents lg:block lg:space-y-6">
+        <fieldset className="card order-1 p-6" disabled={placing}>
           <legend className="sr-only">Pickup time</legend>
           <h2 className="text-[26px]"><span className="text-secondary">1 · </span>Pickup time</h2>
           <div className="mt-4 grid gap-2">
@@ -266,7 +269,39 @@ function CheckoutView({ outletId }: { outletId: string }) {
           </div>
         </fieldset>
 
-        <section className="card mt-6 p-6" aria-labelledby="review-h">
+        <fieldset className="card order-3 space-y-4 p-6" disabled={placing}>
+          <legend className="sr-only">Your details</legend>
+          <h2 className="text-[26px]"><span className="text-secondary">3 · </span>Your details</h2>
+          <Input id="f-name" label="Name" value={form.name} error={errors.name} autoComplete="name" onChange={(v) => edit("name", v)} onBlur={() => blur("name")} />
+          <div>
+            <label htmlFor="f-phone" className="font-bold">Mobile number</label>
+            <div className="mt-1 flex items-stretch">
+              <span className="inline-flex items-center rounded-l-[14px] border-[1.5px] border-r-0 border-line bg-bg-deep px-3 font-semibold" aria-hidden="true">+91</span>
+              <input
+                id="f-phone"
+                inputMode="tel"
+                autoComplete="tel-national"
+                className="!rounded-l-none"
+                value={form.phone}
+                onChange={(e) => edit("phone", e.target.value)}
+                onBlur={() => blur("phone")}
+                aria-invalid={!!(errors.phone || errors.reach)}
+                aria-describedby={[errors.phone && "f-phone-err", errors.reach && "f-reach-err"].filter(Boolean).join(" ") || undefined}
+              />
+            </div>
+            {errors.phone && <FieldError id="f-phone-err">{errors.phone}</FieldError>}
+          </div>
+          <Input id="f-email" label="Email" value={form.email} error={errors.email} autoComplete="email" inputMode="email" onChange={(v) => edit("email", v)} onBlur={() => blur("email")} />
+          {errors.reach && <FieldError id="f-reach-err">{errors.reach}</FieldError>}
+          <label className="choice">
+            <input type="checkbox" checked={form.marketing} onChange={(e) => setForm({ ...form, marketing: e.target.checked })} />
+            <span>Send me offers</span>
+          </label>
+        </fieldset>
+        </div>
+
+        <div className="contents lg:sticky lg:top-[88px] lg:block lg:space-y-6">
+        <section className="card order-2 p-6" aria-labelledby="review-h">
           <h2 id="review-h" className="text-[26px]"><span className="text-secondary">2 · </span>Review</h2>
           <ul className="mt-4 space-y-4">
             {cart.lines.map((l, i) => {
@@ -350,37 +385,7 @@ function CheckoutView({ outletId }: { outletId: string }) {
           </div>
         </section>
 
-        <fieldset className="card mt-6 space-y-4 p-6" disabled={placing}>
-          <legend className="sr-only">Your details</legend>
-          <h2 className="text-[26px]"><span className="text-secondary">3 · </span>Your details</h2>
-          <Input id="f-name" label="Name" value={form.name} error={errors.name} autoComplete="name" onChange={(v) => edit("name", v)} onBlur={() => blur("name")} />
-          <div>
-            <label htmlFor="f-phone" className="font-bold">Mobile number</label>
-            <div className="mt-1 flex items-stretch">
-              <span className="inline-flex items-center rounded-l-[14px] border-[1.5px] border-r-0 border-line bg-bg-deep px-3 font-semibold" aria-hidden="true">+91</span>
-              <input
-                id="f-phone"
-                inputMode="tel"
-                autoComplete="tel-national"
-                className="!rounded-l-none"
-                value={form.phone}
-                onChange={(e) => edit("phone", e.target.value)}
-                onBlur={() => blur("phone")}
-                aria-invalid={!!(errors.phone || errors.reach)}
-                aria-describedby={[errors.phone && "f-phone-err", errors.reach && "f-reach-err"].filter(Boolean).join(" ") || undefined}
-              />
-            </div>
-            {errors.phone && <FieldError id="f-phone-err">{errors.phone}</FieldError>}
-          </div>
-          <Input id="f-email" label="Email" value={form.email} error={errors.email} autoComplete="email" inputMode="email" onChange={(v) => edit("email", v)} onBlur={() => blur("email")} />
-          {errors.reach && <FieldError id="f-reach-err">{errors.reach}</FieldError>}
-          <label className="choice">
-            <input type="checkbox" checked={form.marketing} onChange={(e) => setForm({ ...form, marketing: e.target.checked })} />
-            <span>Send me offers</span>
-          </label>
-        </fieldset>
-
-        <section className="card mt-6 p-6" aria-labelledby="place-h">
+        <section className="card order-4 p-6" aria-labelledby="place-h">
           <h2 id="place-h" className="text-[26px]"><span className="text-secondary">4 · </span>Place</h2>
           <p className="mt-3 font-semibold">{payAtCounterText(menu?.pay_at_counter_methods ?? null)}</p>
           <p className="text-muted">{RECORDED_ONLY}</p>
@@ -403,6 +408,8 @@ function CheckoutView({ outletId }: { outletId: string }) {
           </button>
           {!ordering && menu && <p className="mt-3 text-muted">Not taking orders right now.</p>}
         </section>
+        </div>
+        </div>
       </main>
       <OutletContact outlet={outlet} />
       <MockPanel onChange={() => { void loadAll(); setBump((b) => b + 1); }} />

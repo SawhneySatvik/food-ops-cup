@@ -18,12 +18,10 @@ import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
 import type { Schemas } from "@/lib/munim/types";
 import { SITE } from "@/lib/site";
-import { Ribbon } from "../../pages/home";
 import { useStaff } from "../shell";
 import { CannotVerify, SnapshotDrawer, SourcedValue, StatCard } from "../source";
 import { LiveLine, NotForRole, type OpenRef } from "./inbox";
 
-const RIBBON = ["Sample shop — orders are not real.", "Demo: all data is synthetic.", "Suppliers and recipients are simulated.", "Every number opens the rows behind it."];
 
 /** A figure as text for StatCard: undefined while loading, null for "Cannot verify". */
 const shown = (f: Figure | null | undefined, fmt: CellFormat): string | null | undefined => (f === undefined ? undefined : f === null ? null : formatCell(f.value, f.column, fmt));
@@ -132,7 +130,6 @@ export function OwnerHomePage() {
         {retryAt !== null && <p className="text-muted" role="status">Too many requests. Please wait a moment and try again. You can refresh in {waitS} s.</p>}
         {figures?.error && figures.error.kind !== "rate_limited" && !today && <p className="text-muted">{staffErrorText(figures.error, "home")}</p>}
       </div>
-      <Ribbon items={RIBBON} />
 
       <section aria-label="Today's figures" className="wrap grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="card stat">
@@ -155,12 +152,12 @@ export function OwnerHomePage() {
           : <StatCard label="Most waste this week" value={f.waste ? shown(f.waste.amount, fmt!) : null} refToken={f.waste?.amount?.ref ?? null}
               note={f.waste ? `${ing(f.waste.ingredientId)?.name ?? "One ingredient"}, since Monday. Open the source for every ingredient.` : undefined} onOpen={open} />}
 
-        <div className="card stat">
+        <div className="card stat lg:col-span-2">
           <p className="stat-label">Food shared this month</p>
           {!f ? <div className="skeleton h-10 w-32" aria-hidden="true" />
             : !f.shared ? <CannotVerify />
             : (
-              <ul className="space-y-1 text-[17px] font-semibold">
+              <ul className="flex flex-wrap gap-x-8 gap-y-2 text-[18px] font-semibold">
                 <li>Portions <Inline f={f.shared.portions} fmt={fmt!} onOpen={open} /></li>
                 <li>Packed items <Inline f={f.shared.units} fmt={fmt!} onOpen={open} /></li>
                 <li>Hand-overs <Inline f={f.shared.handovers} fmt={fmt!} onOpen={open} /></li>

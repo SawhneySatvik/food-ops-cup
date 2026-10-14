@@ -203,7 +203,6 @@ function Suppliers() {
               <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
             </div>
           </div>
-          <div className="scallop" aria-hidden="true" />
           <p className="font-semibold">Every supplier here is simulated. Quotes and orders are part of the demo; nothing is sent to a real business.</p>
         </header>
 
@@ -344,7 +343,6 @@ function SupplierPage({ supplierId }: { supplierId: string }) {
             <>
               <header className="space-y-2">
                 <h1 className="section-title"><SupplierName s={supplier} /></h1>
-                <div className="scallop" aria-hidden="true" />
                 {supplier.payment_days !== null && supplier.payment_days > 0 && <p>Pay within {supplier.payment_days} days</p>}
                 {supplier.notes && <p className="text-muted">{supplier.notes}</p>}
                 {!supplier.active && <span className="pill pill-done">Not active</span>}
@@ -461,7 +459,6 @@ function PurchaseOrderPage({ poId }: { poId: string }) {
             <>
               <header className="space-y-2">
                 <h1 className="section-title">Purchase order</h1>
-                <div className="scallop" aria-hidden="true" />
                 <p className="flex flex-wrap items-center gap-2 text-[20px] font-semibold">
                   <SupplierName s={po.supplier} />
                   <StatusPill tone={PO_TONE[po.status] ?? "work"}>{PO_STATUS[po.status] ?? po.status}</StatusPill>
@@ -490,7 +487,7 @@ function PurchaseOrderPage({ poId }: { poId: string }) {
                 <p className="text-[14px] text-muted">{RECORDED_ONLY}</p>
                 {po.negotiation_run_id && (
                   <details>
-                    <summary className="min-h-12 cursor-pointer font-semibold">Quotes from simulated suppliers</summary>
+                    <summary className="min-h-12 cursor-pointer font-semibold">Compare the quotes</summary>
                     <div className="mt-3">
                       {quotes === null || !fmt ? <div className="skeleton h-24" role="status" aria-label="Loading" />
                         : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>

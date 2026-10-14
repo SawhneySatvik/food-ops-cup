@@ -237,6 +237,7 @@
     transform: rotate(-3deg);
     font-weight: 700;
     font-size: 14px;
+    white-space: nowrap;
   }
 
   .skeleton { background: var(--bg-deep); border-radius: 10px; }

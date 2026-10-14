@@ -51,7 +51,6 @@ export function ListingDraftCard({ detail, match, recipients, menu, ingredients,
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="text-[22px]">Give food at risk to a simulated recipient</h3>
         <StatusPill tone={DRAFT_TONE[d.status] ?? "new"}>{DRAFT_STATUS[d.status] ?? d.status}</StatusPill>
-        <span className="text-muted">· {proposer}</span>
       </header>
 
       {view.lines.map(({ index, line, qty }) => (

@@ -123,18 +123,18 @@ export function HomePage() {
 
       <section className="wrap mt-12 grid gap-4 md:grid-cols-3">
         <div className="card p-6">
-          <GiftIcon className="text-secondary" size={30} />
-          <h3 className="mt-3 text-[24px]">Build a gift box</h3>
+          <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent"><GiftIcon className="text-secondary" size={26} /></span>
+          <h3 className="mt-4 text-[24px]">Build a gift box</h3>
           <p className="mt-2 text-muted">Pick a box size and two to four truffle-cookie flavours, add a ribbon and a card. Choose an outlet to start.</p>
         </div>
         <div className="card p-6">
-          <CategoryMotif slug="cakes" size={34} />
-          <h3 className="mt-3 text-[24px]">Cakes with a message</h3>
+          <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent"><CategoryMotif slug="cakes" size={28} /></span>
+          <h3 className="mt-4 text-[24px]">Cakes with a message</h3>
           <p className="mt-2 text-muted">Celebration cakes by weight, classic or eggless, with your words piped on top.</p>
         </div>
         <Link href="/cares" className="card card-link block p-6 text-ink no-underline">
-          <Hazelnut size={30} />
-          <h3 className="mt-3 text-[24px]">Munim Cares</h3>
+          <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent"><Hazelnut size={26} /></span>
+          <h3 className="mt-4 text-[24px]">Munim Cares</h3>
           <p className="mt-2 text-muted">Surplus bakes from our counters, offered to simulated recipients.</p>
           <span className="mt-3 inline-flex items-center gap-1 font-semibold text-primary">See donations <ChevronIcon size={18} /></span>
         </Link>
