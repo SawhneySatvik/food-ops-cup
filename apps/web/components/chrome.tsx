@@ -31,6 +31,7 @@ export function SiteFooter() {
           <Link className="inline-flex min-h-12 items-center" href="/">Menu</Link>
           <Link className="inline-flex min-h-12 items-center" href="/story">Our story</Link>
           <Link className="inline-flex min-h-12 items-center" href="/cares">Munim Cares</Link>
+          <Link className="inline-flex min-h-12 items-center" href="/staff/sign-in">Staff sign-in</Link>
         </nav>
       </div>
     </footer>
