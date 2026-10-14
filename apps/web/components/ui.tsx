@@ -24,6 +24,9 @@ export function SiteHeader({ count, onCart }: { count?: number; onCart?: () => v
         <nav aria-label="Main" className="flex items-center gap-1">
           <Link href="/story" className="hidden min-h-12 items-center px-3 font-semibold text-ink no-underline sm:inline-flex">Our story</Link>
           <Link href="/cares" className="hidden min-h-12 items-center px-3 font-semibold text-ink no-underline sm:inline-flex">Cares</Link>
+          <Link href="/staff/sign-in" className="btn btn-plain no-underline">
+            Staff<span className="hidden sm:inline">&nbsp;sign-in</span>
+          </Link>
           {onCart && (
             <button type="button" className="btn btn-plain" onClick={onCart} aria-label={count ? `Cart, ${count} ${count === 1 ? "item" : "items"}` : "Cart, empty"}>
               <BagIcon />
