@@ -95,20 +95,22 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
       <header className="staff-bar">
         <div className="staff-bar-row">
           <Link href="/staff" className="text-ink no-underline" aria-label="Cobnut Bakehouse staff, home"><Wordmark /></Link>
-          <span className="badge">Staff</span>
+          <span className="badge hidden sm:inline-flex">Staff</span>
           {outlets.length > 1 ? (
-            <label className="flex items-center gap-2 font-semibold">
+            <label className="order-last flex grow basis-[55%] items-center gap-2 font-semibold sm:order-none sm:grow-0 sm:basis-auto">
               Outlet
-              <select className="w-auto" value={outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
+              <select className="min-w-0 flex-1 sm:w-auto sm:flex-none" value={outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
                 {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </label>
-          ) : outlet ? <span className="font-semibold">{outlet.name}</span> : null}
-          <span className="ml-auto flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{session.me.name}</span>
-            <span className="text-muted">· {ROLE_LABEL[session.me.role]}</span>
-            {session.demo && <span className="sim-badge">{DEMO_SIGN_IN}</span>}
-            <button type="button" className="btn btn-plain" onClick={() => { signOut(); router.replace("/staff/sign-in"); }}>Sign out</button>
+          ) : outlet ? <span className="order-last w-full font-semibold sm:order-none sm:w-auto">{outlet.name}</span> : null}
+          {session.demo && <span className="sim-badge order-last sm:hidden">{DEMO_SIGN_IN}</span>}
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <span className="hidden font-semibold md:inline">{session.me.name}</span>
+            <span className="hidden text-muted md:inline">· {ROLE_LABEL[session.me.role]}</span>
+            {session.demo && <span className="sim-badge hidden sm:inline-flex">{DEMO_SIGN_IN}</span>}
+            <button type="button" className="btn btn-plain px-4 sm:px-[22px]" onClick={() => { signOut(); router.replace("/staff/sign-in"); }}
+              aria-label={`Sign out ${session.me.name}`}>Sign out</button>
           </span>
         </div>
         <nav aria-label="Staff" className="staff-nav">

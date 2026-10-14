@@ -13,6 +13,9 @@
   --src: #5b3a78;       /* source chip: plum ink, the colour of a ledger stamp */
   --src-bg: #efe4f6;
 }
+@media (max-width: 639px) {
+  :root { --staff-gutter: 16px; }
+}
 
 @layer components {
   /* ---- shell ---- */
@@ -29,6 +32,8 @@
   .staff-main { padding-block: 20px; }
   .staff-main.wrap { max-width: var(--staff-max); padding-inline: var(--staff-gutter); }
   .staff-main-wide { padding: 16px var(--staff-gutter); max-width: none; }
+  /* Screens that lay out their own sections with .wrap use the staff width too. */
+  body:has(.staff-bar) .wrap { max-width: var(--staff-max); padding-inline: var(--staff-gutter); }
   .staff-main .section-title { font-size: clamp(28px, 4vw, 34px); }
 
   /* ---- source chip, Cannot verify, snapshot drawer ---- */

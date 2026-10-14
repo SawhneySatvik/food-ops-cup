@@ -226,7 +226,7 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
           <button type="button" className="btn btn-plain w-full" onClick={() => setOpen(false)}>Hide</button>
         </div>
       ) : (
-        <button type="button" className="btn min-h-10 bg-ink px-4 text-[13px] text-white opacity-80 shadow-md hover:opacity-100" onClick={() => setOpen(true)}>Mock controls</button>
+        <button type="button" className="btn min-h-9 min-w-0 bg-ink px-3 text-[12px] text-white opacity-70 shadow-md hover:opacity-100" onClick={() => setOpen(true)} aria-label="Mock controls" title="Mock controls">Mock</button>
       )}
     </div>
   );

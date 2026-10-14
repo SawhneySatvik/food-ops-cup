@@ -582,7 +582,7 @@ function caresDraft(now: Date): SeedDraft {
       },
       resolved_refs: [{ path: "/lines/0/qty_milli", ref: snap("expiry", 0, "at_risk_qty_milli"), value: expiry!.rows[0]!.at_risk_qty_milli! }],
       evidence: [bare("expiry"), bare("match")],
-      based_on: [based(match!, "match", 0, "pickup_from"), based(match!, "match", 0, "recipient_id"), based(expiry!, "expiry", 0, "at_risk_qty_milli")],
+      based_on: [based(match!, "match", 0, "name"), based(expiry!, "expiry", 0, "at_risk_qty_milli")],
     },
   };
 }
