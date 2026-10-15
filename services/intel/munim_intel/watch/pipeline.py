@@ -247,13 +247,15 @@ class WatchRun:
             "confidence_bp": spec.confidence_bp(row),
             "dedupe_key": dedupe,
         }
+        one = spec.finding_outlet(row, window) if spec.finding_outlet is not None else None
         envelope = {
             "segments": template_segments(spec, sid, i, hit.impact_row, spec.narration_of(row)),
             "impact_ref": snap_ref(sid, hit.impact_row, spec.impact_column),
             "abstained": False,
         }
         fid = uuid7(run_start_ms(self.ctx.run_id), f"{self.ctx.run_id}\0{dedupe}")
-        res = await self._post_finding({**base, "envelope": {"finding_id": fid, **envelope}}, spec)
+        named = {"outlet_ids": [one]} if one else {}
+        res = await self._post_finding({**base, "envelope": {"finding_id": fid, **envelope}, **named}, spec)
         if res is None:
             return
         self.report.findings[res.outcome] += 1

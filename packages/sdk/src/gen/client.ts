@@ -272,6 +272,7 @@ export const OPERATIONS = [
   "POST /v1/supplier-invoices/{id}:dispute",
   "GET /v1/supplier-returns",
   "POST /v1/supplier-returns",
+  "POST /v1/rfq-requests",
   "GET /v1/specialists",
   "GET /v1/specialists/{id}",
   "GET /v1/storefront/outlets",

@@ -17,6 +17,8 @@ A business-held kind (IN GST, AU ABN) is one licence for every outlet (R-B S2-D)
 outlet whose row for that kind comes first in the snapshot (the template orders rows by outlet id), keyed
 `<kind>:<valid_to>` with no outlet, and its task is tenant-wide (`outlet_ids` [], no `outlet_id`, owner-approved) and
 assigned to that first outlet's manager — a rule chosen here (no cell names who answers for a business licence).
+The calendar is minted over every outlet in scope (no outlet param), so the finding of an outlet-held kind names its
+outlet (`finding_outlet`, T-114) and its manager sees it with the task; a business-held kind's finding stays tenant-wide.
 
 Severity is `critical` when the kind is missing or `days_left` ≤ `critical_days_left_lte` (7, so every expired one);
 otherwise `high`. Dedupe `<outlet>:<kind>:<valid_to>` (business-held: `<kind>:<valid_to>`), with `missing` standing in
@@ -109,6 +111,12 @@ def renew(d: Detection) -> Proposal | Abstain:
     return task(d, TITLE, "days_left" if num(d.row, "days_left") is not None else "status", due, tenant_wide=business)
 
 
+def finding_outlet(row: Row, w: Window) -> str | None:
+    """An outlet-held licence's finding is that outlet's (T-114); a business-held one stays tenant-wide, like its task."""
+    outlet = row.get("outlet_id")
+    return outlet if w.key.split(":")[1] == OUTLET and isinstance(outlet, str) else None
+
+
 def narration_for(row: Row) -> str:
     if _missing(row):
         return "No licence of this kind is on record: {status}."
@@ -129,6 +137,7 @@ SPEC = register(
         dedupe=dedupe,
         narration=NARRATION,
         narration_for=narration_for,
+        finding_outlet=finding_outlet,
         select=select,
         mapping=renew,
     )

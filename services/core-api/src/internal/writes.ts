@@ -86,6 +86,15 @@ export async function writeFinding(c: Queryable, run: Run, raw: unknown) {
     const scope = s.rows[0]?.outlet_scope ?? ["*"];
     if (!scope.includes("*")) outlets = scope;
   }
+  // T-114: a detection about one outlet whose impact snapshot is tenant-wide (its template takes no outlet param) names
+  // that outlet; core takes it only as the impact row's own `outlet_id` cell. That keeps it inside the run's scope: the
+  // impact cell resolved for this run above, so its snapshot's rows are the run's outlets'.
+  if (req.outlet_ids && impact) {
+    const o = req.outlet_ids[0]!;
+    const cell = await c.query<{ v: string | null }>(`SELECT rows -> $2::int ->> 'outlet_id' AS v FROM evidence.snapshot WHERE id = $1`, [impact.snapshot_id, impact.row]);
+    if (cell.rows[0]?.v !== o) throw new ApiError("invalid_payload");
+    outlets = [o];
+  }
   try {
     await c.query(
       `INSERT INTO intel.finding (tenant_id, id, run_id, outlet_ids, pack, type, severity, impact_snapshot_id, impact_row, impact_column, confidence_bp, envelope, dedupe_key)

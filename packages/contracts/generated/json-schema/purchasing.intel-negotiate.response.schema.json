@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "purchasing.intel-negotiate.response",
+  "title": "PurchasingIntelNegotiateResponse",
+  "x-munim-module": "purchasing",
+  "type": "object",
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "drafted",
+        "draft_refused",
+        "no_shortfall",
+        "no_suppliers",
+        "no_reference_price",
+        "no_quote",
+        "no_passing_quote",
+        "model_blocked",
+        "not_simulated"
+      ]
+    },
+    "draft_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "run_id",
+    "status",
+    "draft_id"
+  ],
+  "additionalProperties": false
+}

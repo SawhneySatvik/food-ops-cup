@@ -34,6 +34,10 @@ export const FindingsRequest = z.strictObject({
   /** Merges with an open finding of the same key. */
   dedupe_key: z.string().regex(/^[a-z0-9_.:-]{1,200}$/),
   envelope: FindingEnvelope,
+  /** T-114: the one outlet a detection is about when its impact snapshot was minted tenant-wide (a template with no outlet
+   *  param, e.g. compliance.licence_calendar). Core takes it only inside the run's scope and equal to the impact row's
+   *  `outlet_id` cell; absent or null (intel's generated client sends null) → core stamps the outlets as before. */
+  outlet_ids: z.array(Uuid7).length(1).nullish(),
 });
 export const FindingsResponse = z.strictObject({
   finding_id: Uuid7,

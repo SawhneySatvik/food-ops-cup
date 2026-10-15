@@ -51,6 +51,13 @@ export const SAMPLES: Record<string, unknown> = {
     supplier_return_id: u(90), outlet_id: u(2), supplier_id: u(50), goods_received_id: u(70), reason_code: "damaged", note: "torn pack",
     lines: [{ batch_id: u(72), ingredient_id: u(40), qty_milli: 2000, unit: "kg" }],
   },
+  "purchasing.rfq.request.v1": { rfq_id: u(96), ingredient_id: u(40), outlet_ids: [u(2), u(3)] },
+  "purchasing.intel-negotiate.request": {
+    rfq_id: u(96), ingredient_id: u(40), item_name: "Tomato", unit: "kg", currency: "INR", minor_unit: 2, outlet_ids: [u(2), u(3)],
+    suppliers: [{ supplier_id: u(50), kind: "simulated", card_url: "https://suppliers-sim.example.test/steady/.well-known/agent-card.json" }],
+    item_ids: [u(30), u(31)],
+  },
+  "purchasing.intel-negotiate.response": { run_id: u(97), status: "drafted", draft_id: u(98) },
   "proposal.purchasing.invoice.dispute.v1": {
     dispute_id: u(85), supplier_invoice_id: u(80), basis: "overbilled", lines: [{ invoice_line_id: u(81), claimed_minor: snapRef(S1, 0, "overbilled_minor") }],
   },

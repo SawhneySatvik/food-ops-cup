@@ -43,6 +43,7 @@ from munim_intel.investigate import narrate_step
 from munim_intel.llm import cause, llm_for_role, price_of, provider_of
 from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
+from munim_intel.negotiate.route import negotiate_router
 from munim_intel.runtime.context import RunContext, RunTokenRefused, context_for_event, load_public_key, verify_run_token
 from munim_intel.runtime.internal_client import SERVICE_SECRET_HEADER, CoreError, InternalClient
 from munim_intel.runtime.runner import RunFailed
@@ -312,4 +313,5 @@ def create_app(
         finally:
             await client.aclose()
 
+    app.include_router(negotiate_router(cfg, now=now, core_transport=core_transport))  # T-114: POST /negotiate
     return app

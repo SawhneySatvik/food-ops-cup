@@ -545,7 +545,7 @@ def test_every_posted_draft_and_mint_parses_with_core_zod() -> None:
         f"zod: {len(drafts)} draft bodies, {len(mints)} mint bodies; failing {[i for i in result['drafts'] if i]} {[i for i in result['snapshots'] if i]}"
     )
     assert (len(drafts), len(mints)) == (PROPOSALS, EVERY_TOOL - PROPOSALS)
-    assert result == {"drafts": [[] for _ in drafts], "snapshots": [[] for _ in mints]}
+    assert result == {"drafts": [[] for _ in drafts], "snapshots": [[] for _ in mints], "findings": []}
     # the refusal side: a bare number where a Ref belongs is refused by the same check
     # the first draft whose payload has a top-level ref leaf
     bad = json.loads(

@@ -17,6 +17,7 @@ import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { configureCaresNetwork } from "./modules/cares-network/index.ts";
 import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
 import { configureInvestigations, createHttpNarratePort } from "./modules/investigations/index.ts";
+import { configureRfq, createHttpNegotiatePort } from "./modules/purchasing/index.ts";
 import { configureThreads, createHttpAskPort } from "./modules/threads/index.ts";
 import type { AppEnv, Deps } from "./lib/types.ts";
 import { loadRunTokenKeys, type RunTokenKeys, type SvcTx } from "./runtoken/index.ts";
@@ -93,6 +94,8 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   // T-082b: `POST /v1/ask` calls intel's `/ask` synchronously (a test may re-configure the port on the same deps).
   configureThreads(deps, { keys, intel: createHttpAskPort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
   configureInvestigations(deps, { keys, narrate: createHttpNarratePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
+  // T-114: `POST /v1/rfq-requests` calls intel's `/negotiate` synchronously.
+  configureRfq(deps, { keys, intel: createHttpNegotiatePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
   return {
     app, deps, publish, svc, keys,
     async close() {

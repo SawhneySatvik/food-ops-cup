@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "purchasing.intel-negotiate.request",
+  "title": "PurchasingIntelNegotiateRequest",
+  "x-munim-module": "purchasing",
+  "type": "object",
+  "properties": {
+    "rfq_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ingredient_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "item_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "unit": {
+      "type": "string",
+      "pattern": "^[a-z][a-z_]{0,15}$"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "minor_unit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "outlet_ids": {
+      "minItems": 1,
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      }
+    },
+    "suppliers": {
+      "maxItems": 10,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "supplier_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "kind": {
+            "type": "string",
+            "const": "simulated"
+          },
+          "card_url": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^https?:\\/\\/\\S+$"
+          }
+        },
+        "required": [
+          "supplier_id",
+          "kind",
+          "card_url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "item_ids": {
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      }
+    }
+  },
+  "required": [
+    "rfq_id",
+    "ingredient_id",
+    "item_name",
+    "unit",
+    "currency",
+    "minor_unit",
+    "outlet_ids",
+    "suppliers",
+    "item_ids"
+  ],
+  "additionalProperties": false
+}

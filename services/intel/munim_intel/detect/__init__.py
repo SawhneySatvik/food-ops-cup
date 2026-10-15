@@ -158,6 +158,10 @@ class DetectorSpec:
     tenant_level: bool = False
     #: A row whose narration differs (a licence that is missing has no date to cite): (row) -> the narration; None → `narration`.
     narration_for: Callable[[Row], str] | None = None
+    #: T-114: the one outlet a detection is about when its template takes no outlet param (the snapshot is minted over
+    #: every outlet in scope, so core cannot stamp the outlet from it): (row, window) -> the row's outlet, or None for a
+    #: business-wide detection. Core accepts it only as the impact row's own `outlet_id` cell.
+    finding_outlet: Callable[[Row, Window], str | None] | None = None
 
     def narration_of(self, row: Row) -> str:
         return self.narration if self.narration_for is None else self.narration_for(row)

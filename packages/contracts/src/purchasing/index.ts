@@ -129,6 +129,43 @@ export const PurchasingSupplierReturnCreateV1 = z.strictObject({
     .min(1),
 });
 
+/** A person asks the simulated suppliers to quote one ingredient for the outlets they choose (T-114; founder Q16 default:
+ *  one ingredient, outlets inside the person's own scope). An RFQ to simulated suppliers is not books (R22): core records
+ *  the request (audit), then starts the negotiation run under the person's identity. No quantity is typed: the RFQ
+ *  quantity is the shortfall cell the run mints (pack inventory-purchasing §6), and a purchase order comes back only as a
+ *  draft a person approves (R16). */
+export const PurchasingRfqRequestV1 = z.strictObject({
+  rfq_id: Uuid7,
+  ingredient_id: Uuid7,
+  outlet_ids: z.array(Uuid7).min(1).max(20).refine((a) => new Set(a).size === a.length, { message: "outlet_ids must be distinct" }),
+});
+
+/** core → intel `/negotiate` body (the run token rides as the bearer; its outlet scope is `outlet_ids`). Every value is
+ *  core's own read of the tenant (tenant-trusted names, ADR-014 §6.4); intel still checks each supplier is simulated. */
+export const IntelNegotiateRequest = z.strictObject({
+  rfq_id: Uuid7,
+  ingredient_id: Uuid7,
+  /** The ingredient's name and base unit as core holds them (sent to the simulated suppliers). */
+  item_name: NonEmpty,
+  unit: Unit,
+  currency: CurrencyCode,
+  /** The tenant's country pack currency minor unit (rule 7: read from the pack, never coded). */
+  minor_unit: z.int().min(0).max(4),
+  outlet_ids: z.array(Uuid7).min(1).max(20),
+  /** Active simulated suppliers with an agent card. */
+  suppliers: z.array(z.strictObject({ supplier_id: Uuid7, kind: z.literal("simulated"), card_url: z.string().regex(/^https?:\/\/\S+$/).max(500) })).max(10),
+  /** The items sold at those outlets: the run forecasts each (the shortfall and the deal review read the forecast). */
+  item_ids: z.array(Uuid7).max(200),
+});
+/** intel → core: the run and what came of it — ids and a code only, never supplier text or a number. */
+export const IntelNegotiateResponse = z.strictObject({
+  run_id: Uuid7,
+  status: z.enum([
+    "drafted", "draft_refused", "no_shortfall", "no_suppliers", "no_reference_price", "no_quote", "no_passing_quote", "model_blocked", "not_simulated",
+  ]),
+  draft_id: Uuid7.nullable(),
+});
+
 /** Intel proposes purchase orders as drafts; executing one commits the PO. */
 export const PO_CREATE_DRAFT = defineDraftable("purchasing.po.create.v1", PurchasingPoCreateV1);
 export const INVOICE_DISPUTE_DRAFT = defineDraftable("purchasing.invoice.dispute.v1", PurchasingInvoiceDisputeV1);
@@ -259,6 +296,9 @@ export const SCHEMAS = {
   "purchasing.invoice.approve.v1": PurchasingInvoiceApproveV1,
   "purchasing.invoice.dispute.v1": PurchasingInvoiceDisputeV1,
   "purchasing.supplier_return.create.v1": PurchasingSupplierReturnCreateV1,
+  "purchasing.rfq.request.v1": PurchasingRfqRequestV1,
+  "purchasing.intel-negotiate.request": IntelNegotiateRequest,
+  "purchasing.intel-negotiate.response": IntelNegotiateResponse,
   "proposal.purchasing.po.create.v1": PO_CREATE_DRAFT.proposal,
   "proposal.purchasing.invoice.dispute.v1": INVOICE_DISPUTE_DRAFT.proposal,
   "proposal.purchasing.invoice.record.v1": INVOICE_RECORD_DRAFT.proposal,
@@ -301,4 +341,6 @@ export const ROUTES: readonly Route[] = [
   post("/v1/supplier-invoices/{id}:dispute", "disputeSupplierInvoice", "purchasing.invoice.dispute.v1", "purchasing.invoice.dispute.v1 — record a dispute for the owner to send", 201, true),
   get("/v1/supplier-returns", "listSupplierReturns", "Supplier returns in the caller's outlets", "v1.supplier-returns"),
   post("/v1/supplier-returns", "createSupplierReturn", "purchasing.supplier_return.create.v1", "purchasing.supplier_return.create.v1 — return stock to a supplier", 201),
+  post("/v1/rfq-requests", "requestQuotes", "purchasing.rfq.request.v1",
+    "purchasing.rfq.request.v1 — ask the simulated suppliers to quote one ingredient for the chosen outlets; any purchase order comes back as a draft to approve", 201),
 ];

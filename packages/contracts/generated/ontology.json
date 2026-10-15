@@ -3939,6 +3939,11 @@
           "name": "diet",
           "type": "text",
           "not_null": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "not_null": true
         }
       ]
     },
@@ -4677,6 +4682,11 @@
           "name": "description",
           "type": "text",
           "not_null": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "not_null": true
         }
       ]
     },
@@ -4745,6 +4755,11 @@
           "name": "description",
           "type": "text",
           "not_null": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "not_null": true
         }
       ]
     },
@@ -8621,6 +8636,11 @@
           "name": "description",
           "type": "text",
           "not_null": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "not_null": true
         }
       ]
     },
@@ -23585,7 +23605,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "98f9d198e6d2969fe72507af7c28a802a3517941d622c7b32c89b7613845bf11",
+      "sha256": "f4161b5b4558a2520c16a7c5dc9179df3c5717af8bb552ce640b59cc16614241",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23616,6 +23636,7 @@
         "db/migrations/0027_t098_auto_ceiling_downgrade.sql": "6ccaf968169f7bcb98b920846d900c78bdefcf7a321cf0a562b1b214cc1dd861",
         "db/migrations/0028_cares.sql": "1bb37978712bba947ed66ebb1daf8412f96ac238295e541b01ee98a68c7c4ca7",
         "db/migrations/0029_storefront_display.sql": "119f8e94877103e37af8f479acb8e51e5cc38e4411b9c1f8b30bd3d3a4b13666",
+        "db/migrations/0030_display_order.sql": "c14271c95f32c2866630bd839006fb096628c5f85949054e5733c73f2c4ab073",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -23639,7 +23660,7 @@
         "packages/contracts/src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
         "packages/contracts/src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
         "packages/contracts/src/intel/specialists.ts": "d8b581ddfb7e9aa688c03e1042a5a1825c870feb845b2e65b7971a3e26364d93",
-        "packages/contracts/src/internal/index.ts": "97a6cda4466adda152c23295a4e177c50416f347e0d6873ecae78256d8c74c68",
+        "packages/contracts/src/internal/index.ts": "47e3140a5475a2d3e03803bfb13a9a61904f8953cd6fdb80040ffb67465f37ce",
         "packages/contracts/src/inventory/index.ts": "6901a0a716f29fb209f44dd6460e095ce963691507f9c9741a355dc015d77a34",
         "packages/contracts/src/inventory/read-routes.ts": "71ee24cd61ddba899d309547c0ab12383455baec5766ddfc53f807aed4e8dda4",
         "packages/contracts/src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
@@ -23659,7 +23680,7 @@
         "packages/contracts/src/people/read-routes.ts": "97b9a114de5099ff5c70ab74afb071b838922436ce1b1feafd2d437e33607a8a",
         "packages/contracts/src/platform/index.ts": "14ae9957f97134e9a7329984a40bfcaa3a3f472a65c66dfb41ae14044d738877",
         "packages/contracts/src/platform/read-routes.ts": "dc5da34a61187595de3c1c8f7999d93c93ab6b63b5661762817d3940c6481b6d",
-        "packages/contracts/src/purchasing/index.ts": "075d0cad98daac8618f16f13127a2babc5d7d61aca385b5eb264a14c16a578aa",
+        "packages/contracts/src/purchasing/index.ts": "f2710afa5267412af51ef93bda2f6be23d36637d56351cab9c4d163eecf6b551",
         "packages/contracts/src/registry.ts": "3bf9e3d6c17675f4ea3877cfcb94ef18f9b97cbd75b7d9a1bdd92291f1330b42",
         "packages/contracts/src/shared/cloudevents.ts": "33700ec7cfef94d50183f19f8175c31fdff87adfa9e047a550e40488d724088f",
         "packages/contracts/src/shared/command.ts": "54b44302d0fa5e1f54eb9dafc18cec2bcb8e68b3afdce15dc82fe2c2bfc68b38",
@@ -23684,6 +23705,6 @@
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "096874ba1aff04c984e5991e76c5089b17750c0d590c831a7f845db210863643"
+    "body_sha256": "fbdfaf6db85c607357def9f6fbe7778b367a0317115d19be3f076d4ca863a12a"
   }
 }

@@ -155,16 +155,31 @@ def test_map_columns_renames_and_unmapped() -> None:
     assert got == MAP_LABELS
 
 
+#: The Ask screen's suggested Cobnut questions (tests/manager/record_cobnut_ask.py, T-114): each routes to `lookup`.
+COBNUT_QUESTIONS = (
+    "Which ingredients are below their reorder level?",
+    "How much stock is at risk of expiring in the next three days?",
+    "How did this week's waste compare with a usual week?",
+    "What was labour as a share of sales last week?",
+    "How much food have we donated through Munim Cares this month?",
+)
+
+
 def test_probabilities_sum_to_10000_on_every_recorded_result() -> None:
     results = [ask(ROUTE_INTENT, route_state(q)) for q, _ in LABELLED]
     results += [ask(ROUTE_INTENT, route_state(q)) for q in (PLANTED_OUT_OF_ENUM, PLANTED_NO_LOGPROBS, PLANTED_LOW)]
     results += [ask(MAP_COLUMNS["pos_bills"], {"header": h, "headers": POS_BILLS_HEADERS}) for h in POS_BILLS_HEADERS]
     results += [ask(MAP_COLUMNS["pos_bills"], {"header": PLANTED_MAP_NO_LOGPROBS, "headers": POS_BILLS_HEADERS})]
-    # Every committed fixture is exercised above (24 labelled + 3 planted + 8 headers + 1 planted header, by hand).
-    assert len(list(FIXTURES_DIR.glob("*.json"))) == len(results) == 36
+    cobnut = [ask(ROUTE_INTENT, route_state(q)) for q in COBNUT_QUESTIONS]
+    assert [(r.answer, r.band) for r in cobnut] == [("lookup", "high")] * 5
+    results += cobnut
+    # Every committed fixture is exercised above (24 labelled + 3 planted + 8 headers + 1 planted header + 5 Cobnut, by
+    # hand).
+    assert len(list(FIXTURES_DIR.glob("*.json"))) == len(results) == 41
     with_probs = [r for r in results if r.probs_bp is not None]
-    # 24 labelled + 7 mapped headers carry probabilities (hand count); the 3 abstained and 1 unscored results carry none.
-    assert len(with_probs) == 31
+    # 24 labelled + 7 mapped headers + 5 Cobnut carry probabilities (hand count); the 3 abstained and 1 unscored results
+    # carry none.
+    assert len(with_probs) == 36
     for r in with_probs:
         assert r.probs_bp is not None
         assert abs(sum(r.probs_bp.values()) - 10_000) <= 1, (r.key, r.probs_bp)

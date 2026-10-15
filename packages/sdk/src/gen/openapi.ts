@@ -3071,6 +3071,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/rfq-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** purchasing.rfq.request.v1 — ask the simulated suppliers to quote one ingredient for the chosen outlets; any purchase order comes back as a draft to approve */
+        post: operations["requestQuotes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/specialists": {
         parameters: {
             query?: never;
@@ -8237,6 +8254,12 @@ export interface components {
                 qty_milli: number;
                 unit: string;
             }[];
+        };
+        /** PurchasingRfqRequestV1 */
+        PurchasingRfqRequestV1: {
+            rfq_id: components["schemas"]["Uuid7"];
+            ingredient_id: components["schemas"]["Uuid7"];
+            outlet_ids: components["schemas"]["Uuid7"][];
         };
         /** V1Supplier */
         V1Supplier: {
@@ -25807,6 +25830,92 @@ export interface operations {
                     /** @constant */
                     type: "purchasing.supplier_return.create.v1";
                     payload: components["schemas"]["PurchasingSupplierReturnCreateV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    requestQuotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "purchasing.rfq.request.v1";
+                    payload: components["schemas"]["PurchasingRfqRequestV1"];
                 };
             };
         };

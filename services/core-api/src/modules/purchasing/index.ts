@@ -6,10 +6,11 @@
 //   GET/POST /v1/goods-received · GET /v1/goods-received/{id}
 //   GET/POST /v1/supplier-invoices · GET /v1/supplier-invoices/{id} · POST …/{id}:approve · POST …/{id}:dispute
 //   GET/POST /v1/supplier-returns
+//   POST /v1/rfq-requests (T-114: a person asks the simulated suppliers for quotes — rfq.ts)
 import { commandEnvelopeOf, draftable } from "@munim/contracts";
 import {
   PurchasingGrnReceiveV1, PurchasingInvoiceApproveV1, PurchasingInvoiceDisputeV1, PurchasingInvoiceRecordV1, PurchasingPoCreateV1,
-  PurchasingSupplierReturnCreateV1, PurchasingSupplierUpsertV1,
+  PurchasingRfqRequestV1, PurchasingSupplierReturnCreateV1, PurchasingSupplierUpsertV1,
 } from "@munim/contracts/purchasing";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember } from "../../auth/resolve.ts";
@@ -22,8 +23,10 @@ import {
   grnReceive, invoiceApprove, invoiceDispute, invoiceRecord, poCreate, supplierReturnCreate, supplierUpsert,
 } from "./handlers.ts";
 import { getView, listView, type ViewName } from "./read.ts";
+import { rfqConfig, rfqRequest, startNegotiation } from "./rfq.ts";
 
 export { derivePayable } from "./handlers.ts";
+export { configureRfq, createHttpNegotiatePort, DRAFT_ID_HEADER, NEGOTIATION_HEADER, type NegotiateBody, type NegotiatePort, type RfqConfig } from "./rfq.ts";
 export { setSeams } from "./seams.ts";
 export type { Seams } from "./seams.ts";
 
@@ -64,7 +67,12 @@ function mapDb(e: unknown): unknown {
   return e;
 }
 
-async function command(c: Context<AppEnv>, handler: CommandHandler, schema: Parameters<typeof commandEnvelopeOf>[1], status: 200 | 201, body: unknown) {
+/** `after`: work that runs only once the command has committed for the first time (never on a replay); it returns extra
+ *  response headers. */
+async function command(
+  c: Context<AppEnv>, handler: CommandHandler, schema: Parameters<typeof commandEnvelopeOf>[1], status: 200 | 201, body: unknown,
+  after?: (payload: unknown) => Promise<Record<string, string>>,
+) {
   const m = member(c);
   const env = commandEnvelopeOf(handler.type, schema).safeParse(body);
   if (!env.success) throw new ApiError("invalid_payload");
@@ -81,8 +89,9 @@ async function command(c: Context<AppEnv>, handler: CommandHandler, schema: Para
       { command_id: env.data.command_id, idempotency_key: env.data.idempotency_key, type: handler.type, payload: (env.data as { payload: Record<string, unknown> }).payload },
       handler,
     );
+    const extra = after && !out.replayed ? await after(env.data.payload) : {};
     // The stored text, so a replay is byte-identical; replay is signalled by header only.
-    return c.body(out.body, status, { "Content-Type": "application/json", ...replayHeaders(out) });
+    return c.body(out.body, status, { "Content-Type": "application/json", ...replayHeaders(out), ...extra });
   } catch (e) {
     throw mapDb(e);
   }
@@ -120,4 +129,11 @@ export const router = new Hono<AppEnv>()
     return command(c, invoiceDispute, PurchasingInvoiceDisputeV1, 201, body);
   })
   .get("/v1/supplier-returns", requireMember, list("ret"))
-  .post("/v1/supplier-returns", requireMember, async (c) => command(c, supplierReturnCreate, PurchasingSupplierReturnCreateV1, 201, await json(c)));
+  .post("/v1/supplier-returns", requireMember, async (c) => command(c, supplierReturnCreate, PurchasingSupplierReturnCreateV1, 201, await json(c)))
+  .post("/v1/rfq-requests", requireMember, async (c) => {
+    // No negotiation port wired → refuse before anything is written.
+    const cfg = rfqConfig(c.var.deps);
+    if (!cfg) throw new ApiError("unavailable");
+    const body = await json(c);
+    return command(c, rfqRequest, PurchasingRfqRequestV1, 201, body, (payload) => startNegotiation(c.var.deps, cfg, member(c), payload));
+  });

@@ -23985,6 +23985,135 @@
         }
       }
     },
+    "/v1/rfq-requests": {
+      "post": {
+        "operationId": "requestQuotes",
+        "summary": "purchasing.rfq.request.v1 — ask the simulated suppliers to quote one ingredient for the chosen outlets; any purchase order comes back as a draft to approve",
+        "security": [
+          {
+            "memberToken": [],
+            "tenantHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "PurchasingRfqRequestV1Command",
+                "properties": {
+                  "command_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "idempotency_key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_.:-]{8,100}$"
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "purchasing.rfq.request.v1"
+                  },
+                  "payload": {
+                    "$ref": "#/components/schemas/PurchasingRfqRequestV1"
+                  }
+                },
+                "required": [
+                  "command_id",
+                  "idempotency_key",
+                  "type",
+                  "payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Munim-Replayed": {
+                "description": "\"true\" when this is the stored response of an earlier identical request",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/specialists": {
       "get": {
         "operationId": "listSpecialists",
@@ -54712,6 +54841,34 @@
           "reason_code",
           "note",
           "lines"
+        ],
+        "additionalProperties": false
+      },
+      "PurchasingRfqRequestV1": {
+        "title": "PurchasingRfqRequestV1",
+        "x-munim-contract": "purchasing.rfq.request.v1",
+        "x-munim-module": "purchasing",
+        "type": "object",
+        "properties": {
+          "rfq_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "ingredient_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "outlet_ids": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Uuid7"
+            }
+          }
+        },
+        "required": [
+          "rfq_id",
+          "ingredient_id",
+          "outlet_ids"
         ],
         "additionalProperties": false
       },

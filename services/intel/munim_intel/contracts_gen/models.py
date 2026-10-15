@@ -9907,6 +9907,10 @@ class InternalWatchClaimResponse(BaseModel):
     last_run_at: IsoDatetime | None
 
 
+class OutletIds(RootModel[list[Uuid7]]):
+    root: Annotated[list[Uuid7], Field(max_length=1, min_length=1)]
+
+
 class InternalFindingsRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -9917,6 +9921,7 @@ class InternalFindingsRequest(BaseModel):
     confidence_bp: Annotated[int, Field(ge=0, le=10000)]
     dedupe_key: Annotated[str, Field(pattern='^[a-z0-9_.:-]{1,200}$')]
     envelope: FindingEnvelope
+    outlet_ids: OutletIds | None = None
 
 
 class InternalFindingsResponse(BaseModel):
@@ -12469,6 +12474,48 @@ class PurchasingSupplierReturnCreateV1(BaseModel):
     lines: Annotated[list[Line75], Field(min_length=1)]
 
 
+class PurchasingRfqRequestV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    rfq_id: Uuid7
+    ingredient_id: Uuid7
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=20, min_length=1)]
+
+
+class Supplier(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    supplier_id: Uuid7
+    kind: Literal['simulated']
+    card_url: Annotated[str, Field(max_length=500, pattern='^https?:\\/\\/\\S+$')]
+
+
+class PurchasingIntelNegotiateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    rfq_id: Uuid7
+    ingredient_id: Uuid7
+    item_name: Annotated[str, Field(max_length=200, min_length=1)]
+    unit: Annotated[str, Field(pattern='^[a-z][a-z_]{0,15}$')]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+    minor_unit: Annotated[int, Field(ge=0, le=4)]
+    outlet_ids: Annotated[list[Uuid7], Field(max_length=20, min_length=1)]
+    suppliers: Annotated[list[Supplier], Field(max_length=10)]
+    item_ids: Annotated[list[Uuid7], Field(max_length=200)]
+
+
+class PurchasingIntelNegotiateResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    run_id: Uuid7
+    status: Literal['drafted', 'draft_refused', 'no_shortfall', 'no_suppliers', 'no_reference_price', 'no_quote', 'no_passing_quote', 'model_blocked', 'not_simulated']
+    draft_id: Uuid7 | None
+
+
 class Line76(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -12587,7 +12634,7 @@ class V1Suppliers(BaseModel):
     items: list[V1Supplier]
 
 
-class Supplier(BaseModel):
+class Supplier1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -12614,7 +12661,7 @@ class V1PurchaseOrder(BaseModel):
         extra='forbid',
     )
     po_id: Uuid7
-    supplier: Supplier
+    supplier: Supplier1
     outlet_ids: list[Uuid7]
     status: Literal['committed', 'received', 'cancelled']
     currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
@@ -12652,7 +12699,7 @@ class V1GoodsReceived(BaseModel):
     )
     grn_id: Uuid7
     outlet_id: Uuid7
-    supplier: Supplier
+    supplier: Supplier1
     po_id: Uuid7 | None
     received_at: IsoDatetime
     received_by: Uuid7
@@ -12703,7 +12750,7 @@ class V1SupplierInvoice(BaseModel):
         extra='forbid',
     )
     supplier_invoice_id: Uuid7
-    supplier: Supplier
+    supplier: Supplier1
     invoice_no: str
     invoice_date: Annotated[
         str,
@@ -12748,7 +12795,7 @@ class V1SupplierReturn(BaseModel):
     )
     supplier_return_id: Uuid7
     outlet_id: Uuid7
-    supplier: Supplier
+    supplier: Supplier1
     goods_received_id: Uuid7 | None
     reason_code: str
     note: str
