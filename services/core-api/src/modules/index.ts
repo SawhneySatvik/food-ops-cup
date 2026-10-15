@@ -38,7 +38,7 @@ export const MODULES = [
   "investigations",
   "cares",
 ] as const;
-export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal", "platform"] as const;
+export const ROUTERS = [...MODULES.map((m) => `modules/${m}`), "stream", "internal", "platform", "cron"] as const;
 
 export async function loadRouters(): Promise<Array<{ name: string; router: Hono<AppEnv> }>> {
   const src = join(import.meta.dirname, "..");

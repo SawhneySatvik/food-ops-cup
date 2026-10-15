@@ -47,6 +47,10 @@ export interface CoreApiWiring {
   corsOrigins?: readonly string[];
   /** Proxies in front of core-api (the Cares-network rate limiter's client address); unset = the module's default 0. */
   trustedProxyHops?: number;
+  /** When an SSE stream is ended with a reconnect hint (config `MUNIM_STREAM_MAX_AGE_S`); unset = the stream's 55 min. */
+  streamMaxAgeMs?: number;
+  /** Ceiling on every app pool's size (config `MUNIM_DB_POOL_MAX`); unset = core 10, svc 5, platform 2. */
+  poolMax?: number;
 }
 
 export interface CoreApi {
@@ -70,7 +74,8 @@ export function svcTxOf(pool: pg.Pool): SvcTx {
 }
 
 export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
-  const pools: Pools = { core: createPool(w.coreUrl, 10), svc: createPool(w.svcUrl, 5), ...(w.platformUrl ? { platform: createPool(w.platformUrl, 2) } : {}) };
+  const size = (n: number) => Math.min(n, w.poolMax ?? n);
+  const pools: Pools = { core: createPool(w.coreUrl, size(10)), svc: createPool(w.svcUrl, size(5)), ...(w.platformUrl ? { platform: createPool(w.platformUrl, size(2)) } : {}) };
   const keys = loadRunTokenKeys(w.keys);
   const svc = svcTxOf(pools.svc);
   const publish: PublishDeps = { publisher: createHttpPublisher({ url: w.intelUrl, serviceSecret: w.serviceSecret }), svc, keys };
@@ -79,6 +84,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   // Keyed by this exact Deps object (a WeakMap in stream/index.ts) — never pass createApp a copy.
   configureStream(deps, {
     connect: () => new pg.Client({ connectionString: w.listenUrl, application_name: "munim_stream_listen", keepAlive: true }),
+    ...(w.streamMaxAgeMs ? { maxAgeMs: w.streamMaxAgeMs } : {}),
   });
   // createApp awaits loadContracts() → loadRegistry(), so every draftable type is registered before serving (gotcha 28).
   if (w.trustedProxyHops !== undefined) configureCaresNetwork({ trustedProxyHops: w.trustedProxyHops });
@@ -93,6 +99,29 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
       await closeStream(deps);
       await Promise.all([pools.core.end(), pools.svc.end(), pools.platform?.end()]);
     },
+  };
+}
+
+/** The wiring every composition root takes from the config module: the entry below (`.env` + `.run/`) and
+ *  env-root.ts (env only). `keys` and `blobs` differ between the two, so they are passed in. */
+export function wiringFromConfig(config: Config, log: Logger, o: { idpMode: IdpMode; idp: IdP; keys: CoreApiWiring["keys"]; blobs: BlobStore }): CoreApiWiring {
+  return {
+    idpMode: o.idpMode,
+    coreUrl: config.dbUrl("munim_core"),
+    svcUrl: config.dbUrl("munim_svc"),
+    platformUrl: config.dbUrl("munim_platform"),
+    blobs: o.blobs,
+    listenUrl: config.sessionDbUrl("munim_core"),
+    idp: o.idp,
+    config,
+    log,
+    keys: o.keys,
+    intelUrl: config.intelUrl,
+    serviceSecret: config.serviceSecret(),
+    corsOrigins: parseCorsOrigins(config.corsOrigins),
+    trustedProxyHops: config.trustedProxyHops,
+    streamMaxAgeMs: config.streamMaxAgeMs,
+    ...(config.dbPoolMax ? { poolMax: config.dbPoolMax } : {}),
   };
 }
 
@@ -111,24 +140,14 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
     // Before anything connects: a refused MUNIM_IDP (unknown value, production, non-dev) fails the boot here.
     const idpMode = resolveIdpMode(process.env, process.argv.slice(2));
     if (idpMode === "local") log("core-api: DEV LOCAL SIGN-IN ENABLED — not for real users");
-    const api = await composeCoreApi({
+    const api = await composeCoreApi(wiringFromConfig(config, log, {
       idpMode,
-      coreUrl: config.dbUrl("munim_core"),
-      svcUrl: config.dbUrl("munim_svc"),
-      platformUrl: config.dbUrl("munim_platform"),
-      blobs: localBlobStore(join(config.runDir, "blobs")),
-      listenUrl: config.sessionDbUrl("munim_core"),
       idp: idpMode === "local"
         ? createPersistentLocalIdp(config.runDir)
         : devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
-      config,
-      log,
-      keys: ensureDevRunTokenKeys(config.runTokenKeyDir),
-      intelUrl: config.intelUrl,
-      serviceSecret: config.serviceSecret(),
-      corsOrigins: parseCorsOrigins(config.corsOrigins),
-      trustedProxyHops: config.trustedProxyHops,
-    });
+      keys: config.runTokenKeyPems() ?? ensureDevRunTokenKeys(config.runTokenKeyDir),
+      blobs: localBlobStore(join(config.runDir, "blobs")),
+    }));
     const { port, server } = await serveApi(api.app, config.port);
     log(`core-api: listening on ${port}`);
     let stopping = false;

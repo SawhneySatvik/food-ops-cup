@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -191,5 +191,72 @@ describe("registerRunSecrets", () => {
     const cfg = loadConfig({ runDir: dir, env: {} });
     expect(cfg.registerRunSecrets()).toBe(2);
     expect(cfg.redact("run-secret-role-1 run-secret-service-2")).toBe("[redacted:munim_core password] [redacted:service secret]");
+  });
+});
+
+// Lane B2 (serverless deploy): a host with a read-only, per-instance filesystem boots from env alone.
+describe("env-only config (envOnly: true)", () => {
+  const PRIV = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIPl4ntedPrivKeyBodyLine0000000000000000\n-----END PRIVATE KEY-----";
+  const PUB = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAPl4ntedPubKeyBodyLine00000000000000000000\n-----END PUBLIC KEY-----";
+  const dirWithRunFiles = () => {
+    const dir = mkdtempSync(join(tmpdir(), "munim-config-"));
+    writeFileSync(join(dir, "db-roles.json"), JSON.stringify({ roles: { munim_core: "file-pw-should-not-be-read" } }));
+    writeFileSync(join(dir, "service-secret"), "file-secret-should-not-be-read-000\n");
+    return dir;
+  };
+
+  it("reads role passwords, service secret and run-token PEMs from env; never the files under runDir", () => {
+    const dir = dirWithRunFiles();
+    const cfg = loadConfig({
+      runDir: dir, envOnly: true,
+      env: {
+        MUNIM_DATABASE_URL: "postgresql://127.0.0.1:55432/munim", MUNIM_DB_PASSWORD_MUNIM_CORE: "env-core-pw-1",
+        MUNIM_SERVICE_SECRET: "env-service-secret-0123456789", MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM: PRIV.replaceAll("\n", "\\n"),
+        MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM: PUB,
+      },
+    });
+    expect(new URL(cfg.dbUrl("munim_core")).password).toBe("env-core-pw-1");
+    expect(() => cfg.dbUrl("munim_svc")).toThrow(/no password for munim_svc/);
+    expect(cfg.serviceSecret()).toBe("env-service-secret-0123456789");
+    const pems = cfg.runTokenKeyPems()!;
+    expect(pems.privateKeyPem).toBe(`${PRIV}\n`); // the literal "\n" form is unescaped
+    expect(pems.publicKeyPem).toBe(`${PUB}\n`);
+    expect(cfg.redact("x MC4CAQAwBQYDK2VwBCIEIPl4ntedPrivKeyBodyLine0000000000000000 y")).toBe("x [redacted:run-token private key] y");
+    expect(cfg.redact("env-core-pw-1 env-service-secret-0123456789")).toBe("[redacted:munim_core password] [redacted:service secret]");
+  });
+
+  it("a missing secret is a ConfigError, and nothing is generated or written under runDir", () => {
+    const dir = dirWithRunFiles();
+    const cfg = loadConfig({ runDir: dir, envOnly: true, env: { MUNIM_DATABASE_URL: "postgresql://127.0.0.1:55432/munim" } });
+    expect(() => cfg.serviceSecret()).toThrow(/MUNIM_SERVICE_SECRET is not set/);
+    expect(() => cfg.runTokenKeyPems()).toThrow(/MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM and MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM are not set/);
+    expect(() => cfg.dbUrl("munim_core")).toThrow(/no password for munim_core/); // the file's password is not read
+    const fresh = mkdtempSync(join(tmpdir(), "munim-config-"));
+    expect(() => loadConfig({ runDir: fresh, envOnly: true, env: {} }).serviceSecret()).toThrow(ConfigError);
+    expect(readdirSync(fresh)).toEqual([]);
+  });
+
+  it("without envOnly the files still work, env wins over them, and one PEM alone is refused", () => {
+    const dir = dirWithRunFiles();
+    const cfg = loadConfig({ runDir: dir, env: { MUNIM_DATABASE_URL: "postgresql://127.0.0.1:55432/munim" } });
+    expect(new URL(cfg.dbUrl("munim_core")).password).toBe("file-pw-should-not-be-read");
+    expect(cfg.serviceSecret()).toBe("file-secret-should-not-be-read-000");
+    expect(cfg.runTokenKeyPems()).toBeNull();
+    const env = loadConfig({ runDir: dir, env: { MUNIM_DATABASE_URL: "postgresql://127.0.0.1:55432/munim", MUNIM_DB_PASSWORD_MUNIM_CORE: "env-wins-pw" } });
+    expect(new URL(env.dbUrl("munim_core")).password).toBe("env-wins-pw");
+    expect(() => loadConfig({ env: { MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM: PUB } }).runTokenKeyPems()).toThrow(/both .* or neither/);
+  });
+
+  it("cron secret, stream max age, pool ceiling and tick settings: defaults, bounds, refusals (gotcha 17)", () => {
+    const d = loadConfig({ env: {} });
+    expect([d.cronSecret(), d.streamMaxAgeMs, d.dbPoolMax, d.tickPeriodMinutes, d.tickBudgetMs]).toEqual([null, 3_300_000, undefined, 1440, 240_000]);
+    const s = loadConfig({ env: { MUNIM_CRON_SECRET: "cron-secret-0123456789", MUNIM_STREAM_MAX_AGE_S: "270", MUNIM_DB_POOL_MAX: "3", MUNIM_TICK_PERIOD_MIN: "15", MUNIM_TICK_BUDGET_S: "60" } });
+    expect([s.cronSecret(), s.streamMaxAgeMs, s.dbPoolMax, s.tickPeriodMinutes, s.tickBudgetMs]).toEqual(["cron-secret-0123456789", 270_000, 3, 15, 60_000]);
+    expect(s.redact("cron-secret-0123456789")).toBe("[redacted:cron secret]");
+    expect(() => loadConfig({ env: { MUNIM_CRON_SECRET: "short" } }).cronSecret()).toThrow(/at least 16/);
+    for (const [name, bad] of [["MUNIM_STREAM_MAX_AGE_S", "9"], ["MUNIM_STREAM_MAX_AGE_S", "270s"], ["MUNIM_DB_POOL_MAX", "2"], ["MUNIM_DB_POOL_MAX", "51"],
+      ["MUNIM_TICK_PERIOD_MIN", "1441"], ["MUNIM_TICK_BUDGET_S", "1.5"], ["MUNIM_TICK_BUDGET_S", "-1"]] as const) {
+      expect(() => loadConfig({ env: { [name]: bad } }), `${name}=${bad}`).toThrow(ConfigError);
+    }
   });
 });

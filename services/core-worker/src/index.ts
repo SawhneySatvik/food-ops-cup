@@ -8,5 +8,5 @@ export type { Clock, IntelClient, IntelPath, Log, MintRequest, OutboxRow, Publis
 export type { OutletNight } from "./local-time.ts";
 export { runUntilSignal } from "./process.ts";
 export { POISON_ATTEMPTS, PoisonRows, SWEEP_LOCK, sweepOutbox } from "./sweeper.ts";
-export { Worker, WORKER_ROLE } from "./worker.ts";
-export type { NightlyTask, WorkerOptions } from "./worker.ts";
+export { TICK_LOCK, Worker, WORKER_ROLE } from "./worker.ts";
+export type { NightlyTask, TickResult, WorkerOptions } from "./worker.ts";

@@ -51,11 +51,13 @@ class Config:
             raise ConfigError('MUNIM_MODEL_MODE must be "recorded" or "live"')
         self.model_mode: ModelMode = "live" if mode == "live" else "recorded"
         self.run_dir = Path((env.get("MUNIM_RUN_DIR") or "").strip() or run_dir)
+        # Where `python -m munim_intel` listens. A URL without a port (an https base on a host that routes for us)
+        # takes the scheme's default; the ASGI entry (munim_intel.asgi) never listens.
         intel = urlsplit((env.get("MUNIM_INTEL_URL") or "").strip() or DEFAULT_INTEL_URL)
-        if not intel.hostname or not intel.port:
-            raise ConfigError("MUNIM_INTEL_URL must be http://<host>:<port>")
+        if not intel.hostname or intel.scheme not in ("http", "https"):
+            raise ConfigError("MUNIM_INTEL_URL must be http(s)://<host>[:<port>]")
         self.host: str = intel.hostname
-        self.port: int = intel.port
+        self.port: int = intel.port or (443 if intel.scheme == "https" else 80)
         core = (env.get("MUNIM_CORE_URL") or "").strip()
         self.core_url = core or f"http://127.0.0.1:{(env.get('PORT') or '8787').strip()}"
         # The one origin a negotiation may reach (negotiate/port.py A2aSuppliers); defaults as the Makefile does.
@@ -99,7 +101,11 @@ class Config:
         return v
 
     def run_token_public_key_pem(self) -> bytes:
-        """core's Ed25519 PUBLIC key (`<run dir>/keys/...pub.pem`). intel never reads the private key."""
+        """core's Ed25519 PUBLIC key: `MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM` (a literal `\\n` counts as a newline), else
+        `<run dir>/keys/...pub.pem`. intel never reads the private key."""
+        pem = (self._env.get("MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM") or "").strip().replace("\\n", "\n")
+        if pem:
+            return f"{pem}\n".encode()
         f = self.run_dir / "keys" / PUBLIC_KEY_FILE
         if not f.is_file():
             raise ConfigError(f"no run-token public key at {f}: start core-api once to create it")

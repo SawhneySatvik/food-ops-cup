@@ -80,6 +80,33 @@ export class Cron {
     this.#inFlight.set(job.name, run);
   }
 
+  /** Every job once, in registration order, for one given slot: what a scheduler that calls over HTTP (the tick
+   *  route) gets instead of the timers. A job still in flight from the timers is skipped; once `signal` aborts,
+   *  the running job finishes its current unit of work and the rest are reported "aborted" without starting. */
+  async runOnce(slot: Slot, signal: AbortSignal): Promise<Record<string, "ok" | "failed" | "aborted" | "skipped">> {
+    const out: Record<string, "ok" | "failed" | "aborted" | "skipped"> = {};
+    for (const job of this.#jobs) {
+      if (signal.aborted) {
+        out[job.name] = "aborted";
+        continue;
+      }
+      if (this.#inFlight.has(job.name)) {
+        out[job.name] = "skipped";
+        continue;
+      }
+      this.fired.set(job.name, (this.fired.get(job.name) ?? 0) + 1);
+      this.#log("cron.fired", { job: job.name, at: slot.at.toISOString() });
+      try {
+        await job.run(slot, signal);
+        out[job.name] = signal.aborted ? "aborted" : "ok";
+      } catch (e) {
+        this.#log("cron.failed", { job: job.name, error: errorLabel(e) });
+        out[job.name] = "failed";
+      }
+    }
+    return out;
+  }
+
   /** Stop scheduling and signal in-flight runs to wind down (they finish their current unit of work — a
    *  claimed batch, a tenant call — and start no new one); resolves when every in-flight run has ended. */
   async stop(): Promise<void> {

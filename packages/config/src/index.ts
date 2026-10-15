@@ -51,6 +51,7 @@ const SECRET_NAMES: readonly EnvName[] = [
 
 export type ModelMode = "recorded" | "live";
 export type DbRole = "munim_core" | "munim_svc" | "munim_platform";
+const DB_ROLES: readonly DbRole[] = ["munim_core", "munim_svc", "munim_platform"];
 
 export interface Config {
   nodeEnv: string;
@@ -88,6 +89,23 @@ export interface Config {
   /** The core → intel shared service secret (dev; 03-arch §1.9): `MUNIM_SERVICE_SECRET`, else generated once
    *  under `<runDir>/service-secret` (mode 0600). Registered for redaction. */
   serviceSecret(): string;
+  /** The run-token Ed25519 PEMs from `MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM` / `MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM` (both or
+   *  neither; a literal `\n` counts as a newline), registered for redaction. Neither set → null (the caller uses the
+   *  dev pair under runTokenKeyDir), except env-only, where it is a ConfigError. */
+  runTokenKeyPems(): { privateKeyPem: string; publicKeyPem: string } | null;
+  /** `MUNIM_CRON_SECRET` (≥ 16 characters), the bearer the tick route accepts; unset → null (no tick route). Registered. */
+  cronSecret(): string | null;
+  /** `MUNIM_STREAM_MAX_AGE_S` × 1000: when core-api ends an SSE stream with a reconnect hint. Whole seconds 10–86400,
+   *  default 3300 (55 min); a host that cuts requests sooner (e.g. at 300 s) sets it below its limit. */
+  streamMaxAgeMs: number;
+  /** `MUNIM_DB_POOL_MAX`: a ceiling on core-api's app pools (3–50; below 3 is refused: untested, and a request that
+   *  holds one connection while asking for another would wait forever), for a host that runs many small instances
+   *  against one pooler; unset → undefined (each pool keeps its own size). */
+  dbPoolMax: number | undefined;
+  /** The tick route's slot (`MUNIM_TICK_PERIOD_MIN`, 1–1440, default 1440 = a daily cron) and its time budget
+   *  (`MUNIM_TICK_BUDGET_S`, 1–3600, default 240: under a 300 s request limit). */
+  tickPeriodMinutes: number;
+  tickBudgetMs: number;
   /** Registers for redaction every secret already generated under runDir (role passwords, service secret, the
    *  dev run-token private key) without creating any; returns how many values are now registered in total. */
   registerRunSecrets(): number;
@@ -106,6 +124,9 @@ export interface LoadOptions {
   env?: Record<string, string | undefined>;
   /** Directory of generated Munim-internal files (`.run/`). `MUNIM_RUN_DIR` in `env` wins. */
   runDir?: string;
+  /** Every secret from `env` only: nothing under runDir is read or written (role passwords, service secret,
+   *  run-token keys), and a missing one is a ConfigError. For hosts with a read-only, per-instance filesystem. */
+  envOnly?: boolean;
 }
 
 /** Local Postgres instead of the the dev host poolers (`make up LOCAL_DB=1`): a base URL with host, port and
@@ -151,6 +172,19 @@ export function loadConfig(opts: LoadOptions = {}): Config {
   const port = Number(env.PORT ?? "8787");
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new ConfigError("PORT must be an integer 1–65535");
 
+  const wholeNumber = (name: string, min: number, max: number, dflt: number | undefined): number | undefined => {
+    const raw = env[name]?.trim() ?? "";
+    if (raw === "") return dflt;
+    const n = /^[0-9]{1,5}$/.test(raw) ? Number(raw) : NaN;
+    if (!(n >= min && n <= max)) throw new ConfigError(`${name} must be a whole number from ${min} to ${max}`);
+    return n;
+  };
+  const streamMaxAgeMs = wholeNumber("MUNIM_STREAM_MAX_AGE_S", 10, 86_400, 3_300)! * 1000;
+  const dbPoolMax = wholeNumber("MUNIM_DB_POOL_MAX", 3, 50, undefined);
+  const tickPeriodMinutes = wholeNumber("MUNIM_TICK_PERIOD_MIN", 1, 1_440, 1_440)!;
+  const tickBudgetMs = wholeNumber("MUNIM_TICK_BUDGET_S", 1, 3_600, 240)! * 1000;
+  const envOnly = opts.envOnly === true;
+
   const hopsRaw = env.MUNIM_TRUSTED_PROXY_HOPS?.trim() ?? "";
   if (hopsRaw !== "" && !/^[0-9]{1,2}$/.test(hopsRaw)) throw new ConfigError("MUNIM_TRUSTED_PROXY_HOPS must be a whole number from 0 to 99");
   const trustedProxyHops = hopsRaw === "" ? 0 : Number(hopsRaw);
@@ -160,13 +194,18 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     addSecret(label, v);
     secrets.sort((a, b) => b[1].length - a[1].length);
   };
+  // The PEM body lines: a leaked key shows up as any one of them.
+  const registerPem = (pem: string) => {
+    for (const line of pem.split("\n")) if (line.trim() && !line.startsWith("-----")) register("run-token private key", line.trim());
+  };
 
   /** Every role password in `<runDir>/db-roles.json` (registered for redaction). m-1's bootstrap CLI writes
-   *  `{written_at, roles: {role: password}}`; a flat `{role: password}` map is accepted too. */
+   *  `{written_at, roles: {role: password}}`; a flat `{role: password}` map is accepted too. `MUNIM_DB_PASSWORD_<ROLE>`
+   *  (e.g. MUNIM_DB_PASSWORD_MUNIM_CORE) wins over the file; env-only reads no file. */
   const rolePasswords = (): { file: string; passwords: Record<string, string> } => {
-    const file = join(runDir, "db-roles.json");
+    const file = envOnly ? "MUNIM_DB_PASSWORD_<ROLE>" : join(runDir, "db-roles.json");
     let passwords: Record<string, string> = {};
-    if (existsSync(file)) {
+    if (!envOnly && existsSync(file)) {
       try {
         const parsed = JSON.parse(readFileSync(file, "utf8")) as { roles?: Record<string, string> } & Record<string, unknown>;
         passwords = (parsed.roles ?? parsed) as Record<string, string>;
@@ -174,6 +213,10 @@ export function loadConfig(opts: LoadOptions = {}): Config {
         // No cause: a JSON SyntaxError quotes the input, and these values are not registered secrets yet.
         throw new ConfigError(`${file} is not valid JSON`);
       }
+    }
+    for (const role of DB_ROLES) {
+      const v = env[`MUNIM_DB_PASSWORD_${role.toUpperCase()}`]?.trim();
+      if (v) passwords[role] = v;
     }
     for (const [role, pw] of Object.entries(passwords)) if (typeof pw === "string") register(`${role} password`, pw);
     return { file, passwords };
@@ -216,6 +259,7 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     trustedProxyHops,
     serviceSecret() {
       let v = env.MUNIM_SERVICE_SECRET?.trim();
+      if (!v && envOnly) throw new ConfigError("MUNIM_SERVICE_SECRET is not set (env-only config generates no secret)");
       if (!v) {
         const file = join(runDir, "service-secret");
         if (existsSync(file)) v = readFileSync(file, "utf8").trim();
@@ -228,15 +272,35 @@ export function loadConfig(opts: LoadOptions = {}): Config {
       register("service secret", v);
       return v;
     },
+    runTokenKeyPems() {
+      const pem = (name: string) => env[name]?.trim().replaceAll("\\n", "\n") || undefined;
+      const privateKeyPem = pem("MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM");
+      const publicKeyPem = pem("MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM");
+      if (!privateKeyPem && !publicKeyPem) {
+        if (envOnly) throw new ConfigError("MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM and MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM are not set (env-only config generates no keys)");
+        return null;
+      }
+      if (!privateKeyPem || !publicKeyPem) throw new ConfigError("set both MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM and MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM, or neither");
+      registerPem(privateKeyPem);
+      return { privateKeyPem: `${privateKeyPem}\n`, publicKeyPem: `${publicKeyPem}\n` };
+    },
+    cronSecret() {
+      const v = env.MUNIM_CRON_SECRET?.trim();
+      if (!v) return null;
+      if (v.length < 16) throw new ConfigError("MUNIM_CRON_SECRET must be at least 16 characters");
+      register("cron secret", v);
+      return v;
+    },
+    streamMaxAgeMs,
+    dbPoolMax,
+    tickPeriodMinutes,
+    tickBudgetMs,
     registerRunSecrets() {
       rolePasswords();
       const secret = join(runDir, "service-secret");
       if (existsSync(secret)) register("service secret", readFileSync(secret, "utf8").trim());
       const key = join(runDir, "keys", "run-token-ed25519.pem");
-      if (existsSync(key)) {
-        // The PEM body lines: a leaked key shows up as any one of them.
-        for (const line of readFileSync(key, "utf8").split("\n")) if (line && !line.startsWith("-----")) register("run-token private key", line.trim());
-      }
+      if (existsSync(key)) registerPem(readFileSync(key, "utf8"));
       return secrets.length;
     },
     redact,

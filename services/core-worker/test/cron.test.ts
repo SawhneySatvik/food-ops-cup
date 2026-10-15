@@ -82,3 +82,44 @@ describe("cron registry", () => {
     expect(cron.fired.get("quick")).toBe(2);
   });
 });
+
+// Lane B2: the tick route's one pass (Cron.runOnce) — the same jobs, one given slot, no timers.
+describe("cron runOnce", () => {
+  const slot = { prev: new Date("2026-10-14T01:00:00Z"), at: new Date("2026-10-15T01:00:00Z") };
+
+  it("runs every job once, in order, with the given slot; a failing job is logged and the rest still run", async () => {
+    const log = memLog();
+    const seen: string[] = [];
+    const cron = new Cron(new FakeClock("2026-10-15T01:23:00Z"), log)
+      .add({ name: "a", everyMinutes: 1, run: async (s) => void seen.push(`a ${s.prev.toISOString()}→${s.at.toISOString()}`) })
+      .add({ name: "b", everyMinutes: 15, run: async () => { throw new Error("boom"); } })
+      .add({ name: "c", everyMinutes: 1440, run: async (s) => void seen.push(`c ${s.at.toISOString()}`) });
+    expect(await cron.runOnce(slot, new AbortController().signal)).toEqual({ a: "ok", b: "failed", c: "ok" });
+    expect(seen).toEqual(["a 2026-10-14T01:00:00.000Z→2026-10-15T01:00:00.000Z", "c 2026-10-15T01:00:00.000Z"]);
+    expect(log.lines.filter((l) => l.event === "cron.failed").map((l) => l.fields.job)).toEqual(["b"]);
+    expect(log.lines.filter((l) => l.event === "cron.fired")).toHaveLength(3);
+  });
+
+  it("after the signal aborts, the running job finishes and the rest are reported aborted without starting", async () => {
+    const ctl = new AbortController();
+    const started: string[] = [];
+    const cron = new Cron(new FakeClock("2026-10-15T01:23:00Z"), memLog())
+      .add({ name: "first", everyMinutes: 1, run: async () => { started.push("first"); ctl.abort(); } })
+      .add({ name: "second", everyMinutes: 1, run: async () => void started.push("second") });
+    expect(await cron.runOnce(slot, ctl.signal)).toEqual({ first: "aborted", second: "aborted" });
+    expect(started).toEqual(["first"]);
+  });
+
+  it("a job still in flight from the timers is skipped, not run twice", async () => {
+    const clock = new FakeClock("2026-10-10T00:00:30Z");
+    let runs = 0;
+    const cron = new Cron(clock, memLog()).add({ name: "slow", everyMinutes: 1, run: async () => { runs++; await clock.sleep(120_000); } });
+    cron.start();
+    await clock.advance(30_000); // fires at 00:01, now in flight
+    expect(await cron.runOnce(slot, new AbortController().signal)).toEqual({ slow: "skipped" });
+    expect(runs).toBe(1);
+    const stopped = cron.stop();
+    await clock.advance(120_000);
+    await stopped;
+  });
+});
