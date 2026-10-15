@@ -50,6 +50,9 @@ const SECRET_NAMES: readonly EnvName[] = [
 ];
 
 export type ModelMode = "recorded" | "live";
+/** Where uploaded documents' bytes live: a local directory, a private the dev blob store bucket, a Cloud Storage bucket. */
+export type BlobMode = "fs" | "devhost" | "gcs";
+const BLOB_MODES: readonly BlobMode[] = ["fs", "devhost", "gcs"];
 export type DbRole = "munim_core" | "munim_svc" | "munim_platform";
 const DB_ROLES: readonly DbRole[] = ["munim_core", "munim_svc", "munim_platform"];
 
@@ -106,6 +109,11 @@ export interface Config {
    *  (`MUNIM_TICK_BUDGET_S`, 1–3600, default 240: under a 300 s request limit). */
   tickPeriodMinutes: number;
   tickBudgetMs: number;
+  /** `MUNIM_BLOB`: "fs" (default), "devhost" or "gcs"; anything else is a ConfigError (gotcha 17). Every process that
+   *  writes or reads uploads (core-api, the tick, core-worker) must see the same value. */
+  blob: BlobMode;
+  /** `MUNIM_BLOB_BUCKET`, the bucket for "devhost" and "gcs" (3–63 of a-z 0-9 . _ -); unset or malformed → ConfigError. */
+  blobBucket(): string;
   /** Registers for redaction every secret already generated under runDir (role passwords, service secret, the
    *  dev run-token private key) without creating any; returns how many values are now registered in total. */
   registerRunSecrets(): number;
@@ -169,6 +177,8 @@ export function loadConfig(opts: LoadOptions = {}): Config {
   if (modelMode !== "recorded" && modelMode !== "live") {
     throw new ConfigError(`MUNIM_MODEL_MODE must be "recorded" or "live"`);
   }
+  const blob = (env.MUNIM_BLOB?.trim() || "fs") as BlobMode;
+  if (!BLOB_MODES.includes(blob)) throw new ConfigError(`MUNIM_BLOB must be "fs", "devhost" or "gcs"`);
   const port = Number(env.PORT ?? "8787");
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new ConfigError("PORT must be an integer 1–65535");
 
@@ -295,6 +305,12 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     dbPoolMax,
     tickPeriodMinutes,
     tickBudgetMs,
+    blob,
+    blobBucket() {
+      const v = env.MUNIM_BLOB_BUCKET?.trim() ?? "";
+      if (!/^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$/.test(v)) throw new ConfigError("MUNIM_BLOB_BUCKET is not set or not a bucket name (3–63 of a-z 0-9 . _ -)");
+      return v;
+    },
     registerRunSecrets() {
       rolePasswords();
       const secret = join(runDir, "service-secret");

@@ -9,7 +9,7 @@
 //              orchestrator ruling 10 Oct: fan-out tokens live only as long as the call.
 //   Intel      intelHttp → intel's base URL with the service secret.
 //   Imports    importParseJob (T-030) on the same munim_svc pool, reading uploads from the blob store core-api
-//              writes (both entries build it from config.runDir).
+//              writes (both entries choose it with core-api's blobStoreFromEnv: MUNIM_BLOB, "fs" = config.runDir/blobs).
 //   Auto       autoImportJob / autoDailyJob (T-089b) on the same pool: Auto investigation steps under their standing
 //              grant, narrated through intel's /investigate:narrate with the step's auto_step run token.
 import { join, resolve } from "node:path";
@@ -19,7 +19,8 @@ import { createRowPublisher, outboxRowToCloudEvent, type Publisher as EventPubli
 import { createHttpPublisher } from "../../core-api/src/dev-root.ts";
 import { loadContracts } from "../../core-api/src/lib/contracts.ts";
 import { createPool } from "../../core-api/src/lib/db.ts";
-import { blobs as defaultBlobs, type BlobStore, localBlobStore } from "../../core-api/src/modules/imports/index.ts";
+import { blobStoreFromEnv } from "../../core-api/src/blob-store.ts";
+import { blobs as defaultBlobs, type BlobStore } from "../../core-api/src/modules/imports/index.ts";
 import { createHttpNarratePort } from "../../core-api/src/modules/investigations/index.ts";
 import { endRun, loadRunTokenKeys, mintRunToken, type RunTokenKeys, type SvcTx } from "../../core-api/src/runtoken/index.ts";
 import { ensureDevRunTokenKeys } from "../../core-api/src/runtoken/keys.ts";
@@ -102,7 +103,7 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
       keys: ensureDevRunTokenKeys(config.runTokenKeyDir),
       intelUrl: config.intelUrl,
       serviceSecret: config.serviceSecret(),
-      blobs: localBlobStore(join(config.runDir, "blobs")),
+      blobs: blobStoreFromEnv(config, join(config.runDir, "blobs")),
     });
     // runUntilSignal ends the Worker's pool and exits; the publisher/minter pool closes with the process.
     await runUntilSignal(worker, jsonLog);

@@ -259,4 +259,18 @@ describe("env-only config (envOnly: true)", () => {
       expect(() => loadConfig({ env: { [name]: bad } }), `${name}=${bad}`).toThrow(ConfigError);
     }
   });
+
+  it("blob store: MUNIM_BLOB defaults to fs, takes exactly fs|devhost|gcs; the bucket is read only when asked and must be a bucket name", () => {
+    const d = loadConfig({ env: {} });
+    expect(d.blob).toBe("fs");
+    expect(() => d.blobBucket()).toThrow(/MUNIM_BLOB_BUCKET is not set/);
+    expect(loadConfig({ env: { MUNIM_BLOB: "devhost", MUNIM_BLOB_BUCKET: "munim-uploads" } }).blobBucket()).toBe("munim-uploads");
+    expect(loadConfig({ env: { MUNIM_BLOB: " gcs " } }).blob).toBe("gcs");
+    for (const bad of ["s3", "the dev host", "fs,gcs", "--blob=gcs"]) {
+      expect(() => loadConfig({ env: { MUNIM_BLOB: bad } }), bad).toThrow(ConfigError);
+    }
+    for (const bad of ["ab", "Munim", "-x-", "a/b", "x".repeat(64)]) {
+      expect(() => loadConfig({ env: { MUNIM_BLOB_BUCKET: bad } }).blobBucket(), bad).toThrow(ConfigError);
+    }
+  });
 });

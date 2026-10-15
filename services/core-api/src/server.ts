@@ -9,13 +9,14 @@ import pg from "pg";
 import { createApp, parseCorsOrigins } from "./app.ts";
 import type { IdP } from "./auth/port.ts";
 import { storefrontResolver } from "./auth/resolve.ts";
+import { blobStoreFromEnv } from "./blob-store.ts";
 import type { PublishDeps } from "./commit/index.ts";
 import { createHttpPublisher, createPersistentLocalIdp, devhostIdp } from "./dev-root.ts";
 import { setIdpMode } from "./health/index.ts";
 import { configureInternal } from "./internal/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { configureCaresNetwork } from "./modules/cares-network/index.ts";
-import { type BlobStore, blobs as defaultBlobs, localBlobStore } from "./modules/imports/index.ts";
+import { type BlobStore, blobs as defaultBlobs } from "./modules/imports/index.ts";
 import { configureInvestigations, createHttpNarratePort } from "./modules/investigations/index.ts";
 import { configureRfq, createHttpNegotiatePort } from "./modules/purchasing/index.ts";
 import { configureThreads, createHttpAskPort } from "./modules/threads/index.ts";
@@ -149,7 +150,7 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
         ? createPersistentLocalIdp(config.runDir)
         : devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
       keys: config.runTokenKeyPems() ?? ensureDevRunTokenKeys(config.runTokenKeyDir),
-      blobs: localBlobStore(join(config.runDir, "blobs")),
+      blobs: blobStoreFromEnv(config, join(config.runDir, "blobs")),
     }));
     const { port, server } = await serveApi(api.app, config.port);
     log(`core-api: listening on ${port}`);

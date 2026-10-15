@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0030 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0031 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -33,6 +33,7 @@ export const MIGRATIONS = [
   "0028_cares",
   "0029_storefront_display",
   "0030_display_order",
+  "0031_tick_ledger",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -233,6 +234,8 @@ export const TABLES: Record<string, T> = {
   "core.cares_claim": book(true),
   "core.cares_claim_line": book(), // through its claim (PARENT_SCOPED)
   "core.cares_allocation": book(true),
+  // 0031 (T-117): the tick ledger — which core-worker job ran for which tick slot (service state, no tenant)
+  "core.tick_claim": global,
 };
 
 export const OUR_SCHEMAS = ["core", "evidence", "intel", "platform", "intel_ro", "munim_meta"];
@@ -253,7 +256,7 @@ export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
  *  → intel.chunk) = 366; 0028 adds 29 (cares_recipient 1, cares_enablement 2, network_snapshot 3, cares_profile 1, cares_outlet 2,
  *  cares_listing 3, cares_listing_line 4, cares_handover 3 + the allocation FK added after, cares_handover_line 2, cares_claim 2,
  *  cares_claim_line 2, cares_allocation 2, task.cares_listing_id 1) = 395. */
-export const EXPECTED_COUNTS = { all: 167, core: 134, book: 103, tenant: 150, outlet: 59, fk: 395 };
+export const EXPECTED_COUNTS = { all: 168, core: 135, book: 103, tenant: 150, outlet: 59, fk: 395 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -273,7 +276,7 @@ export const PACK_SCOPED_TABLES: Record<string, string[]> = { AU: ["core.payroll
  *  intel tables written by core-api's internal routes, R25). */
 export const SVC_INSERT_TABLES = [
   "core.document", "core.draft", "core.import_quarantine", "core.import_run", "core.import_staging", "core.investigation_step",
-  "core.outbox", "evidence.snapshot",
+  "core.outbox", "core.tick_claim", "evidence.snapshot",
   "intel.alias", "intel.answer", "intel.chunk", "intel.claim", "intel.edge", "intel.entity", "intel.event_claim",
   "intel.finding", "intel.forecast_point", "intel.forecast_run", "intel.intel_spend", "intel.outcome", "intel.run",
   "intel.supplier_quote", "intel.trace_event", "intel.watch_state", "intel.wiki_page", "intel.wiki_version",

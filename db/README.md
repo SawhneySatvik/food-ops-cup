@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (30 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (31 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -42,7 +42,8 @@ prices on `platform.model_role`, negotiation bounds on `core.business_policy`, `
 rate, `purchasing.deal_inputs` v3 with shop SKU margins), 0027 T-098 (stop reason `ceiling`: a lowered ceiling downgrades a
 running Auto investigation to Plan; Auto entered only with the plan approval), 0028 Munim Cares (ADR-015 §1: 4 platform tables,
 9 core books, 4 stock kinds, 10 commands, 3 derivation rules, 5 definer reads, 5 templates), 0029 T-099 storefront display text,
-0030 T-115 display order (`position` on items, variants, option groups, options) — gates see 29 applied.
+0030 T-115 display order (`position` on items, variants, option groups, options), 0031 T-117 tick ledger (`core.tick_claim`:
+which core-worker job ran for which tick slot) — gates see 30 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -857,6 +858,23 @@ no row written or rewritten, no table, index, policy, trigger, function, command
   `db/tests/redproof-0030.sh` (one plant per gate, plus 0030's own post-conditions re-run after each perturbation).
   Red-proof scripts plant `0031_redproof_plant.sql` now (bumped by 0030); `grants.test.ts` plants `0031_planted.sql`;
   `redproof-0029.sh` takes 0030's `position` grant back before re-running 0029's post-conditions.
+
+**Tick ledger (0031, T-117; R56 G-2).** The header of 0031 is the full list. Additive: one table and its grants; no row written.
+- **`core.tick_claim (job, slot_at)`** — primary key on exactly those two; `claimed_at` (default now), `finished_at` and
+  `outcome` (`ok` / `failed` / `aborted`), set together. core-worker's `Worker.tick` (the tick route a hosted scheduler calls)
+  claims each job with `INSERT … ON CONFLICT (job, slot_at) DO NOTHING` just before it starts and skips a job whose slot is
+  already claimed (`"already-ran"`), so a retried or repeated call never posts the brief twice. Each claim commits on its own,
+  outside the tick's lock transaction: a tick killed mid-job keeps its claims (at most once per job and slot).
+- **Service state, no tenant:** one claim covers every tenant the job visits, so no `tenant_id` and no RLS — like
+  `core.command_authority` and the other tenant-less operational tables, access is by grant alone. `munim:operational`.
+- **Grants:** munim_svc only — SELECT, INSERT, UPDATE of `finished_at` and `outcome`; no role may DELETE or TRUNCATE.
+  The manifest lists it as a `global` operational table and in `SVC_INSERT_TABLES` (hand counts: 168 tables, 135 in core).
+- **Poison rows** (same ticket, no schema change): the sweeper counts a poison row's failures on the row
+  (`core.outbox.publish_attempts`, 0014's munim_svc column grant) and sets `dead_at` at the fifth, so the count adds up across
+  worker processes and tick instances.
+- **Gates:** `tests/tick-ledger-0031.test.ts` (T1 / G / SHAPE); `db/tests/redproof-0031.sh` (one plant per gate, plus 0031's own
+  post-conditions re-run after each perturbation). Red-proof scripts plant `0032_redproof_plant.sql` now (bumped by 0031);
+  `grants.test.ts` plants `0032_planted.sql`.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

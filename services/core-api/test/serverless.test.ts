@@ -1,6 +1,7 @@
 // Lane B2 gates for running core-api as request-scoped functions (env-root.ts, the tick route):
 //   tick   /internal/cron/v1/tick: 404 when unconfigured, without a bearer, with a wrong one (gotcha 16); 200 with the
 //          right one, running every core-worker job once for an aligned slot (an aged outbox row gets published);
+//          a repeated call for that slot runs nothing (T-117: every job "already-ran", a newly aged row stays unpublished);
 //          one tick at a time cluster-wide (the lock held elsewhere → ran:false, nothing runs)
 //   stream composeCoreApi's streamMaxAgeMs reaches the stream: the server ends it with a max_age reconnect hint at
 //          that age, and the SDK reader reconnects (red-proven by removing the wiring — see the lane B2 report)
@@ -87,6 +88,8 @@ describe("tick route", () => {
   });
 
   it("runs every core-worker job once for the aligned slot: an aged outbox row is published", async () => {
+    // The first test's tick claimed this slot already (core.tick_claim, T-117): start from an empty ledger.
+    await db.admin("TRUNCATE core.tick_claim");
     const { api } = await compose();
     const wk = worker();
     configureTick(api.deps, { secret: SECRET, tick: (now) => wk.tick(now, { periodMinutes: 1440, budgetMs: 30_000 }) });
@@ -108,6 +111,19 @@ describe("tick route", () => {
     expect(published).toContain(row);
     const { rows } = await db.admin<{ p: Date | null }>(`SELECT published_at AS p FROM core.outbox WHERE id = $1`, [row]);
     expect(rows[0]!.p).not.toBeNull();
+
+    // A repeated call (a scheduler retry, a manual call) in the same slot runs nothing.
+    const later = randomUUID();
+    await db.withContext("munim_svc", { tenant_id: w.tenant, role: "service" }, (c) => c.query(
+      `INSERT INTO core.outbox (tenant_id, id, aggregatetype, aggregateid, type, payload, created_at)
+       VALUES ($1, $2, 'order', 'x', 'munim.orders.order.placed.v1', '{}'::jsonb, now() - interval '5 minutes')`, [w.tenant, later]));
+    const again = await api.app.request("/internal/cron/v1/tick", { method: "POST", headers: { Authorization: `Bearer ${SECRET}` } });
+    const replay = await again.json() as { ran: boolean; at: string; jobs: Record<string, string> };
+    console.log(`tick again: ${JSON.stringify(replay)}`);
+    expect(again.status).toBe(200);
+    expect(replay).toMatchObject({ ran: true, at: body.at,
+      jobs: { "outbox-sweep": "already-ran", "fanout-watch": "already-ran", "fanout-brief": "already-ran", nightly: "already-ran" } });
+    expect(published).not.toContain(later);
   });
 
   it("one tick at a time: with the lock held elsewhere nothing runs (ran:false)", async () => {

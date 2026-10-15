@@ -5,17 +5,19 @@
 //   - the dev IdP only (MUNIM_IDP=local is a dev mode with token files under `.run/`)
 //   - core-worker's jobs run behind the tick route (`/internal/cron/v1/tick`) when MUNIM_CRON_SECRET is set, instead of
 //     in a long-running process: the same Worker, the same munim_svc role
-//   - uploaded documents go to a per-instance temp directory (no shared blob store exists yet: an upload and the parse
-//     that reads it may land on different instances — reported, lane B2)
+//   - uploaded documents go to the store MUNIM_BLOB names (blobStoreFromEnv): a shared bucket in production, because an
+//     upload and the tick's parse that reads it may land on different instances; "fs" (a per-instance temp directory) is
+//     the default only for a single-instance trial
 // Nothing here listens on a port; the host calls `app.fetch`.
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { type Config, ConfigError, createLogger, type Logger, loadConfig, resolveIdpMode } from "@munim/config";
 import { composeWorker } from "../../core-worker/src/main.ts";
+import { blobStoreFromEnv } from "./blob-store.ts";
 import { configureTick } from "./cron/index.ts";
 import { devhostIdp } from "./dev-root.ts";
-import { localBlobStore } from "./modules/imports/index.ts";
 import { composeCoreApi, type CoreApi, wiringFromConfig } from "./server.ts";
+
+// The one store chooser, for every host's entry (the Cup's core-worker entry imports it from here).
+export { blobStoreFromEnv };
 
 export async function composeFromEnv(env: Record<string, string | undefined> = process.env): Promise<CoreApi> {
   const config = loadConfig({ env, envOnly: true });
@@ -33,7 +35,7 @@ async function compose(config: Config, log: Logger, env: Record<string, string |
   const idpMode = resolveIdpMode(env);
   if (idpMode !== "devhost") throw new ConfigError("the env-only boot supports MUNIM_IDP=devhost only");
   const keys = config.runTokenKeyPems()!; // envOnly: throws when unset, never null
-  const blobs = localBlobStore(join(tmpdir(), "munim-blobs"));
+  const blobs = blobStoreFromEnv(config);
   const api = await composeCoreApi(wiringFromConfig(config, log, {
     idpMode,
     idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),

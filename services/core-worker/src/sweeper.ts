@@ -5,25 +5,8 @@ import type pg from "pg";
 import { errorLabel, PoisonRowError, type Log, type OutboxRow, type Publisher } from "./ports.ts";
 
 export const SWEEP_LOCK = "core-worker:outbox-sweep";
+/** A poison row is dead-lettered (core.outbox.dead_at) at its POISON_ATTEMPTS-th failed publish. */
 export const POISON_ATTEMPTS = 5;
-
-/** Failed attempts of poison rows, and the rows dead-lettered after POISON_ATTEMPTS. In memory, per worker
- *  process: `core.outbox` has no attempts/dead-letter columns yet (requested from m-1), so a restart forgets
- *  and retries a dead row POISON_ATTEMPTS more times. */
-export class PoisonRows {
-  readonly #attempts = new Map<string, number>();
-
-  isDead(id: string): boolean {
-    return (this.#attempts.get(id) ?? 0) >= POISON_ATTEMPTS;
-  }
-
-  /** Records one failed attempt; returns the attempt count. */
-  fail(id: string): number {
-    const n = (this.#attempts.get(id) ?? 0) + 1;
-    this.#attempts.set(id, n);
-    return n;
-  }
-}
 
 export interface SweepOptions {
   batchSize?: number;
@@ -33,8 +16,6 @@ export interface SweepOptions {
   leaseSeconds?: number;
   /** Checked between batches: a stopping worker finishes the batch it claimed, then returns. */
   signal?: AbortSignal;
-  /** Kept across sweeps by the Worker; a fresh one per call otherwise. */
-  poison?: PoisonRows;
 }
 
 export interface SweepResult {
@@ -87,20 +68,18 @@ export async function publishClaimed(
   opts: SweepOptions = {},
 ): Promise<Omit<SweepResult, "locked">> {
   const batch = opts.batchSize ?? 100;
-  const poison = opts.poison ?? new PoisonRows();
   let published = 0;
   while (!opts.signal?.aborted) {
     const { rows } = await pool.query<OutboxRow>(
       "SELECT * FROM core.outbox_claim($1, make_interval(secs => $2), make_interval(secs => $3))",
       [batch, opts.minAgeSeconds ?? 30, opts.leaseSeconds ?? 120]);
     for (const row of rows) {
-      if (poison.isDead(row.id)) continue;
       try {
         await publisher.publish(row);
       } catch (e) {
         if (e instanceof PoisonRowError) {
           // The row is the problem, not intel: count it and keep sweeping the others.
-          const attempts = poison.fail(row.id);
+          const attempts = await recordPoison(pool, row);
           log(attempts >= POISON_ATTEMPTS ? "outbox-sweep.dead_lettered" : "outbox-sweep.poison_row",
             { tenant_id: row.tenant_id, outbox_id: row.id, attempts, reason: e.reason });
           continue;
@@ -117,16 +96,34 @@ export async function publishClaimed(
   return { published, publishFailed: false };
 }
 
-/** munim_svc may UPDATE only `published_at`, and only under the row's tenant (FORCE RLS on core.outbox). */
+/** munim_svc may UPDATE only `published_at`, `publish_attempts` and `dead_at`, and only under the row's tenant (FORCE RLS
+ *  on core.outbox). */
 async function markPublished(pool: pg.Pool, row: OutboxRow): Promise<void> {
+  await inTenant(pool, row.tenant_id, (c) =>
+    c.query("UPDATE core.outbox SET published_at = now() WHERE tenant_id = $1 AND id = $2 AND published_at IS NULL", [row.tenant_id, row.id]));
+}
+
+/** One failed publish of a poison row, counted on the row itself, so every worker process and every tick instance adds to the
+ *  same count (in memory, each serverless instance started from zero and the row never died). At POISON_ATTEMPTS the row gets
+ *  dead_at and outbox_claim never returns it again. Returns the new count (0: published or dead-lettered meanwhile). */
+async function recordPoison(pool: pg.Pool, row: OutboxRow): Promise<number> {
+  const { rows } = await inTenant(pool, row.tenant_id, (c) => c.query<{ n: number }>(
+    `UPDATE core.outbox SET publish_attempts = publish_attempts + 1,
+            dead_at = CASE WHEN publish_attempts + 1 >= $3 THEN now() END
+      WHERE tenant_id = $1 AND id = $2 AND published_at IS NULL AND dead_at IS NULL
+      RETURNING publish_attempts AS n`, [row.tenant_id, row.id, POISON_ATTEMPTS]));
+  return rows[0]?.n ?? 0;
+}
+
+async function inTenant<T>(pool: pg.Pool, tenantId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {
     await c.query("BEGIN");
-    await c.query("SELECT set_config('app.tenant_id', $1, true), set_config('app.role', 'service', true)", [row.tenant_id]);
-    await c.query("UPDATE core.outbox SET published_at = now() WHERE tenant_id = $1 AND id = $2 AND published_at IS NULL",
-      [row.tenant_id, row.id]);
+    await c.query("SELECT set_config('app.tenant_id', $1, true), set_config('app.role', 'service', true)", [tenantId]);
+    const out = await fn(c);
     await c.query("COMMIT");
     c.release();
+    return out;
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});
     c.release(true);

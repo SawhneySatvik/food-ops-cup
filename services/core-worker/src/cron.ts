@@ -17,6 +17,16 @@ export interface Job {
   run(slot: Slot, signal: AbortSignal): Promise<void>;
 }
 
+export type JobResult = "ok" | "failed" | "aborted" | "skipped" | "already-ran";
+
+/** Which job has run for which slot, kept outside the process (Worker: core.tick_claim). `claim` answers null when the
+ *  (job, slot) was claimed before, else the newest earlier slot the job was claimed for (null if none); `finish` records how
+ *  the claimed run ended. */
+export interface SlotLedger {
+  claim(job: string, slotAt: Date): Promise<{ last: Date | null } | null>;
+  finish(job: string, slotAt: Date, outcome: "ok" | "failed" | "aborted"): Promise<void>;
+}
+
 export class Cron {
   readonly #clock: Clock;
   readonly #log: Log;
@@ -82,9 +92,14 @@ export class Cron {
 
   /** Every job once, in registration order, for one given slot: what a scheduler that calls over HTTP (the tick
    *  route) gets instead of the timers. A job still in flight from the timers is skipped; once `signal` aborts,
-   *  the running job finishes its current unit of work and the rest are reported "aborted" without starting. */
-  async runOnce(slot: Slot, signal: AbortSignal): Promise<Record<string, "ok" | "failed" | "aborted" | "skipped">> {
-    const out: Record<string, "ok" | "failed" | "aborted" | "skipped"> = {};
+   *  the running job finishes its current unit of work and the rest are reported "aborted" without starting.
+   *  With a ledger, a job runs only if this pass is the first to claim (job, slot.at); a repeated call for the same
+   *  slot reports it "already-ran". Only a job that starts is claimed, so one skipped or aborted before it started
+   *  still runs on a retry. A claim that cannot be made (the database is down) runs nothing and reports "failed".
+   *  Windows tile across calls: when the job's last claimed slot is later than slot.prev (a manual call a few hours
+   *  after the scheduled one), its window starts there, so what fell in the last window (a 06:00 brief) is not due again. */
+  async runOnce(slot: Slot, signal: AbortSignal, ledger?: SlotLedger): Promise<Record<string, JobResult>> {
+    const out: Record<string, JobResult> = {};
     for (const job of this.#jobs) {
       if (signal.aborted) {
         out[job.name] = "aborted";
@@ -94,15 +109,36 @@ export class Cron {
         out[job.name] = "skipped";
         continue;
       }
+      let window = slot;
+      if (ledger) {
+        let claim: { last: Date | null } | null;
+        try {
+          claim = await ledger.claim(job.name, slot.at);
+        } catch (e) {
+          this.#log("cron.claim_failed", { job: job.name, error: errorLabel(e) });
+          out[job.name] = "failed";
+          continue;
+        }
+        if (!claim) {
+          this.#log("cron.already_ran", { job: job.name, at: slot.at.toISOString() });
+          out[job.name] = "already-ran";
+          continue;
+        }
+        if (claim.last && claim.last > slot.prev) window = { at: slot.at, prev: claim.last };
+      }
       this.fired.set(job.name, (this.fired.get(job.name) ?? 0) + 1);
       this.#log("cron.fired", { job: job.name, at: slot.at.toISOString() });
+      let result: "ok" | "failed" | "aborted";
       try {
-        await job.run(slot, signal);
-        out[job.name] = signal.aborted ? "aborted" : "ok";
+        await job.run(window, signal);
+        result = signal.aborted ? "aborted" : "ok";
       } catch (e) {
         this.#log("cron.failed", { job: job.name, error: errorLabel(e) });
-        out[job.name] = "failed";
+        result = "failed";
       }
+      out[job.name] = result;
+      // The claim stands either way; a lost outcome only leaves finished_at empty.
+      await ledger?.finish(job.name, slot.at, result).catch((e: unknown) => this.#log("cron.finish_failed", { job: job.name, error: errorLabel(e) }));
     }
     return out;
   }
