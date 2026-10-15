@@ -44,7 +44,7 @@ export type ReceiveGoodsCommand = Cmd<"purchasing.grn.receive.v1", Schemas["Purc
 
 export function createStaffClient(opts: StaffClientOptions) {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
-  // Typed with ./types paths: the SDK's own plus GET /v1/me (0.2.0 is not downloadable yet; see types.ts).
+  // Typed with ./types paths (the SDK workspace package).
   const sdk = createSdkClient({ baseUrl, token: opts.token, tenantId: opts.tenantId, fetch: opts.fetch }) as unknown as Client<paths>;
   const timeoutMs = opts.timeoutMs ?? 15_000;
   /** Per-call options: never cached, time-limited, plus the dev switches. */

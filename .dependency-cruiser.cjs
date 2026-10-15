@@ -59,6 +59,8 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     exclude: { path: "(^|/)(node_modules|\\.next|dist|contracts_gen)/" },
     tsPreCompilationDeps: true,
+    // For apps/web's "@/*" path (the only tsconfig paths entry in the repo).
+    tsConfig: { fileName: "tsconfig.depcruise.json" },
     combinedDependencies: false,
     enhancedResolveOptions: {
       exportsFields: ["exports"],

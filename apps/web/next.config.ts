@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // @munim/sdk is a workspace package shipped as TypeScript source.
+  transpilePackages: ["@munim/sdk"],
   turbopack: {
     rules: {
       "*.css": {
