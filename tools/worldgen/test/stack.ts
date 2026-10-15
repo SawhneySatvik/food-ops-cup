@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLogger, loadConfig } from "../../../packages/config/src/index.ts";
 import { startTestDb, type TestDb } from "../../../db/src/harness.ts";
-import { createLocalIdp } from "../../../services/core-api/src/dev-root.ts";
+import { createLocalIdp } from "../../../services/core-api/src/auth/local-idp.ts";
 import { createPool } from "../../../services/core-api/src/lib/db.ts";
 import { localBlobStore } from "../../../services/core-api/src/modules/imports/index.ts";
 import { composeCoreApi, serveApi, type CoreApi } from "../../../services/core-api/src/server.ts";

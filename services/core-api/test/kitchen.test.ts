@@ -17,7 +17,7 @@ import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { type CommandHandler, executeCommand, uuidv7 } from "../src/commit/index.ts";
 import { parseStoredEvent } from "../src/commit/outbox.ts";
 import { createTicketsFor, buildBoard, ticketColour, isLegalAdvance } from "../src/modules/kitchen/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";
 import { seedChart } from "../src/modules/finance/index.ts";
 import { openDb } from "./db.ts";

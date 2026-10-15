@@ -11,7 +11,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { createLogger, loadConfig } from "@munim/config";
 import { uuidv7 } from "@munim/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { composeWorker } from "../../core-worker/src/main.ts";
 import { type CommandHandler, executeCommand } from "../src/commit/index.ts";
 import { orderStatusHandler } from "../src/modules/orders/index.ts";

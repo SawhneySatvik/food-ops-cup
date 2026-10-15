@@ -14,7 +14,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
 import { openStream } from "../../../packages/sdk/src/stream.ts";
 import { Worker } from "../../core-worker/src/worker.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { TENANT_HEADER } from "../src/app.ts";
 import { configureTick } from "../src/cron/index.ts";
 import { composeCoreApi, type CoreApi } from "../src/server.ts";

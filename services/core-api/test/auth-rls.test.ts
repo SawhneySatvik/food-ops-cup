@@ -13,7 +13,7 @@ import {
   type AppEnv, contextOf, createApp, GUEST_TOKEN_HEADER, requireCustomer, requireGuest, requireMember, requireOperator, STOREFRONT_KEY_HEADER,
   storefrontResolver, TENANT_HEADER, withContext,
 } from "../src/app.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 import { addCustomer, addGuestOrder, buildTenant, type Tenant } from "./world.ts";
 

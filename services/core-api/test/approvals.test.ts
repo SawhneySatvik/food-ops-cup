@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { type CommandHandler, uuidv7, verifyAuditChain } from "../src/commit/index.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { registerDraftHandler } from "../src/modules/approvals/index.ts";
 import { draftHandler } from "../src/modules/approvals/handlers.ts";
 import { bindNamedParams, runTemplate } from "../src/modules/approvals/snapshots.ts";

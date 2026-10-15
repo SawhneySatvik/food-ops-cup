@@ -13,7 +13,7 @@ import { BriefItemsResponse } from "@munim/contracts/internal";
 import { type TestDb, uuidv7 } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { createApp, type Deps } from "../src/app.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";
 import { configureInternal } from "../src/internal/index.ts";

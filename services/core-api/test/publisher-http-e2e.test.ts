@@ -1,13 +1,12 @@
 // T-005 end-to-end gates on embedded Postgres: commands → outbox → (after commit) this adapter → a
 // recording /events endpoint. The expected id set comes from core.outbox itself, not from the publisher.
-// Imports the core-api commit library by path: adapters may depend on core-api, never the reverse (R9).
 import { startTestDb, type TestDb } from "@munim/db";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { executeCommand, replayHeaders, uuidv7, type CommandHandler, type ExecuteResult, type PublishDeps } from "../../../../services/core-api/src/commit/index.ts";
-import { ownerContext, provisionTenant, svcTx, testKeys, type Tenant } from "../../../../services/core-api/src/commit/testkit.ts";
-import { verifyRunToken } from "../../../../services/core-api/src/runtoken/index.ts";
-import { createHttpPublisher } from "../src/index.ts";
-import { deadUrl, exactlyOnce, startRecorder } from "./recorder.ts";
+import { executeCommand, replayHeaders, uuidv7, type CommandHandler, type ExecuteResult, type PublishDeps } from "../src/commit/index.ts";
+import { ownerContext, provisionTenant, svcTx, testKeys, type Tenant } from "../src/commit/testkit.ts";
+import { verifyRunToken } from "../src/runtoken/index.ts";
+import { createHttpPublisher } from "../src/commit/publisher-http.ts";
+import { deadUrl, exactlyOnce, startRecorder } from "./publisher-recorder.ts";
 
 const SECRET = "test-secret-not-a-real-one";
 let db: TestDb;

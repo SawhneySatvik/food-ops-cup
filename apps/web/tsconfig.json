@@ -20,7 +20,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@munim-dev/*": ["../../adapters/dev/env/*", "./lib/server/no-dev/*"]
     }
   },
   "include": [

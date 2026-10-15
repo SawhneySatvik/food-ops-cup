@@ -7,7 +7,7 @@ import type { TestDb } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp, withContext } from "../src/app.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 

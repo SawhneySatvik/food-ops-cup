@@ -9,10 +9,10 @@ is commentary. Never edit an applied migration — fix forward in a new file.
 pnpm -F @munim/db test        # every DB gate on embedded Postgres 18 (no Docker, no .env, no network)
 pnpm -F @munim/db typecheck
 node db/tests/static-gate.ts  # host-specific construct scan: prints "N files scanned, M forbidden constructs"
-pnpm -F @munim/db migrate     # applies to $DEVHOST_SESSION_POOLER_CONNECTION_STRING (export it yourself;
-pnpm -F @munim/db seed:packs  #   these scripts never read .env — project rule 20)
+pnpm -F @munim/db migrate     # applies to $MUNIM_DB_URL_SESSION, an admin URL (export it yourself;
+pnpm -F @munim/db seed:packs  #   these scripts never read .env)
 node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords for the 4 runtime roles on
-                              #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
+                              #   $MUNIM_DB_URL_SESSION and writes .run/db-roles.json (0600)
 ```
 
 **Migrations (33 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
@@ -1043,13 +1043,13 @@ cannot be dated in a closed period (entry and close serialise on a per-tenant-mo
 posts once per rule. Loyalty balances never go below zero (customer row lock). Import format mappings are
 `[{source, target, unit?}]` strings only (CHECK) and exist only through an approved draft (MB006).
 
-## Embedded-PG vs hosted the dev host — UNVERIFIED, with fallbacks
+## Embedded-PG vs a hosted Postgres — UNVERIFIED, with fallbacks
 
 Gates run on embedded PostgreSQL 18.4. None of the following has been run on the founder's hosted project:
 
 1. **`ALTER ROLE munim_crosstenant BYPASSRLS`** from the hosted `postgres` role (not a true superuser;
    PG16+ lets a CREATEROLE role grant only attributes it holds). *Fallback:* create the role once in the
-   dashboard SQL editor as `db_admin`-equivalent, or replace the two definer functions with
+   dashboard SQL editor as the host's own admin role, or replace the two definer functions with
    per-tenant loops that set `app.tenant_id` (the sweeper would then need the tenant list from a
    non-RLS registry).
 2. **`GRANT munim_migrator TO CURRENT_USER`** and `SET LOCAL ROLE munim_migrator` from `postgres`.

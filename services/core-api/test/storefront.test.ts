@@ -15,7 +15,7 @@ import { buildWorld, ownerCtx, type TestDb, uuidv7 } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, STOREFRONT_KEY_HEADER, storefrontResolver } from "../src/app.ts";
 import { configureStorefront, resetStorefront } from "../src/modules/storefront/index.ts";
 import {

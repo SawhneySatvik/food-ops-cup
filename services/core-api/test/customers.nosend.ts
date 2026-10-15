@@ -8,7 +8,7 @@ const PATTERNS: Array<[string, RegExp]> = [
   ["fetch call", /\bfetch\s*\(/],
   ["http(s)/net/tls/dgram client", /from\s+["'](?:node:)?(?:https?|net|tls|dgram|http2)["']|\brequire\(\s*["'](?:node:)?(?:https?|net|tls|dgram)["']/],
   ["net.connect / socket", /\b(?:net|tls)\.(?:connect|createConnection)\s*\(|\bnew\s+(?:WebSocket|XMLHttpRequest)\b/],
-  ["mail/SMS client", /\b(?:nodemailer|sendgrid|mailgun|postmark|twilio|cloud-sdk|@cloud-sdk|ses|sns|smtp|msg91|gupshup|whatsapp)\b/i],
+  ["mail/SMS client", /\b(?:nodemailer|sendgrid|mailgun|postmark|twilio|[a-z0-9]+-sdk|ses|sns|smtp|msg91|gupshup|whatsapp)\b/i],
   ["send function", /\bsend(?:Email|Mail|Sms|Text|Message|Campaign|Whatsapp)\b/i],
   ["delivery adapter import", /from\s+["'][^"']*adapters\/[^"']*["']|publisher-http/],
   ["campaign 'sent' status", /["'`]sent["'`]/],

@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 import type pg from "pg";
 import { createLogger, loadRepoConfig } from "../../../packages/config/src/index.ts";
 import { createRowPublisher, outboxRowToCloudEvent, type Publisher as EventPublisher } from "../../core-api/src/commit/outbox.ts";
-import { createHttpPublisher } from "../../core-api/src/dev-root.ts";
+import { createHttpPublisher } from "../../core-api/src/commit/publisher-http.ts";
 import { loadContracts } from "../../core-api/src/lib/contracts.ts";
 import { createPool } from "../../core-api/src/lib/db.ts";
 import { blobStoreFromEnv } from "../../core-api/src/blob-store.ts";

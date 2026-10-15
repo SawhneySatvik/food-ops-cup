@@ -25,7 +25,7 @@ import { createMunimClient } from "../../../packages/sdk/src/gen/client.ts";
 import { openStream, type StreamEvent as SdkStreamEvent } from "../../../packages/sdk/src/stream.ts";
 import { type AppEnv, contextOf, createApp, type Deps, requireMember, STOREFRONT_KEY_HEADER, TENANT_HEADER, withContext } from "../src/app.ts";
 import { GUEST_TOKEN_HEADER, type Storefront } from "../src/auth/resolve.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { readContext } from "../src/stream/feed.ts";
 import { closeStream, configureStream, type StreamOptions } from "../src/stream/index.ts";
 import { openDb } from "./db.ts";

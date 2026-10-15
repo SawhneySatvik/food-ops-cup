@@ -11,8 +11,9 @@ import type { IdP } from "./auth/port.ts";
 import { storefrontResolver } from "./auth/resolve.ts";
 import { blobStoreFromEnv } from "./blob-store.ts";
 import type { PublishDeps } from "./commit/index.ts";
-import { createHttpPublisher, createPersistentLocalIdp, devhostIdp } from "./dev-root.ts";
+import { createHttpPublisher } from "./commit/publisher-http.ts";
 import { setIdpMode } from "./health/index.ts";
+import { idpFromConfig } from "./idp.ts";
 import { configureInternal } from "./internal/index.ts";
 import { createPool, type Pools, withContext } from "./lib/db.ts";
 import { configureCaresNetwork } from "./modules/cares-network/index.ts";
@@ -38,7 +39,7 @@ export interface CoreApiWiring {
   /** munim_core on a session-mode connection, for the stream's LISTEN (a transaction pooler drops NOTIFY). */
   listenUrl: string;
   idp: IdP;
-  /** Reported by /health; default "devhost". */
+  /** Reported by /health (MUNIM_IDP's value); unset → null. */
   idpMode?: IdpMode;
   config: Pick<Config, "nodeEnv" | "redact">;
   log: Logger;
@@ -82,7 +83,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   const svc = svcTxOf(pools.svc);
   const publish: PublishDeps = { publisher: createHttpPublisher({ url: w.intelUrl, serviceSecret: w.serviceSecret }), svc, keys };
   const deps: Deps = { pools, idp: w.idp, storefronts: storefrontResolver(pools.core), publish, blobs: w.blobs ?? defaultBlobs(), config: w.config, log: w.log };
-  setIdpMode(deps, w.idpMode ?? "devhost");
+  if (w.idpMode) setIdpMode(deps, w.idpMode);
   // Keyed by this exact Deps object (a WeakMap in stream/index.ts) — never pass createApp a copy.
   configureStream(deps, {
     connect: () => new pg.Client({ connectionString: w.listenUrl, application_name: "munim_stream_listen", keepAlive: true }),
@@ -146,9 +147,7 @@ if (import.meta.filename === resolve(process.argv[1] ?? "")) {
     if (idpMode === "local") log("core-api: DEV LOCAL SIGN-IN ENABLED — not for real users");
     const api = await composeCoreApi(wiringFromConfig(config, log, {
       idpMode,
-      idp: idpMode === "local"
-        ? createPersistentLocalIdp(config.runDir)
-        : devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
+      idp: idpFromConfig(config, idpMode),
       keys: config.runTokenKeyPems() ?? ensureDevRunTokenKeys(config.runTokenKeyDir),
       blobs: blobStoreFromEnv(config, join(config.runDir, "blobs")),
     }));

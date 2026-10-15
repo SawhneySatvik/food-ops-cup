@@ -24,11 +24,9 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const run = (env: Record<string, string>, args: string[]) => {
-  const base = { ...process.env };
-  delete base.DEVHOST_SESSION_POOLER_CONNECTION_STRING;
-  return spawnSync(process.execPath, [SCRIPT, ...args], { env: { ...base, ...env }, encoding: "utf8" });
-};
+// Only PATH from this process: a database URL in the caller's own environment (under any name) never reaches the script.
+const run = (env: Record<string, string>, args: string[]) =>
+  spawnSync(process.execPath, [SCRIPT, ...args], { env: { PATH: process.env.PATH ?? "", ...env }, encoding: "utf8" });
 const login = async (role: string, password: string) => {
   const c = new pg.Client({ host: "127.0.0.1", port: own.port, user: role, password, database: own.database });
   try {
@@ -50,14 +48,14 @@ test("argument parsing: --out <p> and --out=<p> both work; unknown flags and a m
 test("no connection string in the environment → exit 1 with the reason, nothing written", () => {
   const r = run({}, ["--out", join(dir, "none.json")]);
   expect(r.status).toBe(1);
-  expect(r.stderr).toMatch(/DEVHOST_SESSION_POOLER_CONNECTION_STRING is not set/);
+  expect(r.stderr).toMatch(/bootstrap-roles: FAIL — MUNIM_DB_URL_SESSION( \(or [A-Z_]+\))? is not set in the environment/);
 });
 
 test("rotates all four login passwords, writes them 0600, new passwords log in and the old ones do not", async () => {
   const out = join(dir, "db-roles.json");
   const url = `postgres://postgres:${own.password}@127.0.0.1:${own.port}/${own.database}`;
   expect(await login("munim_core", own.password)).toBe(true); // the harness password, before
-  const r = run({ DEVHOST_SESSION_POOLER_CONNECTION_STRING: url }, [`--out=${out}`]);
+  const r = run({ MUNIM_DB_URL_SESSION: url }, [`--out=${out}`]);
   console.log(`bootstrap-roles: exit ${r.status}; ${r.stdout.trim().replace(dir, "<tmp>")}`);
   expect(r.status).toBe(0);
   expect(r.stdout).not.toMatch(/[0-9a-f]{48}/); // never prints a password

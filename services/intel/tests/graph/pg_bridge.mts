@@ -11,7 +11,7 @@
 import { createInterface } from "node:readline";
 import { createLogger } from "../../../../packages/config/src/index.ts";
 import { buildWorld, startTestDb } from "../../../../db/src/index.ts";
-import { createLocalIdp } from "../../../../services/core-api/src/dev-root.ts";
+import { createLocalIdp } from "../../../../services/core-api/src/auth/local-idp.ts";
 import { createApp, type Deps } from "../../../../services/core-api/src/app.ts";
 import { svcTx, testKeys } from "../../../../services/core-api/src/commit/testkit.ts";
 import { writeClaims, writeEdges, writeEntities } from "../../../../services/core-api/src/internal/batches.ts";

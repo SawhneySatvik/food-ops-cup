@@ -12,7 +12,7 @@ import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, storefrontResolver, TENANT_HEADER } from "../src/app.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { setProvisionTenant } from "../src/platform/index.ts";
 import { isTenancyModuleAbsent } from "../src/platform/provision.ts";
 import { openDb } from "./db.ts";
@@ -124,7 +124,7 @@ describe("model roles change only through an approved config draft", () => {
 
   it("an unknown provider is refused and leaves no draft; nvidia is accepted", async () => {
     const before = await draftCount();
-    for (const provider of ["unlisted", "litellm", "Gemini", ""]) {
+    for (const provider of ["mistral", "litellm", "Gemini", ""]) {
       const r = await propose("model_role:extract", { provider, model_id: "some-model" });
       expect(r.status).toBe(422);
       expect((await r.json()).error.code).toBe("invalid_payload");

@@ -5,13 +5,13 @@ import { Hono } from "hono";
 import { errorBody } from "../lib/errors.ts";
 import type { AppEnv, Deps } from "../lib/types.ts";
 
-// Which IdP this app verifies against (R44a), keyed by its Deps (like stream/index.ts); unset = devhost.
+// Which IdP this app verifies against (R44a: MUNIM_IDP's value), keyed by its Deps (like stream/index.ts); unset = null.
 const idpModes = new WeakMap<Deps, IdpMode>();
 export const setIdpMode = (deps: Deps, mode: IdpMode) => void idpModes.set(deps, mode);
 
 export const health = new Hono<AppEnv>().get("/health", async (c) => {
   const { pools, log } = c.var.deps;
-  const idp = idpModes.get(c.var.deps) ?? "devhost";
+  const idp = idpModes.get(c.var.deps) ?? null;
   try {
     const [v] = await Promise.all([
       pools.core.query<{ version: number | null }>("SELECT max(version)::int AS version FROM munim_meta.schema_migrations"),

@@ -1,7 +1,7 @@
 // T-005 gates on embedded Postgres: idempotent replay (byte-identical body), 409 on a reused key, the
 // advisory lock under concurrency, app.command_type set for the book guard, rollback on handler error,
 // 20 commands → 20 audit rows that verify, tamper → the verifier names the seq, and post-commit publishing
-// through the Publisher port (the HTTP adapter's end-to-end gates live in adapters/dev/publisher-http).
+// through the Publisher port (the HTTP adapter's end-to-end gates: test/publisher-http-e2e.test.ts).
 import { buildWorld, startTestDb, type TestDb } from "@munim/db";
 import { CommandResult, REPLAYED_HEADER, type CloudEvent, type CommandEnvelope } from "@munim/contracts";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";

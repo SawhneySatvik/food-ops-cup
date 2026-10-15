@@ -2,18 +2,65 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileS
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigError, createLogger, ENV_NAMES, loadConfig } from "../src/index.ts";
+import { ConfigError, createLogger, type DevEnv, devEnv, ENV_NAMES, loadConfig } from "../src/index.ts";
 
 // Synthetic planted values — never real keys.
 const PLANTED_PW = "pl4nted-Pw-7f3a9c";
 const PLANTED_KEY = "pl4nted-gemini-key-0042";
 
 describe("names", () => {
-  it("ENV_NAMES is exactly the variable list of .env.example (read independently)", () => {
+  it(".env.example (read independently) lists exactly ENV_NAMES, a dev mapping's names standing in for the ones it aliases", () => {
     const example = readFileSync(join(import.meta.dirname, "../../../.env.example"), "utf8");
     const names = [...example.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*=/gm)].map((m) => m[1]);
-    expect(names.length).toBeGreaterThan(0);
-    expect([...ENV_NAMES].sort()).toEqual([...names].sort());
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    const expected = devEnv ? [...ENV_NAMES.filter((n) => !devEnv!.aliases[n]), ...devEnv.names] : [...ENV_NAMES];
+    expect([...expected].sort()).toEqual([...names].sort());
+  });
+});
+
+// A dev mapping of the shape adapters/dev/env provides in a development checkout, with neutral test names. Tests whose
+// outcome depends on the mapping pass `dev` explicitly (this one or null), so they hold with or without adapters/dev.
+const OTHER_PW = "pl4nted-Pw-other-1b2c";
+const fakeDev: DevEnv = {
+  names: ["OTHER_SESSION_URL", "OTHER_TRANSACTION_URL", "OTHER_PROJECT"],
+  secretNames: ["OTHER_SESSION_URL", "OTHER_TRANSACTION_URL"],
+  aliases: { MUNIM_DB_URL_SESSION: "OTHER_SESSION_URL", MUNIM_DB_URL_TRANSACTION: "OTHER_TRANSACTION_URL" },
+  dbUser: (role, cfg) => `${role}.${cfg.require("OTHER_PROJECT")}`,
+  idpModes: ["devmode"],
+  idpDefault: "devmode",
+  blobModes: ["devstore"],
+  adapter: (kind, mode) => ({ kind, mode }),
+};
+
+describe("a dev mapping", () => {
+  const other = (port: number) => `postgresql://postgres.ref:${OTHER_PW}@pooler.example.test:${port}/postgres`;
+  it("its names stand in for the neutral ones; a role on an aliased URL logs in by its rule, on a neutral URL as itself", () => {
+    const env = { OTHER_TRANSACTION_URL: other(6543), OTHER_PROJECT: "ref", MUNIM_DB_PASSWORD_MUNIM_CORE: "core-pw" };
+    const cfg = loadConfig({ env, dev: fakeDev });
+    expect(cfg.get("MUNIM_DB_URL_TRANSACTION")).toBe(other(6543));
+    expect(new URL(cfg.dbUrl("munim_core")).username).toBe("munim_core.ref");
+    const neutral = loadConfig({ env: { MUNIM_DB_URL_TRANSACTION: other(6543), OTHER_PROJECT: "ref", MUNIM_DB_PASSWORD_MUNIM_CORE: "core-pw" }, dev: fakeDev });
+    expect(new URL(neutral.dbUrl("munim_core")).username).toBe("munim_core");
+    expect(cfg.redact(`x ${OTHER_PW} y`)).toMatch(/^x \[redacted:(MUNIM_DB_URL_TRANSACTION|OTHER_TRANSACTION_URL)\] y$/);
+  });
+  it("a neutral name and its dev name both set and different: refused, naming both and never a value", () => {
+    let thrown: unknown;
+    try {
+      loadConfig({ env: { MUNIM_DB_URL_SESSION: other(5432), OTHER_SESSION_URL: other(6543) }, dev: fakeDev });
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ConfigError);
+    expect((thrown as Error).message).toBe("MUNIM_DB_URL_SESSION and OTHER_SESSION_URL are both set and differ — set one");
+    expect((thrown as Error).message).not.toContain(OTHER_PW);
+    expect(loadConfig({ env: { MUNIM_DB_URL_SESSION: other(5432), OTHER_SESSION_URL: other(5432) }, dev: fakeDev }).get("MUNIM_DB_URL_SESSION")).toBe(other(5432));
+  });
+  it("its modes and adapters exist only with it", () => {
+    const cfg = loadConfig({ env: { MUNIM_BLOB: "devstore" }, dev: fakeDev });
+    expect([cfg.blob, cfg.devAdapter("blob", "devstore"), cfg.devAdapter("idp", "devmode")]).toEqual(["devstore", { kind: "blob", mode: "devstore" }, { kind: "idp", mode: "devmode" }]);
+    expect(() => cfg.devAdapter("blob", "gcs")).toThrow(/no blob adapter "gcs"/);
+    expect(() => loadConfig({ env: { MUNIM_BLOB: "devstore" }, dev: null })).toThrow(ConfigError);
+    expect(() => loadConfig({ env: {}, dev: null }).devAdapter("idp", "devmode")).toThrow(/no idp adapter "devmode" in this build/);
   });
 });
 
@@ -21,10 +68,11 @@ describe("loading", () => {
   it("reads the env file by name, process env wins, unknown names ignored, defaults for internal settings", () => {
     const dir = mkdtempSync(join(tmpdir(), "munim-config-"));
     const file = join(dir, "planted.env");
-    writeFileSync(file, `GEMINI_API_KEY=${PLANTED_KEY}\nDEVHOST_PROJECT_ID=fromfile\nNOT_A_MUNIM_NAME=x\n`);
-    const cfg = loadConfig({ envFile: file, env: { DEVHOST_PROJECT_ID: "fromenv" } });
+    writeFileSync(file, `GEMINI_API_KEY=${PLANTED_KEY}\nMUNIM_DB_URL_SESSION=postgres://file.example.test/m\nNOT_A_MUNIM_NAME=x\n`);
+    const cfg = loadConfig({ envFile: file, env: { MUNIM_DB_URL_SESSION: "postgres://env.example.test/m" }, dev: null });
     expect(cfg.get("GEMINI_API_KEY")).toBe(PLANTED_KEY);
-    expect(cfg.get("DEVHOST_PROJECT_ID")).toBe("fromenv");
+    expect(cfg.get("MUNIM_DB_URL_SESSION")).toBe("postgres://env.example.test/m");
+    expect(cfg.get("NOT_A_MUNIM_NAME")).toBeUndefined();
     expect(cfg.modelMode).toBe("recorded");
     expect(cfg.port).toBe(8787);
     expect(() => cfg.require("NVIDIA_API_KEY")).toThrow(/NVIDIA_API_KEY is not set/);
@@ -46,19 +94,24 @@ describe("loading", () => {
     }
   });
 
-  it("dbUrl logs in as the role on the transaction pooler", () => {
+  it("dbUrl logs in as the role on MUNIM_DB_URL_TRANSACTION", () => {
     const dir = mkdtempSync(join(tmpdir(), "munim-config-"));
     writeFileSync(join(dir, "db-roles.json"), JSON.stringify({ munim_core: "core-role-pw-1" }));
     const cfg = loadConfig({
       runDir: dir,
-      env: {
-        DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING: `postgresql://postgres.ref:${PLANTED_PW}@pooler.example.test:6543/postgres`,
-        DEVHOST_PROJECT_ID: "ref",
-      },
+      env: { MUNIM_DB_URL_TRANSACTION: `postgresql://postgres:${PLANTED_PW}@db.example.test:6543/postgres` },
     });
     const u = new URL(cfg.dbUrl("munim_core"));
-    expect([u.username, u.password, u.host, u.pathname]).toEqual(["munim_core.ref", "core-role-pw-1", "pooler.example.test:6543", "/postgres"]);
+    expect([u.username, u.password, u.host, u.pathname]).toEqual(["munim_core", "core-role-pw-1", "db.example.test:6543", "/postgres"]);
     expect(() => cfg.dbUrl("munim_svc")).toThrow(/no password for munim_svc/);
+    expect(() => loadConfig({ env: {}, dev: null }).dbUrl("munim_core")).toThrow("MUNIM_DB_URL_TRANSACTION is not set");
+  });
+
+  it("MUNIM_IDP_PROJECT_ID: a project id or a ConfigError, read only when asked", () => {
+    expect(loadConfig({ env: { MUNIM_IDP_PROJECT_ID: " munim-cup-2026 " } }).idpProjectId()).toBe("munim-cup-2026");
+    for (const bad of [undefined, "", "Munim", "ab", "x".repeat(31), "1abcdef", "abcdef-"]) {
+      expect(() => loadConfig({ env: { MUNIM_IDP_PROJECT_ID: bad } }).idpProjectId(), String(bad)).toThrow(/MUNIM_IDP_PROJECT_ID/);
+    }
   });
 });
 
@@ -83,8 +136,7 @@ describe("redaction gate", () => {
     // property holds the whole string, and ConfigError keeps it as `cause` — the realistic leak path.
     const cfg = loadConfig({
       env: {
-        DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING: `postgresql://postgres.ref:${PLANTED_PW}@[bad-host:6543/postgres`,
-        DEVHOST_PROJECT_ID: "ref",
+        MUNIM_DB_URL_TRANSACTION: `postgresql://postgres.ref:${PLANTED_PW}@[bad-host:6543/postgres`,
         GEMINI_API_KEY: PLANTED_KEY,
       },
     });
@@ -102,7 +154,7 @@ describe("redaction gate", () => {
     log(`provider call failed with key ${PLANTED_KEY}`);
 
     // Positive quantities first: the error and both lines exist and show where a secret was removed.
-    expect(message).toContain("[redacted:DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING]");
+    expect(message).toContain("[redacted:MUNIM_DB_URL_TRANSACTION]");
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("ConfigError");
     expect(lines[0]).toContain("TypeError"); // the cause was logged …
@@ -122,7 +174,7 @@ describe("redaction gate", () => {
     writeFileSync(join(dir, "db-roles.json"), `{"munim_core": ${rolePw}}`);
     const cfg = loadConfig({
       runDir: dir,
-      env: { DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING: "postgresql://u:p@pooler.example.test:6543/postgres", DEVHOST_PROJECT_ID: "ref" },
+      env: { MUNIM_DB_URL_TRANSACTION: "postgresql://u:p@pooler.example.test:6543/postgres" },
     });
     let thrown: unknown;
     try {
@@ -142,17 +194,16 @@ describe("redaction gate", () => {
 describe("T-009 additions", () => {
   const pooler = (port: number) => `postgresql://postgres.ref:${PLANTED_PW}@pooler.example.test:${port}/postgres`;
 
-  it("sessionDbUrl logs in as the role on the session pooler; m-1's {written_at, roles} file is read", () => {
+  it("sessionDbUrl logs in as the role on MUNIM_DB_URL_SESSION; m-1's {written_at, roles} file is read", () => {
     const dir = mkdtempSync(join(tmpdir(), "munim-config-"));
     writeFileSync(join(dir, "db-roles.json"), JSON.stringify({ written_at: "2026-10-10T00:00:00Z", roles: { munim_core: "core-role-pw-1", munim_svc: "svc-role-pw-2" } }));
-    const cfg = loadConfig({
-      runDir: dir,
-      env: { DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING: pooler(6543), DEVHOST_SESSION_POOLER_CONNECTION_STRING: pooler(5432), DEVHOST_PROJECT_ID: "ref" },
-    });
+    const cfg = loadConfig({ runDir: dir, env: { MUNIM_DB_URL_TRANSACTION: pooler(6543), MUNIM_DB_URL_SESSION: pooler(5432) } });
     const s = new URL(cfg.sessionDbUrl("munim_core"));
     const t = new URL(cfg.dbUrl("munim_svc"));
-    expect([s.username, s.password, s.port]).toEqual(["munim_core.ref", "core-role-pw-1", "5432"]);
-    expect([t.username, t.password, t.port]).toEqual(["munim_svc.ref", "svc-role-pw-2", "6543"]);
+    expect([s.username, s.password, s.port]).toEqual(["munim_core", "core-role-pw-1", "5432"]);
+    expect([t.username, t.password, t.port]).toEqual(["munim_svc", "svc-role-pw-2", "6543"]);
+    // The admin password inside each URL is a secret too (the Cloud SQL runbook puts one in MUNIM_DB_URL_SESSION).
+    expect(cfg.redact(`a ${PLANTED_PW} b`)).toBe("a [redacted:MUNIM_DB_URL_SESSION] b");
     // Both role passwords are registered for redaction once the file is read.
     expect(cfg.redact("a core-role-pw-1 b svc-role-pw-2")).toBe("a [redacted:munim_core password] b [redacted:munim_svc password]");
   });
@@ -260,14 +311,14 @@ describe("env-only config (envOnly: true)", () => {
     }
   });
 
-  it("blob store: MUNIM_BLOB defaults to fs, takes exactly fs|devhost|gcs; the bucket is read only when asked and must be a bucket name", () => {
+  it("blob store: MUNIM_BLOB defaults to fs, takes exactly fs|gcs (or a dev mapping's mode); the bucket is read only when asked and must be a bucket name", () => {
     const d = loadConfig({ env: {} });
     expect(d.blob).toBe("fs");
     expect(() => d.blobBucket()).toThrow(/MUNIM_BLOB_BUCKET is not set/);
-    expect(loadConfig({ env: { MUNIM_BLOB: "devhost", MUNIM_BLOB_BUCKET: "munim-uploads" } }).blobBucket()).toBe("munim-uploads");
+    expect(loadConfig({ env: { MUNIM_BLOB: "gcs", MUNIM_BLOB_BUCKET: "munim-uploads" } }).blobBucket()).toBe("munim-uploads");
     expect(loadConfig({ env: { MUNIM_BLOB: " gcs " } }).blob).toBe("gcs");
-    for (const bad of ["s3", "the dev host", "fs,gcs", "--blob=gcs"]) {
-      expect(() => loadConfig({ env: { MUNIM_BLOB: bad } }), bad).toThrow(ConfigError);
+    for (const bad of ["s3", "GCS", "fs,gcs", "--blob=gcs", "devstore"]) {
+      expect(() => loadConfig({ env: { MUNIM_BLOB: bad }, dev: null }), bad).toThrow(ConfigError);
     }
     for (const bad of ["ab", "Munim", "-x-", "a/b", "x".repeat(64)]) {
       expect(() => loadConfig({ env: { MUNIM_BLOB_BUCKET: bad } }).blobBucket(), bad).toThrow(ConfigError);

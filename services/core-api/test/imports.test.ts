@@ -16,7 +16,7 @@ import { buildWorld, type TestDb, uuidv7, type World } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { parsePendingImports } from "../../core-worker/src/imports/index.ts";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { seedChart } from "../src/modules/finance/index.ts";

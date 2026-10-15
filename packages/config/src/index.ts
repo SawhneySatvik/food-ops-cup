@@ -1,80 +1,80 @@
-// The one config module (project rule 20). Loads the founder's `.env` by the names in `.env.example`,
-// holds Munim-internal settings (defaults in code, generated files under `.run/`), and redacts every
-// secret value from error messages and log lines. Gates never need `.env`: they pass `env` directly.
+// The one config module. Loads an env file (`.env`) by the names in ENV_NAMES, holds Munim-internal settings
+// (defaults in code, generated files under `.run/`), and redacts every secret value from error messages and log
+// lines. Gates never need an env file: they pass `env` directly.
+//
+// Every name here is provider-neutral. A development checkout may add a dev mapping (`devEnv` below): its own
+// variable names for the same settings, extra MUNIM_IDP / MUNIM_BLOB values and their adapters. It is loaded when its
+// file exists and is absent from a build without the dev adapters. A neutral name and the dev name that stands in
+// for it may not both be set to different values.
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { inspect, parseEnv } from "node:util";
 
-/** Exactly the names in `.env.example` (test: test/names.test.ts compares the two). */
+/** The names an env file may hold (`.env.example` lists them). Every other setting comes from the process environment. */
 export const ENV_NAMES = [
   "GEMINI_API_KEY",
   "NVIDIA_API_KEY",
   "OPENROUTER_API_KEY",
-  "DEVHOST_DB_PASSWORD",
-  "DEVHOST_PROJECT_URL",
-  "DEVHOST_PUBLISHABLE_KEY",
-  "DEVHOST_PROJECT_ID",
-  "DEVHOST_SECRET_KEY",
-  "DEVHOST_DIRECT_CONNECTION_STRING",
-  "DEVHOST_DIRECT_CONNECTION_HOST",
-  "DEVHOST_DIRECT_CONNECTION_PORT",
-  "DEVHOST_DIRECT_CONNECTION_DATABASE",
-  "DEVHOST_DIRECT_CONNECTION_USER",
-  "DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING",
-  "DEVHOST_TRANSACTION_POOLER_HOST",
-  "DEVHOST_TRANSACTION_POOLER_PORT",
-  "DEVHOST_TRANSACTION_POOLER_DATABASE",
-  "DEVHOST_TRANSACTION_POOLER_USER",
-  "DEVHOST_SESSION_POOLER_CONNECTION_STRING",
-  "DEVHOST_SESSION_POOLER_HOST",
-  "DEVHOST_SESSION_POOLER_PORT",
-  "DEVHOST_SESSION_POOLER_DATABASE",
-  "DEVHOST_SESSION_POOLER_USER",
-  "UPSTASH_REDIS_REST_URL",
-  "UPSTASH_REDIS_REST_TOKEN",
+  "MUNIM_DB_URL_SESSION",
+  "MUNIM_DB_URL_TRANSACTION",
 ] as const;
 export type EnvName = (typeof ENV_NAMES)[number];
 
-/** Values never shown. Connection strings carry the database password inside them. */
-const SECRET_NAMES: readonly EnvName[] = [
-  "GEMINI_API_KEY",
-  "NVIDIA_API_KEY",
-  "OPENROUTER_API_KEY",
-  "DEVHOST_DB_PASSWORD",
-  "DEVHOST_SECRET_KEY",
-  "DEVHOST_DIRECT_CONNECTION_STRING",
-  "DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING",
-  "DEVHOST_SESSION_POOLER_CONNECTION_STRING",
-  "UPSTASH_REDIS_REST_TOKEN",
-];
+/** Values never shown: the provider keys, and the database URLs, which may carry a password. */
+const SECRET_NAMES: readonly string[] = ENV_NAMES;
 
 export type ModelMode = "recorded" | "live";
-/** Where uploaded documents' bytes live: a local directory, a private the dev blob store bucket, a Cloud Storage bucket. */
-export type BlobMode = "fs" | "devhost" | "gcs";
-const BLOB_MODES: readonly BlobMode[] = ["fs", "devhost", "gcs"];
+/** Where uploaded documents' bytes live: "fs" (a local directory), "gcs" (a Cloud Storage bucket), or a dev mode. */
+export type BlobMode = string;
+const BLOB_MODES: readonly string[] = ["fs", "gcs"];
+/** Which IdP core-api verifies against: "local" (dev only), "identity-platform", or a dev mode. */
+export type IdpMode = string;
+const IDP_MODES: readonly string[] = ["local", "identity-platform"];
 export type DbRole = "munim_core" | "munim_svc" | "munim_platform";
 const DB_ROLES: readonly DbRole[] = ["munim_core", "munim_svc", "munim_platform"];
+const quoted = (xs: readonly string[]) => xs.map((x) => `"${x}"`).join(", ");
+
+/** A dev mapping. Everything it adds is keyed by its own variable names. */
+export interface DevEnv {
+  /** Its variable names, read from the env file and the process environment like ENV_NAMES. */
+  names: readonly string[];
+  /** Those whose values are secrets (a URL's password is registered too). */
+  secretNames: readonly string[];
+  /** A neutral name -> the dev name that may stand in for it. */
+  aliases: Readonly<Partial<Record<EnvName, string>>>;
+  /** A runtime role's login name on a database URL that came from an alias. */
+  dbUser(role: DbRole, cfg: Config): string;
+  /** Extra MUNIM_IDP values; `idpDefault` applies when MUNIM_IDP is unset. */
+  idpModes: readonly string[];
+  idpDefault: string;
+  /** Extra MUNIM_BLOB values. */
+  blobModes: readonly string[];
+  /** The adapter for one of its modes (the composition root that asks knows the port's type). */
+  adapter(kind: "idp" | "blob", mode: string, cfg: Config): unknown;
+}
+
+// Computed, so that no type checker or bundler follows it into a checkout that lacks the file.
+const DEV_ENV = new URL(["..", "..", "..", "adapters", "dev", "env", "index.ts"].join("/"), import.meta.url);
+/** This checkout's dev mapping, or null. */
+export const devEnv: DevEnv | null = existsSync(DEV_ENV) ? ((await import(DEV_ENV.href)) as { devEnv: DevEnv }).devEnv : null;
 
 export interface Config {
   nodeEnv: string;
   port: number;
   modelMode: ModelMode;
-  /** A `.env` value by its `.env.example` name; undefined when unset or empty. */
-  get(name: EnvName): string | undefined;
+  /** An env-file setting by its ENV_NAMES name (or a dev mapping's name); undefined when unset or empty. */
+  get(name: EnvName | (string & {})): string | undefined;
   /** Like get(), but throws a ConfigError naming the variable (never its value) when unset. */
-  require(name: EnvName): string;
+  require(name: EnvName | (string & {})): string;
   /**
-   * App-pool connection string for a runtime role (03-arch §1.2): the transaction pooler's host, port and
-   * database, logged in as the role. UNVERIFIED against the hosted project: the dev host's pooler expects the
-   * user as `<role>.<project id>`; role passwords are not in `.env` and are read from `.run/db-roles.json`
-   * (`{"munim_core": "…", "munim_svc": "…"}`) — how they get there is an open founder question (T-004 report).
+   * App-pool connection string for a runtime role (03-arch §1.2): MUNIM_DB_URL_TRANSACTION's host, port and database,
+   * logged in as the role with its password (`MUNIM_DB_PASSWORD_<ROLE>`, else `.run/db-roles.json`).
    */
   dbUrl(role: DbRole): string;
   /**
-   * Session-mode connection string for a runtime role: the session pooler's host, port and database (IPv4),
-   * logged in as the role like dbUrl(). For LISTEN/NOTIFY (rule 20): a transaction pooler never delivers
-   * notifications.
+   * Session-mode connection string for a runtime role: MUNIM_DB_URL_SESSION, logged in as the role like dbUrl(). For
+   * LISTEN/NOTIFY: a transaction-mode pooler never delivers notifications.
    */
   sessionDbUrl(role: DbRole): string;
   /** Directory of generated Munim-internal files (`.run/`; `MUNIM_RUN_DIR` or LoadOptions.runDir). */
@@ -109,11 +109,15 @@ export interface Config {
    *  (`MUNIM_TICK_BUDGET_S`, 1–3600, default 240: under a 300 s request limit). */
   tickPeriodMinutes: number;
   tickBudgetMs: number;
-  /** `MUNIM_BLOB`: "fs" (default), "devhost" or "gcs"; anything else is a ConfigError (gotcha 17). Every process that
-   *  writes or reads uploads (core-api, the tick, core-worker) must see the same value. */
+  /** `MUNIM_BLOB`: "fs" (default), "gcs" or a dev mapping's mode; anything else is a ConfigError (gotcha 17). Every
+   *  process that writes or reads uploads (core-api, the tick, core-worker) must see the same value. */
   blob: BlobMode;
-  /** `MUNIM_BLOB_BUCKET`, the bucket for "devhost" and "gcs" (3–63 of a-z 0-9 . _ -); unset or malformed → ConfigError. */
+  /** `MUNIM_BLOB_BUCKET`, the bucket for a shared store (3–63 of a-z 0-9 . _ -); unset or malformed → ConfigError. */
   blobBucket(): string;
+  /** `MUNIM_IDP_PROJECT_ID`, the Identity Platform project (6–30 of a-z 0-9 -); unset or malformed → ConfigError. */
+  idpProjectId(): string;
+  /** The dev mapping's adapter for a dev MUNIM_IDP / MUNIM_BLOB value; a ConfigError in a build without it. */
+  devAdapter(kind: "idp" | "blob", mode: string): unknown;
   /** Registers for redaction every secret already generated under runDir (role passwords, service secret, the
    *  dev run-token private key) without creating any; returns how many values are now registered in total. */
   registerRunSecrets(): number;
@@ -126,7 +130,7 @@ export class ConfigError extends Error {
 }
 
 export interface LoadOptions {
-  /** Path of the founder's `.env`; read only if it exists. Gates pass `env` instead and no file. */
+  /** Path of the env file; read only if it exists. Gates pass `env` instead and no file. */
   envFile?: string;
   /** Process-style environment. Values here win over the file. Defaults to `process.env`. */
   env?: Record<string, string | undefined>;
@@ -135,21 +139,36 @@ export interface LoadOptions {
   /** Every secret from `env` only: nothing under runDir is read or written (role passwords, service secret,
    *  run-token keys), and a missing one is a ConfigError. For hosts with a read-only, per-instance filesystem. */
   envOnly?: boolean;
+  /** The dev mapping to apply: default this checkout's (`devEnv`); tests pass null or their own. */
+  dev?: DevEnv | null;
 }
 
-/** Local Postgres instead of the the dev host poolers (`make up LOCAL_DB=1`): a base URL with host, port and
- *  database only; each runtime role logs in as itself with its password from `<runDir>/db-roles.json`. */
+/** A local Postgres (`make up LOCAL_DB=1`): a base URL with host, port and database only; each runtime role logs in
+ *  as itself with its password from `<runDir>/db-roles.json`. Wins over MUNIM_DB_URL_*. */
 const LOCAL_DB_URL = "MUNIM_DATABASE_URL";
 const DEFAULT_INTEL_URL = "http://127.0.0.1:8081";
 
 export function loadConfig(opts: LoadOptions = {}): Config {
   const env = opts.env ?? process.env;
-  const fromFile = opts.envFile && existsSync(opts.envFile) ? parseEnv(readFileSync(opts.envFile, "utf8")) : {};
-  const values = new Map<EnvName, string>();
-  for (const n of ENV_NAMES) {
-    const v = (env[n] ?? (fromFile as Record<string, string | undefined>)[n] ?? "").trim();
+  const dev = opts.dev === undefined ? devEnv : opts.dev;
+  const fromFile = (opts.envFile && existsSync(opts.envFile) ? parseEnv(readFileSync(opts.envFile, "utf8")) : {}) as Record<string, string | undefined>;
+  const values = new Map<string, string>();
+  for (const n of [...ENV_NAMES, ...(dev?.names ?? [])]) {
+    const v = (env[n] ?? fromFile[n] ?? "").trim();
     if (v !== "") values.set(n, v);
   }
+  // A dev name stands in for its neutral name; both set to different values is refused (names only, never values).
+  const aliasOf = new Map<string, string>();
+  for (const [neutral, devName] of Object.entries(dev?.aliases ?? {}) as [EnvName, string][]) {
+    aliasOf.set(neutral, devName);
+    const d = values.get(devName);
+    if (d === undefined) continue;
+    const n = values.get(neutral);
+    if (n !== undefined && n !== d) throw new ConfigError(`${neutral} and ${devName} are both set and differ — set one`);
+    values.set(neutral, d);
+  }
+  const viaAlias = (n: EnvName) => aliasOf.has(n) && values.has(aliasOf.get(n)!);
+  const named = (n: string) => (aliasOf.has(n) ? `${n} (or ${aliasOf.get(n)})` : n);
 
   const secrets: Array<[string, string]> = [];
   const addSecret = (label: string, v: string | undefined) => {
@@ -158,15 +177,13 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     const enc = encodeURIComponent(v);
     if (enc !== v) secrets.push([label, enc]);
   };
-  for (const n of SECRET_NAMES) {
+  for (const n of [...SECRET_NAMES, ...(dev?.secretNames ?? [])]) {
     const v = values.get(n);
     addSecret(n, v);
-    if (v && n.endsWith("_CONNECTION_STRING")) {
-      const pw = urlPassword(v);
-      if (pw) {
-        addSecret(n, pw);
-        addSecret(n, safeDecode(pw));
-      }
+    const pw = v ? urlPassword(v) : null;
+    if (pw) {
+      addSecret(n, pw);
+      addSecret(n, safeDecode(pw));
     }
   }
   // Longest first, so a secret that contains another is replaced whole.
@@ -177,8 +194,9 @@ export function loadConfig(opts: LoadOptions = {}): Config {
   if (modelMode !== "recorded" && modelMode !== "live") {
     throw new ConfigError(`MUNIM_MODEL_MODE must be "recorded" or "live"`);
   }
-  const blob = (env.MUNIM_BLOB?.trim() || "fs") as BlobMode;
-  if (!BLOB_MODES.includes(blob)) throw new ConfigError(`MUNIM_BLOB must be "fs", "devhost" or "gcs"`);
+  const blobModes = [...BLOB_MODES, ...(dev?.blobModes ?? [])];
+  const blob = env.MUNIM_BLOB?.trim() || "fs";
+  if (!blobModes.includes(blob)) throw new ConfigError(`MUNIM_BLOB must be one of ${quoted(blobModes)}`);
   const port = Number(env.PORT ?? "8787");
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new ConfigError("PORT must be an integer 1–65535");
 
@@ -232,7 +250,7 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     return { file, passwords };
   };
 
-  const roleUrl = (base: "DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING" | "DEVHOST_SESSION_POOLER_CONNECTION_STRING", role: DbRole): string => {
+  const roleUrl = (base: "MUNIM_DB_URL_TRANSACTION" | "MUNIM_DB_URL_SESSION", role: DbRole): string => {
     const local = env[LOCAL_DB_URL]?.trim();
     const name = local ? LOCAL_DB_URL : base;
     const text = local || cfg.require(base);
@@ -245,7 +263,7 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     const { file, passwords } = rolePasswords();
     const pw = passwords[role];
     if (!pw) throw new ConfigError(`no password for ${role} in ${file}`);
-    url.username = local ? role : `${role}.${cfg.require("DEVHOST_PROJECT_ID")}`;
+    url.username = !local && dev && viaAlias(base) ? dev.dbUser(role, cfg) : role;
     url.password = pw;
     return url.toString();
   };
@@ -257,11 +275,11 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     get: (n) => values.get(n),
     require(n) {
       const v = values.get(n);
-      if (v === undefined) throw new ConfigError(`${n} is not set — see .env.example`);
+      if (v === undefined) throw new ConfigError(`${named(n)} is not set — see .env.example`);
       return v;
     },
-    dbUrl: (role) => roleUrl("DEVHOST_TRANSACTION_POOLER_CONNECTION_STRING", role),
-    sessionDbUrl: (role) => roleUrl("DEVHOST_SESSION_POOLER_CONNECTION_STRING", role),
+    dbUrl: (role) => roleUrl("MUNIM_DB_URL_TRANSACTION", role),
+    sessionDbUrl: (role) => roleUrl("MUNIM_DB_URL_SESSION", role),
     runDir,
     runTokenKeyDir: join(runDir, "keys"),
     intelUrl: env.MUNIM_INTEL_URL?.trim() || DEFAULT_INTEL_URL,
@@ -310,6 +328,16 @@ export function loadConfig(opts: LoadOptions = {}): Config {
       const v = env.MUNIM_BLOB_BUCKET?.trim() ?? "";
       if (!/^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$/.test(v)) throw new ConfigError("MUNIM_BLOB_BUCKET is not set or not a bucket name (3–63 of a-z 0-9 . _ -)");
       return v;
+    },
+    idpProjectId() {
+      const v = env.MUNIM_IDP_PROJECT_ID?.trim() ?? "";
+      if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(v)) throw new ConfigError("MUNIM_IDP_PROJECT_ID is not set or not a project id (6–30 of a-z 0-9 -)");
+      return v;
+    },
+    devAdapter(kind, mode) {
+      const modes = kind === "idp" ? dev?.idpModes : dev?.blobModes;
+      if (!dev || !modes?.includes(mode)) throw new ConfigError(`no ${kind} adapter "${mode}" in this build`);
+      return dev.adapter(kind, mode, cfg);
     },
     registerRunSecrets() {
       rolePasswords();
@@ -375,20 +403,22 @@ export function loadRepoConfig(root: string, env: Record<string, string | undefi
   return loadConfig({ envFile: env.MUNIM_ENV_FILE?.trim() || join(root, ".env"), runDir: join(root, ".run"), env });
 }
 
-export type IdpMode = "local" | "devhost";
 
-/** Which IdP core-api verifies against (R44a): `--idp=<v>` / `--idp <v>` beats `MUNIM_IDP`; default `devhost`.
- *  Anything but exactly "local" or "devhost" throws (gotcha 17). "local" is refused unless this is a dev
- *  environment: `NODE_ENV=production` or a `MUNIM_ENV` other than `dev` → ConfigError, before anything starts. */
-export function resolveIdpMode(env: Record<string, string | undefined> = process.env, argv: readonly string[] = []): IdpMode {
+/** Which IdP core-api verifies against (R44a): `--idp=<v>` / `--idp <v>` beats `MUNIM_IDP`; unset → the dev mapping's
+ *  default, and a ConfigError in a build without one. Anything but exactly one of the known values throws (gotcha 17).
+ *  "local" is refused unless this is a dev environment: `NODE_ENV=production` or a `MUNIM_ENV` other than `dev` →
+ *  ConfigError, before anything starts. */
+export function resolveIdpMode(env: Record<string, string | undefined> = process.env, argv: readonly string[] = [], dev: DevEnv | null = devEnv): IdpMode {
   let raw = env.MUNIM_IDP;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--idp") raw = argv[++i] ?? "";
     else if (a.startsWith("--idp=")) raw = a.slice("--idp=".length);
   }
-  const mode = raw === undefined ? "devhost" : raw;
-  if (mode !== "local" && mode !== "devhost") throw new ConfigError(`MUNIM_IDP must be exactly "local" or "devhost"`);
+  const modes = [...IDP_MODES, ...(dev?.idpModes ?? [])];
+  const mode = raw === undefined ? dev?.idpDefault : raw;
+  if (mode === undefined) throw new ConfigError(`MUNIM_IDP is not set: one of ${quoted(modes)}`);
+  if (!modes.includes(mode)) throw new ConfigError(`MUNIM_IDP must be exactly one of ${quoted(modes)}`);
   if (mode === "local") {
     if (env.NODE_ENV === "production") throw new ConfigError("MUNIM_IDP=local is refused when NODE_ENV=production");
     // Explicit: an unset MUNIM_ENV is not "dev" (a deploy that forgot NODE_ENV must not accept local tokens). `make up` sets it.

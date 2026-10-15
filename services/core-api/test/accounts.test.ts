@@ -22,7 +22,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, GUEST_TOKEN_HEADER, requireCustomer, storefrontResolver } from "../src/app.ts";
 import { ensureProfile } from "../src/modules/accounts/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 import { addCustomer, addGuestOrder, buildTenant, type Tenant } from "./world.ts";
 

@@ -4,14 +4,15 @@
 //
 //   node db/scripts/bootstrap-roles.ts [--out <path> | --out=<path>]
 //
-// The target comes ONLY from $DEVHOST_SESSION_POOLER_CONNECTION_STRING, exported by the caller — this
-// script never reads .env (project rule 20) and never prints a password. Re-running rotates every
+// The target comes ONLY from $MUNIM_DB_URL_SESSION, exported by the caller — this script never reads .env and never
+// prints a password. Re-running rotates every
 // password. It refuses a database that has not been migrated (the roles must already exist).
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { adminUrlFromEnv } from "../migrate.ts";
 
 export const LOGIN_ROLES = ["munim_core", "munim_svc", "munim_intel_ro", "munim_platform"] as const;
 export const DEFAULT_OUT = fileURLToPath(new URL("../../.run/db-roles.json", import.meta.url));
@@ -61,8 +62,7 @@ export async function bootstrapRoles(client: pg.Client): Promise<Record<string, 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     const { out } = parseArgs(process.argv.slice(2));
-    const url = process.env.DEVHOST_SESSION_POOLER_CONNECTION_STRING;
-    if (!url) throw new Error("bootstrap-roles: DEVHOST_SESSION_POOLER_CONNECTION_STRING is not set in the environment (this script never reads .env — project rule 20)");
+    const url = await adminUrlFromEnv("bootstrap-roles");
     const client = new pg.Client({ connectionString: url });
     await client.connect();
     try {

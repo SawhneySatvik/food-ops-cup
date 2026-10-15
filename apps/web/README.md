@@ -26,12 +26,13 @@ The site talks to one of two backends:
 | `NEXT_PUBLIC_MUNIM_MOCK_CONTROLS` | build | `1` shows the mock's test controls. Only with the mock |
 | `MUNIM_MOCK` | server | `1` serves `/mock/v1/*`; otherwise those routes answer 404. Production never sets it |
 | `MOCK_TOKEN_SECRET` | server | optional: signs the mock's guest tokens |
-| `MUNIM_API_ORIGIN` | build and server | `/api/:path*` is rewritten to `${MUNIM_API_ORIGIN}/:path*` (the munim-api deployment, or `http://127.0.0.1:8790` locally). Unset: no rewrite |
+| `MUNIM_API_ORIGIN` | build and server | `/api/:path*` is rewritten to `${MUNIM_API_ORIGIN}/:path*` (the deployed core-api, or `http://127.0.0.1:8790` locally). Unset: no rewrite |
 | `MUNIM_DEMO_SIGNIN` | server | `1` turns on the demo picker's sign-in route, `POST /staff/demo-session`; otherwise it answers 404 |
 | `MUNIM_DEMO_TENANT_ID` | server | the Cobnut tenant the picker signs into. Point it at a freshly seeded tenant to reset the demo |
-| `DEVHOST_PROJECT_URL`, `DEVHOST_PUBLISHABLE_KEY` | server | the dev IdP, for the picker's password grant |
+| `MUNIM_IDP` | server | how the picker signs a person in, as core-api verifies them: `identity-platform` (Identity Platform's password grant) or `local` (a tokens file, development only) |
+| `MUNIM_IDP_WEB_API_KEY` | server | with `MUNIM_IDP=identity-platform`: the Identity Platform web API key (public by design, restricted to that API) |
 | `MUNIM_DEMO_PASSWORD` | server, secret | the one password of the four demo accounts (`<key>@cobnut-demo.invalid`) |
-| `MUNIM_IDP`, `MUNIM_DEMO_TOKENS` | server | with `MUNIM_IDP=local`, the route reads the token from `MUNIM_DEMO_TOKENS`, a JSON file `{"owner": "…", "manager": "…", "counter": "…", "kitchen": "…"}`, instead of calling the dev host |
+| `MUNIM_DEMO_TOKENS` | server | with `MUNIM_IDP=local`, the route reads the token from this JSON file `{"owner": "…", "manager": "…", "counter": "…", "kitchen": "…"}` instead of calling an IdP |
 
 The secrets are set in the host's settings, never in a committed file. The route never logs a token or the password.
 
@@ -49,7 +50,7 @@ the audit log records the person chosen.
 
 On the mock each person has a public mock token (`lib/munim/session.ts`). On the real API the picker calls
 `POST /staff/demo-session {"person": "<key>"}`, which returns `{token, tenant_id}`; the browser then proves both with
-`GET /v1/me`. The the dev host token lasts about an hour; after that the site signs the person out.
+`GET /v1/me`. The IdP's token lasts about an hour; after that the site signs the person out.
 
 ## Develop on the mock
 

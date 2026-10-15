@@ -1,8 +1,8 @@
-// The env-only composition root, for a host that runs core-api as request-scoped functions on a read-only,
-// per-instance filesystem (a serverless host's function entry imports this). Differences from server.ts's entry:
+// The env-only composition root, for a host that runs core-api from the process environment alone: a container entry
+// (infra/gcp/entries) or request-scoped functions on a read-only, per-instance filesystem. Differences from server.ts's entry:
 //   - config from the process environment only (`envOnly`): no `.env` file and nothing read or written under `.run/`;
 //     a missing secret (role password, service secret, run-token PEMs) fails the boot, never generates one per instance
-//   - the dev IdP only (MUNIM_IDP=local is a dev mode with token files under `.run/`)
+//   - the IdP MUNIM_IDP names (idpFromConfig), never "local" (a dev mode whose signing key lives under `.run/`)
 //   - core-worker's jobs run behind the tick route (`/internal/cron/v1/tick`) when MUNIM_CRON_SECRET is set, instead of
 //     in a long-running process: the same Worker, the same munim_svc role
 //   - uploaded documents go to the store MUNIM_BLOB names (blobStoreFromEnv): a shared bucket in production, because an
@@ -13,7 +13,7 @@ import { type Config, ConfigError, createLogger, type Logger, loadConfig, resolv
 import { composeWorker } from "../../core-worker/src/main.ts";
 import { blobStoreFromEnv } from "./blob-store.ts";
 import { configureTick } from "./cron/index.ts";
-import { devhostIdp } from "./dev-root.ts";
+import { idpFromConfig } from "./idp.ts";
 import { composeCoreApi, type CoreApi, wiringFromConfig } from "./server.ts";
 
 // The one store chooser, for every host's entry (the Cup's core-worker entry imports it from here).
@@ -33,15 +33,10 @@ export async function composeFromEnv(env: Record<string, string | undefined> = p
 
 async function compose(config: Config, log: Logger, env: Record<string, string | undefined>): Promise<CoreApi> {
   const idpMode = resolveIdpMode(env);
-  if (idpMode !== "devhost") throw new ConfigError("the env-only boot supports MUNIM_IDP=devhost only");
+  if (idpMode === "local") throw new ConfigError("the env-only boot refuses MUNIM_IDP=local");
   const keys = config.runTokenKeyPems()!; // envOnly: throws when unset, never null
   const blobs = blobStoreFromEnv(config);
-  const api = await composeCoreApi(wiringFromConfig(config, log, {
-    idpMode,
-    idp: devhostIdp({ projectUrl: config.require("DEVHOST_PROJECT_URL"), publishableKey: config.require("DEVHOST_PUBLISHABLE_KEY") }),
-    keys,
-    blobs,
-  }));
+  const api = await composeCoreApi(wiringFromConfig(config, log, { idpMode, idp: idpFromConfig(config, idpMode), keys, blobs }));
   const cronSecret = config.cronSecret();
   if (cronSecret) {
     const { worker } = composeWorker({

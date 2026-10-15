@@ -23,7 +23,7 @@ import { createInterface } from "node:readline";
 import { createLogger, loadConfig } from "../../../../packages/config/src/index.ts";
 import { startTestDb } from "../../../../db/src/index.ts";
 import { TENANT_HEADER } from "../../../../services/core-api/src/app.ts";
-import { createLocalIdp } from "../../../../services/core-api/src/dev-root.ts";
+import { createLocalIdp } from "../../../../services/core-api/src/auth/local-idp.ts";
 import { localBlobStore } from "../../../../services/core-api/src/modules/imports/index.ts";
 import { configureInvestigations } from "../../../../services/core-api/src/modules/investigations/index.ts";
 import { composeCoreApi, serveApi } from "../../../../services/core-api/src/server.ts";

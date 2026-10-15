@@ -13,7 +13,7 @@ import { uuidv7 } from "@munim/db";
 import { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { type AppEnv, ApiError, createApp, requireCustomer, storefrontResolver, TENANT_HEADER, withContext } from "../src/app.ts";
 import { executeCommand } from "../src/commit/index.ts";
 import { provisionTenant } from "../src/modules/tenancy/index.ts";

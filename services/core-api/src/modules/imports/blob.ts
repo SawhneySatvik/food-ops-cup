@@ -1,6 +1,6 @@
 // Blob port (03-architecture ports): the bytes of an uploaded document live outside Postgres; core.document
 // keeps only the key (`storage_ref`). The local store writes under `.run/blobs/` (git-ignored); a hosted
-// adapter (the dev blob store in dev, GCS for the Cup fork) implements the same two calls later.
+// adapter (Cloud Storage, adapters/gcp/blob-gcs; a dev checkout's own shared store) implements the same two calls.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 

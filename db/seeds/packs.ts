@@ -8,6 +8,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { adminUrlFromEnv } from "../migrate.ts";
 
 export const PACKS_DIR = fileURLToPath(new URL("../../packages/contracts/packs/", import.meta.url));
 
@@ -63,11 +64,7 @@ export async function seedPacks(
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const url = process.env.DEVHOST_SESSION_POOLER_CONNECTION_STRING;
-  if (!url) {
-    console.error("seed:packs: FAIL — DEVHOST_SESSION_POOLER_CONNECTION_STRING is not set in the environment (this script never reads .env — project rule 20)");
-    process.exit(1);
-  }
+  const url = await adminUrlFromEnv("seed:packs");
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {

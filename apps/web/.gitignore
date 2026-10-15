@@ -33,14 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# deployhost
-.deployhost
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 # The example env holds only public mock values
 !.env.example
-
-.deployhost

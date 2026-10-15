@@ -1,11 +1,12 @@
-// idp-local — the IdP adapter every gate uses (03-arch §4). Holds an Ed25519 key pair in memory, publishes
-// it as a one-key JWKS, signs test ID tokens and verifies them exactly as a real adapter would (signature,
-// exp, issuer, audience). Synthetic identities only; never wired into a deployment.
+// The local IdP every gate uses (03-arch §4), and the dev-only MUNIM_IDP=local sign-in. Holds an Ed25519 key pair,
+// publishes it as a one-key JWKS, signs test ID tokens and verifies them exactly as a real adapter would (signature,
+// exp, issuer, audience). Synthetic identities only; never wired into a deployment (resolveIdpMode refuses "local" in
+// production and outside MUNIM_ENV=dev).
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { verifyJwt, type Jwks } from "../../../services/core-api/src/auth/jwt.ts";
-import type { Identity, IdP } from "../../../services/core-api/src/auth/port.ts";
+import { verifyJwt, type Jwks } from "./jwt.ts";
+import type { Identity, IdP } from "./port.ts";
 
 export const LOCAL_ISSUER = "munim-idp-local";
 export const LOCAL_AUDIENCE = "munim";

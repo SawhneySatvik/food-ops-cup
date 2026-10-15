@@ -5,8 +5,8 @@
 //     the file is not recorded, so it applies on a later run against a server that has it.
 //   - From 0002 on, each file runs under `SET LOCAL ROLE munim_migrator`, so every object it creates is
 //     owned by munim_migrator (0001 creates that role, so it runs as the connecting admin).
-// CLI: `pnpm -F @munim/db migrate` against $DEVHOST_SESSION_POOLER_CONNECTION_STRING, which the caller exports
-// (the script never reads .env — project rule 20). Never point it at a database you did not mean to.
+// CLI: `pnpm -F @munim/db migrate` against $MUNIM_DB_URL_SESSION (an admin URL), which the caller exports (the script
+// never reads .env; the config module reads only the environment here). Never point it at a database you did not mean to.
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -126,12 +126,20 @@ export async function migrate(
   return result;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const url = process.env.DEVHOST_SESSION_POOLER_CONNECTION_STRING;
-  if (!url) {
-    console.error("migrate: FAIL — DEVHOST_SESSION_POOLER_CONNECTION_STRING is not set in the environment (this script never reads .env — project rule 20)");
+/** The admin URL a db CLI connects with: MUNIM_DB_URL_SESSION from the process environment only (through the config
+ *  module, so a development checkout's dev name for it works too), or exit 1 naming the variable, never a value. */
+export async function adminUrlFromEnv(cli: string): Promise<string> {
+  const { loadConfig } = await import("../packages/config/src/index.ts");
+  try {
+    return loadConfig({ env: process.env }).require("MUNIM_DB_URL_SESSION");
+  } catch (e) {
+    console.error(`${cli}: FAIL — ${(e as Error).message.replace(" — see .env.example", "")} in the environment (this script never reads .env)`);
     process.exit(1);
   }
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const url = await adminUrlFromEnv("migrate");
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {

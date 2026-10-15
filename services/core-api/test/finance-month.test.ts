@@ -19,7 +19,7 @@ import { type TestDb, uuidv7 } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { executeCommand } from "../src/commit/index.ts";
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";

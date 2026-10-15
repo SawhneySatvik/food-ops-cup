@@ -111,7 +111,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { loadRepoConfig } = await import("@munim/config");
   const { default: pgm } = await import("pg");
   const cfg = loadRepoConfig(new URL("../../../", import.meta.url).pathname);
-  const admin = new pgm.Client({ connectionString: cfg.require("DEVHOST_SESSION_POOLER_CONNECTION_STRING"), ssl: { rejectUnauthorized: false } });
+  const admin = new pgm.Client({ connectionString: cfg.require("MUNIM_DB_URL_SESSION"), ssl: { rejectUnauthorized: false } });
   await admin.connect();
   try {
     const files: Record<string, [string, (n: number, outlet: string) => string]> = { pos_export: ["pos_export_v1", posExportV1] };

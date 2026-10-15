@@ -26,7 +26,7 @@ import { InvestigationsListResponse, InvestigationView, NarrateRequest } from "@
 import { type TestDb, uuidv7 } from "@munim/db";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { createApp, TENANT_HEADER, type Deps } from "../src/app.ts";
 import { verifyAuditChain } from "../src/commit/index.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";

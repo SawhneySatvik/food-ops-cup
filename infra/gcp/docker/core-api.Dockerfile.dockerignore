@@ -7,7 +7,7 @@
 !services/core-api
 !services/core-worker
 !packages
-!adapters
+!adapters/gcp
 !db
 !infra/gcp/entries
 **/node_modules

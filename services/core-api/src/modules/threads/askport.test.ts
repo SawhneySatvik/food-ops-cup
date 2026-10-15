@@ -11,7 +11,7 @@ import { Snapshot } from "@munim/contracts";
 import type { TestDb } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../../auth/local-idp.ts";
 import { openDb } from "../../../test/db.ts";
 import { buildTenant, type Tenant } from "../../../test/world.ts";
 import { createApp, TENANT_HEADER, type Deps } from "../../app.ts";

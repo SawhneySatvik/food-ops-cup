@@ -1,5 +1,5 @@
 // What the worker needs from outside, by injection (03-architecture §0, §1.6, §1.7). T-005 implements
-// Publisher and RunTokenMinter in core-api / adapters/dev/publisher-http; the composition root wires them.
+// Publisher and RunTokenMinter in core-api (commit/publisher-http.ts, runtoken); the composition root wires them.
 
 /** One `core.outbox` row, as `core.outbox_claim()` returns it (db/migrations/0003). */
 export interface OutboxRow {

@@ -7,7 +7,7 @@ import type { Hono } from "hono";
 import type pg from "pg";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { uuidv7 } from "../src/commit/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 
 export { uuidv7 };

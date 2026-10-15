@@ -9,7 +9,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SKIPPED_HERE } from "../../../db/tests/manifest.ts";
 import { createApp } from "../src/app.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 
 // Expected version (W1 fixes #11, #76): the highest file number in db/migrations that is not in m-1's
 // hand-written SKIPPED_HERE (files whose `-- requires:` extension embedded Postgres lacks) — never read from
@@ -52,7 +52,7 @@ describe("/health", () => {
 
     const up = await app.request("/health");
     expect(up.status).toBe(200);
-    expect(await up.json()).toEqual({ status: "ok", migration_version: expectedVersion, idp: "devhost" });
+    expect(await up.json()).toEqual({ status: "ok", migration_version: expectedVersion, idp: null }); // no mode set on these Deps
 
     await db.stop();
     stopped = true;

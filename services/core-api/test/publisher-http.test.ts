@@ -1,8 +1,8 @@
 // HTTP-level gates for the publisher adapter (no database): batch delivery with the service secret,
 // dedupe by CloudEvent id, retry exactly once on retryable failures, no retry on a 4xx, bounded by timeout.
 import { afterEach, describe, expect, test } from "vitest";
-import { BATCH_CONTENT_TYPE, createHttpPublisher, SERVICE_SECRET_HEADER } from "../src/index.ts";
-import { deadUrl, exactlyOnce, startRecorder, type Recorder } from "./recorder.ts";
+import { BATCH_CONTENT_TYPE, createHttpPublisher, SERVICE_SECRET_HEADER } from "../src/commit/publisher-http.ts";
+import { deadUrl, exactlyOnce, startRecorder, type Recorder } from "./publisher-recorder.ts";
 
 const SECRET = "test-secret-not-a-real-one";
 const ev = (i: number) => ({ id: `00000000-0000-7000-8000-${String(i).padStart(12, "0")}`, munimrun: `h.p.s${i}`, type: "munim.x.y.z.v1" });

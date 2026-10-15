@@ -10,9 +10,9 @@ free tier under the in-product spend cap (R56 G-4, R47); every test and gate sta
 **State on 15 Oct (read this first).**
 - Nothing here has run against a real project: no `gcloud` command in this file has been executed, and Docker was not
   available when it was written. Every claim about Google Cloud behaviour is `UNVERIFIED` until the first deploy (T-124).
-- The services' code does not yet accept the neutral names in the table below. **T-122 must land first**; until then
-  `core-api` and `core-worker` do not boot (proved in a copy of their build context: the worker entry stops with `does not
-  provide an export named 'blobStoreFromEnv'`, core-api's with its config error).
+- The services read the neutral names in the table below (T-122): core-api and core-worker choose the IdP and the blob
+  store by `MUNIM_IDP` / `MUNIM_BLOB`, each runtime role logs in as itself on `MUNIM_DB_URL_*`, and the three database CLIs
+  read `MUNIM_DB_URL_SESSION`. An unset `MUNIM_IDP` is refused at boot.
 - Without Docker, each service's build context was reproduced by a script that applies its `.dockerignore` rules, then
   installed (locked), built and started on Node 22 locally (the images use Node 24): web answered 200 on `/` and
   `/staff/sign-in`; intel answered `/health` 200 and 401 without the service secret; suppliers-sim answered `/health` 200;
@@ -221,34 +221,34 @@ deploy script as you.
 
 ## Environment names — one table
 
-Every name the five services read on Cloud Run. "Today" is what the code does now (15 Oct); **NEW** is what T-122 must
-make it accept. Plain values are set by `scripts/deploy-gcp.sh`; secrets are mounted from Secret Manager `:latest`.
+Every name the five services read on Cloud Run. Plain values are set by `scripts/deploy-gcp.sh`; secrets are mounted from
+Secret Manager `:latest`.
 
-| Name | Service(s) | Kind | Source | Today |
-|---|---|---|---|---|
-| `MUNIM_DB_URL_SESSION` | core-api | plain | `postgres://localhost/munim?host=/cloudsql/<project>:asia-south1:munim-db` (script) | **NEW** |
-| `MUNIM_DB_URL_TRANSACTION` | core-api, core-worker | plain | same value (Cloud SQL has no pooler, so session and transaction are one) | **NEW** |
-| `MUNIM_DB_PASSWORD_MUNIM_CORE` | core-api | secret `munim-db-password-munim-core` | `bootstrap-roles` output | accepted |
-| `MUNIM_DB_PASSWORD_MUNIM_SVC` | core-api, core-worker | secret `munim-db-password-munim-svc` | same | accepted |
-| `MUNIM_DB_PASSWORD_MUNIM_PLATFORM` | core-api | secret `munim-db-password-munim-platform` | same | accepted |
-| `MUNIM_SERVICE_SECRET` | core-api, core-worker, intel | secret `munim-service-secret` | `openssl rand` | accepted |
-| `MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM` | core-api, core-worker | secret `munim-run-token-private-key` | `openssl genpkey` | accepted |
-| `MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM` | core-api, core-worker, intel | secret `munim-run-token-public-key` | same pair | accepted |
-| `MUNIM_IDP` | core-api, web | plain `identity-platform` | script | **NEW value** (today only `local` or the dev provider) |
-| `MUNIM_IDP_PROJECT_ID` | core-api, web | plain | script (`$PROJECT_ID`) | **NEW** |
-| `MUNIM_IDP_WEB_API_KEY` | web | secret `munim-idp-web-api-key` | API key, setup step 6 | **NEW** |
-| `MUNIM_BLOB` | core-api, core-worker | plain `gcs` | script | **NEW** (T-116 adds the choice between stores; the value `gcs` matches its brief) |
-| `MUNIM_BLOB_BUCKET` | core-api, core-worker | plain `<project>-munim-blobs` | script | **NEW** (the bucket name is not in T-116's brief; the `gcs` branch reads it) |
-| `MUNIM_INTEL_URL` | core-api, core-worker | plain | script (intel's deterministic URL) | accepted |
-| `MUNIM_STREAM_MAX_AGE_S` | core-api | plain `3300` | script | accepted |
-| `MUNIM_DB_POOL_MAX` | core-api | plain `3` | script; the worker does not read it (its pools are fixed) | accepted |
-| `MUNIM_MODEL_MODE` | intel | plain `live` | script | accepted |
-| `GEMINI_API_KEY` | intel | secret `munim-gemini-api-key` | your key | accepted |
-| `MUNIM_CORE_URL` | intel | plain | script (core-api's deterministic URL) | accepted |
-| `SUPPLIERS_SIM_PUBLIC_URL` | intel, suppliers-sim | plain | script (the sim's deterministic URL; its cards advertise it) | accepted |
-| `MUNIM_DEMO_SIGNIN` | web | plain `1` | script | accepted |
-| `MUNIM_DEMO_TENANT_ID` | web | plain | the tenant id the seed prints (`MUNIM_DEMO_TENANT_ID=… scripts/deploy-gcp.sh --only web`) | accepted |
-| `MUNIM_DEMO_PASSWORD` | web | secret `munim-demo-password` | the demo accounts' one password | accepted |
+| Name | Service(s) | Kind | Source |
+|---|---|---|---|
+| `MUNIM_DB_URL_SESSION` | core-api | plain | `postgres://localhost/munim?host=/cloudsql/<project>:asia-south1:munim-db` (script) |
+| `MUNIM_DB_URL_TRANSACTION` | core-api, core-worker | plain | same value (Cloud SQL has no pooler, so session and transaction are one) |
+| `MUNIM_DB_PASSWORD_MUNIM_CORE` | core-api | secret `munim-db-password-munim-core` | `bootstrap-roles` output |
+| `MUNIM_DB_PASSWORD_MUNIM_SVC` | core-api, core-worker | secret `munim-db-password-munim-svc` | same |
+| `MUNIM_DB_PASSWORD_MUNIM_PLATFORM` | core-api | secret `munim-db-password-munim-platform` | same |
+| `MUNIM_SERVICE_SECRET` | core-api, core-worker, intel | secret `munim-service-secret` | `openssl rand` |
+| `MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM` | core-api, core-worker | secret `munim-run-token-private-key` | `openssl genpkey` |
+| `MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM` | core-api, core-worker, intel | secret `munim-run-token-public-key` | same pair |
+| `MUNIM_IDP` | core-api, web | plain `identity-platform` | script |
+| `MUNIM_IDP_PROJECT_ID` | core-api, web | plain | script (`$PROJECT_ID`) |
+| `MUNIM_IDP_WEB_API_KEY` | web | secret `munim-idp-web-api-key` | API key, setup step 6 |
+| `MUNIM_BLOB` | core-api, core-worker | plain `gcs` | script |
+| `MUNIM_BLOB_BUCKET` | core-api, core-worker | plain `<project>-munim-blobs` | script |
+| `MUNIM_INTEL_URL` | core-api, core-worker | plain | script (intel's deterministic URL) |
+| `MUNIM_STREAM_MAX_AGE_S` | core-api | plain `3300` | script |
+| `MUNIM_DB_POOL_MAX` | core-api | plain `3` | script; the worker does not read it (its pools are fixed) |
+| `MUNIM_MODEL_MODE` | intel | plain `live` | script |
+| `GEMINI_API_KEY` | intel | secret `munim-gemini-api-key` | your key |
+| `MUNIM_CORE_URL` | intel | plain | script (core-api's deterministic URL) |
+| `SUPPLIERS_SIM_PUBLIC_URL` | intel, suppliers-sim | plain | script (the sim's deterministic URL; its cards advertise it) |
+| `MUNIM_DEMO_SIGNIN` | web | plain `1` | script |
+| `MUNIM_DEMO_TENANT_ID` | web | plain | the tenant id the seed prints (`MUNIM_DEMO_TENANT_ID=… scripts/deploy-gcp.sh --only web`) |
+| `MUNIM_DEMO_PASSWORD` | web | secret `munim-demo-password` | the demo accounts' one password |
 
 **Build-time only (web image):** `MUNIM_API_ORIGIN` (core-api's URL, from the script), `NEXT_PUBLIC_MUNIM_STOREFRONT_KEY`
 (secret `munim-storefront-key`, read by the script as you; public by design), `NEXT_PUBLIC_MUNIM_API=/api` and
@@ -262,18 +262,12 @@ make it accept. Plain values are set by `scripts/deploy-gcp.sh`; secrets are mou
 - `MUNIM_CRON_SECRET` and `MUNIM_TICK_*`: no tick route; core-worker runs the jobs.
 - `MUNIM_RUN_DIR` and any local-database URL: dev only.
 
-**What T-116 and T-122 must change beyond the names** (T-121 did not touch `packages/config` or the services):
-1. **DB login.** Config builds the login as `<role>.<project id>` for a pooler. On Cloud SQL the user is the plain role, as
-   the local-database path already does. `MUNIM_DB_URL_*` is a base URL (host, database, no credentials); each role's
-   password is `MUNIM_DB_PASSWORD_<ROLE>`.
-2. **`services/core-api/src/env-root.ts`.** T-116 makes the store a choice by `MUNIM_BLOB` (`gcs` is
-   `gcsBlobStore({ bucket })`) and must **export it as `blobStoreFromEnv(config)`**, because `entries/core-worker.mjs`
-   imports that name so both processes use the same store (if T-116 names it differently, change the one import).
-   T-122 makes `composeFromEnv` accept `MUNIM_IDP=identity-platform` (T-120's `identityPlatformIdp({ projectId })`).
-3. **Three CLIs** read the admin session URL from `MUNIM_DB_URL_SESSION`: `db/migrate.ts`, `db/scripts/bootstrap-roles.ts`,
-   `db/seeds/packs.ts`.
-4. **web's demo sign-in** (`apps/web/lib/server/demo-session.ts`) does the password grant through the IdP-neutral
-   adapter (T-120's `passwordGrant`) with `MUNIM_IDP_WEB_API_KEY`.
+**How the code reads them.** `packages/config` reads the database, IdP and blob names; `MUNIM_DB_URL_*` are base URLs
+(host and database; Cloud SQL has no pooler, so both are the same socket URL) and each runtime role logs in as itself with
+`MUNIM_DB_PASSWORD_<ROLE>`. core-api's `idpFromConfig` and `blobStoreFromEnv` turn `MUNIM_IDP=identity-platform` and
+`MUNIM_BLOB=gcs` into the adapters in `adapters/gcp`; `entries/core-worker.mjs` imports `blobStoreFromEnv` from
+`env-root.ts`, so both processes use the same store. web's demo sign-in (`apps/web/lib/server/demo-session.ts`) runs
+Identity Platform's password grant with `MUNIM_IDP_WEB_API_KEY`.
 
 ## Deploy order
 
@@ -295,7 +289,7 @@ node db/scripts/bootstrap-roles.ts           # fresh random passwords for the lo
 node db/seeds/packs.ts                       # the country packs
 ```
 
-(`db/migrate.ts`, `bootstrap-roles.ts` and `packs.ts` read `MUNIM_DB_URL_SESSION` once T-122 lands.)
+(`db/migrate.ts`, `bootstrap-roles.ts` and `packs.ts` read `MUNIM_DB_URL_SESSION` from the environment only.)
 
 ### 2. Put the role passwords in Secret Manager, then delete the file
 

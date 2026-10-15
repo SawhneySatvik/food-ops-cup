@@ -12,7 +12,7 @@ import { SpecialistDesk, SpecialistsResponse, TRACK_RECORD_COUNTS } from "@munim
 import { ownerCtx, type TestDb, uuidv7 } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { createApp, TENANT_HEADER, type Deps } from "../src/app.ts";
 import { openDb } from "./db.ts";
 import { buildTenant, type Tenant } from "./world.ts";

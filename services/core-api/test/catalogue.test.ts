@@ -18,7 +18,7 @@ import { type AppEnv, contextOf, createApp, TENANT_HEADER, withContext } from ".
 import { draftHandler } from "../src/modules/approvals/handlers.ts";
 import { DRAFT_HANDLERS } from "../src/modules/catalogue/handlers.ts";
 import { couponUses, itemsForSale, priceLines, type PriceRequest, type PriceResult } from "../src/modules/catalogue/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 
 const idp = createLocalIdp();

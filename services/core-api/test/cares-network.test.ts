@@ -24,7 +24,7 @@ import {
 import { buildWorld, ownerCtx, type TestDb, uuidv7, type World } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { type AppEnv, createApp, type Deps, storefrontResolver, TENANT_HEADER } from "../src/app.ts";
 import { canonicalJson, sha256Hex } from "../src/commit/index.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";

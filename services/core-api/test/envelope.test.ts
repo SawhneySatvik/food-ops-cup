@@ -8,7 +8,7 @@ import { APPROVAL_ERROR_CODES, DraftDecisionError } from "@munim/contracts/appro
 import { Hono } from "hono";
 import { ApiError, createApp, errorBody, fromSqlState } from "../src/app.ts";
 import { CommandTypeMismatch, IdempotencyConflict } from "../src/commit/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { ERROR_CODES } from "../src/lib/errors.ts";
 import type pg from "pg";
 

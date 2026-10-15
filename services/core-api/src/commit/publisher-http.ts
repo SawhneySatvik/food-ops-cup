@@ -1,9 +1,9 @@
-// Dev/standalone Publisher adapter (03-architecture §0, §4; R35): POSTs a batch of CloudEvents to intel
+// The Publisher adapter every deployment uses (03-architecture §0, §4; R35): POSTs a batch of CloudEvents to intel
 // `/events` with the service secret header; each event carries its own run token in the `munimrun`
 // extension. Retries once on a network error, timeout, 429 or 5xx; any other status fails at once.
 // Delivery is at-least-once: duplicate ids in one batch are sent once, and a retried batch re-sends the same
-// ids, which intel dedupes (events:claim). Dependency-free (global fetch) and structurally typed, so it
-// imports nothing from core-api; core-api's dev composition root passes it in as its Publisher.
+// ids, which intel dedupes (events:claim). Dependency-free (global fetch) and structurally typed; composeCoreApi and
+// core-worker's composeWorker pass it in as their Publisher.
 
 /** The header intel checks against its configured service secret. */
 export const SERVICE_SECRET_HEADER = "x-munim-service-secret";

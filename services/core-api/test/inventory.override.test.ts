@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { type CommandHandler, executeCommand, uuidv7 } from "../src/commit/index.ts";
 import { consumeExpiredOverrides, deriveOrderConsumption, pickSaleBatches } from "../src/modules/inventory/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 
 const idp = createLocalIdp();

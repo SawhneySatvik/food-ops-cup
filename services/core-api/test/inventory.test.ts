@@ -22,7 +22,7 @@ import { draftHandler } from "../src/modules/approvals/handlers.ts";
 import {
   type ConsumptionResult, consumeExpiredOverrides, deriveGoodsReceipt, deriveOrderConsumption, deriveSaleReturn, onNegativeOnHand, pickSaleBatches,
 } from "../src/modules/inventory/index.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 
 const idp = createLocalIdp();

@@ -1,5 +1,6 @@
-// IdP port (03-arch §4): verify a bearer ID token and return who it names. Adapters: adapters/dev/idp-devhost
-// (dev), adapters/dev/idp-local (every gate). Roles never come from the token (gotcha 11) — Postgres decides.
+// IdP port (03-arch §4): verify a bearer ID token and return who it names. Adapters: adapters/gcp/idp-identity-platform,
+// ./local-idp.ts (every gate, and the dev-only MUNIM_IDP=local), and the dev mapping's. Roles never come from the token
+// (gotcha 11) — Postgres decides.
 export interface Identity {
   sub: string;
   email: string | null;

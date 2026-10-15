@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { createLogger, loadConfig } from "../../../../../packages/config/src/index.ts";
 import { startTestDb } from "../../../../../db/src/index.ts";
-import { createLocalIdp } from "../../../../../services/core-api/src/dev-root.ts";
+import { createLocalIdp } from "../../../../../services/core-api/src/auth/local-idp.ts";
 import { localBlobStore } from "../../../../../services/core-api/src/modules/imports/index.ts";
 import { composeCoreApi, serveApi } from "../../../../../services/core-api/src/server.ts";
 import { configureInternal } from "../../../../../services/core-api/src/internal/index.ts";

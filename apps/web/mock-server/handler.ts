@@ -1,5 +1,5 @@
 // The mock Munim storefront API for Cobnut Bakehouse, served at /mock/v1/*. Same paths, shapes, errors and test
-// switches as the Munim mock (https://munim-rho.example.app/mock), over this bakery's synthetic data.
+// switches as Munim's own hosted SDK mock, over this bakery's synthetic data.
 import { createHash } from "node:crypto";
 import type { Schemas } from "@munim/sdk";
 import { BRAND, CHANNEL_ID, DEALS, ITEMS, OUTLETS, PREP_MIN, STOREFRONT_KEY, TZ, TZ_OFFSET_MIN, OPEN_FROM_MIN, OPEN_TO_MIN, groupId, itemId, optionId, variantId, type MockOutlet } from "./data";

@@ -32,7 +32,7 @@ import { PACKS } from "@munim/contracts/packs";
 import { type TestDb, uuidv7 } from "@munim/db";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { parsePendingImports } from "../../core-worker/src/imports/index.ts";
 import { autoPass } from "../../core-worker/src/investigations/index.ts";
 import { createApp, TENANT_HEADER, type Deps } from "../src/app.ts";

@@ -21,7 +21,7 @@ import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { uuidv7, verifyAuditChain } from "../src/commit/index.ts";
 import { svcTx } from "../src/commit/testkit.ts";
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 
 const idp = createLocalIdp();

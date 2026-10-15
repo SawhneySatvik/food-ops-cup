@@ -1,24 +1,21 @@
 // R44a gates: MUNIM_IDP=local is refused in production / non-dev / for an unknown value (at the real entry point,
-// exit code asserted), /health reports the active IdP, a devhost-mode server 401s a local-IdP token, and
-// worldgen refuses to self-mint against a devhost-mode server.
-import { spawn, spawnSync } from "node:child_process";
+// exit code asserted), an unset MUNIM_IDP is refused unless a dev mapping supplies a default, /health reports the
+// active IdP, and a server on another IdP 401s a local-IdP token. (The seed minter's refusal: seed-minter.test.ts.)
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLogger, resolveIdpMode } from "@munim/config";
+import { createLogger, type DevEnv, resolveIdpMode } from "@munim/config";
 import type { TestDb } from "@munim/db";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp, createPersistentLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp, createPersistentLocalIdp } from "../src/auth/local-idp.ts";
 import { createApp } from "../src/app.ts";
-import { serveApi } from "../src/server.ts";
 import { setIdpMode } from "../src/health/index.ts";
 import type { Deps } from "../src/lib/types.ts";
 import { openDb } from "./db.ts";
 
 const SERVER = join(import.meta.dirname, "../src/server.ts");
-const MINTER = join(import.meta.dirname, "../../../adapters/dev/idp-local/mint-seed-tokens.ts");
-const ROOT = join(import.meta.dirname, "../../..");
 const scratch = mkdtempSync(join(tmpdir(), "munim-idp-"));
 
 /** Runs the real entry with no .env and a scratch run dir; a refusal must exit non-zero before it connects anywhere. */
@@ -28,15 +25,20 @@ function boot(env: Record<string, string>, args: string[] = []) {
 }
 
 describe("MUNIM_IDP selector refusals", () => {
-  it("defaults to devhost and accepts exactly local|devhost in env and flag forms", () => {
-    expect(resolveIdpMode({}, [])).toBe("devhost");
-    expect(resolveIdpMode({ MUNIM_IDP: "local", MUNIM_ENV: "dev" }, [])).toBe("local");
-    expect(resolveIdpMode({ MUNIM_ENV: "dev" }, ["--idp=local"])).toBe("local");
-    expect(resolveIdpMode({ MUNIM_ENV: "dev" }, ["--idp", "local"])).toBe("local");
-    expect(resolveIdpMode({ MUNIM_IDP: "local", MUNIM_ENV: "dev" }, ["--idp=devhost"])).toBe("devhost");
+  // A dev mapping as a development checkout's adapters/dev supplies one: an extra value that is also the default.
+  const dev = { idpModes: ["devmode"], idpDefault: "devmode" } as unknown as DevEnv;
+  it("accepts exactly local|identity-platform in env and flag forms; unset is refused unless a dev mapping has a default", () => {
+    expect(() => resolveIdpMode({}, [], null)).toThrow('MUNIM_IDP is not set: one of "local", "identity-platform"');
+    expect(resolveIdpMode({}, [], dev)).toBe("devmode");
+    expect(resolveIdpMode({ MUNIM_IDP: "identity-platform" }, [], null)).toBe("identity-platform");
+    expect(resolveIdpMode({ MUNIM_IDP: "local", MUNIM_ENV: "dev" }, [], null)).toBe("local");
+    expect(resolveIdpMode({ MUNIM_ENV: "dev" }, ["--idp=local"], null)).toBe("local");
+    expect(resolveIdpMode({ MUNIM_ENV: "dev" }, ["--idp", "local"], null)).toBe("local");
+    expect(resolveIdpMode({ MUNIM_IDP: "local", MUNIM_ENV: "dev" }, ["--idp=identity-platform"], null)).toBe("identity-platform");
+    expect(() => resolveIdpMode({ MUNIM_IDP: "devmode" }, [], null)).toThrow(/exactly/); // a dev value without its mapping
   });
   it("refuses unknown values, production and a non-dev MUNIM_ENV", () => {
-    for (const bad of ["Local", "", "local ", "none"]) expect(() => resolveIdpMode({ MUNIM_IDP: bad }, [])).toThrow(/exactly/);
+    for (const bad of ["Local", "", "local ", "none", "Identity-Platform"]) expect(() => resolveIdpMode({ MUNIM_IDP: bad }, [])).toThrow(/exactly/);
     expect(() => resolveIdpMode({}, ["--idp=bogus"])).toThrow(/exactly/);
     expect(() => resolveIdpMode({ MUNIM_IDP: "local", NODE_ENV: "production" }, [])).toThrow(/production/);
     expect(() => resolveIdpMode({ MUNIM_IDP: "local", MUNIM_ENV: "staging" }, [])).toThrow(/MUNIM_ENV/);
@@ -52,7 +54,7 @@ describe("MUNIM_IDP selector refusals", () => {
   it("core-api boot exits non-zero for an unknown MUNIM_IDP and an unknown --idp flag value", () => {
     const a = boot({ MUNIM_IDP: "okta" });
     expect(a.status).toBe(1);
-    expect(a.stderr).toContain('must be exactly "local" or "devhost"');
+    expect(a.stderr).toContain('MUNIM_IDP must be exactly one of "local", "identity-platform"');
     expect(boot({}, ["--idp=okta"]).status).toBe(1);
   });
   it("a valid local boot announces itself loudly (then fails on the missing database, which is fine here)", () => {
@@ -76,9 +78,9 @@ describe("persistent local signing key", () => {
 describe("/health idp and cross-mode rejection", () => {
   let db: TestDb;
   let pools: { core: pg.Pool; svc: pg.Pool };
-  let devhostDeps: Deps;
+  let otherDeps: Deps;
   let localDeps: Deps;
-  let devhostApp: Awaited<ReturnType<typeof createApp>>;
+  let otherApp: Awaited<ReturnType<typeof createApp>>;
   let localApp: Awaited<ReturnType<typeof createApp>>;
   const local = createPersistentLocalIdp(scratch);
   beforeAll(async () => {
@@ -86,11 +88,12 @@ describe("/health idp and cross-mode rejection", () => {
     pools = { core: db.pool("munim_core", 2), svc: db.pool("munim_svc", 2) };
     const config = { nodeEnv: "test", redact: (s: string) => s };
     const mk = (idp: Deps["idp"]): Deps => ({ pools, idp, storefronts: async () => null, config, log: createLogger(config, () => {}) });
-    // The "devhost" server verifies with a different key (stands in for the dev host's JWKS), as a real one would.
-    devhostDeps = mk(createLocalIdp());
+    // The other server verifies with a different key (stands in for Identity Platform's JWKS), as a real one would.
+    otherDeps = mk(createLocalIdp());
+    setIdpMode(otherDeps, "identity-platform");
     localDeps = mk(local);
     setIdpMode(localDeps, "local");
-    devhostApp = await createApp(devhostDeps);
+    otherApp = await createApp(otherDeps);
     localApp = await createApp(localDeps);
   });
   afterAll(async () => {
@@ -99,46 +102,12 @@ describe("/health idp and cross-mode rejection", () => {
   });
 
   it("reports the active IdP", async () => {
-    expect(await (await devhostApp.request("/health")).json()).toMatchObject({ status: "ok", idp: "devhost" });
+    expect(await (await otherApp.request("/health")).json()).toMatchObject({ status: "ok", idp: "identity-platform" });
     expect(await (await localApp.request("/health")).json()).toMatchObject({ status: "ok", idp: "local" });
   });
-  it("a devhost-mode server rejects an idp-local token (401); the local server accepts it past auth", async () => {
+  it("a server on another IdP rejects a local-IdP token (401); the local server accepts it past auth", async () => {
     const h = { Authorization: `Bearer ${local.sign({ sub: "x", email_verified: true })}` };
-    expect((await devhostApp.request("/v1/me/tenants", { headers: h })).status).toBe(401);
+    expect((await otherApp.request("/v1/me/tenants", { headers: h })).status).toBe(401);
     expect((await localApp.request("/v1/me/tenants", { headers: h })).status).toBe(200);
-  });
-  it("worldgen refuses to self-mint against a devhost-mode server, and mints against a local one", async () => {
-    const listen = async (app: Awaited<ReturnType<typeof createApp>>) => {
-      const { port, server } = await serveApi(app, 0);
-      return { url: `http://127.0.0.1:${port}`, close: () => server.close() };
-    };
-    const run = (args: string[], env: Record<string, string> = {}) => new Promise<{ code: number | null; out: string; err: string }>((ok) => {
-      const p = spawn(args[0] === "make" ? "make" : process.execPath, args[0] === "make" ? args.slice(1) : args, { env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", MUNIM_RUN_DIR: scratch, ...env } });
-      let out = "", err = "";
-      p.stdout.on("data", (d) => (out += d));
-      p.stderr.on("data", (d) => (err += d));
-      p.on("close", (code) => ok({ code, out, err }));
-    });
-    const sup = await listen(devhostApp);
-    const loc = await listen(localApp);
-    try {
-      const m1 = await run([MINTER, "--world=store", `--url=${sup.url}`, `--run-dir=${scratch}`]);
-      expect(m1.code).toBe(1);
-      expect(m1.out).toBe("");
-      expect(m1.err).toContain('not "local"');
-      // `make seed` with no tokens: the minter runs first; its refusal stops the seed before worldgen starts.
-      const w = await run(["make", "-C", ROOT, "seed", "WORLD=store", `RUN=${scratch}`], { MUNIM_API_URL: sup.url });
-      expect(w.code).not.toBe(0);
-      expect(w.err).toContain('not "local"');
-      expect(w.err).toContain("none can be minted");
-      expect(w.out).not.toContain("worldgen:");
-      const m2 = await run([MINTER, "--world=store", `--url=${loc.url}`, `--run-dir=${scratch}`]);
-      expect(m2.code).toBe(0);
-      const tok = (JSON.parse(m2.out) as { owner: string }).owner;
-      await expect(local.verify(tok)).resolves.toMatchObject({ sub: "worldgen-store-owner", email_verified: true });
-    } finally {
-      sup.close();
-      loc.close();
-    }
   });
 });

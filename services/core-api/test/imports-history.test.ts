@@ -8,7 +8,7 @@
 //   equivalence: the batched commit and the per-row seams path write the same rows, postings, origins and audit entries;
 //   round trips: a 1,000-bill batched commit sends ≤ 40 queries (the seams path: ~32 a bill).
 // Red-proofs: services/core-api/test/redproof-history.sh (MUNIM_H1_PLANT, test-side only). Synthetic data only.
-import { appendFileSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,7 +18,7 @@ import { buildWorld, type TestDb, uuidv7, type World } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { parsePendingImports } from "../../core-worker/src/imports/index.ts";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { executeCommand } from "../src/commit/index.ts";
@@ -514,6 +514,7 @@ describe("equivalence: the batched commit writes exactly what the per-row seams 
       }
       const [seams, batched] = snaps as [Snap, Snap];
       const counts = (s: Snap) => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.length]));
+      mkdirSync(join(import.meta.dirname, "../../../scratchpad/h1"), { recursive: true }); // git-ignored: absent in a fresh clone
       appendFileSync(join(import.meta.dirname, "../../../scratchpad/h1/equivalence.jsonl"), `${JSON.stringify({ seams: counts(seams), batched: counts(batched) })}\n`);
       // Positive anchors: the fixtures' hand counts are inside (bills_1: 5 orders, 7 lines, 4 tenders, 2 refunds, 2 voids; waste_1: 3 entries), and
       // the generated file put more than one chunk of orders through.
@@ -538,6 +539,7 @@ describe("round trips (R44c): the batched commit's queries do not grow with the 
         { batched: PLANT === "seams-timing" ? false : true, tenant: T.IN.w.tenant, outlet: T.IN.w.outlets[0] });
       const seams = await timeCommit(admin, "pos_export", "pos_export_v1", (t) => posExportV1(200, t.outlet.name, new Date("2026-10-09T00:00:00Z")),
         { batched: false, tenant: T.IN.w.tenant, outlet: T.IN.w.outlets[0] });
+      mkdirSync(join(import.meta.dirname, "../../../scratchpad/h1"), { recursive: true }); // git-ignored: absent in a fresh clone
       appendFileSync(join(import.meta.dirname, "../../../scratchpad/h1/timing.jsonl"), `${JSON.stringify({ where: "embedded", batched, seams })}\n`);
       expect(batched.rows_ok).toBe(1000);
       expect(batched.queries).toBeLessThanOrEqual(40);

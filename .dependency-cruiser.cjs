@@ -1,20 +1,27 @@
 // Repo boundaries, 03-architecture §7. Run via `make boundaries` (scripts/check/boundaries.sh).
 // Red-proven by scripts/check/planted-violations.sh: each rule below has a plant that must trip it by name.
-// Service test files: services/<svc>/test/** and colocated services/<svc>/src/**/*.test.ts.
-const TEST_FILES = "^services/[^/]+/test/|^services/[^/]+/src/.*\\.test\\.ts$";
+const WEB_FORBIDDEN = "^(services|adapters|tools|db|e2e|evals|infra|scripts)/|^packages/";
+const WEB_PUBLIC = "^packages/(sdk|ui|contracts)/";
+// apps/web's server code (lib/server) may also reach its sign-in grants: Identity Platform's, and a development
+// checkout's own (`@munim-dev/web-signin`, resolved by tsconfig paths; the Cup export has no adapters/dev).
+const WEB_SERVER_GRANTS = ["^adapters/gcp/idp-identity-platform/", "^adapters/dev/env/web-signin\\.ts$"];
 
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     {
       name: "web-imports-only-public-packages",
-      comment: "apps/web may import only @munim/sdk, @munim/ui, @munim/contracts (and npm deps).",
+      comment: "apps/web may import only @munim/sdk, @munim/ui, @munim/contracts (and npm deps); lib/server also its sign-in grants.",
       severity: "error",
-      from: { path: "^apps/web/" },
-      to: {
-        path: "^(services|adapters|tools|db|e2e|evals|infra|scripts)/|^packages/",
-        pathNot: "^packages/(sdk|ui|contracts)/",
-      },
+      from: { path: "^apps/web/", pathNot: "^apps/web/lib/server/" },
+      to: { path: WEB_FORBIDDEN, pathNot: WEB_PUBLIC },
+    },
+    {
+      name: "web-server-imports-only-public-packages-and-grants",
+      comment: "apps/web/lib/server: the public packages plus the sign-in grants, nothing else from the repo.",
+      severity: "error",
+      from: { path: "^apps/web/lib/server/" },
+      to: { path: WEB_FORBIDDEN, pathNot: [WEB_PUBLIC, ...WEB_SERVER_GRANTS] },
     },
     {
       name: "web-imports-only-public-packages-unresolved",
@@ -34,18 +41,13 @@ module.exports = {
       },
     },
     {
-      name: "adapters-dev-only-from-dev-root",
-      comment: "Dev adapters (the dev host etc.) never leave adapters/dev except through a dev composition root (R9).",
+      name: "adapters-dev-stays-in-adapters-dev",
+      comment:
+        "Dev adapters (the hosted dev database's IdP and storage, the dev env names) are reached only from adapters/dev itself, " +
+        "config's dev-mapping test, and apps/web's one dev grant; packages/config loads the mapping by a computed path (T-122, R54 P-4).",
       severity: "error",
-      from: { pathNot: ["^adapters/dev/", "^services/[^/]+/src/dev-root\\.ts$", TEST_FILES] },
+      from: { pathNot: ["^adapters/dev/", "^packages/config/test/dev-env\\.test\\.ts$", "^apps/web/lib/server/"] },
       to: { path: "^adapters/dev/" },
-    },
-    {
-      name: "tests-import-only-idp-local-from-adapters-dev",
-      comment: "Service tests may sign test JWTs with the local dev IdP and nothing else from adapters/dev (W1 fix #72).",
-      severity: "error",
-      from: { path: TEST_FILES },
-      to: { path: "^adapters/dev/", pathNot: "^adapters/dev/idp-local/" },
     },
     {
       name: "no-unresolvable-imports",

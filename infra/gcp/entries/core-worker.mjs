@@ -6,7 +6,7 @@
 import { createServer } from "node:http";
 import { createLogger, loadConfig } from "../../../packages/config/src/index.ts";
 import { loadContracts } from "../../core-api/src/lib/contracts.ts";
-import { blobStoreFromEnv } from "../../core-api/src/env-root.ts"; // T-122 must export this (same store core-api writes to)
+import { blobStoreFromEnv } from "../../core-api/src/env-root.ts"; // the store core-api writes to
 import { composeWorker } from "./main.ts";
 import { jsonLog } from "./ports.ts";
 import { runUntilSignal } from "./process.ts";

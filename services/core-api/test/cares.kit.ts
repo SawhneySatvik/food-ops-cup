@@ -6,7 +6,7 @@ import { createLogger } from "@munim/config";
 import { buildWorld, ownerCtx, type TestDb, uuidv7, type World } from "@munim/db";
 import type { Hono } from "hono";
 import type pg from "pg";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { type AppEnv, createApp, TENANT_HEADER } from "../src/app.ts";
 import { router as caresRouter } from "../src/modules/cares/index.ts";
 import { openDb } from "./db.ts";

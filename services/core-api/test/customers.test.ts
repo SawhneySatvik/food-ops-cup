@@ -21,7 +21,7 @@ import { executeCommand, uuidv7 } from "../src/commit/index.ts";
 import { campaignCreate } from "../src/modules/customers/records.ts";
 import { loyaltyEarnFor, loyaltyRedeem, loyaltyReverseFor, readLoyalty } from "../src/modules/customers/index.ts";
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";
-import { createLocalIdp } from "../../../adapters/dev/idp-local/index.ts";
+import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
 import { findSendPaths } from "./customers.nosend.ts";
 import { buildTenant, type Tenant } from "./world.ts";
@@ -338,7 +338,9 @@ describe("no code path sends a message (R40 C6)", () => {
       `await c.query("UPDATE core.campaign SET status = 'sent'");`,
       `const status = "sent";`,
       `import { twilio } from "twilio";`,
-      `import x from "../../../../adapters/dev/publisher-http/index.ts";`,
+      `import { Mail } from "@vendor/mail-sdk";`,
+      `import x from "../../../../adapters/mail/index.ts";`,
+      `import { createHttpPublisher } from "../../commit/publisher-http.ts";`,
       `sendEmail(to, body);`,
       `net.connect(587, "smtp.example.test");`,
     ];
