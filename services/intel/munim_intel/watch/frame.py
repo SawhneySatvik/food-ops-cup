@@ -6,6 +6,8 @@
                           with the pack's `licence_kinds` that apply to its kind (code, holder, `_unverified` as a flag)
   payroll_scope           the pack's `payroll_scope` ("drafts" | "roster_only"): where payroll may be drafted at all
   narration               "model" or "template" — the typed kill switch; the budget's soft cap means "template"
+  ai_enabled, budget_level the kill switch alone and the month's budget level (T-127): over the cap with AI on, a live run
+                          narrates with a capped model (llm.over_cap), never with AI off
 
 It comes from core's `GET /internal/intel/v1/run-frame` (T-040b; `core_frame_source`, the app's default). When core
 cannot give one (unreachable, refused, an unexpected body) the source returns None and a watcher run does nothing
@@ -46,6 +48,9 @@ class Frame:
     payroll_scope: PayrollScope
     #: The month's AI budget currency (run-frame `budget.currency`): core takes spend rows only in it. None: no budget.
     budget_currency: str | None = None
+    #: The typed kill switch alone (run-frame `ai_enabled`) and the month's budget level (None: no budget) — llm.over_cap's inputs.
+    ai_enabled: bool = False
+    budget_level: str | None = None
 
     @property
     def spend_currency(self) -> str:
@@ -104,6 +109,8 @@ def frame_from_run_frame(body: Mapping[str, Any]) -> Frame:
         narration=narration,
         payroll_scope=_payroll_scope(body["payroll_scope"]),
         budget_currency=body["budget"]["currency"] if body.get("budget") else None,
+        ai_enabled=body.get("ai_enabled") is True,
+        budget_level=body["budget"]["level"] if body.get("budget") else None,
     )
 
 

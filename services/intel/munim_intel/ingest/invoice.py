@@ -82,8 +82,8 @@ def vision_request(llm: BaseLlm, image: bytes, mime_type: str) -> LlmRequest:
     return quarantine.build_request(llm, VISION_SYSTEM, [part], InvoiceRead)
 
 
-async def read_invoice(llm: BaseLlm, image: bytes, mime_type: str, state: RunState) -> InvoiceRead:
-    return await quarantine.call(llm, vision_request(llm, image, mime_type), InvoiceRead, state)
+async def read_invoice(llm: BaseLlm, image: bytes, mime_type: str, state: RunState, actor: str | None = None) -> InvoiceRead:
+    return await quarantine.call(llm, vision_request(llm, image, mime_type), InvoiceRead, state, actor)
 
 
 def doc_ref(document_id: str, start: int, end: int) -> str:

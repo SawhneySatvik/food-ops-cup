@@ -16,13 +16,15 @@ const MOCK = join(import.meta.dirname, "../../../apps/web/mock-server/data.ts");
 const { COUPONS, ITEMS, OUTLETS } = (await import(MOCK)) as { COUPONS: Array<{ code: string }>; ITEMS: MockItem[]; OUTLETS: Array<{ name: string; soldOut: string[] }> };
 
 const AS_OF_DAYS = 70;
+/** Any URL serves (nothing here calls the simulator); the cards must be on it, by the brief's paths (T-127). */
+const SIM = "http://127.0.0.1:4423";
 let stack: Stack;
 const seeded: Array<{ tenantId: string; storefrontKey: string }> = [];
 
 before(async () => {
   stack = await startStack();
   for (const seed of ["cobnut-gate-1", "cobnut-gate-2"]) {
-    const r = await runWorld({ world: "cobnut", seed, asOf: businessToday(new Date(), "Asia/Kolkata"), days: AS_OF_DAYS, baseUrl: stack.baseUrl, token: stack.token("cobnut"), operator: true });
+    const r = await runWorld({ world: "cobnut", seed, asOf: businessToday(new Date(), "Asia/Kolkata"), days: AS_OF_DAYS, baseUrl: stack.baseUrl, token: stack.token("cobnut"), operator: true, simUrl: SIM });
     seeded.push({ tenantId: r.api.tenantId!, storefrontKey: String(r.state.storefrontKey) });
   }
 });
@@ -85,8 +87,20 @@ describe("cobnut", () => {
         { name: "Nandini Mehrotra", email: "owner@cobnut-demo.invalid", role: "owner", outlets: "*", bound: true },
       ]);
       assert.deepEqual(await q(`SELECT e.enabled, d.status FROM platform.cares_enablement e JOIN platform.config_draft d ON d.id = e.config_draft_id WHERE e.tenant_id = $T`), [{ enabled: true, status: "applied" }]);
-      assert.deepEqual(await q(`SELECT name, kind FROM core.supplier WHERE tenant_id = $T ORDER BY name`),
-        [{ name: "Lalbagh Nut & Spice (simulated)", kind: "simulated" }, { name: "Riverbank Dairy (simulated)", kind: "simulated" }]);
+      assert.deepEqual(await q(`SELECT name, kind, a2a_card_url FROM core.supplier WHERE tenant_id = $T ORDER BY name`), [
+        { name: "Bargain Bulk Traders (simulated)", kind: "simulated", a2a_card_url: `${SIM}/discounter/.well-known/agent-card.json` },
+        { name: "Lalbagh Nut & Spice (simulated)", kind: "simulated", a2a_card_url: null },
+        { name: "Premium Provisions (simulated)", kind: "simulated", a2a_card_url: `${SIM}/premium/.well-known/agent-card.json` },
+        { name: "Riverbank Dairy (simulated)", kind: "simulated", a2a_card_url: null },
+        { name: "Steady Wholesale (simulated)", kind: "simulated", a2a_card_url: `${SIM}/steady/.well-known/agent-card.json` },
+      ]);
+      // T-127: core hands intel the carded suppliers in id order (Supplier A, B, C of the recorded negotiation): steady, discounter, premium.
+      assert.deepEqual((await q(`SELECT name FROM core.supplier WHERE tenant_id = $T AND a2a_card_url IS NOT NULL ORDER BY id`)).map((r) => r.name),
+        ["Steady Wholesale (simulated)", "Bargain Bulk Traders (simulated)", "Premium Provisions (simulated)"]);
+      // T-127: this month's purchases budget for the whole business, ₹50,000, the owner's own command (the deal review reads it).
+      assert.deepEqual(await q(`SELECT b.category, b.outlet_id, b.amount_minor::int AS amount, b.currency, b.period_month = date_trunc('month', (now() AT TIME ZONE 'Asia/Kolkata'))::date AS this_month,
+          b.origin ->> 'kind' AS origin, m.name FROM core.budget b JOIN core.member m ON m.id = (b.origin ->> 'principal_id')::uuid WHERE b.tenant_id = $T`),
+        [{ category: "purchases", outlet_id: null, amount: 5_000_000, currency: "INR", this_month: true, origin: "command", name: "Nandini Mehrotra" }]);
     }
     assert.notEqual(seeded[0]!.tenantId, seeded[1]!.tenantId, "a reseed is a fresh tenant");
     // Platform-wide rows do not multiply on a reseed: one Lucknow, the two simulated recipients once.

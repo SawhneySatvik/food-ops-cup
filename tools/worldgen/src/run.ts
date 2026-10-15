@@ -32,6 +32,8 @@ export interface RunOptions {
   token?: (persona: string) => string | Promise<string>;
   /** Real API: an operator can approve platform config (token for persona "operator" and a platform.operator row). */
   operator?: boolean;
+  /** The suppliers simulator's public URL (cobnut's simulated suppliers' agent cards; cli.ts reads SUPPLIERS_SIM_PUBLIC_URL). */
+  simUrl?: string;
 }
 
 /** `state` is what the world handed on (Ctx.s), e.g. cobnut's storefront key for cli.ts to write out. */
@@ -44,7 +46,8 @@ export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log:
     ...(dry ? { fetch: dryFetch(mod.meta), lenient: true } : {}),
     ...(o.operator ? { operator: true } : {}),
   });
-  const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}) });
+  const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}),
+    ...(o.simUrl !== undefined ? { simUrl: o.simUrl } : {}) });
   await mod.build(c);
   return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days} live_days=${c.liveDays}\n${api.logText()}`, api, state: c.s };
 }

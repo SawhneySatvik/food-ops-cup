@@ -76,8 +76,8 @@ def extract_request(llm: BaseLlm, text: str) -> LlmRequest:
     return quarantine.build_request(llm, EXTRACTOR_SYSTEM, [types.Part(text=text)], ExtractedClaims)
 
 
-async def extract(llm: BaseLlm, text: str, state: RunState) -> list[ExtractedClaim]:
-    return (await quarantine.call(llm, extract_request(llm, text), ExtractedClaims, state)).claims
+async def extract(llm: BaseLlm, text: str, state: RunState, actor: str | None = None) -> list[ExtractedClaim]:
+    return (await quarantine.call(llm, extract_request(llm, text), ExtractedClaims, state, actor)).claims
 
 
 def _in_quote(name: str | None, quote: str) -> bool:

@@ -76,7 +76,7 @@ class Ingest:
     async def _extract(self, agent: str, source: str, text: str, report: Report) -> list[claims_mod.ExtractedClaim] | None:
         await self._trace("subagent_start", agent=agent, source=source)
         try:
-            out = await claims_mod.extract(self.extract_llm, text, self.state)
+            out = await claims_mod.extract(self.extract_llm, text, self.state, self.actor)
         except (QuarantineBreach, ModelUnavailable, Unreadable) as e:
             code = "response_not_schema" if isinstance(e, Unreadable) else e.code
             report.refused[code] = report.refused.get(code, 0) + 1
@@ -163,7 +163,7 @@ class Ingest:
         source = f"doc:{document_id}"
         await self._trace("subagent_start", agent="vision", source=source)
         try:
-            read = await read_invoice(self.vision_llm, image, mime_type, self.state)
+            read = await read_invoice(self.vision_llm, image, mime_type, self.state, self.actor)
         except (QuarantineBreach, ModelUnavailable, Unreadable) as e:
             code = "response_not_schema" if isinstance(e, Unreadable) else e.code
             report.refused[code] = 1

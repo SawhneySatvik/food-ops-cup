@@ -24,7 +24,8 @@ from pydantic import BaseModel, ValidationError
 from munim_intel.config import Config
 from munim_intel.llm import ModelRoleSource, llm_for_role
 from munim_intel.llm.recorded import RecordedLlm
-from munim_intel.runtime.state import RunState
+from munim_intel.runtime.state import ACTOR, RunState
+from munim_intel.trace.served import ModelPath, served_by
 
 #: Recorded extractor and vision responses (SYNTHETIC; written by tests/ingest/make_fixtures.py).
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -87,7 +88,8 @@ def build_request(llm: BaseLlm, system: str, parts: list[types.Part], schema: ty
     return LlmRequest(model=llm.model, contents=[types.Content(role="user", parts=parts)], config=config)
 
 
-async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], state: RunState) -> M:
+async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], state: RunState, actor: str | None = None) -> M:
+    """`actor`: who the path label is traced under (default: the running context's, ACTOR)."""
     if tool_count(req) != 0:
         raise QuarantineBreach("request_has_tools")
     budget = state.budget
@@ -98,6 +100,7 @@ async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], sta
     state.tainted = True
     last: LlmResponse | None = None
     failed: str | None = None
+    path: ModelPath | None = None
     try:
         async for resp in llm.generate_content_async(req, stream=False):
             parts = (resp.content.parts or []) if resp.content else []
@@ -112,6 +115,12 @@ async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], sta
         raise
     except Exception as e:  # noqa: BLE001 — re-raised below as a code, outside this handler
         failed = f"model_error:{type(e).__name__}"
+        path = served_by(e)
+    else:
+        path = served_by(last)
+    # T-125: which path served a live call (live, recorded-fallback, abstained) — a label only; a recorded replay carries none.
+    if path is not None:
+        await state.traces.append("route", actor or ACTOR.get(), {"model_path": path})
     if failed is not None:
         raise ModelUnavailable(failed)
     text = "".join(p.text or "" for p in (last.content.parts or []) if not p.thought) if last and last.content else ""
@@ -122,8 +131,8 @@ async def call[M: BaseModel](llm: BaseLlm, req: LlmRequest, schema: type[M], sta
 
 
 async def quarantined_llm(role: Literal["extract", "vision"], cfg: Config, roles: ModelRoleSource) -> BaseLlm:
-    """The `extract` or `vision` role. Recorded mode replays this package's fixtures."""
+    """The `extract` or `vision` role. Recorded mode replays this package's fixtures; live mode falls back to them (T-125)."""
     if cfg.model_mode == "recorded":
         return RecordedLlm(model=f"recorded/{role}", fixtures_dir=FIXTURES_DIR)
     # Extraction posts no spend rows today (reported, R47 D1): no currency to match; a role with no price is still refused.
-    return await llm_for_role(role, cfg, roles, currency=None)
+    return await llm_for_role(role, cfg, roles, currency=None, fallback_dir=FIXTURES_DIR)

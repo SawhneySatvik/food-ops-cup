@@ -19,11 +19,13 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 from google.adk.models import BaseLlm
+from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from google.genai.errors import ClientError
 
-from conftest import SECRET
+from conftest import GEMINI_KEY, SECRET
 from munim_intel.app import create_app
 from munim_intel.config import Config, load_config
 from munim_intel.contracts_gen.models import InternalRunFrameResponse, InvestigationsNarrateRequest
@@ -111,6 +113,24 @@ def frame(narration: str = "model") -> InternalRunFrameResponse:
     )
 
 
+#: platform.model_role with the narrate role priced in INR (a live narration needs a price, R47 D1).
+ROLES = {
+    "items": [
+        {
+            "role": "narrate",
+            "model_id": "gemini-3.5-flash-lite",
+            "provider": "gemini",
+            "location": "global",
+            "probed_at": None,
+            "updated_at": "2026-10-10T00:00:00Z",
+            "input_price_per_mtok_minor": 2_700,
+            "output_price_per_mtok_minor": 22_500,
+            "price_currency": "INR",
+        }
+    ]
+}
+
+
 class Core:
     def __init__(self, run_frame: InternalRunFrameResponse | None = None) -> None:
         self.run_frame = run_frame
@@ -126,6 +146,8 @@ class Core:
         path = request.url.path.removeprefix("/internal/intel/v1/")
         if request.method == "GET" and path == "run-frame":
             return httpx.Response(200, content=self.run_frame.model_dump_json()) if self.run_frame else httpx.Response(503)
+        if request.method == "GET" and path == "model-roles":
+            return httpx.Response(200, json=ROLES)
         body = json.loads(request.content)
         if path == "answers":
             self.answers.append(body)
@@ -278,6 +300,69 @@ def test_ai_off_no_frame_or_a_failed_run_is_all_template(narration: str | None, 
     assert out.source == "template" and out.tainted is False
     assert len(llm.requests) == (1 if fail else 0)
     assert len(core.spend) == (1 if fail else 0), "a failed call is still charged; no call, no row"
+
+
+@pytest.mark.parametrize(
+    ("ai_enabled", "level", "mode", "narrates"),
+    [(False, "hard", "live", False), (True, None, "live", False), (True, "hard", "recorded", False), (True, "hard", "live", True)],
+)
+def test_over_the_cap_a_live_step_narrates_and_never_with_ai_off(ai_enabled: bool, level: str | None, mode: str, narrates: bool) -> None:
+    """T-127 (R58): over the month's AI cap with AI on, in live mode, the step narrates (its model is the capped one the app
+    builds: each call served from its recorded fixture or abstaining); AI switched off, no budget for the month or recorded
+    mode keep core's template, with no model call."""
+    budget = None
+    if level is not None:
+        budget = {
+            "month": "2026-10-01",
+            "currency": "INR",
+            "owner_cap_minor": None,
+            "operator_limit_minor": 500_000,
+            "effective_cap_minor": 500_000,
+            "spent_minor": 500_000,
+            "hard_left_minor": 0,
+            "level": level,
+        }
+    core = Core(
+        InternalRunFrameResponse.model_validate({**frame("template").model_dump(mode="json"), "budget": budget, "ai_enabled": ai_enabled})
+    )
+    llm = Scripted(reply="supplier_price: Supplier prices pushed the margin down {C1}.", requests=[])
+    out = asyncio.run(narrate_step(CTX, request(), core.run_frame, core.client(), load_config(env={"MUNIM_MODEL_MODE": mode}), llm))
+    assert (out.source, len(llm.requests)) == (("model", 1) if narrates else ("template", 0))
+
+
+@pytest.mark.parametrize(("level", "provider_calls"), [("hard", 0), ("ok", 1)])
+def test_over_the_cap_the_app_builds_the_narration_model_capped_and_no_call_reaches_the_provider(
+    level: str, provider_calls: int, cfg: Config, minted: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-127 (R58, money): through the app in live mode, a step over the month's cap (AI on) builds the narrate model `capped`:
+    no call reaches the provider (no fixture holds this narration, so the step keeps core's template). Paired: with budget left
+    the same step calls the provider once (rate-limited here, so it too keeps the template)."""
+    calls: list[str] = []
+
+    async def rate_limited(_llm: Gemini, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        calls.append(llm_request.model or "")
+        raise ClientError(429, {"error": {"code": 429, "message": "PLANTED quota exceeded", "status": "RESOURCE_EXHAUSTED"}})
+        yield LlmResponse()  # pragma: no cover — an async generator
+
+    monkeypatch.setattr(Gemini, "generate_content_async", rate_limited)
+    live = load_config(env={"MUNIM_RUN_DIR": str(cfg.run_dir), "GEMINI_API_KEY": GEMINI_KEY, "MUNIM_MODEL_MODE": "live"})
+    budget = {
+        "month": "2026-10-01",
+        "currency": "INR",
+        "owner_cap_minor": None,
+        "operator_limit_minor": 500_000,
+        "effective_cap_minor": 500_000,
+        "spent_minor": 500_000 if level == "hard" else 0,
+        "hard_left_minor": 0 if level == "hard" else 500_000,
+        "level": level,
+    }
+    narration = "template" if level == "hard" else "model"
+    core = Core(InternalRunFrameResponse.model_validate({**frame(narration).model_dump(mode="json"), "budget": budget, "ai_enabled": True}))
+    client = TestClient(create_app(live, core_transport=core.transport))
+    headers = {"x-munim-service-secret": SECRET, "authorization": f"Bearer {minted['tokens']['ask']}"}
+    r = client.post("/investigate:narrate", json=request().model_dump(mode="json"), headers=headers)
+    assert r.status_code == 200 and r.json()["source"] == "template"
+    assert len(calls) == provider_calls
 
 
 def test_the_route_takes_ask_tokens_only_and_refuses_bad_bodies(cfg: Config, minted: dict[str, Any]) -> None:

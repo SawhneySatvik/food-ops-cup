@@ -9,6 +9,8 @@ replay unchanged (no model request names an outlet), and the expected PO is S1's
       quote_compare cells — status `drafted`;
   (2) no shortfall → `no_shortfall`: no supplier is contacted and no model is called;
   (3) AI off (`narration` template) → `model_blocked` before anything is forecast or sent; no supplier → `no_suppliers`;
+      over the month's AI cap with AI on, in live mode (T-127, R58) → the models are built capped and the run goes on, while
+      AI switched off, no budget for the month or recorded mode stay `model_blocked` with no model built;
   (4) the HTTP route: the same 401 without the secret or with a non-`ask` token, 400 when the body's outlets are not the
       token's scope, 503 when core gives no run-frame — none of them reaches a supplier or a model.
 Every snapshot the route mints is checked against its template's params schema as core reads it (the latest version, in
@@ -170,12 +172,39 @@ class Counting(httpx.AsyncBaseTransport):
         return await self.inner.handle_async_request(request)
 
 
-async def models(_client: Any, _currency: str) -> tuple[Any, Any]:
+async def models(_client: Any, _currency: str, _capped: bool = False) -> tuple[Any, Any]:
     return llm("reason"), llm("extract")
 
 
+def frame_at(ai_enabled: bool, level: str | None) -> InternalRunFrameResponse:
+    """The route's frame as core derives it (frame.ts): narration `model` only with AI on and budget left; no budget → null."""
+    budget = None
+    if level is not None:
+        left = 0 if level == "hard" else 400_000
+        budget = {
+            "month": "2026-10-01",
+            "currency": "INR",
+            "owner_cap_minor": None,
+            "operator_limit_minor": 500_000,
+            "effective_cap_minor": 500_000,
+            "spent_minor": 500_000 - left,
+            "hard_left_minor": left,
+            "level": level,
+        }
+    narration = "model" if ai_enabled and level == "ok" else "template"
+    body = frame(narration).model_dump(mode="json")
+    return InternalRunFrameResponse.model_validate({**body, "budget": budget, "ai_enabled": ai_enabled})
+
+
 def run(
-    tmp: Path, *, shortfall_qty: int | None = None, narration: str = "model", suppliers: Sequence[str] = KEYS
+    tmp: Path,
+    *,
+    shortfall_qty: int | None = None,
+    narration: str = "model",
+    suppliers: Sequence[str] = KEYS,
+    the_frame: InternalRunFrameResponse | None = None,
+    mode: str = "recorded",
+    models_of: Any = models,
 ) -> tuple[str, str | None, RouteCore, Counting]:
     run_id = uuid7(1_760_500_000_000, f"route/{tmp}")
     ctx = RunContext(
@@ -183,8 +212,9 @@ def run(
     )
     core = route_core(run_id, shortfall_qty)
     sim = Counting()
-    cfg = Config({"MUNIM_MODEL_MODE": "recorded", "SUPPLIERS_SIM_PUBLIC_URL": PUBLIC}, {}, tmp)
-    status, draft = asyncio.run(run_negotiation(ctx, request(suppliers), frame(narration), core, cfg, models, sim))  # type: ignore[arg-type]
+    cfg = Config({"MUNIM_MODEL_MODE": mode, "SUPPLIERS_SIM_PUBLIC_URL": PUBLIC}, {}, tmp)
+    f = the_frame or frame(narration)
+    status, draft = asyncio.run(run_negotiation(ctx, request(suppliers), f, core, cfg, models_of, sim))  # type: ignore[arg-type]
     return status, draft, core, sim
 
 
@@ -244,6 +274,29 @@ def test_ai_off_or_no_supplier_stops_before_anything_is_forecast_or_sent(tmp_pat
     for kw, want in (({"narration": "template"}, "model_blocked"), ({"suppliers": ()}, "no_suppliers")):
         status, _, core, sim = run(tmp_path / want, **kw)
         assert (status, core.forecasts, core.snapshots, sim.requests) == (want, [], {}, 0)
+
+
+def test_over_the_cap_negotiates_capped_and_ai_off_never_builds_a_model(tmp_path: Path) -> None:
+    """T-127 (R58): over the month's AI cap with AI on, in live mode, the models are built capped (each call served from its
+    recorded fixture or abstaining; the kit's stand-ins answer here) and the run drafts as it does with budget left. AI switched
+    off — with the budget spent or not — no budget for the month and recorded mode build no model, forecast nothing and contact
+    no supplier."""
+    built: list[bool] = []
+
+    async def spy(client: Any, currency: str, capped: bool = False) -> tuple[Any, Any]:
+        built.append(capped)
+        return await models(client, currency)
+
+    for name, ai, level, mode in (
+        ("off-hard", False, "hard", "live"),
+        ("off-ok", False, "ok", "live"),
+        ("no-budget", True, None, "live"),
+        ("recorded", True, "hard", "recorded"),
+    ):
+        status, _, core, sim = run(tmp_path / name, the_frame=frame_at(ai, level), mode=mode, models_of=spy)
+        assert (status, built, core.forecasts, core.snapshots, sim.requests) == ("model_blocked", [], [], {}, 0), name
+    status, draft_id, core, sim = run(tmp_path / "capped", the_frame=frame_at(True, "hard"), mode="live", models_of=spy)
+    assert built == [True] and status == "drafted" and draft_id is not None and sim.requests > 0
 
 
 def test_the_route_refuses_before_reaching_a_supplier_or_a_model(cfg: Config, minted: dict[str, Any]) -> None:

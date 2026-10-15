@@ -40,7 +40,7 @@ from munim_intel.config import Config, ConfigError
 from munim_intel.contracts_gen.models import Cloudevent, InvestigationsNarrateRequest, ThreadsIntelAskRequest
 from munim_intel.events import handle_event
 from munim_intel.investigate import narrate_step
-from munim_intel.llm import cause, llm_for_role, price_of, provider_of
+from munim_intel.llm import cause, frame_over_cap, llm_for_role, over_cap, price_of, provider_of
 from munim_intel.llm.providers import ProviderUnavailable
 from munim_intel.manager.ask import ModelsFactory, answer_ask, default_models, fetch_run_frame
 from munim_intel.negotiate.route import negotiate_router
@@ -67,6 +67,16 @@ class _Refused(Exception):
         self.response = response
 
 
+async def watch_narrator(cfg: Config, client: InternalClient, frame: Frame) -> BaseLlm | None:
+    """The narrate model of a watcher or brief run: with AI on and budget left; over the month's AI cap with AI on, in live mode,
+    built `capped` — each call served from its recorded fixture or abstaining (T-127, R58). None (template wording) with AI
+    switched off or no budget for the month."""
+    capped = over_cap(cfg, frame.ai_enabled, frame.budget_level)
+    if frame.narration != "model" and not capped:
+        return None
+    return await llm_for_role("narrate", cfg, client, currency=frame.spend_currency, capped=capped)
+
+
 def create_app(
     cfg: Config,
     *,
@@ -84,8 +94,8 @@ def create_app(
     models_of = ask_models or default_models(cfg)
 
     # T-083: the investigation narration model (`narrate` role); a test may pass a recorded one of its own.
-    async def narrate_model(client: InternalClient, currency: str) -> BaseLlm:
-        return await (narrate_llm(client) if narrate_llm else llm_for_role("narrate", cfg, client, currency=currency))
+    async def narrate_model(client: InternalClient, currency: str, capped: bool) -> BaseLlm:
+        return await (narrate_llm(client) if narrate_llm else llm_for_role("narrate", cfg, client, currency=currency, capped=capped))
 
     # Read lazily: core-api creates the key and the secret on its first start, which may follow intel's.
     def public_key() -> Ed25519PublicKey:
@@ -167,12 +177,11 @@ def create_app(
         client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
         try:
             llm: BaseLlm | None = None
-            if frame.narration == "model":
-                try:
-                    llm = await llm_for_role("narrate", cfg, client, currency=frame.spend_currency)
-                except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
-                    # Rule 11: AI surfaces degrade to the template, never to an error.
-                    log.warning("intel: run %s narrates by template: %s", ctx.run_id, cause(e))
+            try:
+                llm = await watch_narrator(cfg, client, frame)
+            except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
+                # Rule 11: AI surfaces degrade to the template, never to an error.
+                log.warning("intel: run %s narrates by template: %s", ctx.run_id, cause(e))
             meter = None
             if llm is not None:
                 meter = Meter(SpendBuffer(client.write_spend, frame.spend_currency), "narrate", provider_of(llm), llm.model, price_of(llm))
@@ -205,9 +214,9 @@ def create_app(
         try:
             llm: BaseLlm | None = None
             # A frame we cannot get means template wording, not an error (rule 11).
-            if frame is not None and frame.narration == "model":
+            if frame is not None:
                 try:
-                    llm = await llm_for_role("narrate", cfg, client, currency=frame.spend_currency)
+                    llm = await watch_narrator(cfg, client, frame)
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
                     log.warning("intel: brief run %s words by template: %s", ctx.run_id, cause(e))
             items = [
@@ -282,9 +291,10 @@ def create_app(
         client = InternalClient(ctx, base_url=cfg.core_url, service_secret=cfg.service_secret(), transport=core_transport)
         try:
             llm: BaseLlm | None = None
-            if frame is not None and frame.narration == "model":
+            capped = frame_over_cap(cfg, frame)
+            if frame is not None and (frame.narration == "model" or capped):
                 try:
-                    llm = await narrate_model(client, spend_currency(frame))
+                    llm = await narrate_model(client, spend_currency(frame), capped)
                 except (ProviderUnavailable, CoreError, httpx.HTTPError) as e:
                     # Rule 11: the step keeps its template narration.
                     log.warning("intel: narrate run %s by template: %s", ctx.run_id, cause(e))

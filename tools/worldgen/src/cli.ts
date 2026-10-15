@@ -6,7 +6,9 @@
 // `make seed` fills MUNIM_SEED_TOKENS itself for a core-api started with MUNIM_IDP=local (R44a) — see the Makefile and
 // adapters/dev/idp-local/mint-seed-tokens.ts (worldgen's src may not spawn processes or reach adapters, gate d).
 // --plan runs the world against a fake transport and prints the request log (no server, no tokens).
-// cobnut (the demo bakery behind apps/web) is a fresh tenant on every run unless --seed is given, and needs an "operator" token. It writes
+// cobnut (the demo bakery behind apps/web) is a fresh tenant on every run unless --seed is given (`make seed WORLD=cobnut SEED=<seed>`), and
+// needs an "operator" token and SUPPLIERS_SIM_PUBLIC_URL (the suppliers simulator's public URL, as intel has it: its simulated suppliers'
+// agent cards are <url>/{steady,discounter,premium}/.well-known/agent-card.json; refused before anything is written without it). It writes
 // what the site needs under ${MUNIM_RUN_DIR:-<repo>/.run}/cobnut/ (0700; files 0600; git-ignored) and prints only the tenant id and paths:
 //   storefront-key     the raw storefront key (NEXT_PUBLIC_MUNIM_STOREFRONT_KEY)
 //   demo-tokens.json   {owner, manager, counter, kitchen} bearer tokens, only against a local-IdP core-api (MUNIM_DEMO_TOKENS; 1 h)
@@ -23,10 +25,30 @@ function parse(argv: string[]): Map<string, string> {
   for (let i = 0; i < argv.length; i++) {
     const m = /^--([a-z-]+)(?:=(.*))?$/.exec(argv[i]!);
     if (!m || !FLAGS.has(m[1]!)) throw new Error(`unknown argument ${argv[i]}`);
-    // `--flag value` and `--flag=value` both work; --plan takes none.
-    out.set(m[1]!, m[1] === "plan" ? "true" : (m[2] ?? argv[++i] ?? ""));
+    // `--flag value` and `--flag=value` both work; --plan takes none. A missing value (or the next flag in its place) is refused.
+    const value = m[1] === "plan" ? "true" : (m[2] ?? argv[++i]);
+    if (value === undefined || value === "" || (m[2] === undefined && value.startsWith("--"))) throw new Error(`--${m[1]} needs a value`);
+    out.set(m[1]!, value);
   }
   return out;
+}
+
+/** The suppliers simulator's public URL from the environment: an http(s) URL, no query, credentials or fragment; no trailing slash. */
+function simUrlFrom(raw: string | undefined): string {
+  if (!raw) {
+    throw new Error("cobnut's simulated suppliers carry agent cards on the suppliers simulator: set SUPPLIERS_SIM_PUBLIC_URL to its public URL "
+      + "(the one intel has, e.g. http://127.0.0.1:8090 locally)");
+  }
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error("SUPPLIERS_SIM_PUBLIC_URL is not a URL");
+  }
+  if (!["http:", "https:"].includes(u.protocol) || u.username || u.password || u.search || u.hash) {
+    throw new Error("SUPPLIERS_SIM_PUBLIC_URL must be an http(s) URL with no credentials, query or fragment");
+  }
+  return u.toString().replace(/\/+$/, "");
 }
 
 async function main() {
@@ -42,9 +64,11 @@ async function main() {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error("--as-of must be YYYY-MM-DD");
   // A reseed of cobnut must be a new tenant (its id derives from the seed), so its default seed is fresh each run.
   const seed = args.get("seed") ?? (world === "cobnut" ? `cobnut-${Date.now().toString(36)}` : DEFAULT_SEED);
+  const simUrl = world === "cobnut" ? simUrlFrom(process.env.SUPPLIERS_SIM_PUBLIC_URL) : undefined;
+  const sim = simUrl !== undefined ? { simUrl } : {};
 
   if (args.has("plan")) {
-    process.stdout.write((await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}) })).log);
+    process.stdout.write((await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), ...sim })).log);
     return;
   }
   const tokens: Record<string, string> = process.env.MUNIM_SEED_TOKENS ? (JSON.parse(process.env.MUNIM_SEED_TOKENS) as Record<string, string>) : {};
@@ -52,10 +76,10 @@ async function main() {
   const missing = mod.meta.personas.filter((p) => !tokens[p]);
   if (missing.length) {
     throw new Error(`no bearer token for persona(s): ${missing.join(", ")}. Set MUNIM_SEED_TOKENS='{"${missing[0]}":"<jwt>",…}'. `
-      + "A the dev host-mode core-api needs real verified sign-ins; for the dev-only local sign-in start it with `MUNIM_IDP=local make up LOCAL_DB=1` and run `make seed` (it mints the tokens).");
+      + "A core-api on a real IdP needs real verified sign-ins; for the dev-only local sign-in start it with `MUNIM_IDP=local make up LOCAL_DB=1` and run `make seed` (it mints the tokens).");
   }
   const baseUrl = process.env.MUNIM_API_URL ?? `http://127.0.0.1:${process.env.PORT ?? "8787"}`;
-  const r = await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), baseUrl, token: (p) => tokens[p]!, operator: tokens.operator !== undefined });
+  const r = await runWorld({ world: world as WorldName, seed, asOf, days, ...(liveDays !== undefined ? { liveDays } : {}), ...sim, baseUrl, token: (p) => tokens[p]!, operator: tokens.operator !== undefined });
   if (world === "cobnut") {
     const local = ((await (await fetch(new URL("/health", baseUrl))).json()) as { idp?: unknown }).idp === "local";
     const dir = join(resolve(process.env.MUNIM_RUN_DIR || join(import.meta.dirname, "../../../.run")), "cobnut");
@@ -73,6 +97,7 @@ async function main() {
     console.log(`          storefront key: ${keyFile}`);
     if (tokenFile) console.log(`          demo tokens (local IdP, 1 h): ${tokenFile}`);
     console.log(`          site env: ${env}`);
+    console.log(`          simulated suppliers' agent cards: ${simUrl}/{steady,discounter,premium}/.well-known/agent-card.json`);
     return;
   }
   if (tokens.operator === undefined) console.log("worldgen: no operator token, so this world is onboarded self-serve and is NOT labelled demo (hard rule 5: no \"Sample data\" badge in the UI). Add \"operator\" to MUNIM_SEED_TOKENS to provision it as a demo tenant.");

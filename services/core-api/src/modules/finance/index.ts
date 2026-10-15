@@ -1,6 +1,7 @@
 // Finance module (T-026). Mounted by modules/index.ts.
 //   POST /v1/finance/channel-terms     finance.channel_terms.set.v1 (own command)
 //   POST /v1/finance/expenses          finance.expense.record.v1 (own command; posts finance.post_expense)
+//   POST /v1/finance/budgets           finance.budget.set.v1 (own command, owner/judge; one per outlet or business, category, month)
 //   POST /v1/finance/disputes          finance.dispute.draft.v1 (own command; also draftable)
 //   POST /v1/finance/period-closes     finance.period.close.v1 (own command; also draftable)
 //   GET  /v1/finance/exports/tally     journal vouchers as CSV (owner, advisor, judge)
@@ -11,7 +12,7 @@
 // finance.post_* rule), seedChart (T-020), recordSettlement / recordBankLines (T-030's approved import commit),
 // reconcileSettlement. Supplier agents and payments are simulated / recorded only (project rule 5).
 import { commandEnvelopeOf } from "@munim/contracts";
-import { FinanceChannelTermsSetV1, FinanceDisputeDraftV1, FinanceExpenseRecordV1, FinancePeriodCloseV1 } from "@munim/contracts/finance";
+import { FinanceBudgetSetV1, FinanceChannelTermsSetV1, FinanceDisputeDraftV1, FinanceExpenseRecordV1, FinancePeriodCloseV1 } from "@munim/contracts/finance";
 import { Hono, type Context } from "hono";
 import { contextOf, requireMember } from "../../auth/resolve.ts";
 import { type CommandHandler, executeCommand, replayHeaders } from "../../commit/index.ts";
@@ -20,7 +21,7 @@ import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import type { Queryable } from "../../runtoken/index.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
-import { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
+import { budgetSet, channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
 import { listChannelTerms, tallyExport } from "./read.ts";
 import { readRoutes } from "./routes.ts";
 
@@ -28,7 +29,7 @@ export { seedChart } from "./chart.ts";
 export { postFor, reverseFor, reverseSource, type PostResult, type ReversalRuleId } from "./post.ts";
 export { recordBankLines, recordSettlement, reconcileSettlement, type BankLineInput, type SettlementInput } from "./settle.ts";
 export { FINANCE_TEMPLATES } from "./read.ts";
-export { channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
+export { budgetSet, channelTermsSet, disputeDraft, expenseRecord, journalAdjust, periodClose } from "./commands.ts";
 
 // Draftable handlers register once per process even if this file is loaded twice (loadRouters imports by
 // file URL; tests may import by path).
@@ -87,6 +88,7 @@ function financeReader(c: Context<AppEnv>) {
 export const router = new Hono<AppEnv>()
   .post("/v1/finance/channel-terms", requireMember, ownCommand("finance.channel_terms.set.v1", FinanceChannelTermsSetV1, channelTermsSet))
   .post("/v1/finance/expenses", requireMember, ownCommand("finance.expense.record.v1", FinanceExpenseRecordV1, expenseRecord))
+  .post("/v1/finance/budgets", requireMember, ownCommand("finance.budget.set.v1", FinanceBudgetSetV1, budgetSet))
   .post("/v1/finance/disputes", requireMember, ownCommand("finance.dispute.draft.v1", FinanceDisputeDraftV1, disputeDraft))
   .post("/v1/finance/period-closes", requireMember, ownCommand("finance.period.close.v1", FinancePeriodCloseV1, periodClose))
   .get("/v1/finance/channel-terms", requireMember, async (c) => {

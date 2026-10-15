@@ -19,11 +19,14 @@ export interface Ctx {
   readonly planted: Set<string>;
   /** Things a builder wants to hand to later steps (channel ids, outlet ids …). */
   readonly s: Record<string, unknown>;
+  /** The suppliers simulator's public URL (as intel holds it, SUPPLIERS_SIM_PUBLIC_URL), for the simulated suppliers' agent cards
+   *  (cobnut). No trailing slash. */
+  simUrl?: string;
 }
 
 export type { J };
 
-export function makeCtx(o: { api: Api; world: string; seed: string; asOf: string; days: number; liveDays?: number }): Ctx {
+export function makeCtx(o: { api: Api; world: string; seed: string; asOf: string; days: number; liveDays?: number; simUrl?: string }): Ctx {
   const planted = new Set<string>();
   return {
     ...o,

@@ -71,6 +71,8 @@ const DISHES: Dish[] = [
 export async function build(c: Ctx): Promise<void> {
   // A demo tenant (hard rule 5: the "Sample data" badge) with Cares: both need the operator, so there is no self-serve fallback.
   if (!c.api.hasOperator) throw new Error('cobnut is provisioned by the platform operator (is_demo, Cares): add "operator" to MUNIM_SEED_TOKENS');
+  // Its simulated suppliers' agent cards live on the suppliers simulator (cli.ts refuses before writing anything without the URL).
+  if (!c.simUrl) throw new Error("cobnut's simulated suppliers need the suppliers simulator's public URL (SUPPLIERS_SIM_PUBLIC_URL)");
   const { asOf: A } = c;
   const D = (n: number) => addDays(A, -n);
   const biz = await k.onboard(c, {
@@ -189,6 +191,19 @@ export async function build(c: Ctx): Promise<void> {
   await k.supplier(c, "nuts", "Lalbagh Nut & Spice (simulated)", 7, [{ key: "hazelnuts", ing: hazelnuts, priceMinor: 148000, at: observed }]);
   const po = await k.purchaseOrder(c, "butter", dairy, hzg.id, D(5), [{ ing: butter, qtyMilli: 10000, priceMinor: 56000 }]);
   await k.goodsReceived(c, "butter", dairy, hzg.id, po.id, at(D(5), "07:30", tz), [{ ing: butter, qtyMilli: 10000, costMinor: null, poLine: po.lines[0]! }]);
+  // The simulated suppliers' agents a request for quotes (POST /v1/rfq-requests) asks: their agent cards on the suppliers simulator at
+  // c.simUrl (intel refuses a card anywhere else). Core hands intel the carded suppliers in id order and the recorded negotiation calls
+  // them Supplier A, B and C in that order, so the three ids are their keys' ids sorted: steady < discounter < premium.
+  const agents = [["steady", "Steady Wholesale (simulated)", 15], ["discounter", "Bargain Bulk Traders (simulated)", 7],
+    ["premium", "Premium Provisions (simulated)", 30]] as const;
+  const agentIds = agents.map(([key]) => c.api.id(`supplier:${key}`)).sort();
+  for (const [i, [key, name, days]] of agents.entries()) {
+    await k.supplier(c, key, name, days, [], { id: agentIds[i]!, cardUrl: `${c.simUrl}/${key}/.well-known/agent-card.json` });
+  }
+  // This month's purchases budget for the whole business, the owner's own command: the deal review reads it (budget_left_minor); with
+  // none every quote is budget_missing ("cannot verify") and no PO draft can pass. ₹50,000. The month is the outlets' business month now
+  // (not aliased in the request log: as a date it would also rename every other line that names the 1st of that month).
+  await k.budget(c, "purchases", { month: `${live.slice(0, 7)}-01`, category: "purchases", amountMinor: 5_000_000 });
   const hazelMin = 3000 + Math.ceil(hazelNeed / 11) + 2000;
   await k.reorderLevel(c, hzg.id, hazelnuts, hazelMin, hazelMin + 8000);
   await k.reorderLevel(c, hzg.id, butter, 4000, 10000);

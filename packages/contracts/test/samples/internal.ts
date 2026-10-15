@@ -54,6 +54,7 @@ export const SAMPLES: Record<string, unknown> = {
     budget: { month: "2026-10-01", currency: "INR", owner_cap_minor: 300000, operator_limit_minor: 500000, effective_cap_minor: 300000, spent_minor: 7515,
       hard_left_minor: 292485, level: "ok" },
     narration: "model",
+    ai_enabled: true,
     negotiation: { target_bp: 9500, walkaway_bp: 11000 },
     licence_kinds: [{ code: "fssai", holder: "outlet", outlet_kinds: ["restaurant", "cloud_kitchen", "store"], unverified: false },
       { code: "gst", holder: "business", outlet_kinds: ["restaurant", "cloud_kitchen", "store"], unverified: true }],

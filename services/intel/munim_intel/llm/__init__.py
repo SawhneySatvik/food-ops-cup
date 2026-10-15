@@ -9,7 +9,7 @@ from google.adk.integrations.openai import OpenAILlm
 from google.adk.models import BaseLlm
 
 from munim_intel.config import Config
-from munim_intel.contracts_gen.models import PlatformModelRoles
+from munim_intel.contracts_gen.models import InternalRunFrameResponse, PlatformModelRoles
 from munim_intel.llm.providers import PROVIDERS, PriceRefused, ProviderUnavailable, build_live_llm, row_price
 from munim_intel.llm.recorded import FIXTURES_DIR, RecordedLlm
 from munim_intel.trace.price import Price
@@ -53,6 +53,20 @@ async def llm_for_role(
     if fallback_dir is not None:
         llm.fallback = RecordedLlm(model=f"recorded/{role}", fixtures_dir=fallback_dir)
     return llm
+
+
+def over_cap(cfg: Config, ai_enabled: bool | None, budget_level: str | None) -> bool:
+    """T-127 (R58; T-125's open item): live mode, AI switched on (the run-frame's `ai_enabled`, the typed kill switch alone) and
+    the month's AI budget spent (budget level `hard`). Such a run still builds its models, `capped`: no call reaches the provider
+    and each is served from the recorded fixture of that exact call or abstains. Never with AI switched off (no AI answer, not
+    even a recorded one), with no budget for the month (R47 D2: AI declines) or in recorded mode (every gate replays as before).
+    Every model gate reads this rule; none restates it."""
+    return cfg.model_mode == "live" and ai_enabled is True and budget_level == "hard"
+
+
+def frame_over_cap(cfg: Config, frame: InternalRunFrameResponse | None) -> bool:
+    """`over_cap` of a run-frame (no frame: no model)."""
+    return frame is not None and over_cap(cfg, frame.ai_enabled, frame.budget.level if frame.budget is not None else None)
 
 
 def price_of(llm: BaseLlm) -> Price | None:

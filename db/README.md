@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (31 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (33 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -43,7 +43,8 @@ rate, `purchasing.deal_inputs` v3 with shop SKU margins), 0027 T-098 (stop reaso
 running Auto investigation to Plan; Auto entered only with the plan approval), 0028 Munim Cares (ADR-015 §1: 4 platform tables,
 9 core books, 4 stock kinds, 10 commands, 3 derivation rules, 5 definer reads, 5 templates), 0029 T-099 storefront display text,
 0030 T-115 display order (`position` on items, variants, option groups, options), 0031 T-117 tick ledger (`core.tick_claim`:
-which core-worker job ran for which tick slot) — gates see 30 applied.
+which core-worker job ran for which tick slot), 0032 T-127 the command authority of `purchasing.rfq.request.v1`, 0033 T-127 the
+latest forecast run per outlet (a new version of six forecast-reading templates) — gates see 32 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -875,6 +876,35 @@ no row written or rewritten, no table, index, policy, trigger, function, command
 - **Gates:** `tests/tick-ledger-0031.test.ts` (T1 / G / SHAPE); `db/tests/redproof-0031.sh` (one plant per gate, plus 0031's own
   post-conditions re-run after each perturbation). Red-proof scripts plant `0032_redproof_plant.sql` now (bumped by 0031);
   `grants.test.ts` plants `0032_planted.sql`.
+
+**RFQ authority (0032, T-127).** The header of 0032 is the full list. Additive: one `core.command_authority` row, no other object.
+- **`purchasing.rfq.request.v1`** (`POST /v1/rfq-requests`, T-114): owner, manager, judge; scope `outlet` (core-api judges every
+  chosen outlet); `target_tables` `'{}'` — a request for quotes to simulated suppliers is not books (R22), so the guard's own-command
+  branch admits no book table under it (MB008), as for `findings.dismiss.v1`. Not draft-only; no role cap, outlet column, amount cap
+  or customer table. It replaces the stand-in T-114's tests inserted (`rfq.test.ts`'s `RFQ_NO_AUTHORITY_ROW=1` now deletes this
+  row to prove every request is refused without it).
+- **Gates:** `tests/rfq-authority-0032.test.ts` (A1 the row / LOG the command_log foreign key / G no book table, staff MB001);
+  `db/tests/redproof-0032.sh`.
+
+**Latest forecast run per outlet (0033, T-127).** The header of 0033 is the full list. Additive: one new version of six templates.
+- **Why:** they read "the latest forecast run with a point the minter can see", one run for the whole read. The negotiation
+  forecasts only the outlets a person chose (its run token's scope; mint refuses the rest), so after a one-outlet RFQ every
+  all-outlet read found no forecast for the other outlets (their need read 0).
+- **The new versions** pick, for each outlet, the newest run with a point at that outlet the minter can see (RLS keeps an
+  out-of-scope outlet out), and read only that run's points at that outlet, in its own method: `kitchen.prep_need` v2,
+  `forecast.points` v2, `inventory.shortfall` v3, `inventory.expiry_risk` v3, `purchasing.deal_inputs` v4 (the shared `fuse`
+  CTE), `market.upcoming` v3. Same params, columns and min_role; each SQL is the previous version's with the pick replaced (each
+  anchor must occur exactly once, else 0033 refuses). With one run covering every outlet they return what the previous versions
+  return. `people.labour_vs_demand` (slot points only, which no negotiation posts), `forecast.accuracy` and `forecast.freshness`
+  (already per outlet) are unchanged; the post-condition names every latest reader of `intel.forecast_run` that does not pick per
+  outlet, and only those three may.
+- **Gates:** `tests/forecast-outlet-0033.test.ts` — the oracle is the world, not the migration: a newer run covering outlet A
+  alone with A's points copied changes no read of the new versions (every one of the six, at every outlet, A and B), while the
+  previous versions lose B at "every outlet" for all six; a doubled A-only run is read for A only; a manager of A reads A only.
+  `db/tests/redproof-0033.sh` (each new version put back to the tenant-wide pick; the outlet join dropped; the oldest run picked;
+  an open read policy; 0033's own post-conditions re-run). Red-proof scripts plant `0034_redproof_plant.sql` now (bumped by
+  0032/0033); `grants.test.ts` plants `0034_planted.sql`; `redproof-0026.sh` takes 0033's `purchasing.deal_inputs` v4 back
+  before re-running 0026's post-conditions (v3 the latest).
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

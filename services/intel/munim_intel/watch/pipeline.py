@@ -55,6 +55,7 @@ from munim_intel.contracts_gen.models import (
     Snapshot,
 )
 from munim_intel.detect import REGISTRY, DetectorSpec, Driver, Hit, OutletFrame, Severity, Thresholds, Window
+from munim_intel.llm import over_cap
 from munim_intel.mapping import Abstain, Detection, DraftMapping, Minted, draft_body, snap_ref
 from munim_intel.narrate import NARRATE_AT, model_segments, template_segments
 from munim_intel.runtime.context import RunContext
@@ -123,8 +124,9 @@ class WatchRun:
         self.core = core
         self.frame = frame
         self.cfg = cfg
-        #: The narrate-role model; None → template narration only (and then 0 model calls).
-        self.llm = llm if frame.narration == "model" else None
+        #: The narrate-role model; None → template narration only (and then 0 model calls). Over the month's AI cap with AI on (live)
+        #: it is the capped model app.watch built: each call served from its recorded fixture or abstaining (T-127).
+        self.llm = llm if frame.narration == "model" or over_cap(cfg, frame.ai_enabled, frame.budget_level) else None
         self.state = RunState(
             traces=TraceBuffer(core.write_traces),
             budget=Budget(max_model_calls=MAX_NARRATIONS, max_input_tokens=MAX_NARRATIONS * 8_000, max_tool_calls=0),

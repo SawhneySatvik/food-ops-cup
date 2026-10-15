@@ -8,6 +8,8 @@
 //     never shown (a person sees the template's snapshot);
 //   - the narration mode: `model` only with AI on (`intel.enabled`), a budget for the month, and hard_left > 0.
 //     Run tokens are never refused for budget: at the cap a run still gets its frame and runs rules only;
+//   - `ai_enabled`: the kill switch alone (T-127, R58), so intel can tell AI switched off (no AI answer at all) from over the
+//     month's cap (live mode: each model call served from its recorded fixture or abstaining, T-125);
 //   - the owner's negotiation bounds (R47 D7): the tenant-wide business policy in force on the frame's UTC date, each bound
 //     defaulting to 9500 / 11000 bp of the reference price when unset. Outlet-level overrides are not served: the bound is per business;
 //   - the pack's `licence_kinds` (code, holder, outlet kinds, `_unverified` as a flag) and `payroll_scope` (W3.2);
@@ -77,6 +79,7 @@ export async function runFrame(c: Queryable, run: Run, at: Date) {
     outlets,
     budget,
     narration,
+    ai_enabled: aiOn,
     negotiation: { target_bp: pol?.t ?? NEGOTIATION_DEFAULTS.target_bp, walkaway_bp: pol?.w ?? NEGOTIATION_DEFAULTS.walkaway_bp },
     // A kind with `_unverified` notes is flagged, never explained: the notes are pack prose, a watcher needs the code.
     licence_kinds: pack.doc.licence_kinds.map((k) => ({ code: k.code, holder: k.holder, outlet_kinds: k.outlet_kinds, unverified: (k._unverified?.length ?? 0) > 0 })),

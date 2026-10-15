@@ -146,6 +146,7 @@ export const OPERATIONS = [
   "GET /v1/finance/period-closes",
   "POST /v1/finance/channel-terms",
   "POST /v1/finance/expenses",
+  "POST /v1/finance/budgets",
   "POST /v1/finance/disputes",
   "POST /v1/finance/period-closes",
   "GET /v1/finance/exports/tally",

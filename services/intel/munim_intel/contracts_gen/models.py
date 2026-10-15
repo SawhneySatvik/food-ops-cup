@@ -9276,6 +9276,23 @@ class FinanceExpenseRecordV1(BaseModel):
     document_id: Uuid7 | None
 
 
+class FinanceBudgetSetV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    budget_id: Uuid7
+    outlet_id: Uuid7 | None
+    category: Literal['purchases', 'labour', 'marketing', 'utilities', 'maintenance', 'other']
+    period_month: Annotated[
+        str,
+        Field(
+            pattern='^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))$'
+        ),
+    ]
+    amount_minor: Annotated[int, Field(ge=0, le=9007199254740991)]
+    currency: Annotated[str, Field(pattern='^[A-Z]{3}$')]
+
+
 class Line39(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -10288,6 +10305,7 @@ class InternalRunFrameResponse(BaseModel):
     outlets: list[Outlet2]
     budget: Budget | None
     narration: Literal['model', 'template']
+    ai_enabled: bool | None = False
     negotiation: Negotiation
     licence_kinds: list[LicenceKind]
     payroll_scope: Literal['drafts', 'roster_only']

@@ -132,6 +132,7 @@ CONTRACTS: dict[str, str] = {
     "v1.finance.period-closes": "V1FinancePeriodCloses",
     "finance.channel_terms.set.v1": "FinanceChannelTermsSetV1",
     "finance.expense.record.v1": "FinanceExpenseRecordV1",
+    "finance.budget.set.v1": "FinanceBudgetSetV1",
     "finance.dispute.draft.v1": "FinanceDisputeDraftV1",
     "finance.period.close.v1": "FinancePeriodCloseV1",
     "finance.journal.adjust.v1": "FinanceJournalAdjustV1",

@@ -1,9 +1,9 @@
 // A person asks the simulated suppliers for quotes (T-114; pack inventory-purchasing §6 "Trigger: … or a person's ask").
 //   POST /v1/rfq-requests  purchasing.rfq.request.v1 {rfq_id, ingredient_id, outlet_ids}
-//   1. executeCommand: the person's own command, judged per chosen outlet by core.command_authority (the row is a
-//      migrator request — until it exists the authority read finds nothing and the command is refused, and the
-//      command_log FK would refuse it too); one audit entry under their name. An RFQ to simulated suppliers is not
-//      books (R22): nothing else is written here.
+//   1. executeCommand: the person's own command, judged per chosen outlet by core.command_authority (0032's row: owner,
+//      manager, judge, outlet scope, no book table; without it the authority read finds nothing and the command_log FK
+//      refuses the type too); one audit entry under their name. An RFQ to simulated suppliers is not books (R22):
+//      nothing else is written here.
 //   2. Only on the first execution (a replay returns the stored bytes and never starts a second run): core reads the
 //      ingredient, the tenant's simulated suppliers with an agent card and the active items under the person's own
 //      context, mints an `ask` run (actor = the person, scope = exactly the chosen outlets; intel.run has no negotiation

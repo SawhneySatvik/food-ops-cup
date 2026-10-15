@@ -369,14 +369,15 @@ describe("D3 — purchasing.deal_inputs v3 (shop SKU margin from the catalogue p
     expect([rest, margin_rule_applies]).toEqual([v2, "true"]);
   });
 
-  test("v3 is the latest, with v2's params and min_role; margin_at_quote_bp names core.price.amount_minor", async () => {
+  // 0033 (T-127) adds v4 on top (the latest forecast run per outlet), with v3's params, columns and role (forecast-outlet-0033.test.ts).
+  test("v3 has v2's params and min_role, v4 (0033) is the latest; margin_at_quote_bp names core.price.amount_minor", async () => {
     const r = await db.admin<{ latest: number; same: boolean; src: boolean }>(`
       SELECT (SELECT max(version) FROM evidence.snapshot_template WHERE id = 'purchasing.deal_inputs') latest,
              (SELECT a.params_schema = b.params_schema AND a.min_role = b.min_role FROM evidence.snapshot_template a, evidence.snapshot_template b
                WHERE a.id = b.id AND a.id = 'purchasing.deal_inputs' AND a.version = 2 AND b.version = 3) same,
              (SELECT (c -> 'numeric_source') ? 'core.price.amount_minor' FROM evidence.snapshot_template t, jsonb_array_elements(t.columns) c
                WHERE t.id = 'purchasing.deal_inputs' AND t.version = 3 AND c ->> 'name' = 'margin_at_quote_bp') src`);
-    expect(r.rows).toEqual([{ latest: 3, same: true, src: true }]);
+    expect(r.rows).toEqual([{ latest: 4, same: true, src: true }]);
   });
 });
 

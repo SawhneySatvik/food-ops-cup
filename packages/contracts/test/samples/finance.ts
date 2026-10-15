@@ -8,6 +8,9 @@ const expense = {
   expense_id: u(1101), outlet_id: u(2), category: "utilities", incurred_on: "2026-09-03", amount_minor: 450000, tax_minor: 0, currency: "INR",
   payee: "Synthetic Power Co", note: null, document_id: null,
 };
+const budget = {
+  budget_id: u(1110), outlet_id: null, category: "purchases", period_month: "2026-10-01", amount_minor: 5000000, currency: "INR",
+};
 const dispute = {
   dispute_id: u(1102), channel_id: u(30), basis: "short_payout", currency: "INR", break_ids: [u(1103)], total_claimed_minor: 2400,
   lines: [{ settlement_line_id: u(1104), order_id: null, claimed_minor: 2400 }],
@@ -24,6 +27,7 @@ const adjust = {
 export const SAMPLES: Record<string, unknown> = {
   "finance.channel_terms.set.v1": terms,
   "finance.expense.record.v1": expense,
+  "finance.budget.set.v1": budget,
   "finance.dispute.draft.v1": dispute,
   "finance.period.close.v1": close,
   "finance.journal.adjust.v1": adjust,

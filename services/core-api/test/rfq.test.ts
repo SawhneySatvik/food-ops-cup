@@ -9,8 +9,8 @@
 //   (4) intel failing after the commit: 503, the request stays on record, the run is ended;
 //   (5) no negotiation port wired: 503 before anything is written.
 // The intel side is a fake at the service boundary (the port); the run token is checked with core's own verifier.
-// STAND-IN: core.command_authority has no row for purchasing.rfq.request.v1 yet (a migrator request, T-114 report).
-// AUTHORITY_ROW below inserts it for this file only; without it every request is refused (redproof-t114.sh proves it).
+// The command's core.command_authority row is the migration's (0032); RFQ_NO_AUTHORITY_ROW=1 deletes it for this file's database,
+// and redproof-t114.sh proves every request is then refused.
 import { createLogger } from "@munim/config";
 import { CommandResult, REPLAYED_HEADER } from "@munim/contracts";
 import { buildWorld, type TestDb } from "@munim/db";
@@ -25,10 +25,6 @@ import type { Deps } from "../src/lib/types.ts";
 import { configureRfq, DRAFT_ID_HEADER, type NegotiateBody, NEGOTIATION_HEADER } from "../src/modules/purchasing/index.ts";
 import { verifyRunToken } from "../src/runtoken/index.ts";
 import { openDb } from "./db.ts";
-
-/** The row the migrator is asked for (T-114 report). Test-only stand-in until it lands; idempotent either way. */
-export const AUTHORITY_ROW = `INSERT INTO core.command_authority (command_type, allowed_roles, scope, target_tables)
-  VALUES ('purchasing.rfq.request.v1', ARRAY['owner', 'manager', 'judge'], 'outlet', '{}') ON CONFLICT (command_type) DO NOTHING`;
 
 const idp = createLocalIdp();
 const keys = testKeys();
@@ -70,7 +66,7 @@ const logged = () => count(`SELECT count(*) n FROM core.command_log WHERE tenant
 
 beforeAll(async () => {
   db = await openDb();
-  if (!process.env.RFQ_NO_AUTHORITY_ROW) await db.admin(AUTHORITY_ROW);
+  if (process.env.RFQ_NO_AUTHORITY_ROW) await db.admin(`DELETE FROM core.command_authority WHERE command_type = 'purchasing.rfq.request.v1'`);
   const w = await buildWorld(db);
   Object.assign(T, { tenant: w.tenant, owner: w.owner, staff: w.staff, outlets: [...w.outlets], ingredient: w.ingredient, item: w.item, supplier: w.supplier });
   const own = (command_type: string) => ({ tenant_id: T.tenant, outlet_ids: "*" as const, role: "owner" as const, member_id: T.owner, command_type });

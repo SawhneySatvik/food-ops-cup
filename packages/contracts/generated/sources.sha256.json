@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "81e84fcb107c55dd9034f7b9a7f3fae51fde1b58bddc24649cf74707485ec371",
+    "sha256": "35163e273511469c9cc972dfeb4c5c7b0d49a9f52a70c7b683c4dc0ab8d8eb5d",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "10706811f9b0d09ce96ede6d854e2269aef0f93f572829dcd46a1fe11a279e5f",
@@ -19,7 +19,7 @@
       "src/customers/index.ts": "16cdc538740cf838f90600a590a45516eddff19d9a3630c0b376090869c00b18",
       "src/customers/read-routes.ts": "b7c48d8e7cd4c2af5eb185461132309382987d090a651dd20cf80f2b6dca202c",
       "src/events/index.ts": "bf71718146f0e2e06fe4f94d9c65811aad7ac2143915495a1f64cb28b246b534",
-      "src/finance/index.ts": "beecd41fc6d3f16edf799eb9bf5cdd04bf97750315c92bc13b62ff253825f3e4",
+      "src/finance/index.ts": "2fb1455ed0c9dbf0b69915411d9cb8281423ceb820bf0bc6e2e5bb04af1ac674",
       "src/finance/read-routes.ts": "9e7260d74eebc6c4e03eeaf1a84d1e86ccf13ffebf243d11cb232217d27da4a7",
       "src/findings/index.ts": "33ca0bb6cb4f8ec360ca7c0792c3479e2d2bff491cd3362f41c0c8583d72df03",
       "src/goals/index.ts": "17c09806bb3d86bdcaa5b0d9b6944e6ae16b32d93dee68f8ec4adf1a1fdb9e6f",
@@ -29,7 +29,7 @@
       "src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
       "src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
       "src/intel/specialists.ts": "d8b581ddfb7e9aa688c03e1042a5a1825c870feb845b2e65b7971a3e26364d93",
-      "src/internal/index.ts": "47e3140a5475a2d3e03803bfb13a9a61904f8953cd6fdb80040ffb67465f37ce",
+      "src/internal/index.ts": "e391e4bb7b7b4c5de5413f9100435c7ac9718fb39f10d2b442b97c7cdfe66491",
       "src/inventory/index.ts": "6901a0a716f29fb209f44dd6460e095ce963691507f9c9741a355dc015d77a34",
       "src/inventory/read-routes.ts": "71ee24cd61ddba899d309547c0ab12383455baec5766ddfc53f807aed4e8dda4",
       "src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
@@ -75,7 +75,7 @@
     }
   },
   "outputs": {
-    "sha256": "bd08d8a3a2d139036a2e4a4f7a699bfee7ac5395e9bfc89e6b19c258c6766698",
+    "sha256": "047064d1e6807053de68d52e40b7ce1e335d2ccdde51827515a5935447407bc0",
     "files": {
       "packages/contracts/generated/json-schema/ai_policy.cap.set.v1.schema.json": "228d897944481f937931e9b4ae34e80c21c534892a782c25aa1202cbbc374a83",
       "packages/contracts/generated/json-schema/ai_policy.ceiling.set.v1.schema.json": "9d5c5260af71c0a0cb09f5a29fc98f1456aff30fe2daad1785bf98f0f034eeaf",
@@ -134,6 +134,7 @@
       "packages/contracts/generated/json-schema/drafts.decision-error.schema.json": "8f0a19817f02c177e7d8837ec1776cda51726883dab727199303c5415d01b430",
       "packages/contracts/generated/json-schema/drafts.reject.v1.schema.json": "627afa0f1561ebfcc209f02f0b070cbefd4e15bc0dce48bba3b91c835e46a170",
       "packages/contracts/generated/json-schema/error.schema.json": "1c02c97382e43799b604302f8636b245003c3a905197bc1fc380e9737cd67311",
+      "packages/contracts/generated/json-schema/finance.budget.set.v1.schema.json": "5fbd3cc97a983611bd5315e09758259a3c8d5e922465ab8ac9f5736d95f70aeb",
       "packages/contracts/generated/json-schema/finance.channel_terms.set.v1.schema.json": "10557a63740f19b9c0fc469521a610435634b41cc66d1c71784ff397244f9728",
       "packages/contracts/generated/json-schema/finance.dispute.draft.v1.schema.json": "665a04f55fe1b6facbb85f91daf93104de2354483767f0c241e7cbab90e26a13",
       "packages/contracts/generated/json-schema/finance.expense.record.v1.schema.json": "f41db9a0a412fd5dd225fac795533fde871d07dfca324265d00bc669080aa30c",
@@ -169,7 +170,7 @@
       "packages/contracts/generated/json-schema/internal.graph-query.request.schema.json": "3881565fd7f5918bb0826955268d726e768aa16958b69467108b367fd9613856",
       "packages/contracts/generated/json-schema/internal.graph-query.response.schema.json": "bd2ddd1f333dfed1913ff2cd09913302bbe2a820fcb3613f7607196660f13e0f",
       "packages/contracts/generated/json-schema/internal.quotes-batch.request.schema.json": "3065eb3b90b2118321a0c088ccb2173d3cd398f99ab08b2f71c4a74cf3ff68af",
-      "packages/contracts/generated/json-schema/internal.run-frame.response.schema.json": "e7d9d3a46512c0fb73cfcc0319af7251360d4fb0a337ec418e0e4698ee803b2f",
+      "packages/contracts/generated/json-schema/internal.run-frame.response.schema.json": "3ed561cdcdab84b9384b6f5801f29ed56f5c85df62070372278444dc91b2fb1e",
       "packages/contracts/generated/json-schema/internal.snapshots.request.schema.json": "e4c4df5f783b31980a88597850cfe6e2d02777b29608e3bc28c4c5fdde819d42",
       "packages/contracts/generated/json-schema/internal.spend.request.schema.json": "53892f15e5782f8c6bb09bef0cef4872e6bc3e90dac331263062ff4ba17afd0f",
       "packages/contracts/generated/json-schema/internal.traces-batch.request.schema.json": "82ceff78e974e19725b73ec08e36ab8d732a903acf7b6d9eea95b8f90861b719",
@@ -474,13 +475,13 @@
       "packages/contracts/generated/json-schema/v1.wiki.page.schema.json": "ecc53d79b450ef1be0ef23cea8f1871dd62b01ab584ed2ecf7154813820457ee",
       "packages/contracts/generated/json-schema/v1.wiki.pages.schema.json": "09d6180befde63a25f3e761415a6272019b5dd806eb84c87c490776c0e63cd02",
       "packages/contracts/generated/json-schema/v1.wiki.versions.schema.json": "42aa36edb9167c1a83959039d5fdd48678ec7780cecadeb6462effae9cbb8b52",
-      "packages/contracts/generated/openapi/internal.json": "636650c284defeeecd74e363ae385d999e9e4b8d1757bb450fa939f5cefa48cd",
-      "packages/contracts/generated/openapi/public.json": "30f1ad177ecd9da69ce9809e5ec9cac3a680898087006b0e2df589f0aaf454e3",
-      "packages/sdk/src/gen/client.ts": "181c8ea4436e5ca223bfce8fa3e0bbc5fba4b2ab244161ac4368e163a2a60e21",
-      "packages/sdk/src/gen/openapi.ts": "6b96f4d9a54b72f4bd9adc37e6dfa6086d8fe972fb3ec464d8559ea5e6057d6d",
+      "packages/contracts/generated/openapi/internal.json": "a8df119d30597f19ac25d268ee6b83ee47498b6b630cd18668a1ada2e8b036d7",
+      "packages/contracts/generated/openapi/public.json": "9ccc1e9ef98f077a06a897957c45d7b997631bb3a69a21cc13cc08adbf7483ac",
+      "packages/sdk/src/gen/client.ts": "ea6663c35dff213f630726a46414c87ec7fb93f83b1f0625791ae45603c2a13e",
+      "packages/sdk/src/gen/openapi.ts": "9471de78164d88e8865f16bffd08609dc7f12472637fc6ae71088a978779afab",
       "services/intel/munim_intel/contracts_gen/__init__.py": "d0798482bbf59961d1af51ab44119d4355b12bf22846ddfe8ea0232502e91dad",
-      "services/intel/munim_intel/contracts_gen/models.py": "07c4b8389b7ca7781a5b838b19c89b245b59b1c90e6910b1e3d935e509015f2a",
-      "services/intel/munim_intel/contracts_gen/names.py": "42209300884c233a4f9a46888240edf5be8876f9438db4f47ba2c212bb7d9adb"
+      "services/intel/munim_intel/contracts_gen/models.py": "a2bb66b691f465945a21da5415262b4688c6ba074955b40083187d526dda74b7",
+      "services/intel/munim_intel/contracts_gen/names.py": "12ae24745386e86f8e702bda65469dee059f5a0c96531c62e7f9e1a45a45dd13"
     }
   }
 }

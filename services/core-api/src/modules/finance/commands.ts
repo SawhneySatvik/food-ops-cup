@@ -2,11 +2,12 @@
 // target_tables (the guard checks it, MB008); derived postings ride on posting rules (post.ts).
 //   finance.channel_terms.set.v1   own command (owner/judge)          → core.channel_terms
 //   finance.expense.record.v1      own command (owner/manager/judge)  → core.expense (+ finance.post_expense)
+//   finance.budget.set.v1          own command (owner/judge)          → core.budget (one per outlet or business, category, month)
 //   finance.dispute.draft.v1       own command or approved draft      → core.dispute, core.dispute_line, breaks → disputed
 //   finance.period.close.v1        own command or approved draft      → core.period_close
 //   finance.journal.adjust.v1      approved draft ONLY                → core.journal_entry, core.posting
 import {
-  FinanceChannelTermsSetV1, FinanceDisputeDraftV1, FinanceExpenseRecordV1, FinanceJournalAdjustV1, FinancePeriodCloseV1,
+  FinanceBudgetSetV1, FinanceChannelTermsSetV1, FinanceDisputeDraftV1, FinanceExpenseRecordV1, FinanceJournalAdjustV1, FinancePeriodCloseV1,
 } from "@munim/contracts/finance";
 import type { CommandHandler } from "../../commit/index.ts";
 import { uuidv7 } from "../../commit/index.ts";
@@ -65,6 +66,37 @@ export const expenseRecord: CommandHandler = {
     return {
       entityId: p.expense_id,
       audit: [{ entity: "core.expense", entityId: p.expense_id, after: { outlet_id: p.outlet_id, category: p.category, journal_entry_id: posted.entry_id } }],
+    };
+  },
+};
+
+export const budgetSet: CommandHandler = {
+  type: "finance.budget.set.v1",
+  async run(c, cmd) {
+    const p = parse(FinanceBudgetSetV1, cmd.payload);
+    // One budget per outlet (or the whole business), category and month (0008's unique index): set again, that row's amount
+    // changes. Locked, so two sets of one budget run one after the other. Who may set it is the book guard's verdict (0008's
+    // authority row: owner and judge), which the write below meets before anything else is checked.
+    const prior = (await c.query<{ id: string; amount_minor: string }>(
+      `SELECT id, amount_minor::text AS amount_minor FROM core.budget
+        WHERE outlet_id IS NOT DISTINCT FROM $1 AND category = $2 AND period_month = $3 FOR UPDATE`, [p.outlet_id, p.category, p.period_month])).rows[0];
+    if (prior) {
+      const kept = (await c.query<{ currency: string }>(`UPDATE core.budget SET amount_minor = $2 WHERE id = $1 RETURNING currency`, [prior.id, p.amount_minor])).rows[0]!;
+      // The table's trigger judges the currency of a new row; an amount change keeps the row's, so another one is refused here.
+      if (kept.currency !== p.currency) throw new ApiError("currency_mismatch");
+      return {
+        entityId: prior.id,
+        audit: [{ entity: "core.budget", entityId: prior.id, before: { amount_minor: Number(prior.amount_minor) }, after: { amount_minor: p.amount_minor } }],
+      };
+    }
+    await c.query(
+      `INSERT INTO core.budget (tenant_id, id, outlet_id, category, period_month, amount_minor, currency, created_by)
+       VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, current_setting('app.member_id')::uuid)`,
+      [p.budget_id, p.outlet_id, p.category, p.period_month, p.amount_minor, p.currency]);
+    return {
+      entityId: p.budget_id,
+      audit: [{ entity: "core.budget", entityId: p.budget_id,
+        after: { outlet_id: p.outlet_id, category: p.category, period_month: p.period_month, amount_minor: p.amount_minor, currency: p.currency } }],
     };
   },
 };

@@ -221,7 +221,7 @@ async def negotiate(
             # contracts ChunksBatchRequest: a chunk holds at most 8000 characters; a longer reply is not read at all.
             x = Extracted(None, "no_text" if not reply else "reply_too_long" if len(reply) > 8000 else None)
             if x.reason is None:
-                x = await extract(reply, read_as, llm=extract_llm, state=state)
+                x = await extract(reply, read_as, llm=extract_llm, state=state, actor=ACTOR)
             f = x.fields
             if f is None:
                 leg.state, leg.dropped = "no_quote", x.reason

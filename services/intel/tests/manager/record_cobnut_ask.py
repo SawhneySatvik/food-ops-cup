@@ -197,7 +197,7 @@ def serve() -> None:
     cfg = load_repo_config(INTEL.parents[1])
     assert cfg.model_mode == "recorded"
 
-    async def models(_client: Any, _currency: str) -> Models:
+    async def models(_client: Any, _currency: str, _capped: bool = False) -> Models:
         return Models(recorded_decision(), AskAuthor())
 
     logging.basicConfig(level=logging.INFO)

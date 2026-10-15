@@ -1332,6 +1332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/finance/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** finance.budget.set.v1 — set a month's budget for one spending category, for one outlet or the whole business (owner) */
+        post: operations["setBudget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/finance/exports/tally": {
         parameters: {
             query?: never;
@@ -6392,6 +6409,17 @@ export interface components {
             payee: string;
             note: string | null;
             document_id: components["schemas"]["Uuid7"] | null;
+        };
+        /** FinanceBudgetSetV1 */
+        FinanceBudgetSetV1: {
+            budget_id: components["schemas"]["Uuid7"];
+            outlet_id: components["schemas"]["Uuid7"] | null;
+            /** @enum {string} */
+            category: "purchases" | "labour" | "marketing" | "utilities" | "maintenance" | "other";
+            /** Format: date */
+            period_month: string;
+            amount_minor: number;
+            currency: string;
         };
         /** FinanceDisputeDraftV1 */
         FinanceDisputeDraftV1: {
@@ -16538,6 +16566,92 @@ export interface operations {
                     /** @constant */
                     type: "finance.expense.record.v1";
                     payload: components["schemas"]["FinanceExpenseRecordV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    setBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "finance.budget.set.v1";
+                    payload: components["schemas"]["FinanceBudgetSetV1"];
                 };
             };
         };

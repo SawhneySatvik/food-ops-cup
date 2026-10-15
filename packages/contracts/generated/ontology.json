@@ -17060,7 +17060,7 @@
     },
     {
       "id": "forecast.points",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_forecast_points",
@@ -17871,7 +17871,7 @@
     },
     {
       "id": "inventory.expiry_risk",
-      "version": 2,
+      "version": 3,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_inventory_expiry_risk",
@@ -18019,7 +18019,7 @@
     },
     {
       "id": "inventory.shortfall",
-      "version": 2,
+      "version": 3,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_inventory_shortfall",
@@ -18334,7 +18334,7 @@
     },
     {
       "id": "kitchen.prep_need",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_kitchen_prep_need",
@@ -19438,7 +19438,7 @@
     },
     {
       "id": "market.upcoming",
-      "version": 2,
+      "version": 3,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_market_upcoming",
@@ -20497,7 +20497,7 @@
     },
     {
       "id": "purchasing.deal_inputs",
-      "version": 3,
+      "version": 4,
       "min_role": "manager",
       "agent_exposed": false,
       "tool": null,
@@ -23638,7 +23638,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "8c1a1707b1c767f327916e960f075045ee3085219805bbebb7c7eaaa701f1b9a",
+      "sha256": "771ebd437f3bf993933b4b67e2124328d7329d797331b91e190bb4e558302824",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23671,6 +23671,8 @@
         "db/migrations/0029_storefront_display.sql": "119f8e94877103e37af8f479acb8e51e5cc38e4411b9c1f8b30bd3d3a4b13666",
         "db/migrations/0030_display_order.sql": "c14271c95f32c2866630bd839006fb096628c5f85949054e5733c73f2c4ab073",
         "db/migrations/0031_tick_ledger.sql": "9fb59dfd0563ac5d7d3c059dab9957090ddd1a727671557f608d7267e866e035",
+        "db/migrations/0032_rfq_authority.sql": "b06db355bfdbb5946663355dd152743fef4c6044525c4b791e746382fb5d1f14",
+        "db/migrations/0033_forecast_per_outlet.sql": "af502f55800c9954fe035939bcb9c679e9a94bdf9bc658d31b16cf752863a67f",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -23684,7 +23686,7 @@
         "packages/contracts/src/customers/index.ts": "16cdc538740cf838f90600a590a45516eddff19d9a3630c0b376090869c00b18",
         "packages/contracts/src/customers/read-routes.ts": "b7c48d8e7cd4c2af5eb185461132309382987d090a651dd20cf80f2b6dca202c",
         "packages/contracts/src/events/index.ts": "bf71718146f0e2e06fe4f94d9c65811aad7ac2143915495a1f64cb28b246b534",
-        "packages/contracts/src/finance/index.ts": "beecd41fc6d3f16edf799eb9bf5cdd04bf97750315c92bc13b62ff253825f3e4",
+        "packages/contracts/src/finance/index.ts": "2fb1455ed0c9dbf0b69915411d9cb8281423ceb820bf0bc6e2e5bb04af1ac674",
         "packages/contracts/src/finance/read-routes.ts": "9e7260d74eebc6c4e03eeaf1a84d1e86ccf13ffebf243d11cb232217d27da4a7",
         "packages/contracts/src/findings/index.ts": "33ca0bb6cb4f8ec360ca7c0792c3479e2d2bff491cd3362f41c0c8583d72df03",
         "packages/contracts/src/goals/index.ts": "17c09806bb3d86bdcaa5b0d9b6944e6ae16b32d93dee68f8ec4adf1a1fdb9e6f",
@@ -23694,7 +23696,7 @@
         "packages/contracts/src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
         "packages/contracts/src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
         "packages/contracts/src/intel/specialists.ts": "d8b581ddfb7e9aa688c03e1042a5a1825c870feb845b2e65b7971a3e26364d93",
-        "packages/contracts/src/internal/index.ts": "47e3140a5475a2d3e03803bfb13a9a61904f8953cd6fdb80040ffb67465f37ce",
+        "packages/contracts/src/internal/index.ts": "e391e4bb7b7b4c5de5413f9100435c7ac9718fb39f10d2b442b97c7cdfe66491",
         "packages/contracts/src/inventory/index.ts": "6901a0a716f29fb209f44dd6460e095ce963691507f9c9741a355dc015d77a34",
         "packages/contracts/src/inventory/read-routes.ts": "71ee24cd61ddba899d309547c0ab12383455baec5766ddfc53f807aed4e8dda4",
         "packages/contracts/src/investigations/index.ts": "4dfd5cc4c269a139599d4f0407c80593d3d327ea8c2aedffc6918e53d1e3890f",
@@ -23739,6 +23741,6 @@
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "b3a2ec0d3b972896f7db764ee434d7759a451e334627c8b54f4755f82abc70e0"
+    "body_sha256": "734b42bb8a23a624052d318efd7073111cb0358939db23834ab59c3b76e3a0d2"
   }
 }

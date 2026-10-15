@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0031 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0033 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -34,6 +34,8 @@ export const MIGRATIONS = [
   "0029_storefront_display",
   "0030_display_order",
   "0031_tick_ledger",
+  "0032_rfq_authority",
+  "0033_forecast_per_outlet",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -353,6 +355,8 @@ export const TEMPLATES = [
   "people.labour_vs_demand@2", "purchasing.deal_inputs@3",
   // 0028 (ADR-015 §1.6): the Cares templates (four member, one operator).
   "cares.impact", "cares.listings", "cares.pickup_crew", "cares.recipient_match", "platform.cares_network_impact",
+  // 0033 (T-127): the latest forecast run per outlet, a new version of the six readers of one tenant-wide latest run.
+  "kitchen.prep_need@2", "forecast.points@2", "inventory.shortfall@3", "inventory.expiry_risk@3", "purchasing.deal_inputs@4", "market.upcoming@3",
 ].sort();
 /** 0019 O2: child tables with no outlet column, visible exactly when their parent row is (policy tenant_via_parent).
  *  Not core.posting: it stays tenant-only (0019 header: the parent policy made large imports quadratic); templates read

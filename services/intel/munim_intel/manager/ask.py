@@ -6,8 +6,10 @@ No signature text ever leaves intel: core composes "{Specialist} · via Manager"
 
   1. `@Kitchen` (any specialist off for every outlet kind in scope) → abstain not_applicable, no model call;
   2. AI off or the month's budget spent (run-frame `narration` ≠ model, the typed kill switch) → abstain model_blocked,
-     no model call (rule 11: degrade, never error). The models are resolved only after these two exits (R-E 2-A): a role
-     that cannot be built (no key, a retired id, model roles unreadable) is model_blocked too, never a 502;
+     no model call (rule 11: degrade, never error) — except over the month's cap with AI on, in live mode (llm.over_cap,
+     T-127): the models are built `capped`, every call served from its recorded fixture or abstaining. The models are
+     resolved only after these two exits (R-E 2-A): a role that cannot be built (no key, a retired id, model roles
+     unreadable) is model_blocked too, never a 502;
   3. route.intent → path (paths.py); `certification_request` → abstain not_a_certificate, no model call; an unscored
      unaddressed `investigate` is answered by the Manager alone, its envelope offering follow_up `dig_deeper` (R47 D5);
   4. otherwise one Manager LlmAgent (`munim`) over the T-082a assembler and PackToolset, ending in submit_answer.
@@ -24,8 +26,9 @@ response returns RunState.tainted. An early exit runs nothing and returns the th
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable
 from dataclasses import dataclass
+from typing import Protocol
 
 import httpx
 from google.adk.agents import LlmAgent
@@ -46,7 +49,7 @@ from munim_intel.decide.mimic import router_decision_model
 from munim_intel.decide.port import Band, DecisionModel, DecisionState, EgressRefused, answer_or_fallback
 from munim_intel.decide.questions import ROUTE_INTENT
 from munim_intel.fanout.tool import Branches, FanOutTool, orchestrator_budget
-from munim_intel.llm import cause, llm_for_role, price_of, provider_of
+from munim_intel.llm import cause, frame_over_cap, llm_for_role, price_of, provider_of
 from munim_intel.llm.providers import PriceRefused, ProviderUnavailable, RetiredModelRefused
 from munim_intel.manager.paths import FAN_OUT, Binding, bind, not_applicable, path_for
 from munim_intel.runtime.context import RunContext
@@ -73,14 +76,18 @@ class Models:
     reason: BaseLlm
 
 
-#: (client, the run's spend currency) -> the models, each priced in that currency (R47 D1).
-ModelsFactory = Callable[[InternalClient, str], Awaitable[Models]]
+class ModelsFactory(Protocol):
+    """(client, the run's spend currency, capped) -> the models, each priced in that currency (R47 D1); `capped`: over the month's
+    AI cap (llm.over_cap), every call is served from its recorded fixture or abstains (T-125, T-127)."""
+
+    def __call__(self, client: InternalClient, currency: str, capped: bool = False, /) -> Awaitable[Models]: ...
 
 
 def default_models(cfg: Config) -> ModelsFactory:
-    async def build(client: InternalClient, currency: str) -> Models:
+    async def build(client: InternalClient, currency: str, capped: bool = False) -> Models:
         return Models(
-            await router_decision_model(cfg, client, currency=currency), await llm_for_role("reason", cfg, client, currency=currency)
+            await router_decision_model(cfg, client, currency=currency, capped=capped),
+            await llm_for_role("reason", cfg, client, currency=currency, capped=capped),
         )
 
     return build
@@ -200,11 +207,12 @@ async def answer_ask(
 
     if not_applicable(req.addressed_to, frozenset(outlet_kinds(frame))):
         return await early("not_applicable", {})
-    if frame.narration != "model":
+    capped = frame_over_cap(cfg, frame)
+    if frame.narration != "model" and not capped:
         return await early("model_blocked", {})
     if not isinstance(models, Models):
         try:
-            models = await models(client, spend.currency)
+            models = await models(client, spend.currency, capped)
         except (ProviderUnavailable, RetiredModelRefused, CoreError, httpx.HTTPError) as e:
             # Rule 11: a model that cannot be built is AI unavailable for this ask — an abstention, never a 502. A price
             # refusal (R47 D1) names its code on the abstain trace.

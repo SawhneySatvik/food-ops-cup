@@ -203,6 +203,10 @@
         "template"
       ]
     },
+    "ai_enabled": {
+      "default": false,
+      "type": "boolean"
+    },
     "negotiation": {
       "type": "object",
       "properties": {

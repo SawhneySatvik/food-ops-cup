@@ -203,11 +203,13 @@ export async function recipe(c: Ctx, it: Item, from: string, lines: Array<{ ing:
 
 // ---- suppliers, purchasing -----------------------------------------------------------------------------------
 
-/** Suppliers are always simulated (hard rule 5): the read model carries the "Simulated supplier" label. */
-export async function supplier(c: Ctx, key: string, name: string, paymentDays = 15, prices: Array<{ key: string; ing: Ingredient; priceMinor: number; at: string }> = []): Promise<string> {
-  const id = c.api.id(`supplier:${key}`);
+/** Suppliers are always simulated (hard rule 5): the read model carries the "Simulated supplier" label. `o.cardUrl`: the simulated
+ *  agent's card (a request for quotes reaches only suppliers that have one); `o.id` overrides the key's id. */
+export async function supplier(c: Ctx, key: string, name: string, paymentDays = 15, prices: Array<{ key: string; ing: Ingredient; priceMinor: number; at: string }> = [],
+  o: { cardUrl?: string; id?: string } = {}): Promise<string> {
+  const id = o.id ?? c.api.id(`supplier:${key}`);
   await c.api.cmd("owner", "/v1/suppliers", "purchasing.supplier.upsert.v1", `supplier:${key}`, {
-    supplier_id: id, name, kind: "simulated", a2a_card_url: null, terms: { payment_days: paymentDays, notes: "Synthetic, simulated supplier" },
+    supplier_id: id, name, kind: "simulated", a2a_card_url: o.cardUrl ?? null, terms: { payment_days: paymentDays, notes: "Synthetic, simulated supplier" },
     prices: prices.map((p) => ({
       price_id: c.api.id(`supplier:${key}:price:${p.key}`), ingredient_id: p.ing.id, unit: p.ing.unit, unit_price_minor: p.priceMinor, currency: c.s.currency, observed_at: p.at, source_ref: "Price list (synthetic)",
     })),
@@ -355,6 +357,14 @@ export async function channelTerms(c: Ctx, key: string, channelId: string, o: { 
   await c.api.cmd("owner", "/v1/finance/channel-terms", "finance.channel_terms.set.v1", `terms:${key}`, {
     channel_terms_id: c.api.id(`terms:${key}`), channel_id: channelId, commission_bp: o.commissionBp, ads_opted_in: o.ads,
     ad_spend_cap_minor: o.ads ? o.capMinor : null, promo_share_bp: o.promoBp, payout_cycle_days: o.cycleDays, currency: c.s.currency, valid_from: o.from, valid_to: null,
+  });
+}
+
+/** A month's budget for one spending category (finance.budget.set.v1, the owner's own command); `outletId` null = the whole business. */
+export async function budget(c: Ctx, key: string, o: { month: string; category: string; amountMinor: number; outletId?: string | null }) {
+  await c.api.cmd("owner", "/v1/finance/budgets", "finance.budget.set.v1", `budget:${key}`, {
+    budget_id: c.api.id(`budget:${key}`), outlet_id: o.outletId ?? null, category: o.category, period_month: o.month, amount_minor: o.amountMinor,
+    currency: c.s.currency,
   });
 }
 

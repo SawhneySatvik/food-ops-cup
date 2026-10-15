@@ -137,12 +137,12 @@ def ground(f: QuoteFields, reply: str, rfq: Rfq) -> Extracted:
     return Extracted(f, None, spans)
 
 
-async def extract(reply: str, rfq: Rfq, *, llm: BaseLlm, state: RunState) -> Extracted:
+async def extract(reply: str, rfq: Rfq, *, llm: BaseLlm, state: RunState, actor: str | None = None) -> Extracted:
     """Grounded typed fields, or the reason there are none (refused, unreadable, the call failed or was not made, or the
     fields are not where the reply states them)."""
     req = quarantine.build_request(llm, INSTRUCTION, [types.Part(text=message(reply, rfq.unit, rfq.currency, rfq.minor_unit))], QuoteFields)
     try:
-        f = await quarantine.call(llm, req, QuoteFields, state)
+        f = await quarantine.call(llm, req, QuoteFields, state, actor)
     except (quarantine.QuarantineBreach, quarantine.ModelUnavailable) as e:
         return Extracted(None, e.code)
     except quarantine.Unreadable:

@@ -2,7 +2,8 @@
 // the token's RLS). Embedded Postgres, no model, a pinned frame clock. Synthetic data only.
 //   (3) a run scoped to 1 of 3 outlets lists exactly that outlet; a '*' run lists 3
 //   (4) budget left = the lower of (owner cap, operator limit) − spend, by hand, with cap < limit and cap > limit
-//   (5) at the cap: the run token is still minted and served (never refused for budget); level hard, narration template
+//   (5) at the cap: the run token is still minted and served (never refused for budget); level hard, narration template,
+//       ai_enabled still true (T-127: over the cap is not AI switched off); the kill switch off → ai_enabled false
 //   (6) pack, currency, ladder, thresholds and business dates = hand values (pack md tables, the tz rules by hand),
 //       incl. both Melbourne DST transitions and a Kolkata control
 //   (8) R47 D7: negotiation bounds default to 9500/11000, serve the tenant-wide policy in force (each bound alone defaults the other),
@@ -134,7 +135,7 @@ describe("budget (gates 4 and 5; F11 O-2: the lower of owner cap and operator li
     await setCap(7_515); // = Σ spend → left 0
     const tok = await run(A, ["*"]); // minted at the cap
     const f = await frame(tok);
-    expect([f.budget!.hard_left_minor, f.budget!.level, f.narration]).toEqual([0, "hard", "template"]);
+    expect([f.budget!.hard_left_minor, f.budget!.level, f.narration, f.ai_enabled]).toEqual([0, "hard", "template", true]);
     await spend(tok, 40); // recorded past the cap
     expect((await frame(tok)).budget!.hard_left_minor).toBe(-40);
     // The run's other routes still work at the cap (rules only).
@@ -149,11 +150,11 @@ describe("budget (gates 4 and 5; F11 O-2: the lower of owner cap and operator li
     const tok = await run(A, ["*"]);
     await db.admin(`UPDATE platform.feature_flag SET value = 'false' WHERE key = 'intel.enabled'`);
     const off = await frame(tok);
-    expect([off.budget!.level, off.narration]).toEqual(["ok", "template"]);
+    expect([off.budget!.level, off.narration, off.ai_enabled]).toEqual(["ok", "template", false]);
     await db.admin(`UPDATE platform.feature_flag SET value = 'true' WHERE key = 'intel.enabled'`);
     clock = new Date("2026-11-02T08:00:00Z");
     const nov = await frame(tok);
-    expect([nov.budget, nov.narration]).toEqual([null, "template"]);
+    expect([nov.budget, nov.narration, nov.ai_enabled]).toEqual([null, "template", true]);
     clock = new Date("2026-10-11T08:00:00Z");
   });
 });

@@ -325,6 +325,10 @@ export const RunFrameResponse = z.strictObject({
   budget: RunFrameBudget.nullable(),
   /** `model` only with AI on (`intel.enabled`), a budget, and level `ok`; else `template` (rule 11). */
   narration: z.enum(["model", "template"]),
+  /** The typed kill switch alone (`intel.enabled`; T-127, R58), whatever the budget. With narration `template` it tells AI
+   *  switched off (false: no AI answer at all, not even a recorded one) from over the month's budget (true with budget level
+   *  `hard`: in live mode each model call is served from its recorded fixture or abstains, T-125). Absent (an older core) = false. */
+  ai_enabled: z.boolean().default(false),
   /** R47 D7: the owner's negotiation bounds as basis points of the reference price (target ≤ walk-away); 9500 / 11000 when the owner set none. */
   negotiation: z.strictObject({ target_bp: z.int().min(1).max(20000), walkaway_bp: z.int().min(1).max(20000) }),
   /** The pack's licence kinds, in pack order. */

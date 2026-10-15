@@ -207,13 +207,14 @@ def _usage(req: LlmRequest, resp: LlmResponse | None) -> Usage:
     return Usage(u.prompt_token_count, (u.candidates_token_count or 0) + (u.thoughts_token_count or 0))
 
 
-async def router_decision_model(cfg: Config, roles: ModelRoleSource, *, currency: str) -> LlmMimic:
+async def router_decision_model(cfg: Config, roles: ModelRoleSource, *, currency: str, capped: bool = False) -> LlmMimic:
     """The W3 decision model: the `router` role only (F2), priced in the run's spend `currency` (R47 D1: refused before
-    any call when the router has no price, or one in another currency). Recorded mode replays `decide/fixtures/`."""
+    any call when the router has no price, or one in another currency). Recorded mode replays `decide/fixtures/`. `capped`:
+    over the month's AI cap (llm.over_cap), the call is served from those fixtures or abstains."""
     if cfg.model_mode == "recorded":
         return recorded_decision()
     # Live: a failed call is served from this package's fixtures when it has one (T-125), as recorded mode replays them.
-    return LlmMimic(await llm_for_role("router", cfg, roles, currency=currency, fallback_dir=FIXTURES_DIR))
+    return LlmMimic(await llm_for_role("router", cfg, roles, currency=currency, fallback_dir=FIXTURES_DIR, capped=capped))
 
 
 def recorded_decision(fixtures_dir: Path = FIXTURES_DIR) -> LlmMimic:

@@ -18,11 +18,15 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import pytest
+from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from google.genai.errors import ClientError
 
-from munim_intel.contracts_gen.models import InternalBatchResponse, InternalDraftsResponse, InternalTracesBatchRequest
+from conftest import GEMINI_KEY
+from munim_intel.config import load_config
+from munim_intel.contracts_gen.models import InternalBatchResponse, InternalDraftsResponse, InternalTracesBatchRequest, PlatformModelRoles
 from munim_intel.decide import mimic
 from munim_intel.decide.mimic import LlmMimic
 from munim_intel.decide.port import EgressRefused, egress_payload
@@ -36,6 +40,7 @@ from munim_intel.ingest.link import Alias, AliasTable, normalize_alias
 from munim_intel.ingest.pipeline import Ingest, Report
 from munim_intel.ingest.quarantine import FIXTURES_DIR, QuarantineBreach, tool_count
 from munim_intel.ingest.sink import BATCHES
+from munim_intel.llm.providers import TimedGemini
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import CoreError
@@ -615,3 +620,98 @@ def test_a_claim_whose_quote_names_both_is_kept_after_normalising() -> None:
     claim = ExtractedClaim(quote="X supplies paneer to the Indiranagar kitchen", predicate="supplies", subject=" x ", object="PANEER")
     kept = claims_mod.claim_rows([claim], F10_SOURCE, chunk_id=C.vid(0xC9), message_id=None, aliases=ALIASES)
     assert kept.dropped == 0 and [(r["span_start"], r["quote"]) for r in kept.rows] == [(6, "X supplies paneer to the Indiranagar kitchen")]
+
+
+# -- T-127 (T-125's open items 2 and 3): a live extraction falls back to THIS package's recorded fixtures, and says so -------
+
+LIVE_ROLES = {
+    "items": [
+        {
+            "role": "extract",
+            "model_id": "gemini-3.5-flash-lite",
+            "provider": "gemini",
+            "location": "global",
+            "probed_at": None,
+            "updated_at": "2026-10-10T00:00:00Z",
+            "input_price_per_mtok_minor": 2_700,
+            "output_price_per_mtok_minor": 22_500,
+            "price_currency": "INR",
+        },
+    ]
+}
+
+
+class _Roles:
+    async def model_roles(self) -> PlatformModelRoles:
+        return PlatformModelRoles.model_validate(LIVE_ROLES)
+
+
+def _live(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Live mode with a fake key; the provider planted in place of the network answers every call 429 (free tier)."""
+    calls: list[str] = []
+
+    async def rate_limited(_llm: Gemini, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        calls.append(llm_request.model or "")
+        raise ClientError(429, {"error": {"code": 429, "message": "PLANTED quota exceeded", "status": "RESOURCE_EXHAUSTED"}})
+        yield LlmResponse()  # pragma: no cover — an async generator
+
+    monkeypatch.setattr(Gemini, "generate_content_async", rate_limited)
+    return calls
+
+
+def _routes(sent: list[InternalTracesBatchRequest]) -> list[tuple[str, dict[str, Any]]]:
+    """(actor, payload) of every `route` event the run flushed."""
+    events = [e.model_dump(mode="json") for req in sent for e in req.events]
+    return [(e["actor"], e["payload"]) for e in events if e["kind"] == "route"]
+
+
+def _rows_and_routes(llm: Any) -> tuple[list[dict[str, Any]], list[tuple[str, dict[str, Any]]], Report]:
+    state, sent = new_state()
+    sink = FakeSink()
+    ing = Ingest(
+        state=state,
+        sink=sink,
+        extract_llm=llm,
+        vision_llm=llm,
+        embedder=RecordedEmbedder(),
+        aliases=ALIASES,
+        actor="specialist:inventory_purchasing",
+    )
+
+    async def go() -> Report:
+        out = await ing.document(C.DOC_SUPPLY, C.SUPPLY_TEXT)
+        await state.traces.flush()
+        return out
+
+    report = asyncio.run(go())
+    return sink.rows("claims:batch"), _routes(sent), report
+
+
+def test_a_live_extraction_that_fails_is_served_from_the_ingest_fixtures_and_traced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The recorded claims of the supply document (this package's fixtures, read by recorded mode) are what a rate-limited live
+    run stores, and its one call is traced `recorded-fallback` under the run's actor. Paired: recorded mode traces no path."""
+    recorded_rows, recorded_routes, _ = _rows_and_routes(RecordedLlm(model="recorded/extract", fixtures_dir=FIXTURES_DIR))
+    assert recorded_rows and recorded_routes == [], "recorded mode: claims, and no path label (traces unchanged)"
+    calls = _live(tmp_path, monkeypatch)
+    cfg = load_config(env={"MUNIM_MODEL_MODE": "live", "GEMINI_API_KEY": GEMINI_KEY}, run_dir=tmp_path)
+    llm = asyncio.run(quarantine.quarantined_llm("extract", cfg, _Roles()))
+    assert isinstance(llm, TimedGemini) and llm.fallback is not None and llm.fallback.fixtures_dir == FIXTURES_DIR
+    rows, routes, report = _rows_and_routes(llm)
+    assert rows == recorded_rows and report.refused == {}
+    assert routes == [("specialist:inventory_purchasing", {"model_path": "recorded-fallback"})] and len(calls) == 1
+
+
+def test_a_live_extraction_with_no_fixture_abstains_as_before_and_is_traced_abstained(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _live(tmp_path, monkeypatch)
+    cfg = load_config(env={"MUNIM_MODEL_MODE": "live", "GEMINI_API_KEY": GEMINI_KEY}, run_dir=tmp_path)
+    llm = asyncio.run(quarantine.quarantined_llm("extract", cfg, _Roles()))
+    state, sent = new_state()
+    with pytest.raises(quarantine.ModelUnavailable) as e:
+        asyncio.run(quarantine.call(llm, extract_request(llm, "A note nobody recorded: X supplies paneer."), ExtractedClaims, state))
+    asyncio.run(state.traces.flush())
+    assert e.value.code == "model_error:ClientError" and len(calls) == 1
+    assert _routes(sent) == [("manager", {"model_path": "abstained"})]

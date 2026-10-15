@@ -36,7 +36,7 @@ from munim_intel.contracts_gen.models import (
     InvestigationsNarrateResponse,
     Segment,
 )
-from munim_intel.llm import price_of, provider_of
+from munim_intel.llm import frame_over_cap, price_of, provider_of
 from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import InternalClient
 from munim_intel.runtime.runner import RunFailed, run_agent
@@ -146,7 +146,7 @@ async def narrate_step(
     state = RunState(traces=TraceBuffer(client.write_traces))
     tables = handles(req)
     reply = ""
-    if llm is not None and frame is not None and frame.narration == "model":
+    if llm is not None and frame is not None and (frame.narration == "model" or frame_over_cap(cfg, frame)):
         # The one call is charged to the month's budget (W3 close ruling); run_agent posts the row with the traces.
         state.meter = Meter(SpendBuffer(client.write_spend, spend_currency(frame)), "narrate", provider_of(llm), llm.model, price_of(llm))
         reply = await model_reply(ctx, req, tables, llm, cfg, state)

@@ -28,7 +28,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -47,7 +47,7 @@ from munim_intel.contracts_gen.models import (
 )
 from munim_intel.forecast import WEIGHTED, Series, forecast_series
 from munim_intel.forecast.engine import HOLDOUT, HORIZON
-from munim_intel.llm import cause, llm_for_role, price_of, provider_of
+from munim_intel.llm import cause, frame_over_cap, llm_for_role, price_of, provider_of
 from munim_intel.llm.providers import ProviderUnavailable, RetiredModelRefused
 from munim_intel.manager.ask import fetch_run_frame
 from munim_intel.mapping import uuid7_ms
@@ -73,15 +73,19 @@ POINTS_PER_BATCH = 500
 #: One supplier's A2A request (the reply is code on the simulated side).
 SUPPLIER_TIMEOUT_S = 20.0
 
-#: (client, the run's spend currency) -> (the chooser's `reason` model, the extractor's `extract` model).
-NegotiateModels = Callable[[InternalClient, str], Awaitable[tuple[BaseLlm, BaseLlm]]]
+
+class NegotiateModels(Protocol):
+    """(client, the run's spend currency, capped) -> (the chooser's `reason` model, the extractor's `extract` model); `capped`:
+    over the month's AI cap (llm.over_cap), every call is served from its recorded fixture or abstains (T-125, T-127)."""
+
+    def __call__(self, client: InternalClient, currency: str, capped: bool = False, /) -> Awaitable[tuple[BaseLlm, BaseLlm]]: ...
 
 
 def default_models(cfg: Config) -> NegotiateModels:
-    async def build(client: InternalClient, currency: str) -> tuple[BaseLlm, BaseLlm]:
+    async def build(client: InternalClient, currency: str, capped: bool = False) -> tuple[BaseLlm, BaseLlm]:
         return (
-            await llm_for_role("reason", cfg, client, currency=currency),
-            await llm_for_role("extract", cfg, client, currency=currency),
+            await llm_for_role("reason", cfg, client, currency=currency, capped=capped),
+            await llm_for_role("extract", cfg, client, currency=currency, capped=capped),
         )
 
     return build
@@ -181,11 +185,13 @@ async def run_negotiation(
     )
     if not suppliers:
         return "no_suppliers", None
-    # Rule 11: with AI off or the month's budget spent no supplier reply can be read — nothing is sent at all.
-    if frame.narration != "model":
+    # Rule 11: with AI off or no budget for the month no supplier reply can be read — nothing is sent at all. Over the month's
+    # cap with AI on (live mode) the models are built capped: each call is served from its recorded fixture or abstains (T-127).
+    capped = frame_over_cap(cfg, frame)
+    if frame.narration != "model" and not capped:
         return "model_blocked", None
     try:
-        reason_llm, extract_llm = await models(client, spend_currency(frame))
+        reason_llm, extract_llm = await models(client, spend_currency(frame), capped)
     except (ProviderUnavailable, RetiredModelRefused, CoreError, httpx.HTTPError) as e:
         log.warning("intel: negotiate run %s has no model: %s", ctx.run_id, cause(e))
         return "model_blocked", None
