@@ -200,7 +200,7 @@ def test_each_role_gets_its_timeout_and_an_operator_may_override_it(tmp_path: Pa
     assert isinstance(g, TimedGemini) and isinstance(g, Gemini) and g.timeout_s == 60.0
     assert isinstance(o, TimedOpenAILlm) and isinstance(o, OpenAILlm) and o.timeout_s == 30.0  # mimic's request shape holds
     over = load_config(env={"GEMINI_API_KEY": GEMINI_KEY, "MUNIM_MODEL_TIMEOUT_REASON_S": "7.5"}, run_dir=tmp_path)
-    assert build_live_llm(row("gemini", "gemini-3.8-flash", "reason"), over).timeout_s == 7.5  # type: ignore[attr-defined]
+    assert build_live_llm(row("gemini", "gemini-3.8-flash", "reason"), over).timeout_s == 7.5
     for bad in ("soon", "0", "-1", "601"):
         with pytest.raises(ConfigError):
             load_config(env={"MUNIM_MODEL_TIMEOUT_ROUTER_S": bad}, run_dir=tmp_path)

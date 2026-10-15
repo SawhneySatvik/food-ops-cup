@@ -40,6 +40,7 @@ from munim_intel.decide.port import DecisionQuestion, DecisionResult, DecisionSt
 from munim_intel.llm import ModelRoleSource, llm_for_role, price_of, provider_of
 from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.runtime.context import RunContext
+from munim_intel.trace.served import ModelPath, served_by
 from munim_intel.trace.spend import Usage, estimate_input_tokens
 
 CODES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -140,29 +141,30 @@ class LlmMimic:
         requests = [(q, build_request(self._llm, q, state)) for q in qs]
         return [await self._ask(q, state, req) for q, req in requests]
 
-    async def _call(self, req: LlmRequest) -> tuple[LlmResponse | None, bool]:
-        """(the final response or None, whether the provider rejected a request that asked for logprobs)."""
+    async def _call(self, req: LlmRequest) -> tuple[LlmResponse | None, bool, ModelPath | None]:
+        """(the final response or None, whether the provider rejected a request that asked for logprobs, the path that
+        served the call — live mode only, trace/served.py)."""
         last: LlmResponse | None = None
         try:
             async for resp in self._llm.generate_content_async(req, stream=False):
                 if not resp.partial:
                     last = resp
         except ClientError as e:  # a 429 is a ClientError too: only a 400 on a logprobs request is a rejection
-            return None, e.code == 400 and bool(req.config.response_logprobs)
-        except Exception:  # noqa: BLE001 — a provider failure is an abstain (rule 11); its text never leaves here
-            return None, False
-        return last, False
+            return None, e.code == 400 and bool(req.config.response_logprobs), served_by(e)
+        except Exception as e:  # noqa: BLE001 — a provider failure is an abstain (rule 11); its text never leaves here
+            return None, False, served_by(e)
+        return last, False, served_by(last)
 
     async def _ask(self, q: DecisionQuestion, state: DecisionState, req: LlmRequest) -> DecisionResult:
         started = time.monotonic()
         codes = codes_for(q)
         calls = 1
-        last, rejected = await self._call(req)
+        last, rejected, path = await self._call(req)
         usage = [_usage(req, last)]
         if rejected and q.use_unscored:
             calls = 2
             retry = build_request(self._llm, q, state, logprobs=False)
-            last, _ = await self._call(retry)
+            last, _, path = await self._call(retry)
             usage.append(_usage(retry, last))
         ms = int((time.monotonic() - started) * 1000)
         tokens = (last.usage_metadata.prompt_token_count or 0) if last is not None and last.usage_metadata else 0
@@ -182,6 +184,7 @@ class LlmMimic:
                 call_usage=tuple(usage),
                 provider=provider_of(self._llm),
                 price=price_of(self._llm),
+                model_path=path,
             )
 
         if rejected and not q.use_unscored:
@@ -209,7 +212,8 @@ async def router_decision_model(cfg: Config, roles: ModelRoleSource, *, currency
     any call when the router has no price, or one in another currency). Recorded mode replays `decide/fixtures/`."""
     if cfg.model_mode == "recorded":
         return recorded_decision()
-    return LlmMimic(await llm_for_role("router", cfg, roles, currency=currency))
+    # Live: a failed call is served from this package's fixtures when it has one (T-125), as recorded mode replays them.
+    return LlmMimic(await llm_for_role("router", cfg, roles, currency=currency, fallback_dir=FIXTURES_DIR))
 
 
 def recorded_decision(fixtures_dir: Path = FIXTURES_DIR) -> LlmMimic:

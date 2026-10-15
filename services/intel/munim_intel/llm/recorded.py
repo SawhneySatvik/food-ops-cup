@@ -5,7 +5,8 @@ text, function-call name + args, function-response name + data), tool declaratio
 generated function-call ids and Gemini thought signatures are left out. Every UUID in the projection becomes a
 positional placeholder (`⟦uuid:N⟧`, by first appearance), so a run with a fresh run id or freshly minted
 snapshot ids hits the same fixture; placeholders in the recorded responses are mapped back to this request's ids.
-A missing fixture is an error naming the key — never a fall-through to a live model.
+A missing fixture is an error naming the key — never a fall-through to a live model. The other direction exists in live
+mode only: a live call that fails is served from its fixture when there is one (providers.py, T-125).
 """
 
 from __future__ import annotations
@@ -115,9 +116,18 @@ class RecordedLlm(BaseLlm):
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
         key, canonical, ids = request_key(llm_request)
+        responses = self.replay(key, ids)
+        if responses is None:
+            raise RecordedFixtureMissing(key, canonical)
+        for r in responses:
+            yield r
+
+    def replay(self, key: str, ids: list[str]) -> list[LlmResponse] | None:
+        """The fixture `<key>.json` with this request's `ids` put back, or None when there is none. The one loader: the
+        live models' fallback (providers.py, T-125) replays through it too, and decides itself what a miss means."""
         path = self.fixtures_dir / f"{key}.json"
         if not path.is_file():
-            raise RecordedFixtureMissing(key, canonical)
+            return None
 
         def back(m: re.Match[str]) -> str:
             n = int(m.group(1))
@@ -130,5 +140,4 @@ class RecordedLlm(BaseLlm):
         except (ValueError, KeyError) as e:
             raise RecordedFixtureInvalid(f"{key}.json: {type(e).__name__}") from None
         RecordedLlm.calls += 1
-        for r in responses:
-            yield LlmResponse.model_validate_json(_PLACEHOLDER.sub(back, json.dumps(r, ensure_ascii=False)))
+        return [LlmResponse.model_validate_json(_PLACEHOLDER.sub(back, json.dumps(r, ensure_ascii=False))) for r in responses]

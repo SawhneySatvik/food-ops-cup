@@ -4,7 +4,8 @@ Every Runner of a run gets a MunimPlugin over the same RunState, so budget, tain
 per run, not per Runner. Each callback counts itself in `RunState.fired`; the fired gate reads the count, so a
 misspelt hook (never called by ADK) shows up as 0.
 
-What reaches a trace: kinds, actors, agent and registered tool names, outcomes, exception class names. Never the
+What reaches a trace: kinds, actors, agent and registered tool names, outcomes, exception class names, and in live mode
+the path that served each model call (`route` {model_path}: live / recorded-fallback / abstained, T-125). Never the
 member's message, model text, tool arguments or results, or an exception's message (rule 8; ADR-014 §6.4 rule 5).
 
 Spend (W3 close ruling, trace/spend.py): every provider call of the context is one row in the run's spend buffer —
@@ -37,6 +38,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from munim_intel.runtime.state import ACTOR, RunState, check_actor
 from munim_intel.trace.buffer import Payload
+from munim_intel.trace.served import served_by
 from munim_intel.trace.spend import Usage, estimate_input_tokens
 
 #: Tools whose results carry untrusted text into the context (ADR-014 §6.4 rule 2).
@@ -185,6 +187,10 @@ class MunimPlugin(BasePlugin):
 
     async def after_model_callback(self, *, callback_context: CallbackContext, llm_response: LlmResponse) -> None:
         self._fire("after_model_callback")
+        # Live mode (T-125): which path served the call, a label (trace/served.py). A recorded replay carries none.
+        path = served_by(llm_response)
+        if path is not None and not llm_response.partial:
+            await self._trace("route", {"model_path": path})
         usage = llm_response.usage_metadata
         if usage is not None:
             self.state.budget.input_tokens += usage.prompt_token_count or 0
@@ -199,6 +205,9 @@ class MunimPlugin(BasePlugin):
 
     async def on_model_error_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest, error: Exception) -> None:
         self._fire("on_model_error_callback")
+        path = served_by(error)
+        if path is not None:
+            await self._trace("route", {"model_path": path})
         await self._trace("error", {"where": "model", "error": type(error).__name__})
         if self.state.meter is not None:
             self.state.meter.record(Usage(self._estimate, 0, estimated=True))

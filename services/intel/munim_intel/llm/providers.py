@@ -10,6 +10,15 @@ Every live call has a per-role timeout (W3 close ruling; `Config.model_timeouts_
 subclassed, so `isinstance(llm, OpenAILlm)` (the DecisionModel's request shape) and `llm.model` hold. Past the timeout
 the call raises TimeoutError, which fails like any provider error: the run's RunFailed (ask → abstention, narration →
 template) or the DecisionModel's `adapter_error`.
+
+Recorded fallback (T-125, ledger R56 G-4): a live call that fails — a free-tier 429, a timeout, any provider error, or the
+month's AI budget spent (`capped`: no provider call is made) — is served from the recorded fixture of that exact call
+when `llm_for_role` gave the model one: the request as the recorded model would send it (its `recorded/<role>` id, keyed
+before the provider's own preprocessing edits the request in place), replayed through RecordedLlm's one loader. With no
+fixture the original exception is re-raised untouched, so every caller degrades exactly as before. Each response carries
+the path that served it, and an abstaining exception its label (trace/served.py). A served fixture's token counts are
+the authoring run's, not this call's: they are dropped, so the call is charged the request-size estimate (trace/spend.py),
+as a failed call is.
 """
 
 from __future__ import annotations
@@ -20,14 +29,15 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 from google.adk.integrations.openai import OpenAILlm
-from google.adk.models import BaseLlm
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 
 from munim_intel.config import Config, ProviderKeyName
 from munim_intel.contracts_gen.models import PlatformModelRoleRow
+from munim_intel.llm.recorded import RecordedLlm, request_key
 from munim_intel.trace.price import Price
+from munim_intel.trace.served import KEY, ModelPath
 
 # Same rule as platform.model_role's CHECK (0002): any id containing gemini-2.5, any provider, any case.
 _RETIRED = re.compile(r"gemini-2\.5", re.IGNORECASE)
@@ -82,21 +92,50 @@ async def bounded(responses: AsyncGenerator[LlmResponse, None], seconds: float) 
         return [r async for r in responses]
 
 
+class OverCap(Exception):
+    """The month's AI budget is spent (R47): no provider call is made, and the call takes the fallback path as a 429 does."""
+
+
+async def served(llm: TimedGemini | TimedOpenAILlm, req: LlmRequest, call: AsyncGenerator[LlmResponse, None]) -> list[LlmResponse]:
+    """One live-mode call: `call` (the provider's, not started yet) within the timeout, else the fallback (module doc)."""
+    fallback = llm.fallback
+    key = None if fallback is None else request_key(req.model_copy(update={"model": fallback.model}))
+    path: ModelPath
+    try:
+        if llm.capped:
+            await call.aclose()
+            raise OverCap()
+        responses, path = await bounded(call, llm.timeout_s), "live"
+    except Exception as e:  # noqa: BLE001 — every failure takes the same path; a miss re-raises the exception untouched
+        replayed = None if fallback is None or key is None else fallback.replay(key[0], key[2])
+        if replayed is None:
+            setattr(e, KEY, "abstained")
+            raise
+        responses, path = [r.model_copy(update={"usage_metadata": None}) for r in replayed], "recorded-fallback"
+    return [r.model_copy(update={"custom_metadata": {**(r.custom_metadata or {}), KEY: path}}) for r in responses]
+
+
 class TimedGemini(Gemini):
     timeout_s: float = 60.0
     price: Price | None = None
+    #: The recorded fixtures that may serve a failed call (T-125); None: a failed call only fails (the live probe).
+    fallback: RecordedLlm | None = None
+    #: The month's AI budget is spent: every call takes the fallback path, none reaches the provider.
+    capped: bool = False
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
-        for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
+        for r in await served(self, llm_request, super().generate_content_async(llm_request, stream)):
             yield r
 
 
 class TimedOpenAILlm(OpenAILlm):
     timeout_s: float = 60.0
     price: Price | None = None
+    fallback: RecordedLlm | None = None
+    capped: bool = False
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
-        for r in await bounded(super().generate_content_async(llm_request, stream), self.timeout_s):
+        for r in await served(self, llm_request, super().generate_content_async(llm_request, stream)):
             yield r
 
 
@@ -105,7 +144,7 @@ def refuse_retired(model_id: str) -> None:
         raise RetiredModelRefused(model_id)
 
 
-def build_live_llm(row: PlatformModelRoleRow, cfg: Config, price: Price | None = None) -> BaseLlm:
+def build_live_llm(row: PlatformModelRoleRow, cfg: Config, price: Price | None = None) -> TimedGemini | TimedOpenAILlm:
     """`price`: the role's operator price, which `llm_for_role` (every run's path) always sets; None only for the live
     provider probe (tests/live), which posts no spend rows."""
     refuse_retired(row.model_id)
@@ -118,7 +157,7 @@ def build_live_llm(row: PlatformModelRoleRow, cfg: Config, price: Price | None =
     if key is None:
         raise ProviderUnavailable(f"{row.provider}: {provider.key_name} is not set — skipped")
     timeout_s = cfg.model_timeouts_s[row.role]
-    llm: BaseLlm
+    llm: TimedGemini | TimedOpenAILlm
     if row.provider == "gemini":
         llm = TimedGemini(model=row.model_id, client_kwargs={"api_key": key}, timeout_s=timeout_s, price=price)
     else:

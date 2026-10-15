@@ -476,7 +476,7 @@ def test_a_rejected_logprobs_request_is_retried_once_and_routes_draft_request_un
     assert retry.model_dump(exclude={"response_logprobs", "logprobs"}) == first.model_dump(exclude={"response_logprobs", "logprobs"})
     # Through the Manager's own router (manager/ask.py) and path table: the route trace labels intent, band and path.
     seen.clear()
-    intent, band = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, dm))
+    intent, band, _ = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, dm))
     assert (intent, band, len(seen)) == ("draft_request", "unscored", 2)
     assert PATHS[intent] is DRAFT
     assert bind(PATHS[intent], None).abstain == "specialist_needed"
@@ -489,7 +489,7 @@ def test_both_calls_of_a_rejected_then_retried_route_are_spend_rows(monkeypatch:
     usage, so it is charged on the request-size estimate; the retry on the provider's 247 prompt tokens."""
     seen = gemini_rejecting_logprobs(monkeypatch, "D")
     spend = SpendBuffer(_no_sink, "INR")
-    intent, band = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, live_router(), spend))
+    intent, band, _ = asyncio.run(route(CTX, "Order 20 kg of onions from our usual supplier", FRAME, live_router(), spend))
     rows = spend.entries
     assert (intent, band, len(seen)) == ("draft_request", "unscored", 2)
     assert [(r["role"], r["provider"], r["model_id"]) for r in rows] == [("router", "gemini", "gemini-3.5-flash-lite")] * 2

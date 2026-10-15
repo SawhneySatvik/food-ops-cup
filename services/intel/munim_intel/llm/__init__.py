@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal, Protocol
 
 from google.adk.integrations.openai import OpenAILlm
@@ -10,7 +11,7 @@ from google.adk.models import BaseLlm
 from munim_intel.config import Config
 from munim_intel.contracts_gen.models import PlatformModelRoles
 from munim_intel.llm.providers import PROVIDERS, PriceRefused, ProviderUnavailable, build_live_llm, row_price
-from munim_intel.llm.recorded import RecordedLlm
+from munim_intel.llm.recorded import FIXTURES_DIR, RecordedLlm
 from munim_intel.trace.price import Price
 
 ModelRoleName = Literal["router", "reason", "extract", "narrate", "vision", "embed"]
@@ -20,10 +21,23 @@ class ModelRoleSource(Protocol):
     async def model_roles(self) -> PlatformModelRoles: ...
 
 
-async def llm_for_role(role: ModelRoleName, cfg: Config, roles: ModelRoleSource, *, currency: str | None) -> BaseLlm:
+async def llm_for_role(
+    role: ModelRoleName,
+    cfg: Config,
+    roles: ModelRoleSource,
+    *,
+    currency: str | None,
+    fallback_dir: Path | None = FIXTURES_DIR,
+    capped: bool = False,
+) -> BaseLlm:
     """The role's model, carrying its operator price (R47 D1). Live: refused before any call when the operator set no
     price, or a price in another currency than `currency` — the run's spend currency (`spend_currency(frame)`); None
-    only for a caller that posts no spend rows. Recorded: a replay with no price (charged 0)."""
+    only for a caller that posts no spend rows. Recorded: a replay with no price (charged 0).
+
+    Live (T-125, R56 G-4): a call that fails is served from the fixture of that exact call under `fallback_dir` (as the
+    recorded `recorded/<role>` model reads them), else fails as before; None for a probe, which a fixture must never
+    pass. `capped`: the month's AI budget is spent — no call reaches the provider (so none is charged: no price), each
+    takes that fallback path."""
     if cfg.model_mode == "recorded":
         return RecordedLlm(model=f"recorded/{role}")
     row = next((r for r in (await roles.model_roles()).items if r.role == role), None)
@@ -34,7 +48,11 @@ async def llm_for_role(role: ModelRoleName, cfg: Config, roles: ModelRoleSource,
         raise PriceRefused("price_missing", role)
     if currency is not None and price.currency != currency:
         raise PriceRefused("price_currency_mismatch", role)
-    return build_live_llm(row, cfg, price)
+    llm = build_live_llm(row, cfg, None if capped else price)
+    llm.capped = capped
+    if fallback_dir is not None:
+        llm.fallback = RecordedLlm(model=f"recorded/{role}", fixtures_dir=fallback_dir)
+    return llm
 
 
 def price_of(llm: BaseLlm) -> Price | None:

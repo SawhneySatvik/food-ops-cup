@@ -23,7 +23,8 @@ async def smoke_run(ctx: RunContext, cfg: Config, client: InternalClient, roles:
     tool's context fields (which come from the RunContext, not the model), and model text as hashes."""
     agent = LlmAgent(
         name="smoke",
-        model=await llm_for_role("router", cfg, roles, currency=None),  # the probe posts no spend rows
+        # The probe posts no spend rows, and no recorded fixture may pass for a dead provider (no fallback, T-125).
+        model=await llm_for_role("router", cfg, roles, currency=None, fallback_dir=None),
         instruction=INSTRUCTION,
         tools=build_tools(["echo"], ctx, client),
     )

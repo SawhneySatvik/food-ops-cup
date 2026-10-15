@@ -57,6 +57,7 @@ from munim_intel.skills.loader import PackToolset
 from munim_intel.tools.answer import SubmitAnswerTool
 from munim_intel.tools.handles import HandleTable
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.served import ModelPath
 from munim_intel.trace.spend import Meter, SpendBuffer, spend_currency
 
 log = logging.getLogger("munim_intel.manager")
@@ -110,19 +111,19 @@ def outlet_kinds(frame: InternalRunFrameResponse) -> tuple[str, ...]:
 
 async def route(
     ctx: RunContext, question: str, frame: InternalRunFrameResponse, decide: DecisionModel, spend: SpendBuffer | None = None
-) -> tuple[str, Band]:
-    """(intent, band). Abstained or below threshold → `explain` (§4.3); so is a question the egress check refuses to
-    send (e.g. a pasted id: no UUID leaves the process) — nothing is sent, the caller's fallback runs. Each provider call
-    the decision cost is a `router` row in `spend`."""
+) -> tuple[str, Band, ModelPath | None]:
+    """(intent, band, the path that served the router's call — live mode only, T-125). Abstained or below threshold →
+    `explain` (§4.3); so is a question the egress check refuses to send (e.g. a pasted id: no UUID leaves the process) —
+    nothing is sent, the caller's fallback runs. Each provider call the decision cost is a `router` row in `spend`."""
     state: DecisionState = {"question": question, "outlet_kinds": outlet_kinds(frame), "country": frame.pack.code}
     try:
         [result] = await decide.decide(ctx, state, [ROUTE_INTENT])
     except EgressRefused:
-        return "explain", "low"
+        return "explain", "low", None
     if spend is not None:
         for usage in result.call_usage:
             spend.add("router", result.provider, result.model_id, usage, result.price)
-    return answer_or_fallback(ROUTE_INTENT, result) or "explain", result.band
+    return answer_or_fallback(ROUTE_INTENT, result) or "explain", result.band, result.model_path
 
 
 @dataclass(frozen=True)
@@ -209,10 +210,12 @@ async def answer_ask(
             # refusal (R47 D1) names its code on the abstain trace.
             log.warning("intel: ask run %s has no model: %s", ctx.run_id, cause(e))
             return await early("model_blocked", {}, e.code if isinstance(e, PriceRefused) else None)
-    intent, band = await route(ctx, req.question, frame, models.decide, spend)
+    intent, band, model_path = await route(ctx, req.question, frame, models.decide, spend)
     path, follow_up = path_for(intent, band, req.addressed_to, bool(req.deep))
     b = bind(path, req.addressed_to)
     labels: dict[str, str | list[str]] = {"intent": intent, "band": band, "path": b.path.name}
+    if model_path is not None:
+        labels["model_path"] = model_path
     if follow_up is not None:
         labels["follow_up"] = follow_up
     if b.abstain is not None:
