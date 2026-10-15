@@ -5,6 +5,9 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { createMunimClient } from "../../../packages/sdk/src/index.ts";
+import type { Api } from "../src/api.ts";
+import { makeCtx } from "../src/ctx.ts";
+import { operatorApprove } from "../src/kit.ts";
 import { runWorld } from "../src/run.ts";
 import { businessToday } from "../src/time.ts";
 import { startStack, type Stack } from "./stack.ts";
@@ -19,13 +22,13 @@ const AS_OF_DAYS = 70;
 /** Any URL serves (nothing here calls the simulator); the cards must be on it, by the brief's paths (T-127). */
 const SIM = "http://127.0.0.1:4423";
 let stack: Stack;
-const seeded: Array<{ tenantId: string; storefrontKey: string }> = [];
+const seeded: Array<{ tenantId: string; storefrontKey: string; aiPricing: unknown; api: Api; seed: string }> = [];
 
 before(async () => {
   stack = await startStack();
   for (const seed of ["cobnut-gate-1", "cobnut-gate-2"]) {
     const r = await runWorld({ world: "cobnut", seed, asOf: businessToday(new Date(), "Asia/Kolkata"), days: AS_OF_DAYS, baseUrl: stack.baseUrl, token: stack.token("cobnut"), operator: true, simUrl: SIM });
-    seeded.push({ tenantId: r.api.tenantId!, storefrontKey: String(r.state.storefrontKey) });
+    seeded.push({ tenantId: r.api.tenantId!, storefrontKey: String(r.state.storefrontKey), aiPricing: r.state.aiPricing, api: r.api, seed });
   }
 });
 after(async () => {
@@ -98,14 +101,41 @@ describe("cobnut", () => {
       assert.deepEqual((await q(`SELECT name FROM core.supplier WHERE tenant_id = $T AND a2a_card_url IS NOT NULL ORDER BY id`)).map((r) => r.name),
         ["Steady Wholesale (simulated)", "Bargain Bulk Traders (simulated)", "Premium Provisions (simulated)"]);
       // T-127: this month's purchases budget for the whole business, ₹50,000, the owner's own command (the deal review reads it).
-      assert.deepEqual(await q(`SELECT b.category, b.outlet_id, b.amount_minor::int AS amount, b.currency, b.period_month = date_trunc('month', (now() AT TIME ZONE 'Asia/Kolkata'))::date AS this_month,
-          b.origin ->> 'kind' AS origin, m.name FROM core.budget b JOIN core.member m ON m.id = (b.origin ->> 'principal_id')::uuid WHERE b.tenant_id = $T`),
-        [{ category: "purchases", outlet_id: null, amount: 5_000_000, currency: "INR", this_month: true, origin: "command", name: "Nandini Mehrotra" }]);
+      // R59: this month and the next two (the demo runs through the quarter without a reseed). Months counted from now in Kolkata, by hand.
+      const offset = (col: string) => `(extract(year FROM ${col}) * 12 + extract(month FROM ${col}) - extract(year FROM now() AT TIME ZONE 'Asia/Kolkata') * 12
+        - extract(month FROM now() AT TIME ZONE 'Asia/Kolkata'))::int`;
+      assert.deepEqual(await q(`SELECT b.category, b.outlet_id, b.amount_minor::int AS amount, b.currency, ${offset("b.period_month")} AS month,
+          b.origin ->> 'kind' AS origin, m.name FROM core.budget b JOIN core.member m ON m.id = (b.origin ->> 'principal_id')::uuid WHERE b.tenant_id = $T ORDER BY b.period_month`),
+        [0, 1, 2].map((month) => ({ category: "purchases", outlet_id: null, amount: 5_000_000, currency: "INR", month, origin: "command", name: "Nandini Mehrotra" })));
+      // R59 (R47 D2): a nominal ₹100 operator AI budget row for the same three months.
+      assert.deepEqual(await q(`SELECT ${offset("month")} AS month, limit_minor::int AS limit, currency FROM platform.llm_budget WHERE tenant_id = $T ORDER BY month`),
+        [0, 1, 2].map((month) => ({ month, limit: 10_000, currency: "INR" })));
     }
     assert.notEqual(seeded[0]!.tenantId, seeded[1]!.tenantId, "a reseed is a fresh tenant");
+    // R59 (R47 D1): the four live roles priced at 0 INR per 1M tokens in and out, by an applied operator draft each; the reseed into the
+    // same database found them priced and proposed nothing (a price already set is never overwritten).
+    assert.deepEqual((await stack.admin(`SELECT role, input_price_per_mtok_minor::int AS i, output_price_per_mtok_minor::int AS o, price_currency AS cur
+        FROM platform.model_role WHERE role IN ('router', 'reason', 'narrate', 'extract') ORDER BY role`)).rows,
+      ["extract", "narrate", "reason", "router"].map((role) => ({ role, i: 0, o: 0, cur: "INR" })));
+    assert.equal(Number((await stack.admin(`SELECT count(*) n FROM platform.config_draft WHERE target LIKE 'model_role:%' AND status = 'applied'`)).rows[0]!.n), 4);
+    assert.deepEqual(seeded.map((s) => (s.aiPricing as { priced: string[] }).priced), [["router", "reason", "narrate", "extract"], []]);
+    assert.deepEqual((seeded[1]!.aiPricing as { kept: string[] }).kept, ["router (0/0 INR)", "reason (0/0 INR)", "narrate (0/0 INR)", "extract (0/0 INR)"]);
     // Platform-wide rows do not multiply on a reseed: one Lucknow, the two simulated recipients once.
     assert.deepEqual((await stack.admin(`SELECT name, simulated FROM platform.cares_recipient WHERE city_code = 'lucknow' ORDER BY name`)).rows,
       [{ name: "Old Town Community Kitchen (simulated)", simulated: true }, { name: "Riverside Night Shelter (simulated)", simulated: true }]);
+  });
+
+  test("R59: a reseed of the same world finds its operator drafts applied — approving one again is done, a draft not applied is refused", async () => {
+    // The same seed proposes the same draft ids (core replays the proposal) and core answers the approval 409 already_decided.
+    const { api, seed, tenantId } = seeded[0]!;
+    const c = makeCtx({ api, world: "cobnut", seed, asOf: businessToday(new Date(), "Asia/Kolkata"), days: AS_OF_DAYS });
+    const applied = [`config_draft:llm_budget:${tenantId}`, `config_draft:llm_budget:${tenantId}:+1`, `config_draft:llm_budget:${tenantId}:+2`,
+      ...["router", "reason", "narrate", "extract"].map((r) => `config_draft:model_role:${r}`)].map((k) => api.id(k));
+    for (const id of applied) await operatorApprove(c, id); // each resolves: already applied
+    const proposed = api.id(`config_draft:t127b-proposed:${tenantId}`);
+    await api.post("operator", "/platform/v1/config-drafts", { draft_id: proposed, target: `llm_budget:${tenantId}`, patch: { month: "2030-01-01", limit_minor: 1, currency: "INR" } }, { noTenant: true });
+    await api.post("operator", "/platform/v1/config-drafts/{id}:reject", { reason: "red-proof: not applied" }, { params: { id: proposed }, noTenant: true });
+    await assert.rejects(operatorApprove(c, proposed), /is rejected, not applied/);
   });
 
   test("the storefront menu equals apps/web/mock-server/data.ts at both outlets, in its order", async () => {

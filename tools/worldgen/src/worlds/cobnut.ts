@@ -11,6 +11,9 @@ import { addDays, at, businessToday, mondayOf } from "../time.ts";
 
 export const meta = { tz: "Asia/Kolkata", currency: "INR", personas: ["owner", "manager", "counter", "kitchen"] } as const;
 
+/** The months the demo runs without a reseed (R59): this one and the next two, for the AI budget and the purchases budget. */
+const MONTHS = 3;
+
 /** The IN pack has no bakery class; restaurant_5 is the mock's bakery_5 rate (5%: CGST 2.5% + SGST 2.5%). */
 const TAX = "restaurant_5";
 const KINDS = ["counter", "own_site"];
@@ -80,7 +83,11 @@ export async function build(c: Ctx): Promise<void> {
     outlet: { name: "Cobnut Hazratganj", address: "14 Synthetic Arcade, Hazratganj, Lucknow (synthetic)", taxIds: { GSTIN: "09AAAAA0001A1Z5", FSSAI: "20000000000001" } },
     // No tax ids: Gomti Nagar's receipts show the tax_id_missing state.
     more: [{ name: "Cobnut Gomti Nagar", address: "7 Synthetic Market, Gomti Nagar, Lucknow (synthetic)", kind: "restaurant", taxIds: {} }],
+    // R59: a nominal ₹100 AI budget row for this month and the next two, so the live demo runs through the quarter without a reseed.
+    aiBudget: { limitMinor: 10_000, months: MONTHS },
   });
+  // R59: the live roles priced at ₹0 on the free-tier key (any real price already set is kept, and reported by cli.ts).
+  c.s.aiPricing = await k.aiRolePrices(c, biz.currency);
   c.s.currency = biz.currency;
   const [hzg, gmt] = biz.outlets as [k.OutletInfo, k.OutletInfo];
   const tz = hzg.tz;
@@ -200,10 +207,13 @@ export async function build(c: Ctx): Promise<void> {
   for (const [i, [key, name, days]] of agents.entries()) {
     await k.supplier(c, key, name, days, [], { id: agentIds[i]!, cardUrl: `${c.simUrl}/${key}/.well-known/agent-card.json` });
   }
-  // This month's purchases budget for the whole business, the owner's own command: the deal review reads it (budget_left_minor); with
-  // none every quote is budget_missing ("cannot verify") and no PO draft can pass. ₹50,000. The month is the outlets' business month now
-  // (not aliased in the request log: as a date it would also rename every other line that names the 1st of that month).
-  await k.budget(c, "purchases", { month: `${live.slice(0, 7)}-01`, category: "purchases", amountMinor: 5_000_000 });
+  // The purchases budget for the whole business, this month and the next two, the owner's own command: the deal review reads it
+  // (budget_left_minor); with none every quote is budget_missing ("cannot verify") and no PO draft can pass. ₹50,000 a month. The months
+  // follow the outlets' business month now (not aliased in the request log: as a date it would also rename every other line that names
+  // the 1st of that month).
+  for (let i = 0; i < MONTHS; i++) {
+    await k.budget(c, i === 0 ? "purchases" : `purchases:+${i}`, { month: k.monthAfter(live, i), category: "purchases", amountMinor: 5_000_000 });
+  }
   const hazelMin = 3000 + Math.ceil(hazelNeed / 11) + 2000;
   await k.reorderLevel(c, hzg.id, hazelnuts, hazelMin, hazelMin + 8000);
   await k.reorderLevel(c, hzg.id, butter, 4000, 10000);
@@ -292,4 +302,11 @@ export async function build(c: Ctx): Promise<void> {
   await k.caresListing(c, "rolls_b", hzg, { recipient: recipients.kitchen!, pickupFrom: when("cares_pickup_b_from", tomorrow, "21:00"), pickupTo: when("cares_pickup_b_to", tomorrow, "22:00"),
     lines: [{ key: "rolls", ing: rolls, batch: "ROLLS-HZG-1", qtyMilli: 12000, expires: rollsExp }] });
   await k.caresNetworkImpact(c, addDays(A, -c.days), c.api.alias(addDays(live, 1), "cares_impact_to"));
+
+  // R59: read back from core that a live AI run of this business has what it needs (every live role priced in its currency, an AI
+  // budget row for each month); a gap fails the seed by name rather than leaving the demo answering "model_blocked".
+  if (!c.api.lenient) {
+    const missing = await k.aiReadiness(c, biz.currency, Array.from({ length: MONTHS }, (_, i) => k.monthAfter(A, i)));
+    if (missing.length) throw new Error(`cobnut: live AI is not ready: ${missing.join("; ")}`);
+  }
 }

@@ -98,6 +98,10 @@ async function main() {
     if (tokenFile) console.log(`          demo tokens (local IdP, 1 h): ${tokenFile}`);
     console.log(`          site env: ${env}`);
     console.log(`          simulated suppliers' agent cards: ${simUrl}/{steady,discounter,premium}/.well-known/agent-card.json`);
+    const pricing = r.state.aiPricing as { priced: string[]; kept: string[] } | undefined;
+    if (pricing) {
+      console.log(`          live AI roles priced at 0 INR (R59): ${pricing.priced.join(", ") || "none"}; already priced, left as they are: ${pricing.kept.join(", ") || "none"}`);
+    }
     return;
   }
   if (tokens.operator === undefined) console.log("worldgen: no operator token, so this world is onboarded self-serve and is NOT labelled demo (hard rule 5: no \"Sample data\" badge in the UI). Add \"operator\" to MUNIM_SEED_TOKENS to provision it as a demo tenant.");

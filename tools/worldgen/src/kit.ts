@@ -22,6 +22,8 @@ export interface OnboardSpec {
   ownerName: string;
   outlet: { name: string; address: string; tz?: string; taxIds: Record<string, string> };
   more?: Array<{ name: string; address: string; kind: "restaurant" | "cloud_kitchen" | "store"; taxIds: Record<string, string> }>;
+  /** The operator's monthly AI budget rows (R47 D2): `months` rows from the as-of month on, each `limitMinor`. Default one month, 500000. */
+  aiBudget?: { limitMinor: number; months: number };
 }
 
 /** The pack values a seed run mirrors for the operator-provisioned path, where core's self-serve defaults do not apply (what the packs list; a
@@ -130,14 +132,84 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
   // The month is the timeline's last (the real current month when as-of is today). Skipped, loudly in the CLI, when no operator is signed in.
   if (api.hasOperator) {
     // The draft id is global (platform.config_draft), so it carries the tenant: without it a second business with the same seed
-    // and world replays/collides with the first's draft. Logged under an alias because the tenant id is server-minted.
-    const draft = api.alias(api.id(`config_draft:llm_budget:${api.tenantId}`), "draft:llm_budget");
-    await api.post("operator", "/platform/v1/config-drafts", {
-      draft_id: draft, target: `llm_budget:${api.tenantId}`, patch: { month: `${c.asOf.slice(0, 7)}-01`, limit_minor: 500000, currency },
-    }, { noTenant: true });
-    await api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true });
+    // and world replays/collides with the first's draft. Logged under an alias because the tenant id is server-minted. A later
+    // month's draft also carries its offset (the first keeps the id every world has always used).
+    const budget = spec.aiBudget ?? { limitMinor: 500000, months: 1 };
+    for (let i = 0; i < budget.months; i++) {
+      const suffix = i === 0 ? "" : `:+${i}`;
+      const draft = api.alias(api.id(`config_draft:llm_budget:${api.tenantId}${suffix}`), `draft:llm_budget${suffix}`);
+      await api.post("operator", "/platform/v1/config-drafts", {
+        draft_id: draft, target: `llm_budget:${api.tenantId}`, patch: { month: monthAfter(c.asOf, i), limit_minor: budget.limitMinor, currency },
+      }, { noTenant: true });
+      await operatorApprove(c, draft);
+    }
   }
   return { country: spec.country, currency, outlets, channels };
+}
+
+/** The operator approves a draft it proposed (R27: its own command is its approval). Reseeding the same world into the same database
+ *  proposes the same draft again (a replay) and core answers its approval 409 `already_decided`: that draft is done when core reads it
+ *  back as applied, and anything else still fails the seed. */
+export async function operatorApprove(c: Ctx, draft: string): Promise<void> {
+  await c.api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true, expect: [200, 201, 409] });
+  if (c.api.lenient) return;
+  const d = await c.api.get("operator", "/platform/v1/config-drafts/{id}", { params: { id: draft } });
+  if (d.status !== "applied") throw new Error(`operator draft ${draft} is ${String(d.status)}, not applied`);
+}
+
+/** The first day of the month `n` months after `date`'s (YYYY-MM-01). */
+export function monthAfter(date: string, n: number): string {
+  const m = Number(date.slice(5, 7)) - 1 + n;
+  return `${Number(date.slice(0, 4)) + Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, "0")}-01`;
+}
+
+// ---- the live AI roles (R59; R47 D1, D2) ------------------------------------------------------------------------
+
+/** R59: the roles a live demo calls — the router, the Manager's `reason`, the watchers' and brief's `narrate`, the extractor. */
+export const LIVE_ROLES = ["router", "reason", "narrate", "extract"] as const;
+
+/** R59, as the operator (one approved config draft per role, R24): each live role with no price is priced at 0 per 1M tokens in
+ *  and out, in `currency`, on its current provider and model (the free-tier key bills nothing). A role that already carries a price
+ *  keeps it — a real price is never overwritten — and is named in `kept`. Idempotent: a reseed into the same database finds the
+ *  roles priced and proposes nothing. */
+export async function aiRolePrices(c: Ctx, currency: string): Promise<{ priced: string[]; kept: string[] }> {
+  const rows = ((await c.api.get("operator", "/platform/v1/model-roles")).items ?? []) as J[];
+  const out = { priced: [] as string[], kept: [] as string[] };
+  for (const role of LIVE_ROLES) {
+    const row = rows.find((r) => r.role === role);
+    if (row && row.input_price_per_mtok_minor !== null && row.input_price_per_mtok_minor !== undefined) {
+      out.kept.push(`${role} (${String(row.input_price_per_mtok_minor)}/${String(row.output_price_per_mtok_minor)} ${String(row.price_currency)})`);
+      continue;
+    }
+    if (!row && !c.api.lenient) throw new Error(`no platform.model_role row for ${role}`);
+    // Platform-wide, so the draft id names the role (no tenant); a reseed never proposes it again (the role is priced by then).
+    const draft = c.api.alias(c.api.id(`config_draft:model_role:${role}`), `draft:model_role:${role}`);
+    await c.api.post("operator", "/platform/v1/config-drafts", {
+      draft_id: draft, target: `model_role:${role}`,
+      patch: { provider: row?.provider ?? "gemini", model_id: row?.model_id ?? "plan-model", input_price_per_mtok_minor: 0, output_price_per_mtok_minor: 0, price_currency: currency },
+    }, { noTenant: true });
+    await operatorApprove(c, draft);
+    out.priced.push(role);
+  }
+  return out;
+}
+
+/** What a live AI run of this business needs and lacks (R47 D1, D2): every live role priced in `currency`, and an AI budget row in
+ *  `currency` for each of `months` (YYYY-MM-01). Empty = ready. Read back from core, never from what this seed sent. */
+export async function aiReadiness(c: Ctx, currency: string, months: string[]): Promise<string[]> {
+  const roles = ((await c.api.get("operator", "/platform/v1/model-roles")).items ?? []) as J[];
+  const budgets = ((await c.api.get("operator", "/platform/v1/budgets")).items ?? []) as J[];
+  const missing: string[] = [];
+  for (const role of LIVE_ROLES) {
+    const r = roles.find((x) => x.role === role);
+    if (!r || r.input_price_per_mtok_minor === null || r.input_price_per_mtok_minor === undefined || r.price_currency !== currency) {
+      missing.push(`model_role ${role} has no ${currency} price`);
+    }
+  }
+  for (const m of months) {
+    if (!budgets.some((b) => b.tenant_id === c.api.tenantId && b.month === m && b.currency === currency)) missing.push(`no ${currency} AI budget row for ${m}`);
+  }
+  return missing;
 }
 
 // ---- stock and catalogue -------------------------------------------------------------------------------------
@@ -743,7 +815,7 @@ export async function customer(c: Ctx, key: string, name: string, phone: string,
 export async function platformDraft(c: Ctx, key: string, target: string, patch: J): Promise<void> {
   const draft = c.api.alias(c.api.id(`config_draft:${key}:${c.api.tenantId}`), `draft:${key}`);
   await c.api.post("operator", "/platform/v1/config-drafts", { draft_id: draft, target, patch }, { noTenant: true });
-  await c.api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true });
+  await operatorApprove(c, draft);
 }
 
 /** `id`: a fixed recipient id (default: from the seed); `from`/`to`: receiving hours (default 09:00-19:00). */
