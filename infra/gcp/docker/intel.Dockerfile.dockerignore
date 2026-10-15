@@ -1,0 +1,16 @@
+# Allowlist: only what intel needs enters the build context. Secrets and local state never match.
+*
+!pyproject.toml
+!uv.lock
+!services/intel
+!services/suppliers-sim
+!packages/contracts/src/shared/grammar
+!packages/contracts/generated
+**/node_modules
+**/.next
+**/.venv
+**/.env*
+**/.run
+**/__pycache__
+**/tests
+**/test

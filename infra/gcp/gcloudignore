@@ -1,0 +1,23 @@
+# What `gcloud builds submit --ignore-file=infra/gcp/gcloudignore` uploads. Without it gcloud falls back to the repo's
+# ignore rules, and anything not matched there is uploaded to the build bucket. Secrets and local state first, then
+# the top-level folders that no image reads (each Dockerfile's own .dockerignore narrows the rest). `/.*/` is every
+# top-level dot-directory: the repo's git data, CI files, local tool state and caches.
+/.*/
+.git
+**/.env*
+**/.run
+**/node_modules
+**/.next
+**/.venv
+**/__pycache__
+**/.screenshots
+**/scratchpad
+/apps/site/
+/art/
+/deploy/
+/docs/
+/e2e/
+/evals/
+/scripts/
+/tests/
+/tools/

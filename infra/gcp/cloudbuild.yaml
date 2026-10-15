@@ -1,0 +1,11 @@
+# One image from one Dockerfile, built from the repo root. Used by scripts/deploy-gcp.sh for every service but web.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    env: ["DOCKER_BUILDKIT=1"]
+    args: ["build", "-f", "${_DOCKERFILE}", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]
+substitutions:
+  _IMAGE: ""
+  _DOCKERFILE: ""
+options:
+  logging: CLOUD_LOGGING_ONLY

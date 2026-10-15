@@ -1,0 +1,8 @@
+#!/bin/sh
+# Test double: records every call, answers the two reads the script makes, talks to nobody.
+printf '%s\n' "$*" >> "$STUB_LOG"
+case "$*" in
+  *"projects describe"*) echo 123456789012 ;;
+  *"secrets versions access"*) echo sfkey-test-123 ;;
+esac
+exit 0

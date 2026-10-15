@@ -1,0 +1,20 @@
+# Allowlist: only what core-api needs enters the build context. Secrets and local state never match.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!services/core-api
+!services/core-worker
+!packages
+!adapters
+!db
+!infra/gcp/entries
+**/node_modules
+**/.next
+**/.venv
+**/.env*
+**/.run
+**/__pycache__
+**/tests
+**/test

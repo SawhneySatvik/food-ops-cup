@@ -1,0 +1,20 @@
+# Allowlist: only what web needs enters the build context. Secrets and local state never match.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps/web
+!services/core-api
+!services/core-worker
+!packages
+!adapters
+!db
+**/node_modules
+**/.next
+**/.venv
+**/.env*
+**/.run
+**/__pycache__
+**/tests
+**/test

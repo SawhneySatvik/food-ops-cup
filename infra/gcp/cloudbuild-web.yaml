@@ -1,0 +1,21 @@
+# The web image. Next inlines NEXT_PUBLIC_* and evaluates rewrites() at build time, so the core-api origin and the
+# storefront key (public by design, it ships to browsers) are build arguments.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    env: ["DOCKER_BUILDKIT=1"]
+    args:
+      - build
+      - -f
+      - infra/gcp/docker/web.Dockerfile
+      - --build-arg=MUNIM_API_ORIGIN=${_MUNIM_API_ORIGIN}
+      - --build-arg=NEXT_PUBLIC_MUNIM_STOREFRONT_KEY=${_STOREFRONT_KEY}
+      - -t
+      - ${_IMAGE}
+      - .
+images: ["${_IMAGE}"]
+substitutions:
+  _IMAGE: ""
+  _MUNIM_API_ORIGIN: ""
+  _STOREFRONT_KEY: ""
+options:
+  logging: CLOUD_LOGGING_ONLY
