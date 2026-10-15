@@ -8279,6 +8279,39 @@
       ]
     },
     {
+      "name": "core.tick_claim",
+      "tag": "operational",
+      "tenant": false,
+      "primary_key": "{job,slot_at}",
+      "columns": [
+        {
+          "name": "job",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "slot_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "not_null": false
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "not_null": false
+        }
+      ]
+    },
+    {
       "name": "core.ticket_counter",
       "tag": "operational",
       "tenant": true,
@@ -23605,7 +23638,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "f4161b5b4558a2520c16a7c5dc9179df3c5717af8bb552ce640b59cc16614241",
+      "sha256": "8c1a1707b1c767f327916e960f075045ee3085219805bbebb7c7eaaa701f1b9a",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23637,6 +23670,7 @@
         "db/migrations/0028_cares.sql": "1bb37978712bba947ed66ebb1daf8412f96ac238295e541b01ee98a68c7c4ca7",
         "db/migrations/0029_storefront_display.sql": "119f8e94877103e37af8f479acb8e51e5cc38e4411b9c1f8b30bd3d3a4b13666",
         "db/migrations/0030_display_order.sql": "c14271c95f32c2866630bd839006fb096628c5f85949054e5733c73f2c4ab073",
+        "db/migrations/0031_tick_ledger.sql": "9fb59dfd0563ac5d7d3c059dab9957090ddd1a727671557f608d7267e866e035",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -23705,6 +23739,6 @@
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "fbdfaf6db85c607357def9f6fbe7778b367a0317115d19be3f076d4ca863a12a"
+    "body_sha256": "b3a2ec0d3b972896f7db764ee434d7759a451e334627c8b54f4755f82abc70e0"
   }
 }
