@@ -106,12 +106,12 @@ describe("GUARD the new columns sit behind the book guard", () => {
 });
 
 describe("G privileges on the new columns", () => {
-  test("munim_core UPDATE lists, exactly (hand-typed: 0003/0004/0005/0014 lists + 0029's columns)", async () => {
+  test("munim_core UPDATE lists, exactly (hand-typed: 0003/0004/0005/0014 lists + 0029's columns + 0030's position)", async () => {
     const want: Record<string, string> = {
       "core.item": "active,barcode,brand_id,category,currency,description,diet,display_name,mrp_minor,name_key,stock_ingredient_id",
-      "core.variant": "active,barcode,description,display_name,name_key",
-      "core.option_group": "description,display_name,max_select,min_select,name_key,required",
-      "core.option": "active,description,display_name,name_key,price_delta_minor",
+      "core.variant": "active,barcode,description,display_name,name_key,position",
+      "core.option_group": "description,display_name,max_select,min_select,name_key,position,required",
+      "core.option": "active,description,display_name,name_key,position,price_delta_minor",
       "core.outlet": "accepting_orders,address,business_day_cutoff,busy_extra_min,cancel_window_min,default_prep_min,name,phone,pickup_lead_min,"
         + "pickup_slot_min,reschedule_window_min,tax_ids,tz,upi_vpa",
     };

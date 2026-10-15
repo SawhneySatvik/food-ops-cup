@@ -15,7 +15,7 @@ node db/scripts/bootstrap-roles.ts [--out <path>]   # sets fresh LOGIN passwords
                               #   $DEVHOST_SESSION_POOLER_CONNECTION_STRING and writes .run/db-roles.json (0600)
 ```
 
-**Migrations (26 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
+**Migrations (30 files).** 0001–0006 M-A (frozen). 0007 W1 riders (command→table binding, storefront keys and
 the two cross-tenant lookups, outbox seq, guest order hash, outlet VPA fix, `munim_meta.assert_catalog()`),
 0008 finance, 0009 documents/imports/conversations, 0010 people, 0011 customers & growth, 0012 compliance, goals,
 market, intel tables, `intel_ro` views, `platform.llm_budget_spent`, 0013 embeddings (`-- requires: vector`:
@@ -41,7 +41,8 @@ remaining step, the investigation inbox NOTIFY, the operator's spend-row `id`), 
 prices on `platform.model_role`, negotiation bounds on `core.business_policy`, `people.labour_vs_demand` v2 at the extra staff's
 rate, `purchasing.deal_inputs` v3 with shop SKU margins), 0027 T-098 (stop reason `ceiling`: a lowered ceiling downgrades a
 running Auto investigation to Plan; Auto entered only with the plan approval), 0028 Munim Cares (ADR-015 §1: 4 platform tables,
-9 core books, 4 stock kinds, 10 commands, 3 derivation rules, 5 definer reads, 5 templates) — gates see 27 applied.
+9 core books, 4 stock kinds, 10 commands, 3 derivation rules, 5 definer reads, 5 templates), 0029 T-099 storefront display text,
+0030 T-115 display order (`position` on items, variants, option groups, options) — gates see 29 applied.
 Every migration from 0007 ends with
 `PERFORM munim_meta.assert_catalog('<n>')` (tags, guard + origin on books, guard fires first, binding lists name
 book tables and no book table is unwritable, forced RLS, FK covering indexes, no cascades, no PUBLIC/DELETE
@@ -838,6 +839,24 @@ The header of 0029 is the full list. Additive: no row written, no table, policy,
   `core.outlet` (tenant_id, id, name, tz). Same signature, so `assert_catalog`'s definer list is unchanged.
 - **Gates:** `tests/storefront-0029.test.ts` (D1 / D2 / GUARD / G / ISO / X1), the 0028 crosstenant assertion grown by
   `tz`; `db/tests/redproof-0029.sh` (one plant per gate, plus 0029's own post-conditions re-run after each perturbation).
+
+**Display order (0030, T-115; lane B1 report §6 items 2–3).** The header of 0030 is the full list. Additive and metadata-only:
+no row written or rewritten, no table, index, policy, trigger, function, command type or derivation rule added.
+- **`position`** (integer ≥ 0, NOT NULL, default 0; CHECK `<table>_position_check`) on `core.item`, `core.variant`,
+  `core.option_group`, `core.option` — book columns, written only under `catalogue.item.upsert.v1`. A variant's, option
+  group's or option's position is its index in the command's array (INSERT and UPDATE: resending the full list reorders it,
+  a partial list moves the children it names to the front); a new item takes the tenant's `max(position) + 1` once, on INSERT.
+  Reads (catalogue `itemsForSale`, the storefront menu, the member item list) order by position, then `name_key`; rows that
+  predate 0030 (or are inserted by SQL fixtures) are all 0, so they keep name order.
+- **Outlets get no column:** no command can carry an outlet position without a tenancy contract field; the storefront
+  lists outlets by `created_at`, then name.
+- **Grants:** munim_core's UPDATE lists on variant / option_group / option are revoked and re-granted (0029 lists +
+  `position`); `core.item` keeps its 0029 list (no UPDATE of `position`); INSERT stays table-level (0004). No other role
+  gains a privilege on `position`.
+- **Gates:** `tests/display-order-0030.test.ts` (P1 / GUARD / G / ISO), the 0029 UPDATE-list assertion grown by `position`;
+  `db/tests/redproof-0030.sh` (one plant per gate, plus 0030's own post-conditions re-run after each perturbation).
+  Red-proof scripts plant `0031_redproof_plant.sql` now (bumped by 0030); `grants.test.ts` plants `0031_planted.sql`;
+  `redproof-0029.sh` takes 0030's `position` grant back before re-running 0029's post-conditions.
 
 **Outlet RLS on compliance and goals (0015 A3).** `licence`, `checklist`, `asset`, `goal`, `task`: the 0014 outlet
 predicate plus `outlet_id IS NULL` (a tenant-wide row is visible to every member); `amc`, `maintenance`: visible

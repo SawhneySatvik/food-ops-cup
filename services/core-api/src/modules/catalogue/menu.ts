@@ -3,7 +3,8 @@
 // core.item.mrp_minor. No cart totals — carts are priced by `priceLines`.
 // A sellable entry is an active item with no active variants (variant null), or each active variant of it; it is
 // listed only when a price row is in force for the outlet and channel kind on the outlet's business date now (a
-// variant without its own row uses the item's row). Option groups and options are ordered by name key.
+// variant without its own row uses the item's row). Display order (0030): items by category, then position, then name
+// key; variants, option groups and options by position, then name key (position 0 everywhere = name order).
 import type { DealWindow } from "@munim/contracts/catalogue";
 import { ApiError } from "../../lib/errors.ts";
 import type { Queryable } from "../../runtoken/index.ts";
@@ -36,7 +37,8 @@ export type MenuEntry = {
   deals: Array<{ deal_id: string; name_key: string; kind: string; windows: DealWindow[] }>;
 };
 
-type EntryRow = Omit<MenuEntry, "price_minor" | "mrp_minor" | "option_groups" | "deals"> & { price_minor: string; mrp_minor: string | null };
+type EntryRow = Omit<MenuEntry, "price_minor" | "mrp_minor" | "option_groups" | "deals"> & { price_minor: string; mrp_minor: string | null;
+  item_position: number; variant_position: number | null };
 
 export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kind: string, opts: { at?: Date; item_id?: string } = {}) {
   const { business_date } = await outletClock(tx, outlet_id, opts.at ?? new Date());
@@ -44,7 +46,7 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
     `WITH sellable AS (
        SELECT i.id AS item_id, v.id AS variant_id, i.kind, i.name_key, v.name_key AS variant_name_key, i.category, i.brand_id,
               i.display_name, i.description, i.diet, v.display_name AS variant_display_name, v.description AS variant_description,
-              CASE WHEN v.id IS NULL THEN i.barcode ELSE v.barcode END AS barcode, i.mrp_minor
+              CASE WHEN v.id IS NULL THEN i.barcode ELSE v.barcode END AS barcode, i.mrp_minor, i.position AS item_position, v.position AS variant_position
          FROM core.item i
          LEFT JOIN core.variant v ON v.tenant_id = i.tenant_id AND v.item_id = i.id AND v.active
         WHERE i.active AND ($4::uuid IS NULL OR i.id = $4) AND ${sellableAs("i", "v.id")})
@@ -57,7 +59,7 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
                         AND (p.variant_id = s.variant_id OR p.variant_id IS NULL)
                         AND p.valid_from <= $3::date AND (p.valid_to IS NULL OR $3::date < p.valid_to)
                       ORDER BY p.variant_id NULLS LAST LIMIT 1) p ON true
-      ORDER BY s.category, s.name_key, s.variant_name_key NULLS FIRST`,
+      ORDER BY s.category, s.item_position, s.name_key, s.variant_position NULLS FIRST, s.variant_name_key NULLS FIRST`,
     [outlet_id, channel_kind, business_date, opts.item_id ?? null])).rows;
 
   const itemIds = [...new Set(rows.map((r) => r.item_id))];
@@ -68,11 +70,11 @@ export async function itemsForSale(tx: Queryable, outlet_id: string, channel_kin
             g.display_name AS group_display_name, g.description AS group_description,
             o.id AS option_id, o.name_key, o.price_delta_minor, o.currency, o.display_name, o.description
        FROM core.option_group g JOIN core.option o ON o.tenant_id = g.tenant_id AND o.option_group_id = g.id AND o.active
-      WHERE g.item_id = ANY($1::uuid[]) ORDER BY g.name_key, g.id, o.name_key, o.id`, [itemIds])).rows;
+      WHERE g.item_id = ANY($1::uuid[]) ORDER BY g.position, g.name_key, g.id, o.position, o.name_key, o.id`, [itemIds])).rows;
   const deals = (await loadDeals(tx)).filter((d) =>
     d.valid_from <= business_date && (d.valid_to === null || business_date < d.valid_to) && (d.outlet_ids.length === 0 || d.outlet_ids.includes(outlet_id)));
 
-  const entries: MenuEntry[] = rows.map((r) => {
+  const entries: MenuEntry[] = rows.map(({ item_position: _ip, variant_position: _vp, ...r }) => {
     const groups = new Map<string, MenuEntry["option_groups"][number]>();
     for (const o of optionRows.filter((x) => x.item_id === r.item_id)) {
       const g = groups.get(o.option_group_id) ?? { option_group_id: o.option_group_id, name_key: o.group_name_key, min_select: o.min_select, max_select: o.max_select, required: o.required,

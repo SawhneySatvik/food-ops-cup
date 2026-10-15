@@ -71,8 +71,9 @@ async function payAtCounterMethods(c: Queryable): Promise<Array<ReturnType<typeo
 const publicTaxIds = (pack: CountryPack, o: OutletRow) =>
   pack.tax_ids.filter((t) => t.on_receipt && typeof o.tax_ids[t.code] === "string").map((t) => ({ code: t.code, label: t.label, value: o.tax_ids[t.code]! }));
 
+/** Outlets in the order the owner opened them (T-115: no command carries an outlet position), then by name. */
 export async function outlets(c: Queryable) {
-  const r = await c.query<OutletRow>(`SELECT ${OUTLET_COLS} FROM core.outlet ORDER BY name, id`);
+  const r = await c.query<OutletRow>(`SELECT ${OUTLET_COLS} FROM core.outlet ORDER BY created_at, name, id`);
   const pack = await tenantPack(c);
   return {
     outlets: r.rows.map((o) => ({ outlet_id: o.id, name: o.name, kind: o.kind, tz: o.tz, address: o.address, phone: o.phone, tax_ids: publicTaxIds(pack, o) })),

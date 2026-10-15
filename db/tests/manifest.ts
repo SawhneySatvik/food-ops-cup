@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0029 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0030 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -32,6 +32,7 @@ export const MIGRATIONS = [
   "0027_t098_auto_ceiling_downgrade",
   "0028_cares",
   "0029_storefront_display",
+  "0030_display_order",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];

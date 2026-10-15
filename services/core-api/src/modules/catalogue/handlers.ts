@@ -10,6 +10,9 @@
 // Upserts are additive: children not named in the payload are left as they are (switch them off with
 // `active: false`); identity fields the schema grants no UPDATE on (item kind, deal kind/start, coupon terms)
 // must match the stored row, else 409.
+// Display order (0030, T-115): a named variant's, option group's or option's position is its index in the payload's
+// array (so resending the full list reorders it; a partial list moves the children it names to the front). A new
+// item takes the tenant's next position, once, on INSERT (the order the owner added items); no field changes it.
 import type { CommandEnvelope } from "@munim/contracts";
 import {
   CatalogueAvailabilitySetV1, CatalogueCouponSetV1, CatalogueDealEndV1, CatalogueDealUpsertV1, CatalogueItemUpsertV1,
@@ -155,6 +158,7 @@ export const itemUpsert: CommandHandler = {
     const { variants, option_groups, ...item } = p;
     const had = await one<{ kind: string }>(c, `SELECT kind FROM core.item WHERE id = $1`, [p.item_id]);
     if (had && had.kind !== p.kind) throw new ApiError("conflict");
+    let position: number | null = null;
     const itemCols = [p.name_key, p.category, p.brand_id, p.barcode, p.stock_ingredient_id, p.active, p.mrp_minor, p.currency];
     if (had) {
       const args: unknown[] = [p.item_id, ...itemCols];
@@ -163,10 +167,11 @@ export const itemUpsert: CommandHandler = {
     } else {
       const args: unknown[] = [p.item_id, ...itemCols, p.kind];
       const x = shown(p, args);
-      await c.query(`INSERT INTO core.item (tenant_id, id, name_key, category, brand_id, barcode, stock_ingredient_id, active, mrp_minor, currency, kind${x.cols})
-                     VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10${x.vals})`, args);
+      position = (await c.query<{ position: number }>(
+        `INSERT INTO core.item (tenant_id, id, name_key, category, brand_id, barcode, stock_ingredient_id, active, mrp_minor, currency, kind, position${x.cols})
+         VALUES (${T}, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, (SELECT coalesce(max(position) + 1, 0) FROM core.item)${x.vals}) RETURNING position`, args)).rows[0]!.position;
     }
-    audit.push({ entity: "core.item", entityId: p.item_id, after: item });
+    audit.push({ entity: "core.item", entityId: p.item_id, after: position === null ? item : { ...item, position } });
 
     // A child that exists under another parent is a conflict, never a silent move.
     const child = async (table: string, id: string, parentCol: string, parent: string) => {
@@ -174,40 +179,40 @@ export const itemUpsert: CommandHandler = {
       if (r && r.parent !== parent) throw new ApiError("conflict");
       return r !== undefined;
     };
-    for (const v of variants) {
+    for (const [vi, v] of variants.entries()) {
       if (await child("variant", v.variant_id, "item_id", p.item_id)) {
-        const args: unknown[] = [v.variant_id, v.name_key, v.barcode, v.active];
-        await c.query(`UPDATE core.variant SET name_key = $2, barcode = $3, active = $4${shown(v, args).set} WHERE id = $1`, args);
+        const args: unknown[] = [v.variant_id, v.name_key, v.barcode, v.active, vi];
+        await c.query(`UPDATE core.variant SET name_key = $2, barcode = $3, active = $4, position = $5${shown(v, args).set} WHERE id = $1`, args);
       } else {
-        const args: unknown[] = [v.variant_id, p.item_id, v.name_key, v.barcode, v.active];
+        const args: unknown[] = [v.variant_id, p.item_id, v.name_key, v.barcode, v.active, vi];
         const x = shown(v, args);
-        await c.query(`INSERT INTO core.variant (tenant_id, id, item_id, name_key, barcode, active${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5${x.vals})`, args);
+        await c.query(`INSERT INTO core.variant (tenant_id, id, item_id, name_key, barcode, active, position${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5, $6${x.vals})`, args);
       }
-      audit.push({ entity: "core.variant", entityId: v.variant_id, after: v });
+      audit.push({ entity: "core.variant", entityId: v.variant_id, after: { ...v, position: vi } });
     }
-    for (const g of option_groups) {
-      const groupCols = [g.name_key, g.min_select, g.max_select, g.required];
+    for (const [gi, g] of option_groups.entries()) {
+      const groupCols = [g.name_key, g.min_select, g.max_select, g.required, gi];
       if (await child("option_group", g.option_group_id, "item_id", p.item_id)) {
         const args: unknown[] = [g.option_group_id, ...groupCols];
-        await c.query(`UPDATE core.option_group SET name_key = $2, min_select = $3, max_select = $4, required = $5${shown(g, args).set} WHERE id = $1`, args);
+        await c.query(`UPDATE core.option_group SET name_key = $2, min_select = $3, max_select = $4, required = $5, position = $6${shown(g, args).set} WHERE id = $1`, args);
       } else {
         const args: unknown[] = [g.option_group_id, p.item_id, ...groupCols];
         const x = shown(g, args);
-        await c.query(`INSERT INTO core.option_group (tenant_id, id, item_id, name_key, min_select, max_select, required${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5, $6${x.vals})`, args);
+        await c.query(`INSERT INTO core.option_group (tenant_id, id, item_id, name_key, min_select, max_select, required, position${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5, $6, $7${x.vals})`, args);
       }
       const { options: opts, ...group } = g;
-      audit.push({ entity: "core.option_group", entityId: g.option_group_id, after: group });
-      for (const o of opts) {
+      audit.push({ entity: "core.option_group", entityId: g.option_group_id, after: { ...group, position: gi } });
+      for (const [oi, o] of opts.entries()) {
         if (await child("option", o.option_id, "option_group_id", g.option_group_id)) {
-          const args: unknown[] = [o.option_id, o.name_key, o.price_delta_minor, o.active];
-          await c.query(`UPDATE core.option SET name_key = $2, price_delta_minor = $3, active = $4${shown(o, args).set} WHERE id = $1`, args);
+          const args: unknown[] = [o.option_id, o.name_key, o.price_delta_minor, o.active, oi];
+          await c.query(`UPDATE core.option SET name_key = $2, price_delta_minor = $3, active = $4, position = $5${shown(o, args).set} WHERE id = $1`, args);
         } else {
-          const args: unknown[] = [o.option_id, g.option_group_id, o.name_key, o.price_delta_minor, o.currency, o.active];
+          const args: unknown[] = [o.option_id, g.option_group_id, o.name_key, o.price_delta_minor, o.currency, o.active, oi];
           const x = shown(o, args);
-          await c.query(`INSERT INTO core.option (tenant_id, id, option_group_id, name_key, price_delta_minor, currency, active${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5, $6${x.vals})`, args);
+          await c.query(`INSERT INTO core.option (tenant_id, id, option_group_id, name_key, price_delta_minor, currency, active, position${x.cols}) VALUES (${T}, $1, $2, $3, $4, $5, $6, $7${x.vals})`, args);
         }
         const { ingredient_deltas, ...option } = o;
-        audit.push({ entity: "core.option", entityId: o.option_id, after: option });
+        audit.push({ entity: "core.option", entityId: o.option_id, after: { ...option, position: oi } });
         for (const d of ingredient_deltas) {
           const prev = await one<{ option_id: string; ingredient_id: string }>(c, `SELECT option_id, ingredient_id FROM core.option_ingredient_delta WHERE id = $1`, [d.delta_id]);
           if (prev && (prev.option_id !== o.option_id || prev.ingredient_id !== d.ingredient_id)) throw new ApiError("conflict");

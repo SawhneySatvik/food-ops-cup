@@ -36,25 +36,29 @@ type MenuItem = {
   option_groups: Array<{ display_name: string | null; description: string | null; min_select: number; max_select: number; required: boolean; options: Array<{ display_name: string | null; price_delta_minor: number }> }>;
 };
 
-/** Core lists variants and options by name_key (no display order exists), the mock in array order: compared as sets. */
-const sorted = (xs: unknown[][]) => xs.map((x) => JSON.stringify(x)).sort();
-
-/** Every difference between a storefront menu and the mock's ITEMS at one outlet (names, kinds, prices, sizes, options, sold-out state). */
+/** Every difference between a storefront menu and the mock's ITEMS at one outlet (names, kinds, prices, sizes, options, sold-out state),
+ *  in the mock's order (T-115, 0030): items within each category, sizes, option groups and options in data.ts array order. The site
+ *  orders the categories itself (apps/web/lib/site.ts categoryOrder), so their order is not compared. */
 function menuDiff(items: MenuItem[], outletName: string): string[] {
   const mock = OUTLETS.find((o) => o.name === outletName);
   if (!mock) return [`no mock outlet ${outletName}`];
   const out: string[] = [];
   if (items.length !== ITEMS.length) out.push(`${outletName}: ${items.length} items, mock has ${ITEMS.length}`);
+  for (const c of new Set(ITEMS.map((m) => m.category))) {
+    const want = ITEMS.filter((m) => m.category === c).map((m) => m.name);
+    const got = items.filter((i) => i.category === c).map((i) => i.display_name);
+    if (JSON.stringify(want) !== JSON.stringify(got)) out.push(`${outletName} ${c} order: mock ${JSON.stringify(want)}, seeded ${JSON.stringify(got)}`);
+  }
   for (const m of ITEMS) {
     const it = items.find((x) => x.display_name === m.name);
     if (!it) { out.push(`${outletName}: missing ${m.name}`); continue; }
     const want = {
       description: m.description, diet: m.diet, category: m.category, kind: m.kind, price: m.price, available: !(m.soldOut || mock.soldOut.includes(m.slug)),
-      variants: sorted(m.variants.map((v) => [v.name, v.price])), groups: m.groups.map((g) => [g.name, g.description, g.min, g.max, g.min > 0, sorted(g.options.map((o) => [o.name, o.delta]))]),
+      variants: m.variants.map((v) => [v.name, v.price]), groups: m.groups.map((g) => [g.name, g.description, g.min, g.max, g.min > 0, g.options.map((o) => [o.name, o.delta])]),
     };
     const got = {
       description: it.description, diet: it.diet, category: it.category, kind: it.kind, price: it.price_minor, available: it.available,
-      variants: sorted(it.variants.map((v) => [v.display_name, v.price_minor])), groups: it.option_groups.map((g) => [g.display_name, g.description, g.min_select, g.max_select, g.required, sorted(g.options.map((o) => [o.display_name, o.price_delta_minor]))]),
+      variants: it.variants.map((v) => [v.display_name, v.price_minor]), groups: it.option_groups.map((g) => [g.display_name, g.description, g.min_select, g.max_select, g.required, g.options.map((o) => [o.display_name, o.price_delta_minor])]),
     };
     for (const k of Object.keys(want) as Array<keyof typeof want>) {
       if (JSON.stringify(want[k]) !== JSON.stringify(got[k])) out.push(`${outletName} ${m.name} ${k}: mock ${JSON.stringify(want[k])}, seeded ${JSON.stringify(got[k])}`);
@@ -90,11 +94,12 @@ describe("cobnut", () => {
       [{ name: "Old Town Community Kitchen (simulated)", simulated: true }, { name: "Riverside Night Shelter (simulated)", simulated: true }]);
   });
 
-  test("the storefront menu equals apps/web/mock-server/data.ts at both outlets", async () => {
+  test("the storefront menu equals apps/web/mock-server/data.ts at both outlets, in its order", async () => {
     for (const { storefrontKey } of seeded) {
       const sf = createMunimClient({ baseUrl: stack.baseUrl, storefrontKey }) as unknown as { GET(p: string, i?: unknown): Promise<{ data?: Record<string, unknown> }> };
       const outlets = ((await sf.GET("/v1/storefront/outlets")).data!.outlets as Array<{ outlet_id: string; name: string }>);
-      assert.deepEqual(outlets.map((o) => o.name).sort(), OUTLETS.map((o) => o.name).sort());
+      // In the mock's order (Hazratganj first): the storefront lists outlets in the order they were opened (T-115).
+      assert.deepEqual(outlets.map((o) => o.name), OUTLETS.map((o) => o.name));
       for (const o of outlets) {
         const menu = (await sf.GET("/v1/storefront/outlets/{outlet_id}/menu", { params: { path: { outlet_id: o.outlet_id } } })).data!;
         assert.deepEqual(menuDiff(menu.items as MenuItem[], o.name), []);

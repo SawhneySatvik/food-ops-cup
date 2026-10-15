@@ -29,7 +29,7 @@ export const readRoutes = methodGuard(
           `SELECT id, kind, name_key, category, brand_id, barcode, stock_ingredient_id, active FROM core.item
             WHERE ($1::boolean OR active) AND ($2::uuid IS NULL OR id < $2) ORDER BY id DESC LIMIT $3`, [inactive, cursor, limit + 1])).rows;
         const variants = (await db.query<Record<string, any>>(
-          `SELECT id, item_id, name_key, barcode, active FROM core.variant WHERE item_id = ANY ($1::uuid[]) AND ($2::boolean OR active) ORDER BY id`,
+          `SELECT id, item_id, name_key, barcode, active FROM core.variant WHERE item_id = ANY ($1::uuid[]) AND ($2::boolean OR active) ORDER BY position, name_key, id`,
           [items.slice(0, limit).map((i) => i.id), inactive])).rows;
         return page(items, limit, (i) => ({
           item_id: i.id, kind: i.kind, name_key: i.name_key, category: i.category, brand_id: i.brand_id, barcode: i.barcode,

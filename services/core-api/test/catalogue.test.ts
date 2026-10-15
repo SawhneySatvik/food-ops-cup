@@ -476,9 +476,9 @@ describe("reads", () => {
     const menu = MenuResponse.parse(await r.json());
     const a = menu.entries.find((e) => e.item_id === I.A)!;
     expect([a.price_minor, a.tax_class, a.available]).toEqual([24900, "restaurant_5", true]);
-    expect(a.option_groups.map((g) => [g.name_key, g.required, g.options.map((o) => o.price_delta_minor)])).toEqual([["opt.extras", false, [3000, 5000]], ["opt.spice", true, [500, 0]]]); // by name: extra_cheese, extra_paneer; hot, mild
+    expect(a.option_groups.map((g) => [g.name_key, g.required, g.options.map((o) => o.price_delta_minor)])).toEqual([["opt.extras", false, [3000, 5000]], ["opt.spice", true, [0, 500]]]); // payload order (0030): extra_cheese, extra_paneer; mild, hot
     expect(a.deals.map((d) => d.deal_id).sort()).toEqual([I.DL3, I.DL4].sort());
-    // B has active variants: listed as each of them (by name key), garlic at its own price, plain at the item's; never bare.
+    // B has active variants: listed as each of them (payload order, here also name order), garlic at its own price, plain at the item's; never bare.
     expect(menu.entries.filter((e) => e.item_id === I.B).map((e) => [e.variant_id, e.price_minor])).toEqual([[I.vGarlic, 7500], [I.vPlain, 6000]]);
     expect(menu.entries.find((e) => e.item_id === I.D)!.available).toBe(false); // sold out in cart 14
   });
