@@ -19,7 +19,7 @@ import { RecipientRanking } from "./recipients";
 
 type Kind = OwnListing["food"]["kind"];
 
-export function OwnListingForm({ outletId, prefill, menu, ingredients, session, client, fmt, tz, onOpen, onAuth, onPublished }: {
+export function OwnListingForm({ outletId, prefill, menu, ingredients, session, client, fmt, tz, onOpen, onAuth, onPublished, onCancel }: {
   outletId: string;
   /** "List this" on a food-at-risk row: the batch, its unit and use-by date (never its quantity). */
   prefill: AtRiskRow | null;
@@ -31,7 +31,10 @@ export function OwnListingForm({ outletId, prefill, menu, ingredients, session, 
   tz: string;
   onOpen: (snapshotId: string, refToken: string) => void;
   onAuth: (e: MunimError) => boolean;
-  onPublished: (text: string) => void;
+  /** Published: the chosen recipient's name and when it picks up, for the confirmation (shown with its badge). */
+  onPublished: (listed: { name: string; when: string }) => void;
+  /** "Cancel": close the form; nothing is published. */
+  onCancel: () => void;
 }) {
   const [kind, setKind] = useState<Kind>(prefill?.foodKind ?? "packaged");
   const [itemId, setItemId] = useState("");
@@ -65,7 +68,7 @@ export function OwnListingForm({ outletId, prefill, menu, ingredients, session, 
   const publish = async () => {
     if (!form || !chosen) return;
     const r = await cmd.send((prev) => publishAttempt(prev, form, chosen), (body) => client.publishListing(body));
-    if (r?.ok) onPublished(`Listed. ${chosen.name} can pick it up ${dayLabel(chosen.pickupFrom, tz, fmt.locale)} from ${formatTime(chosen.pickupFrom, tz, fmt.locale)}.`);
+    if (r?.ok) onPublished({ name: chosen.name, when: `${dayLabel(chosen.pickupFrom, tz, fmt.locale)} from ${formatTime(chosen.pickupFrom, tz, fmt.locale)}` });
   };
 
   return (
@@ -125,14 +128,15 @@ export function OwnListingForm({ outletId, prefill, menu, ingredients, session, 
         <RecipientRanking snapshot={match} fmt={fmt} tz={tz} chosen={chosen?.recipientId ?? null} onChoose={setChosen} onOpen={onOpen} />
       )}
 
-      {chosen && (
-        <div className="grid gap-2">
-          <button type="button" className="btn btn-primary justify-self-start" disabled={cmd.busy || cmd.wait > 0} onClick={() => void publish()}>
+      {chosen && <p className="text-[14px] text-muted">Shown to the simulated recipient only. Check your local food-donation rules.</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        {chosen && (
+          <button type="button" className="btn btn-primary" disabled={cmd.busy || cmd.wait > 0} onClick={() => void publish()}>
             {cmd.busy ? "Saving…" : cmd.wait > 0 ? `Try again in ${cmd.wait} s` : `Publish as ${session.me.name}`}
           </button>
-          <p className="text-[14px] text-muted">Shown to the simulated recipient only. Check your local food-donation rules.</p>
-        </div>
-      )}
+        )}
+        <button type="button" className="btn btn-plain" disabled={cmd.busy} onClick={onCancel}>Cancel</button>
+      </div>
       {cmd.error && <ErrorNote>{cmd.error}</ErrorNote>}
     </section>
   );

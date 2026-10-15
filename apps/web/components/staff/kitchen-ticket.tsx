@@ -13,18 +13,17 @@ type Ticket = Schemas["V1KdsBoard"]["tickets"][number];
 /** Minutes since the ticket's timer started, from the board's own as_of (never the tablet's clock). */
 export const elapsedMin = (t: Ticket, asOf: string): number => Math.max(0, Math.floor((Date.parse(asOf) - Date.parse(t.started_at)) / 60_000));
 
-export function TicketCard({ ticket, asOf, tz, locale, names, sizeOf, busy, onAdvance }: {
+export function TicketCard({ ticket, asOf, tz, locale, names, busy, onAdvance, sizeOf }: {
   ticket: Ticket;
   asOf: string;
   tz: string;
   locale: string;
   /** Display names by name_key, from GET /v1/catalogue/menu (the board sends name keys only). */
   names: (nameKey: string) => string;
-  /** A line's size ("1 kg (serves 8–10)"), read from the ticket's order (the board's lines carry no variant); null
-   *  while unknown or when the line has no size (11 §3). */
-  sizeOf?: (lineNo: number) => string | null;
   busy: boolean;
   onAdvance: (t: Ticket, to: "preparing" | "ready" | "done") => void;
+  /** The line's size ("1 kg (serves 8–10)"), read from the ticket's order: the board's lines carry no variant. */
+  sizeOf?: (lineNo: number) => string | null;
 }) {
   const next = TICKET_NEXT[ticket.status];
   const kind = ticket.kind === "pickup" ? "Pickup" : ticket.kind === "dine_in" ? `Table ${ticket.table_ref ?? ""}`.trim() : ticket.kind === "delivery" ? "Delivery" : "Takeaway";
@@ -35,7 +34,7 @@ export function TicketCard({ ticket, asOf, tz, locale, names, sizeOf, busy, onAd
           <p className="ticket-no">#{ticket.ticket_no}</p>
           <p className="text-[15px] font-semibold">{kind} · {ticket.channel_kind === "counter" ? "Counter" : "Web"}</p>
         </div>
-        <div className="ticket-meta">
+        <div className="text-right">
           <p className="ticket-timer">{elapsedMin(ticket, asOf)} min</p>
           <p className="text-[15px] font-bold">{TICKET_COLOUR[ticket.colour]}{ticket.due_at ? ` · due ${formatTime(ticket.due_at, tz, locale)}` : ""}</p>
         </div>
@@ -44,7 +43,7 @@ export function TicketCard({ ticket, asOf, tz, locale, names, sizeOf, busy, onAd
         <StatusPill tone={TICKET_TONE[ticket.status]!}>{TICKET_STATUS[ticket.status]}</StatusPill>
         {ticket.lines.map((l) => (
           <div key={l.line_no} className="space-y-1">
-            <p className="ticket-line"><span className="ticket-qty">{formatQty(l.qty_milli, locale)}×</span> {names(l.name_key)}{sizeOf?.(l.line_no) ? ` · ${sizeOf(l.line_no)}` : ""}</p>
+            <p className="ticket-line"><span className="ticket-qty">{formatQty(l.qty_milli, locale)}×</span> {names(l.name_key)}{sizeOf?.(l.line_no) && <span className="font-bold"> · {sizeOf?.(l.line_no)}</span>}</p>
             {l.options.length > 0 && <p className="ticket-options">{l.options.map((o) => names(o.name_key)).join(" · ")}</p>}
             {l.note && <p className="ticket-note">“{l.note}”</p>}
           </div>

@@ -114,6 +114,9 @@ export function payAtCounterText(methods: ReadonlyArray<string> | null): string 
 /** Shown wherever payment is mentioned. */
 export const RECORDED_ONLY = "Recorded only — Munim does not process payments.";
 
+/** The badge on every screen of a demo business (hard rule 5): the shop always, staff screens when the tenant is_demo. */
+export const SAMPLE_DATA = "Sample data";
+
 export const DIET_LABEL: Record<string, string> = { veg: "Veg", non_veg: "Non-veg", egg: "Egg", vegan: "Vegan" };
 
 export const STATUS_LABEL: Record<string, string> = {

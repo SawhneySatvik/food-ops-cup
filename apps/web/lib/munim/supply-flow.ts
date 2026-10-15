@@ -37,11 +37,13 @@ export const isPoDraft = (d: Draft): d is PoDraft => d.command_type === "purchas
 export interface PoDraftLine {
   index: number;
   line: PoPayload["lines"][number];
+  /** Quantity and price are cells of the negotiation's quote comparison (core's negotiation review): each with its
+   *  chip, or "Cannot verify" for a person who may not open that snapshot (the run's outlet scope). */
   qty: DraftValue;
-  /** A simulated supplier's quote is a quote row, which core does not resolve for the approver: always "unverified". */
   price: DraftValue;
-  /** The quote the proposed price cites, to mark its row in the comparison; null when it cites none. */
-  quoteId: string | null;
+  /** The quote comparison row the price cites. The viewer's own comparison of the same negotiation lists the same
+   *  quotes in the same order (core sorts by round, then supplier), so this row is marked "Proposed" there. */
+  quoteRow: number | null;
 }
 export function poDraftLines(d: PoDraft, unverified: readonly string[]): PoDraftLine[] {
   return d.payload.lines.map((line, index) => {
@@ -51,30 +53,9 @@ export function poDraftLines(d: PoDraft, unverified: readonly string[]): PoDraft
       line,
       qty: draftValue(line.qty_milli, `/lines/${index}/qty_milli`, d.resolved_refs, unverified),
       price: draftValue(line.unit_price_minor, `/lines/${index}/unit_price_minor`, d.resolved_refs, unverified),
-      quoteId: cited?.kind === "row" && cited.table === "intel.supplier_quote" ? cited.id : null,
+      quoteRow: cited?.kind === "snap" ? cited.row : null,
     };
   });
-}
-
-export interface PoEdits {
-  /** Typed quantity per line index (thousandths of the line's unit), optional. */
-  qty: Readonly<Record<number, number>>;
-  /** Typed unit price per line index (minor units per unit), required for every unverified price. */
-  price: Readonly<Record<number, number>>;
-}
-/** True while some field that does not trace has no typed value: "Approve with my edits" stays disabled. */
-export const missingEdits = (lines: readonly PoDraftLine[], e: PoEdits): boolean =>
-  lines.some((l) => (l.qty.kind === "unverified" && e.qty[l.index] === undefined) || (l.price.kind === "unverified" && e.price[l.index] === undefined));
-/** The payload with each typed number as { value, typed_by: the approver } (R26); untouched fields keep their ref. */
-export function editedPo(p: PoPayload, e: PoEdits, memberId: string): PoPayload {
-  return {
-    ...p,
-    lines: p.lines.map((l, i) => ({
-      ...l,
-      qty_milli: e.qty[i] === undefined ? l.qty_milli : { value: e.qty[i]!, typed_by: memberId },
-      unit_price_minor: e.price[i] === undefined ? l.unit_price_minor : { value: e.price[i]!, typed_by: memberId },
-    })),
-  };
 }
 
 // ---- the simulated suppliers' quotes (purchasing.quote_compare, minted by the viewer for the negotiation) ----

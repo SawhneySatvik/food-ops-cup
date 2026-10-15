@@ -92,6 +92,9 @@ export function SnapshotDrawer({ client, open, onClose, fmt, tz, label }: {
     return () => { live = false; };
   }, [open, client]);
   const cited = open ? parseRef(open.refToken) : null;
+  // Id columns mean nothing to a person (and v7 ids share their first characters), so only a cited id column is shown,
+  // by its last characters.
+  const columns = snap && snap !== "failed" ? snap.columns.filter((c) => c.type !== "uuid" || (cited?.kind === "snap" && cited.column === c.name)) : [];
   return (
     <dialog ref={ref} className="drawer" aria-labelledby="snap-title" onClose={onClose}>
       <div className="flex items-center justify-between gap-3 border-b-[1.5px] border-line p-4">
@@ -110,15 +113,16 @@ export function SnapshotDrawer({ client, open, onClose, fmt, tz, label }: {
             {cited && cited.kind === "snap" && cellOf(snap, cited) === undefined && <p><CannotVerify /> The cited cell is not in these rows.</p>}
             <div className="overflow-x-auto">
               <table className="snap-table">
-                <thead><tr>{snap.columns.map((c) => <th key={c.name} className={c.type === "integer" || c.type === "numeric" ? "num" : undefined} scope="col">{c.name}</th>)}</tr></thead>
+                <thead><tr>{columns.map((c) => <th key={c.name} className={c.type === "integer" || c.type === "numeric" ? "num" : undefined} scope="col">{c.name}</th>)}</tr></thead>
                 <tbody>
                   {snap.rows.map((row, i) => {
                     const here = cited?.kind === "snap" && cited.row === i;
                     return (
                       <tr key={i} aria-current={here ? "true" : undefined}>
-                        {snap.columns.map((c) => (
+                        {columns.map((c) => (
                           <td key={c.name} className={c.type === "integer" || c.type === "numeric" ? "num" : undefined} aria-current={here && cited?.kind === "snap" && cited.column === c.name ? "true" : undefined}>
-                            {c.type === "uuid" ? String(row[c.name] ?? "—").slice(0, 8) : formatCell(row[c.name] ?? null, c.name, fmt)}
+                            {c.type === "uuid" ? `…${String(row[c.name] ?? "—").slice(-8)}` : formatCell(row[c.name] ?? null, c.name, fmt)}
+                            {c.name === "name" && row.simulated === true && <> <SimulatedRecipient /></>}
                           </td>
                         ))}
                       </tr>

@@ -1,5 +1,8 @@
 import { Suspense } from "react";
-import { PurchaseOrderScreen } from "@/components/staff/pages/suppliers";
+import type { Metadata } from "next";
+import { PurchaseOrderScreen } from "@/components/staff/pages/purchase-order";
+
+export const metadata: Metadata = { title: "A purchase order" };
 
 // Staff pages render only after the browser has read the session (see app/staff/layout.tsx).
 export const instant = false;

@@ -181,7 +181,8 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
     onChange?.();
   };
   return (
-    <div className="fixed bottom-24 left-3 z-40 lg:bottom-4">
+    // On staff screens it sits at the end of the page, never floating over a till tile's price or a Review button.
+    <div className={staff ? "wrap pb-8" : "fixed bottom-24 left-3 z-40 lg:bottom-4"}>
       {open ? (
         <div className="card w-[240px] space-y-3 p-4 text-[14px]">
           <p className="font-bold">Mock test controls (dev only)</p>
@@ -226,7 +227,7 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
           <button type="button" className="btn btn-plain w-full" onClick={() => setOpen(false)}>Hide</button>
         </div>
       ) : (
-        <button type="button" className="btn min-h-9 min-w-0 bg-ink px-3 text-[12px] text-white opacity-70 shadow-md hover:opacity-100" onClick={() => setOpen(true)} aria-label="Mock controls" title="Mock controls">Mock</button>
+        <button type="button" className="btn min-h-12 min-w-12 bg-ink px-4 text-[14px] text-white opacity-70 shadow-md hover:opacity-100" onClick={() => setOpen(true)} aria-label="Mock controls" title="Mock controls">Mock</button>
       )}
     </div>
   );

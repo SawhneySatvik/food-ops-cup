@@ -6,12 +6,12 @@
 import { createHash } from "node:crypto";
 import type { Schemas } from "@/lib/munim/types";
 import { DEMO_TENANT_ID } from "@/lib/munim/session";
-import { CHANNEL_ID, CURRENCY, ITEMS, id7, itemId } from "./data";
+import { CHANNEL_ID, CURRENCY, ITEMS, PREP_MIN, id7, itemId } from "./data";
 import { BadRequest, outletById, price } from "./pricing";
 import {
   CARES_PROFILE, CHANNELS, COUNTER_CHANNEL_ID, DEVICES, INGREDIENTS, MEMBERS, MEMBER_OUTLETS, RECIPIENTS, SPECIALISTS, TEMPLATE_COLUMNS, TEMPLATE_MIN_ROLE, TENANT,
-  addressedTo, answerFor, boardOf, buildOrder, businessDate, menuFor, mintRows, orderListItem, posDevice, reorderLevels, seedDrafts, seedFindings, seedListings,
-  seedGoodsReceived, seedOrders, seedPurchaseOrders, seedSnapshots, seedSuppliers, seedThreads, snapshotOf, type Placed, type SeedDraft,
+  addressedTo, answerFor, boardOf, buildOrder, businessDate, menuFor, mintRows, orderListItem, posDevice, receiptOf, reorderLevels, seedDrafts, seedFindings, seedListings,
+  seedGoodsReceived, seedOrders, seedPurchaseOrders, seedSnapshots, seedSuppliers, seedThreads, snapshotOf, type Placed,
 } from "./staff-data";
 
 type S = Schemas;
@@ -41,9 +41,20 @@ const refuse = (status: number, code: ErrorCode, reason: string | null = null, e
 
 // ---------------------------------------------------------------- the books (one copy per server instance)
 interface DraftState {
-  sd: SeedDraft;
+  draft: S["V1Draft"];
   decision: S["V1DraftDetail"]["decision"];
+  /** The payload the decision approved (core.decision.final_payload): edits stay here, never in the draft. No member
+   *  route serves it (00 §7 question 15). */
+  final: unknown;
   history: S["V1DraftDetail"]["history"];
+}
+/** One audit entry on a purchase order (core.audit_log, entity core.purchase_order), for GET /v1/lineage. */
+interface PoAudit {
+  action: string;
+  at: string;
+  actor: { member_id: string; role: string };
+  /** The draft whose approval made it, or null for a person's own command. */
+  draftId: string | null;
 }
 interface LiveEvent {
   seq: number;
@@ -63,6 +74,7 @@ interface World {
   threads: Map<string, S["V1Thread"]>;
   listings: Map<string, S["V1CaresListing"]>;
   pos: Map<string, S["V1PurchaseOrder"]>;
+  poAudits: Map<string, PoAudit[]>;
   grns: Map<string, S["V1GoodsReceived"]>;
   log: Map<string, { hash: string; status: number; body: unknown }>;
   events: LiveEvent[];
@@ -76,11 +88,16 @@ function books(now: Date): World {
     orders: new Map(orders.map((p) => [p.order.order_id, p])),
     ticketNo: new Map(), invoiceNo: new Map(), usedLineIds: new Set(orders.flatMap((p) => p.order.lines.map((l) => l.line_id))),
     findings: new Map(seedFindings(now).map((f) => [f.finding_id, f])),
-    drafts: new Map(seedDrafts(now).map((sd) => [sd.draft.draft_id, { sd, decision: null, history: [{ event: "proposed", at: sd.draft.created_at, by: sd.draft.source }] }])),
+    drafts: new Map(seedDrafts(now).map((draft) => [draft.draft_id, { draft, decision: null, final: null, history: [{ event: "proposed", at: draft.created_at, by: draft.source }] }])),
     snapshots: new Map(seedSnapshots(now).map((s) => [s.snapshot_id, s])),
     threads: new Map(seedThreads(now).map((t) => [t.thread_id, t])),
     listings: new Map(seedListings(now).map((l) => [l.listing_id, l])),
     pos: new Map(seedPurchaseOrders(now).map((p) => [p.po_id, p])),
+    // Last week's butter order: placed by the owner, then received at the counter (one audit entry each).
+    poAudits: new Map(seedPurchaseOrders(now).map((p) => [p.po_id, [
+      { action: "purchasing.po.create.v1", at: p.created_at, actor: { member_id: MEMBERS[0]!.me.member_id, role: "owner" }, draftId: null },
+      ...seedGoodsReceived(now).filter((g) => g.po_id === p.po_id).map((g) => ({ action: "purchasing.grn.receive.v1", at: g.received_at, actor: { member_id: g.received_by, role: MEMBERS.find((x) => x.me.member_id === g.received_by)!.me.role }, draftId: null })),
+    ]])),
     grns: new Map(seedGoodsReceived(now).map((g) => [g.grn_id, g])),
     log: new Map(), events: [],
   };
@@ -111,8 +128,12 @@ function allow(m: Me, roles: readonly string[], code: ErrorCode = "forbidden") {
 }
 const ORDER_ROLES = ["owner", "manager", "staff", "judge"];
 const DECIDE_ROLES = ["owner", "manager", "judge"];
-/** 14 §10: deciding a draft also needs the draft's own command's authority (cares.listing.publish.v1 is owner and judge). */
-const DECIDE_ROLES_BY_TYPE: Record<string, readonly string[]> = { "cares.listing.publish.v1": ["owner", "judge"] };
+/** core's roleAllowed: a draft is decided only by a role its own command type also allows (core.command_authority).
+ *  A type not listed here is refused, as core refuses a type with no authority row. */
+const DRAFT_TYPE_ROLES: Record<string, readonly string[]> = {
+  "kitchen.prep_time.set.v1": DECIDE_ROLES, "kitchen.prep_list.create.v1": DECIDE_ROLES, "purchasing.po.create.v1": DECIDE_ROLES,
+  "cares.listing.publish.v1": ["owner", "judge"],
+};
 
 // ---------------------------------------------------------------- commands
 interface Command<P> {
@@ -182,8 +203,13 @@ function placeOrder(w: World, who: Who, body: unknown, now: Date): Response {
   });
 }
 
+/** The preview body and its lines are strict in core's contract: any other field (a line `note`, say) is 422. */
+const PREVIEW_KEYS = ["outlet_id", "channel_id", "brand_id", "kind", "pickup_window_id", "promised_at", "coupon_codes", "loyalty_redeem_points", "lines"];
+const PREVIEW_LINE_KEYS = ["item_id", "variant_id", "option_ids", "qty_milli", "barcode"];
 function preview(body: unknown, who: Who, now: Date): Response {
   const b = body as S["OrdersPreviewRequest"];
+  const only = (o: object, keys: string[]) => Object.keys(o).every((k) => keys.includes(k));
+  if (!b || typeof b !== "object" || !only(b, PREVIEW_KEYS) || !Array.isArray(b.lines) || b.lines.some((l) => !l || typeof l !== "object" || !only(l, PREVIEW_LINE_KEYS))) refuse(422, "invalid_payload");
   const outlet = outletById(b?.outlet_id);
   if (!outlet) return notFound();
   if (!sees(who.m, outlet.outlet_id)) return notFound();
@@ -288,8 +314,44 @@ function advanceTicket(w: World, who: Who, ticketId: string, body: unknown, now:
 }
 
 // ---------------------------------------------------------------- inbox and approvals
-const visibleDraft = (m: Me, d: DraftState) => seesAll(m, d.sd.draft.outlet_ids);
-const detailOf = (d: DraftState): S["V1DraftDetail"] => ({ draft: d.sd.draft, decision: d.decision, unverified_refs: d.sd.draft.status === "proposed" ? d.sd.unverified : [], history: d.history });
+/** core's draft row-level security: a draft shows when its outlets overlap the person's (one with none: every outlet). */
+const visibleDraft = (m: Me, d: DraftState) => m.outlet_ids === "*" || d.draft.outlet_ids.some((o) => sees(m, o));
+/** The outlets a command writes to, from its payload (core's outletTargets): none means the whole business. */
+const targetsOf = (p: Json): string[] =>
+  typeof p.outlet_id === "string" ? [p.outlet_id] : Array.isArray(p.outlet_ids) ? p.outlet_ids.filter((x): x is string => typeof x === "string") : [];
+
+type Cell = S["Snapshot"]["rows"][number][string];
+const SNAP_REF = /^⟨snap:([0-9a-f-]{36})·(0|[1-9][0-9]*)·([a-z_][a-z0-9_]*)⟩$/u;
+/** The cell a snap ref names, only when this person may open its snapshot (core: visibleTo, then cellOf). */
+function cellFor(w: World, m: Me, ref: string): { value: Cell } | null {
+  const p = SNAP_REF.exec(ref);
+  const s = p ? w.snapshots.get(p[1]!) : undefined;
+  const row = s && canOpen(m, s) ? s.rows[Number(p![2])] : undefined;
+  return row && p![3]! in row ? { value: row[p![3]!]! } : null;
+}
+/** Values beside refs (findings, answers) only from cells this person may open (core resolves them per viewer). */
+const seen = <T extends { ref: string }>(w: World, m: Me, refs: readonly T[]): T[] => refs.filter((r) => cellFor(w, m, r.ref) !== null);
+
+/** A draft as this person sees it (core's view()): a payload ref they cannot open is unverified; a based_on cell they
+ *  cannot open is left out of based_on and is unverified too. */
+function viewOf(w: World, m: Me, d: DraftState): { draft: S["V1Draft"]; unverified: string[] } {
+  const unverified: string[] = [];
+  const resolved = refLeaves(d.draft.payload).flatMap(({ path, ref }) => {
+    const c = cellFor(w, m, ref);
+    if (!c) unverified.push(ref);
+    return c ? [{ path, ref, value: c.value }] : [];
+  });
+  const basedOn = d.draft.based_on.filter((b) => {
+    const open = cellFor(w, m, b.ref) !== null;
+    if (!open) unverified.push(b.ref);
+    return open;
+  });
+  return { draft: { ...d.draft, resolved_refs: resolved, based_on: basedOn }, unverified };
+}
+function detailOf(w: World, m: Me, d: DraftState): S["V1DraftDetail"] {
+  const v = viewOf(w, m, d);
+  return { draft: v.draft, decision: d.decision, unverified_refs: v.unverified, history: d.history };
+}
 
 /** JSON Pointer paths of every numeric leaf that is still a ref (string starting with ⟨). */
 function refLeaves(x: unknown, path = ""): { path: string; ref: string }[] {
@@ -325,30 +387,33 @@ function decide(w: World, who: Who, draftId: string, verb: "approve" | "reject",
   if (p.draft_id !== draftId) refuse(422, "invalid_payload");
   const d = w.drafts.get(draftId);
   if (!d || !visibleDraft(who.m, d)) return notFound();
-  allow(who.m, DECIDE_ROLES_BY_TYPE[d.sd.draft.command_type] ?? DECIDE_ROLES);
-  if (d.sd.draft.outlet_ids.length === 0 && who.m.outlet_ids !== "*") refuse(403, "forbidden", "authority_denied");
+  allow(who.m, DECIDE_ROLES);
+  allow(who.m, DRAFT_TYPE_ROLES[d.draft.command_type] ?? []);
+  // core judges both verbs over every one of the draft's outlets (none = the whole business, so every outlet), and
+  // approve also over the outlets its payload writes to: a manager of one outlet cannot decide a two-outlet draft.
+  if (!seesAll(who.m, d.draft.outlet_ids) || (verb === "approve" && !seesAll(who.m, targetsOf(d.draft.payload as Json)))) refuse(403, "forbidden", "authority_denied");
   const by = { member_id: who.m.member_id, name: who.m.name };
+  /** Audit-made history rows (executed, stale, failed) name the role, as core's do; the decision row names the person. */
+  const byRole = { member_id: who.m.member_id, role: who.m.role };
   return once(w, who, cmd, 200, () => {
     const forced = req.headers.get("X-Mock-Force-Decision");
-    if (d.sd.draft.status !== "proposed" || forced === "already_decided") refuse(409, "already_decided");
+    const at = now.toISOString();
+    // Like core, a retry after a stale or failed outcome gets that outcome again, not "already decided".
+    if (verb === "approve" && d.draft.status === "stale") refuse(409, "stale_draft", "stale_draft");
+    if (verb === "approve" && d.draft.status === "failed") refuse(422, "execution_failed");
+    if (d.draft.status !== "proposed" || forced === "already_decided") refuse(409, "already_decided");
     if (verb === "reject") {
       if (typeof p.reason !== "string" || p.reason.length < 1 || p.reason.length > 500) refuse(422, "invalid_payload");
-      d.sd.draft.status = "rejected";
-      d.decision = { decision_id: id7(`decision:${draftId}`), verdict: "rejected", reason: p.reason, decided_by: by, decided_at: now.toISOString() };
-      d.history.push({ event: "rejected", at: now.toISOString(), by, reason: p.reason, decision_id: d.decision.decision_id });
-      d.sd.draft.updated_at = now.toISOString();
-      emit(w, "inbox.draft", { status: "rejected", command_type: d.sd.draft.command_type, outlet_ids: d.sd.draft.outlet_ids, finding_id: d.sd.draft.finding_id, updated_at: now.toISOString() }, { inbox: true });
+      d.draft.status = "rejected";
+      d.decision = { decision_id: id7(`decision:${draftId}`), verdict: "rejected", reason: p.reason, decided_by: by, decided_at: at };
+      d.history.push({ event: "rejected", at, by, reason: p.reason });
+      d.draft.updated_at = at;
+      emit(w, "inbox.draft", { status: "rejected", command_type: d.draft.command_type, outlet_ids: d.draft.outlet_ids, finding_id: d.draft.finding_id, updated_at: at }, { inbox: true });
       return result(cmd, draftId);
     }
-    if (p.command_type !== d.sd.draft.command_type) refuse(422, "invalid_payload");
-    if (forced === "stale") {
-      const b = d.sd.draft.based_on[0]!;
-      d.sd.draft.status = "stale";
-      d.history.push({ event: "stale", at: now.toISOString(), by, changes: [{ ref: b.ref, value: b.expected, now_ref: null, now: null }] });
-      refuse(409, "stale_draft", "stale_draft", { changes: [{ ref: b.ref, value: b.expected, now_ref: null, now: null }] });
-    }
+    if (p.command_type !== d.draft.command_type) refuse(422, "invalid_payload");
     const edited = p.edited_payload ?? null;
-    const proposed = refLeaves(d.sd.draft.payload);
+    const proposed = refLeaves(d.draft.payload);
     let left = proposed;
     if (edited) {
       const edits = editsOf(edited);
@@ -357,30 +422,45 @@ function decide(w: World, who: Who, draftId: string, verb: "approve" | "reject",
       if (kept.some((k) => !proposed.some((x) => x.path === k.path && x.ref === k.ref))) refuse(422, "invalid_payload");
       left = kept;
     }
-    const stillUnverified = left.filter((l) => d.sd.unverified.includes(l.ref)).map((l) => l.ref);
-    if (stillUnverified.length > 0) refuse(422, "cannot_verify", "unresolved_ref", { refs: stillUnverified });
-    if (forced === "execution_failed") refuse(422, "execution_failed");
-    const resolved = new Map<string, unknown>(d.sd.draft.resolved_refs.map((r) => [r.path, r.value]));
-    const final = finalOf(edited ?? d.sd.draft.payload, resolved) as Json;
-    const entity = execute(w, d.sd.draft.command_type, final, now, who.m.member_id);
-    const verdict = edited ? "edited" : "approved";
-    d.decision = { decision_id: id7(`decision:${draftId}`), verdict, reason: p.reason ?? null, decided_by: by, decided_at: now.toISOString() };
-    if (edited) d.sd.draft.payload = edited as S["V1Draft"]["payload"];
-    d.sd.draft.status = "executed";
-    d.sd.draft.updated_at = now.toISOString();
-    d.history.push({ event: verdict, at: now.toISOString(), by, reason: p.reason ?? null, decision_id: d.decision.decision_id }, { event: "executed", at: now.toISOString(), by });
-    emit(w, "inbox.draft", { status: "executed", command_type: d.sd.draft.command_type, outlet_ids: d.sd.draft.outlet_ids, finding_id: d.sd.draft.finding_id, updated_at: now.toISOString() }, { inbox: true });
-    return result(cmd, entity, d.sd.draft.command_type);
+    // As core: every ref left in the final payload must open for the approver (422 with those refs), then every cell
+    // the draft was based on is read again under the approver's access (422 with no refs when one will not open).
+    const unresolved = left.filter((l) => !cellFor(w, who.m, l.ref)).map((l) => l.ref);
+    if (unresolved.length > 0) refuse(422, "cannot_verify", "unresolved_ref", { refs: unresolved });
+    if (d.draft.based_on.some((b) => !cellFor(w, who.m, b.ref))) refuse(422, "cannot_verify", "unresolved_ref");
+    if (forced === "stale") {
+      const b = d.draft.based_on[0]!;
+      d.draft.status = "stale";
+      d.history.push({ event: "stale", at, by: byRole, decision_id: null, changes: [{ ref: b.ref, value: b.expected, now_ref: null, now: null }] });
+      refuse(409, "stale_draft", "stale_draft", { changes: [{ ref: b.ref, value: b.expected, now_ref: null, now: null }] });
+    }
+    const verdict = edited ? ("edited" as const) : ("approved" as const);
+    const decision = { decision_id: id7(`decision:${draftId}`), verdict, reason: p.reason ?? null, decided_by: by, decided_at: at };
+    // Core stores the final payload on the decision and never changes the draft's own payload.
+    d.final = edited ?? d.draft.payload;
+    if (forced === "execution_failed") {
+      // Core keeps the decision when execution fails: the draft is "failed", and the Decided list still shows who.
+      d.decision = decision;
+      d.draft.status = "failed";
+      d.draft.updated_at = at;
+      d.history.push({ event: verdict, at, by, reason: decision.reason }, { event: "failed", at, by: byRole, decision_id: decision.decision_id });
+      refuse(422, "execution_failed");
+    }
+    const resolved = new Map<string, unknown>(proposed.map((l) => [l.path, cellFor(w, who.m, l.ref)?.value]));
+    const final = finalOf(edited ?? d.draft.payload, resolved) as Json;
+    const entity = execute(w, d.draft.command_type, final, now, byRole, draftId);
+    d.decision = decision;
+    d.draft.status = "executed";
+    d.draft.updated_at = at;
+    d.history.push({ event: verdict, at, by, reason: decision.reason }, { event: "executed", at, by: byRole, decision_id: decision.decision_id });
+    emit(w, "inbox.draft", { status: "executed", command_type: d.draft.command_type, outlet_ids: d.draft.outlet_ids, finding_id: d.draft.finding_id, updated_at: at }, { inbox: true });
+    return result(cmd, entity, d.draft.command_type);
   });
 }
 
-/** Applies an approved draft's final payload, under the approver. Returns the entity it made. */
-function execute(w: World, type: string, payload: Json, now: Date, by: string): string {
-  if (type === "cares.listing.publish.v1") {
-    const p = payload as unknown as S["CaresListingPublishV1"];
-    storeListing(w, p, by, now);
-    return p.listing_id;
-  }
+/** Applies an approved draft's final payload, or a person's own purchase order, under that person. Returns the entity
+ *  it made. A purchase order gets its audit entry, which GET /v1/lineage reads. */
+function execute(w: World, type: string, payload: Json, now: Date, actor: { member_id: string; role: string }, draftId: string | null): string {
+  if (type === "cares.listing.publish.v1") return storeListing(w, payload as unknown as S["CaresListingPublishV1"], actor.member_id, now);
   if (type === "purchasing.po.create.v1") {
     const p = payload as unknown as S["PurchasingPoCreateV1"];
     const supplier = seedSuppliers(now).find((s) => s.supplier_id === p.supplier_id)!;
@@ -389,6 +469,7 @@ function execute(w: World, type: string, payload: Json, now: Date, by: string): 
       currency: p.currency, total_minor: p.lines.reduce((s, l) => s + Math.round((l.qty_milli * l.unit_price_minor) / 1000), 0), expected_on: p.expected_on, negotiation_run_id: p.negotiation_run_id,
       created_at: now.toISOString(), lines: p.lines.map((l, i) => ({ po_line_id: id7(`po_line:${p.po_id}:${i}`), line_no: i + 1, ingredient_id: l.ingredient_id, qty_milli: l.qty_milli, unit: l.unit, unit_price_minor: l.unit_price_minor })),
     });
+    w.poAudits.set(p.po_id, [{ action: "purchasing.po.create.v1", at: now.toISOString(), actor, draftId }]);
     return p.po_id;
   }
   if (type === "kitchen.prep_list.create.v1") return String(payload.prep_list_id);
@@ -397,12 +478,34 @@ function execute(w: World, type: string, payload: Json, now: Date, by: string): 
 
 function inbox(w: World, m: Me): S["V1InboxResponse"] {
   const items: S["V1InboxResponse"]["items"] = [
-    ...[...w.findings.values()].filter((f) => f.status === "open").map((finding) => ({ kind: "finding" as const, finding })),
-    ...[...w.drafts.values()].filter((d) => d.sd.draft.status === "proposed" && visibleDraft(m, d)).map((d) => ({ kind: "draft" as const, draft: d.sd.draft })),
+    ...[...w.findings.values()].filter((f) => f.status === "open").map((f) => ({ kind: "finding" as const, finding: { ...f, resolved_refs: seen(w, m, f.resolved_refs) } })),
+    ...[...w.drafts.values()].filter((d) => d.draft.status === "proposed" && visibleDraft(m, d)).map((d) => ({ kind: "draft" as const, draft: viewOf(w, m, d).draft })),
   ];
   const updated = (i: (typeof items)[number]) => (i.kind === "finding" ? i.finding.updated_at : i.draft.updated_at);
   items.sort((a, b) => updated(b).localeCompare(updated(a)));
   return { items, next_cursor: null };
+}
+
+/** GET /v1/lineage for a purchase order, the one table the mock serves: one chain per audit entry, oldest first, with
+ *  the decision and draft hops when an approval made it. The finding, run and snapshot hops are left empty here. */
+function lineage(w: World, m: Me, table: string, id: string): Response {
+  const po = table === "core.purchase_order" ? w.pos.get(id) : undefined;
+  const audits = po && po.outlet_ids.some((o) => sees(m, o)) ? (w.poAudits.get(id) ?? []) : [];
+  if (audits.length === 0) return notFound();
+  const chains = audits.map((a, i) => {
+    const d = a.draftId ? w.drafts.get(a.draftId) : undefined;
+    const dec = d?.decision ?? null;
+    return {
+      audit: { seq: i + 1, action: a.action, entity: table, entity_id: id, at: a.at, actor: { member_id: a.actor.member_id, kind: "member", role: a.actor.role }, decision_id: dec?.decision_id ?? null },
+      decision: dec ? { decision_id: dec.decision_id, verdict: dec.verdict, reason: dec.reason, reason_code: null, decided_by: dec.decided_by, decided_at: dec.decided_at } : null,
+      draft: d ? {
+        draft_id: d.draft.draft_id, command_type: d.draft.command_type, source: d.draft.source, outlet_ids: d.draft.outlet_ids, created_at: d.draft.created_at,
+        outcome: { status: d.draft.status, reason: null, reason_code: null, changes: [], sqlstate: null, failure_reason: null },
+      } : null,
+      finding: null, run: null, snapshots: [], unverified_refs: [],
+    };
+  });
+  return staffJson(200, { row: { table, id }, chains } satisfies S["V1LineageRow"]);
 }
 
 // ---------------------------------------------------------------- snapshots
@@ -415,9 +518,9 @@ function mint(w: World, who: Who, body: unknown, now: Date): Response {
   const required: Record<string, string[]> = {
     "kitchen.ticket_coverage": ["outlet_id", "from", "to"], "people.labour_pct": ["outlet_id", "from", "to"], "cares.impact": ["outlet_id", "from", "to"],
     "inventory.waste_week": ["outlet_id", "week_start"], "inventory.below_reorder": [], "purchasing.quote_compare": ["negotiation_run_id"],
-    "inventory.expiry_risk": ["outlet_id", "days", "as_of"],
-    "cares.recipient_match": ["outlet_id", "needs_cooked", "needs_raw", "needs_packaged", "qty_milli", "unit", "expires_on"],
+    "inventory.expiry_risk": ["outlet_id", "days", "as_of"], "cares.recipient_match": ["outlet_id", "needs_cooked", "needs_raw", "needs_packaged", "qty_milli", "unit", "expires_on"],
   };
+  if (!required[template]) return notFound(); // run-minted only on the mock (03 §2)
   const keys = Object.keys(params);
   if (keys.some((k) => !required[template]!.includes(k)) || required[template]!.some((k) => !(k in params))) refuse(422, "invalid_payload");
   if (typeof params.outlet_id === "string" && !sees(who.m, params.outlet_id)) refuse(403, "forbidden");
@@ -427,15 +530,26 @@ function mint(w: World, who: Who, body: unknown, now: Date): Response {
   w.snapshots.set(s.snapshot_id, s);
   return staffJson(201, s);
 }
+/** core's visibleTo: the template's role or above, and a scope inside the person's (one of every outlet, "*", opens only
+ *  for someone with every outlet). Every value beside a ref is read through this. */
+function canOpen(m: Me, s: S["Snapshot"]): boolean {
+  if (RANK[m.role]! < RANK[TEMPLATE_MIN_ROLE[s.template_id] ?? "owner"]!) return false;
+  const scope = s.outlet_scope as string[];
+  return m.outlet_ids === "*" || (!scope.includes("*") && scope.every((o) => sees(m, o)));
+}
 function openSnapshot(w: World, who: Who, id: string): Response {
   const s = w.snapshots.get(id);
-  if (!s || RANK[who.m.role]! < RANK[TEMPLATE_MIN_ROLE[s.template_id] ?? "owner"]!) return notFound();
-  const scope = s.outlet_scope as string[];
-  if (scope[0] === "*" ? who.m.outlet_ids !== "*" : !scope.every((o) => sees(who.m, o))) return notFound();
-  return staffJson(200, s);
+  return s && canOpen(who.m, s) ? staffJson(200, s) : notFound();
 }
 
 // ---------------------------------------------------------------- Ask
+/** core's answerViews: a ref resolves only for a viewer who may open its snapshot. Every template these answers cite
+ *  is manager and up, so a staff member's answers carry no values ("Cannot verify" on screen). */
+const forViewer = (w: World, m: Me, a: S["V1AskResponse"]["answer"]): S["V1AskResponse"]["answer"] => ({ ...a, resolved_refs: seen(w, m, a.resolved_refs) });
+/** core lists a thread to anyone whose outlet scope covers the thread's, not only to the member who started it; a
+ *  thread scoped to every outlet only to an owner, advisor or judge with every outlet. */
+const seesThread = (m: Me, t: S["V1Thread"]) =>
+  t.outlet_scope[0] === "*" ? m.outlet_ids === "*" && ["owner", "advisor", "judge"].includes(m.role) : (t.outlet_scope as string[]).every((o) => sees(m, o));
 function ask(w: World, who: Who, body: unknown, req: Request, now: Date): Response {
   const b = body as S["V1AskRequest"] | null;
   const question = typeof b?.question === "string" ? b.question.trim() : "";
@@ -443,7 +557,8 @@ function ask(w: World, who: Who, body: unknown, req: Request, now: Date): Respon
   const forced = req.headers.get("X-Mock-Force-Ai");
   if (forced === "off") return fail(503, "unavailable");
   const existing = b?.thread_id ? w.threads.get(b.thread_id) : undefined;
-  if (b?.thread_id && !existing) return notFound();
+  // As core (row-level security on threads): a thread outside the person's scope is 404, like an unknown one.
+  if (b?.thread_id && (!existing || !seesThread(who.m, existing))) return notFound();
   const addressed = addressedTo(question) ?? existing?.specialist ?? null;
   const answerId = id7(`answer:${now.getTime()}:${w.threads.size}`);
   const answer = forced === "abstain"
@@ -454,35 +569,33 @@ function ask(w: World, who: Who, body: unknown, req: Request, now: Date): Respon
   thread.turns.push(turn);
   thread.updated_at = now.toISOString();
   w.threads.set(thread.thread_id, thread);
-  return staffJson(200, { thread_id: thread.thread_id, turn: { turn_id: turn.turn_id, turn_no: turn.turn_no, addressed_to: addressed, tainted: false }, answer } satisfies S["V1AskResponse"]);
+  return staffJson(200, { thread_id: thread.thread_id, turn: { turn_id: turn.turn_id, turn_no: turn.turn_no, addressed_to: addressed, tainted: false }, answer: forViewer(w, who.m, answer) } satisfies S["V1AskResponse"]);
 }
 
 // ---------------------------------------------------------------- Cares and purchasing
-function publishListing(w: World, who: Who, body: unknown, now: Date): Response {
-  const cmd = envelopeOf<S["CaresListingPublishV1"]>(body, "cares.listing.publish.v1");
-  const p = cmd.payload;
-  allow(who.m, ["owner", "judge"], "book_write_refused");
-  if (!outletById(p.outlet_id) || !sees(who.m, p.outlet_id)) return notFound();
-  if (!Array.isArray(p.lines) || p.lines.length === 0 || p.lines.some((l) => !UUID7.test(l.line_id) || (l.item_id === null) === (l.ingredient_id === null) || (l.food_kind === "cooked" && l.unit !== "portion"))) refuse(422, "invalid_payload");
-  return once(w, who, cmd, 200, () => {
-    if (p.kind === "offer") refuse(409, "conflict", "offer_not_enabled");
-    const r = RECIPIENTS.items.find((x) => x.recipient_id === p.recipient_id);
-    const accepts = (k: string) => (k === "cooked" ? r?.accepts_cooked : k === "raw" ? r?.accepts_raw : r?.accepts_packaged);
-    // Core sends these two as 422 invalid_payload (14 §4.4), not 409.
-    if (!r || p.lines.some((l) => !accepts(l.food_kind) || l.unit_price_minor !== null)) refuse(422, "invalid_payload", "recipient_ineligible");
-    if (Date.parse(p.pickup_to) <= now.getTime()) refuse(422, "invalid_payload", "listing_expired");
-    storeListing(w, p, who.m.member_id, now);
-    return result(cmd, p.listing_id);
-  });
-}
-/** A published donation, under the person who published it (their own command, or their approval of a draft). */
-function storeListing(w: World, p: S["CaresListingPublishV1"], by: string, now: Date) {
+/** A donation as core's cares.listing.publish.v1 checks it (a person's own command or an approved draft; published_by is
+ *  that person). Like core, a recipient that cannot take the food and a pickup already over are 422 with a reason. */
+function storeListing(w: World, p: S["CaresListingPublishV1"], by: string, now: Date): string {
+  if (p.kind === "offer") refuse(409, "conflict", "offer_not_enabled");
+  const r = RECIPIENTS.items.find((x) => x.recipient_id === p.recipient_id);
+  const accepts = (k: string) => (k === "cooked" ? r?.accepts_cooked : k === "raw" ? r?.accepts_raw : r?.accepts_packaged);
+  if (Date.parse(p.pickup_to) <= now.getTime()) refuse(422, "invalid_payload", "listing_expired");
+  if (!r || p.lines.some((l) => !accepts(l.food_kind) || l.unit_price_minor !== null)) refuse(422, "invalid_payload", "recipient_ineligible");
   w.listings.set(p.listing_id, {
     listing_id: p.listing_id, outlet_id: p.outlet_id, kind: p.kind, status: "published", recipient_id: p.recipient_id, pickup_from: p.pickup_from, pickup_to: p.pickup_to,
     pickup_on: businessDate(new Date(p.pickup_from)), published_by: by, published_at: now.toISOString(),
     lines: p.lines.map((l, i) => ({ line_id: l.line_id, line_no: i + 1, food_kind: l.food_kind, item_id: l.item_id, ingredient_id: l.ingredient_id, batch_id: l.batch_id, qty_milli: l.qty_milli, unit: l.unit, expires_on: l.expires_on, unit_price_minor: null, currency: null })),
     handovers: [], ...{ labels: CARES_PROFILE.labels, note_key: CARES_PROFILE.note_key },
   });
+  return p.listing_id;
+}
+function publishListing(w: World, who: Who, body: unknown, now: Date): Response {
+  const cmd = envelopeOf<S["CaresListingPublishV1"]>(body, "cares.listing.publish.v1");
+  const p = cmd.payload;
+  allow(who.m, ["owner", "judge"], "book_write_refused");
+  if (!outletById(p.outlet_id) || !sees(who.m, p.outlet_id)) return notFound();
+  if (!Array.isArray(p.lines) || p.lines.length === 0 || p.lines.some((l) => !UUID7.test(l.line_id) || (l.item_id === null) === (l.ingredient_id === null) || (l.food_kind === "cooked" && l.unit !== "portion"))) refuse(422, "invalid_payload");
+  return once(w, who, cmd, 200, () => result(cmd, storeListing(w, p, who.m.member_id, now)));
 }
 function withdrawListing(w: World, who: Who, id: string, body: unknown): Response {
   const cmd = envelopeOf<S["CaresListingWithdrawV1"]>(body, "cares.listing.withdraw.v1");
@@ -515,45 +628,52 @@ function recordHandover(w: World, who: Who, body: unknown, now: Date): Response 
     return result(cmd, p.handover_id);
   });
 }
+/** A person's own purchase order. Core's book guard refuses a role or outlet that may not write it (403
+ *  book_write_refused); an unknown or inactive supplier is 400, as core's handler answers. */
 function createPo(w: World, who: Who, body: unknown, now: Date): Response {
   const cmd = envelopeOf<S["PurchasingPoCreateV1"]>(body, "purchasing.po.create.v1");
   const p = cmd.payload;
-  allow(who.m, DECIDE_ROLES);
+  allow(who.m, DECIDE_ROLES, "book_write_refused");
   if (!Array.isArray(p.outlet_ids) || p.outlet_ids.length === 0 || !Array.isArray(p.lines) || p.lines.length === 0) refuse(422, "invalid_payload");
-  if (!p.outlet_ids.every((o) => sees(who.m, o))) refuse(403, "forbidden", "authority_denied");
-  if (!seedSuppliers(now).some((s) => s.supplier_id === p.supplier_id)) return notFound();
-  return once(w, who, cmd, 201, () => result(cmd, execute(w, "purchasing.po.create.v1", p as unknown as Json, now, who.m.member_id)));
+  if (!p.outlet_ids.every((o) => sees(who.m, o))) refuse(403, "book_write_refused", "authority_denied");
+  if (!seedSuppliers(now).some((s) => s.supplier_id === p.supplier_id && s.active)) refuse(400, "bad_request");
+  return once(w, who, cmd, 201, () => result(cmd, execute(w, "purchasing.po.create.v1", p as unknown as Json, now, { member_id: who.m.member_id, role: who.m.role }, null)));
 }
 
-/** 15 §10: purchasing.grn.receive.v1 with core's rules. A batch for batch-tracked stock and none for the rest (400);
- *  the order line's price when the cost is null; 409 for an order that is not committed; the order is received once
- *  every line has come in (judged only for someone who sees all the order's outlets). */
+/** Goods in, as core's purchasing.grn.receive.v1: a batch for batch-tracked stock and none for the rest (400), a null cost
+ *  takes the PO line's price, a PO that is not committed is 409, and the PO turns received once every line has come in
+ *  (only for someone who sees all its outlets). Stock levels are not modelled. */
 function receiveGoods(w: World, who: Who, body: unknown, now: Date): Response {
   const cmd = envelopeOf<S["PurchasingGrnReceiveV1"]>(body, "purchasing.grn.receive.v1");
   const p = cmd.payload;
-  allow(who.m, ["owner", "manager", "staff", "judge"]);
-  if (!UUID7.test(p.grn_id) || !Array.isArray(p.lines) || p.lines.length === 0 || p.lines.some((l) => !UUID7.test(l.grn_line_id) || !(l.qty_milli > 0))) refuse(422, "invalid_payload");
-  if (!outletById(p.outlet_id)) return notFound();
-  if (!sees(who.m, p.outlet_id)) refuse(403, "forbidden", "authority_denied");
-  const supplier = seedSuppliers(now).find((x) => x.supplier_id === p.supplier_id && x.active);
-  if (!supplier) refuse(400, "bad_request");
-  const po = p.po_id ? w.pos.get(p.po_id) : null;
-  if (p.po_id && (!po || !po.outlet_ids.some((o) => sees(who.m, o)))) return notFound();
+  if (!UUID7.test(p.grn_id) || !Array.isArray(p.lines) || p.lines.length === 0) refuse(422, "invalid_payload");
+  allow(who.m, ORDER_ROLES, "book_write_refused");
+  if (!sees(who.m, p.outlet_id)) refuse(403, "book_write_refused", "authority_denied");
   return once(w, who, cmd, 201, () => {
-    if (po && (po.status !== "committed" || po.supplier.supplier_id !== p.supplier_id || !po.outlet_ids.includes(p.outlet_id))) refuse(409, "conflict");
+    const supplier = seedSuppliers(now).find((s) => s.supplier_id === p.supplier_id);
+    if (!supplier) refuse(400, "bad_request");
+    const po = p.po_id ? w.pos.get(p.po_id) : undefined;
+    if (p.po_id && (!po || po.supplier.supplier_id !== p.supplier_id || !po.outlet_ids.includes(p.outlet_id))) refuse(400, "bad_request");
+    if (po && po.status !== "committed") refuse(409, "conflict");
     const lines = p.lines.map((l) => {
       const ing = INGREDIENTS.items.find((i) => i.ingredient_id === l.ingredient_id);
-      const poLine = po ? po.lines.find((x) => x.po_line_id === l.po_line_id) : null;
-      if (!ing || (po && (!poLine || poLine.ingredient_id !== l.ingredient_id)) || ing.tracked_by_batch !== (l.batch !== null)) refuse(400, "bad_request");
-      if (l.currency !== CURRENCY) refuse(422, "currency_mismatch");
-      const cost = l.unit_cost_minor ?? poLine?.unit_price_minor;
-      if (cost === undefined || cost === null) refuse(400, "bad_request");
-      return { grn_line_id: l.grn_line_id, po_line_id: l.po_line_id, ingredient_id: l.ingredient_id, batch_id: l.batch?.batch_id ?? null, qty_milli: l.qty_milli, unit: l.unit, unit_cost_minor: cost!, currency: CURRENCY };
+      if (!ing || ing.tracked_by_batch !== (l.batch !== null)) refuse(400, "bad_request");
+      const pl = l.po_line_id ? po?.lines.find((x) => x.po_line_id === l.po_line_id) : undefined;
+      if (l.po_line_id && (!pl || pl.ingredient_id !== l.ingredient_id)) refuse(400, "bad_request");
+      const cost = l.unit_cost_minor ?? pl?.unit_price_minor ?? null;
+      if (cost === null) refuse(400, "bad_request");
+      return { grn_line_id: l.grn_line_id, po_line_id: l.po_line_id, ingredient_id: l.ingredient_id, batch_id: l.batch?.batch_id ?? null, qty_milli: l.qty_milli, unit: l.unit, unit_cost_minor: cost!, currency: l.currency };
     });
-    w.grns.set(p.grn_id, { grn_id: p.grn_id, outlet_id: p.outlet_id, supplier: { supplier_id: supplier!.supplier_id, name: supplier!.name, kind: supplier!.kind, label: supplier!.label }, po_id: p.po_id, received_at: p.received_at ?? now.toISOString(), received_by: who.m.member_id, note: p.note, lines });
-    if (po && seesAll(who.m, po.outlet_ids)) {
-      const got = (poLineId: string) => [...w.grns.values()].filter((g) => g.po_id === po.po_id).reduce((t, g) => t + g.lines.filter((x) => x.po_line_id === poLineId).reduce((u, x) => u + x.qty_milli, 0), 0);
-      if (po.lines.every((l) => got(l.po_line_id) >= l.qty_milli)) po.status = "received";
+    w.grns.set(p.grn_id, {
+      grn_id: p.grn_id, outlet_id: p.outlet_id, supplier: { supplier_id: supplier!.supplier_id, name: supplier!.name, kind: supplier!.kind, label: supplier!.label },
+      po_id: p.po_id, received_at: p.received_at ?? now.toISOString(), received_by: who.m.member_id, note: p.note, lines,
+    });
+    if (po) {
+      const got = (lineId: string) => [...w.grns.values()].flatMap((g) => g.lines).filter((g) => g.po_line_id === lineId).reduce((s, g) => s + g.qty_milli, 0);
+      if (po.lines.every((l) => got(l.po_line_id) >= l.qty_milli) && seesAll(who.m, po.outlet_ids)) {
+        po.status = "received";
+        w.poAudits.get(po.po_id)?.push({ action: "purchasing.grn.receive.v1", at: now.toISOString(), actor: { member_id: who.m.member_id, role: who.m.role }, draftId: null });
+      }
     }
     return result(cmd, p.grn_id);
   });
@@ -562,7 +682,10 @@ function receiveGoods(w: World, who: Who, body: unknown, now: Date): Response {
 // ---------------------------------------------------------------- live updates
 function stream(w: World, who: Who, url: URL, req: Request): Response {
   const topics = (url.searchParams.get("topics") ?? "").split(",").filter(Boolean);
-  if (topics.length === 0 || topics.length > 10) return fail(400, "bad_request");
+  // As core: no topics, more than ten, a malformed one or a second inbox: is 400; a well-formed one that is not this
+  // person's is 404 below.
+  const TOPIC = /^(kds|inbox|trace|order):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  if (topics.length === 0 || topics.length > 10 || topics.some((t) => !TOPIC.test(t)) || topics.filter((t) => t.startsWith("inbox:")).length > 1) return fail(400, "bad_request");
   for (const t of topics) {
     const [kind, id] = t.split(":");
     const ok = kind === "kds" ? !!id && !!outletById(id) && sees(who.m, id)
@@ -629,7 +752,7 @@ function webOrder(w: World, who: Who, body: unknown, now: Date): Response {
   const ticketNo = (w.ticketNo.get(outletId) ?? 0) + 1;
   const { placed } = buildOrder({
     orderId, outletId, ticketNo, channelId: CHANNEL_ID, deviceId: null, invoiceNo: null, kind: "pickup", tableRef: null, status: "placed", createdAt: now.toISOString(),
-    promisedAt: new Date(now.getTime() + 20 * 60_000).toISOString(),
+    promisedAt: new Date(now.getTime() + PREP_MIN * 60_000).toISOString(),
     lines: [
       { line_id: id7(`line:web:${orderId}:0`), item_id: itemId(picks[0]!.slug), variant_id: null, option_ids: [], qty_milli: 2000, note: null },
       { line_id: id7(`line:web:${orderId}:1`), item_id: itemId(picks[1]!.slug), variant_id: null, option_ids: [id7(`option:${picks[1]!.slug}:milk:oat`)], qty_milli: 1000, note: "Less ice, please" },
@@ -676,7 +799,8 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       // Like core today: every outlet of the business, whatever the person's scope (screens filter by GET /v1/me).
       if (path === "/v1/outlets") return staffJson(200, MEMBER_OUTLETS);
       if (path === "/v1/channels") return staffJson(200, CHANNELS);
-      if (path === "/v1/devices") return staffJson(200, DEVICES); // tenant-wide too, like core
+      // Devices are outlet-scoped in core (row-level security on core.device): the person's outlets only.
+      if (path === "/v1/devices") return staffJson(200, { devices: DEVICES.devices.filter((d) => sees(m, d.outlet_id)) } satisfies S["V1Devices"]);
       if (path === "/v1/catalogue/menu") {
         const outlet = q("outlet") ?? "", kind = q("channel_kind");
         if (!kind || !UUID7.test(outlet)) return fail(400, "bad_request");
@@ -695,6 +819,13 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
         const p = w.orders.get(r[1]!);
         return p && sees(m, p.order.outlet_id) ? staffJson(200, p.order) : notFound();
       }
+      r = x(/^\/v1\/orders\/([^/:]+)\/receipt$/);
+      if (r) {
+        const p = w.orders.get(r[1]!);
+        if (!p || !sees(m, p.order.outlet_id)) return notFound();
+        const receipt = receiptOf(p.order);
+        return receipt ? staffJson(200, receipt) : fail(409, "conflict", "tax_id_missing");
+      }
       if (path === "/v1/kitchen/board") {
         const outlet = q("outlet") ?? "";
         if (!UUID7.test(outlet)) return fail(400, "bad_request");
@@ -703,27 +834,33 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       }
       if (path === "/v1/inbox") return staffJson(200, inbox(w, m));
       if (path === "/v1/drafts") {
-        const status = q("status") ?? "proposed", outlet = q("outlet");
-        if (outlet && !sees(m, outlet)) return notFound();
-        const items = [...w.drafts.values()].filter((d) => visibleDraft(m, d) && (!outlet || d.sd.draft.outlet_ids.includes(outlet)) && (status === "decided" ? d.decision !== null : d.sd.draft.status === status)).map((d) => ({ draft: d.sd.draft, decision: d.decision, unverified_refs: detailOf(d).unverified_refs }));
+        const status = q("status") ?? "proposed";
+        const outlet = q("outlet");
+        const items = [...w.drafts.values()]
+          .filter((d) => visibleDraft(m, d) && (!outlet || d.draft.outlet_ids.includes(outlet)) && (status === "decided" ? d.decision !== null : d.draft.status === status))
+          .sort((a, b) => b.draft.updated_at.localeCompare(a.draft.updated_at))
+          .map((d) => {
+            const v = detailOf(w, m, d);
+            return { draft: v.draft, decision: v.decision, unverified_refs: v.unverified_refs };
+          });
         return staffJson(200, { items, has_more: false, next_cursor: null } satisfies S["V1DraftsResponse"]);
       }
       r = x(/^\/v1\/drafts\/([^/:]+)$/);
       if (r) {
         const d = w.drafts.get(r[1]!);
-        return d && visibleDraft(m, d) ? staffJson(200, detailOf(d)) : notFound();
+        return d && visibleDraft(m, d) ? staffJson(200, detailOf(w, m, d)) : notFound();
       }
       r = x(/^\/v1\/snapshots\/([^/:]+)$/);
       if (r) return openSnapshot(w, who, r[1]!);
       if (path === "/v1/threads") {
-        const items = [...w.threads.values()].filter((t) => t.created_by === m.member_id)
+        const items = [...w.threads.values()].filter((t) => seesThread(m, t))
           .map((t) => ({ thread_id: t.thread_id, specialist: t.specialist, created_by: t.created_by, outlet_scope: t.outlet_scope, created_at: t.created_at, updated_at: t.updated_at }));
         return staffJson(200, { items, next_cursor: null } satisfies S["V1ThreadsResponse"]);
       }
       r = x(/^\/v1\/threads\/([^/:]+)$/);
       if (r) {
         const t = w.threads.get(r[1]!);
-        return t && t.created_by === m.member_id ? staffJson(200, t) : notFound();
+        return t && seesThread(m, t) ? staffJson(200, { ...t, turns: t.turns.map((x) => ({ ...x, answer: x.answer && forViewer(w, m, x.answer) })) }) : notFound();
       }
       if (path === "/v1/specialists") return staffJson(200, SPECIALISTS);
       if (path === "/v1/cares/profile") return staffJson(200, CARES_PROFILE);
@@ -760,7 +897,7 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
         const p = w.pos.get(r[1]!);
         return p && p.outlet_ids.some((o) => sees(m, o)) ? staffJson(200, p) : notFound();
       }
-      // 15 §10: goods-received notes in the person's outlets.
+      if (path === "/v1/inventory/ingredients") return staffJson(200, INGREDIENTS);
       if (path === "/v1/goods-received") {
         const items = [...w.grns.values()].filter((g) => sees(m, g.outlet_id)).sort((a, b) => b.received_at.localeCompare(a.received_at));
         return staffJson(200, { items } satisfies S["V1GoodsReceivedList"]);
@@ -770,11 +907,14 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
         const g = w.grns.get(r[1]!);
         return g && sees(m, g.outlet_id) ? staffJson(200, g) : notFound();
       }
-      if (path === "/v1/inventory/ingredients") return staffJson(200, INGREDIENTS);
       if (path === "/v1/inventory/reorder-levels") {
         const outlet = q("outlet");
         if (!outlet) return fail(400, "bad_request");
         return outletById(outlet) && sees(m, outlet) ? staffJson(200, reorderLevels(outlet, now)) : notFound();
+      }
+      if (path === "/v1/lineage") {
+        const row = /^(core|intel)\.([a-z][a-z0-9_]*):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(q("row") ?? "");
+        return row ? lineage(w, m, `${row[1]}.${row[2]}`, row[3]!) : fail(400, "bad_request");
       }
       if (path === "/v1/stream") return stream(w, who, url, req);
       return notFound();
@@ -795,9 +935,10 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       if (r) {
         const cmd = envelopeOf<S["FindingsDismissV1"]>(body, "findings.dismiss.v1");
         if (cmd.payload.finding_id !== r[1]) refuse(422, "invalid_payload");
-        if (m.role === "staff") refuse(403, "forbidden", "authority_denied");
+        // core's order: 404, then 403, then 409 (findings/dismiss.ts).
         const f = w.findings.get(r[1]!);
         if (!f) return notFound();
+        if (m.role === "staff") refuse(403, "forbidden", "authority_denied");
         return once(w, who, cmd, 200, () => {
           if (f.status !== "open") refuse(409, "conflict");
           f.status = "dismissed";

@@ -1,6 +1,6 @@
 // Static page chrome rendered by the root layout (server component): the demo bar and the footer labels.
 import Link from "next/link";
-import { RECORDED_ONLY } from "@/lib/munim/copy";
+import { RECORDED_ONLY, SAMPLE_DATA } from "@/lib/munim/copy";
 import { Hazelnut } from "./art";
 
 export const DEMO_TOP = "Sample shop — orders are not real.";
@@ -8,7 +8,9 @@ export const DEMO_FOOT = "Demo: all data is synthetic. Payments are recorded, ne
 
 export function DemoBar() {
   return (
-    <div className="bg-ink px-4 py-2 text-center text-[14px] font-semibold text-white" role="note">
+    <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-ink px-4 py-2 text-center text-[14px] font-semibold text-white" role="note">
+      {/* The storefront API has no is_demo; Cobnut is synthetic wherever it runs, so the shop always says so. */}
+      <span className="rounded-full border-[1.5px] border-dashed border-white px-2.5 leading-6">{SAMPLE_DATA}</span>
       {DEMO_TOP}
     </div>
   );

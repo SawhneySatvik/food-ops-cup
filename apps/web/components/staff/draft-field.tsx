@@ -10,7 +10,7 @@ import { CannotVerify, SourcedValue } from "./source";
 export const unitOf = (column: string, currency: string, lineUnit = "quantity"): string =>
   column.endsWith("_minor") ? currency : column.endsWith("_sec") ? "seconds" : column.endsWith("_milli") ? lineUnit : "number";
 
-export function DraftField({ label, value, edit, editorName, fmt, column, onOpen, onEdit, editing }: {
+export function DraftField({ label, value, edit, editorName, fmt, column, lineUnit, onOpen, onEdit, editing }: {
   label: string;
   /** draftValue(leaf, path, resolved_refs, unverified_refs) from refs.ts. */
   value: DraftValue;
@@ -20,6 +20,8 @@ export function DraftField({ label, value, edit, editorName, fmt, column, onOpen
   fmt: CellFormat;
   /** The payload field name ("unit_price_minor", "qty_milli", "prep_sec") so the value is formatted by its unit. */
   column: string;
+  /** The payload line's unit ("kg", "g"), for the input's label on a quantity field. */
+  lineUnit?: string;
   onOpen: (snapshotId: string, refToken: string) => void;
   /** Present while the card is in edit mode: renders the input. */
   onEdit?: (v: number | null) => void;
@@ -44,7 +46,7 @@ export function DraftField({ label, value, edit, editorName, fmt, column, onOpen
         )}
         {editing && onEdit && (
           <label className="block text-[14px] font-semibold">
-            {value.kind === "unverified" ? "Type the value you checked" : "Change it (optional)"} ({unitOf(column, fmt.currency)})
+            {value.kind === "unverified" ? "Type the value you checked" : "Change it (optional)"} ({unitOf(column, fmt.currency, lineUnit)})
             <input inputMode="decimal" onChange={(e) => onEdit(parseTyped(e.target.value, column, fmt.currency))} />
           </label>
         )}

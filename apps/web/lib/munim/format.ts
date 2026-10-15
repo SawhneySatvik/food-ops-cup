@@ -19,7 +19,11 @@ export const formatRate = (bp: number, locale: string): string =>
 export const formatTime = (iso: string, tz: string, locale: string): string =>
   new Intl.DateTimeFormat(locale, { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 
-export const formatDayTime = (iso: string, tz: string, locale: string): string =>
+/** A wall-clock "HH:MM" (an outlet's pickup hours) in the same style as formatTime, with no date or zone involved. */
+export const formatClock = (hhmm: string, locale: string): string =>
+  new Intl.DateTimeFormat(locale, { timeZone: "UTC", hour: "numeric", minute: "2-digit" }).format(new Date(`1970-01-01T${hhmm}:00Z`));
+
+export const formatDayTime =(iso: string, tz: string, locale: string): string =>
   new Intl.DateTimeFormat(locale, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 
 /** A plain date ("2026-10-14", e.g. expires_on) without shifting it through a time zone. */

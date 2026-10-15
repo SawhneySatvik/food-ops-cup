@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { MunimError } from "@/lib/munim/client";
 import { caresGate, handoverAttempt, type CaresProfile, type Listing } from "@/lib/munim/cares-flow";
 import { envelope } from "@/lib/munim/commands";
+import { approveGate, numericFields, type DraftDetail } from "@/lib/munim/drafts";
 import { namesFrom, ticketNews, type Board } from "@/lib/munim/kitchen";
 import { formatCell, parseTyped, renderSegment } from "@/lib/munim/refs";
-import { DEMO_PEOPLE, DEMO_TENANT_ID } from "@/lib/munim/session";
+import { DEMO_PEOPLE, DEMO_TENANT_ID, type Me } from "@/lib/munim/session";
 import { reasonText, staffErrorText } from "@/lib/munim/staff-copy";
-import { editedPo, missingEdits, poDraftLines, type PoDraft } from "@/lib/munim/supply-flow";
 import { uuidv7 } from "@/lib/munim/uuid";
 import { handleStaff, resetStaffBooks } from "@/mock-server/staff";
 import { id7 } from "@/mock-server/data";
@@ -80,17 +80,17 @@ describe("Cares gate (stubbed profiles)", () => {
 describe("mock member rules (14 §10, 15 §10)", () => {
   beforeEach(() => resetStaffBooks());
 
-  it("the inbox holds the expiry finding and the Cares proposal", async () => {
+  it("the inbox holds the expiry finding, the Cares proposal and the pooled purchase order", async () => {
     const r = await call("GET", "/v1/inbox", "owner");
     const items = r.body.items as { kind: string }[];
-    expect(items.length).toBe(7);
-    expect(items.filter((i) => i.kind === "draft").length).toBe(4);
+    expect(items.length).toBe(8);
+    expect(items.filter((i) => i.kind === "draft").length).toBe(5);
   });
 
   it("staff cannot mint or decide; a staff withdraw is book_write_refused", async () => {
     const mint = await call("POST", "/v1/snapshots", "counter", { template_id: "inventory.expiry_risk", params: { outlet_id: id7("outlet:hazratganj"), days: 7, as_of: "2026-10-14" } });
     expect(mint.status).toBe(404);
-    const draftId = id7("draft:cares");
+    const draftId = id7("draft:cares_sourdough");
     const approve = await call("POST", `/v1/drafts/${draftId}:approve`, "counter", envelope("drafts.approve.v1", { draft_id: draftId, command_type: "cares.listing.publish.v1", edited_payload: null, reason: null }));
     expect(approve.status).toBe(403);
     const listingId = id7("listing:tonight");
@@ -99,7 +99,7 @@ describe("mock member rules (14 §10, 15 §10)", () => {
   });
 
   it("approving the Cares proposal publishes the listing under the approver; a part hand-over over the listed qty is refused", async () => {
-    const draftId = id7("draft:cares");
+    const draftId = id7("draft:cares_sourdough");
     const ok = await call("POST", `/v1/drafts/${draftId}:approve`, "owner", envelope("drafts.approve.v1", { draft_id: draftId, command_type: "cares.listing.publish.v1", edited_payload: null, reason: null }));
     expect([ok.status, ok.body.type]).toEqual([200, "cares.listing.publish.v1"]);
     const listing = (await call("GET", `/v1/cares/listings/${ok.body.entity_id as string}`, "owner")).body as unknown as Listing;
@@ -110,20 +110,16 @@ describe("mock member rules (14 §10, 15 §10)", () => {
     expect([r.status, r.body.error?.reason_code]).toEqual([409, "qty_exceeds_listed"]);
   });
 
-  it("a PO draft's price never traces; approved with the owner's typed price, then received in full", async () => {
+  it("a PO draft's quantity and price trace to the quote cells; approved as proposed, then received in full", async () => {
     const draftId = id7("draft:po_nuts");
-    const detail = (await call("GET", `/v1/drafts/${draftId}`, "owner")).body as unknown as { draft: PoDraft; unverified_refs: string[] };
-    const lines = poDraftLines(detail.draft, detail.unverified_refs);
-    expect(lines[0]!.price.kind).toBe("unverified");
-    expect(missingEdits(lines, { qty: {}, price: {} })).toBe(true);
-    const plain = await call("POST", `/v1/drafts/${draftId}:approve`, "owner", envelope("drafts.approve.v1", { draft_id: draftId, command_type: "purchasing.po.create.v1", edited_payload: null, reason: null }));
-    expect([plain.status, plain.body.error?.code]).toEqual([422, "cannot_verify"]);
-    const ownerId = id7("member:owner");
-    const edited = editedPo(detail.draft.payload, { qty: {}, price: { 0: 140000 } }, ownerId);
-    const ok = await call("POST", `/v1/drafts/${draftId}:approve`, "owner", envelope("drafts.approve.v1", { draft_id: draftId, command_type: "purchasing.po.create.v1", edited_payload: edited, reason: "Agreed by phone" }));
+    const detail = (await call("GET", `/v1/drafts/${draftId}`, "owner")).body as unknown as DraftDetail;
+    const owner = (await call("GET", "/v1/me", "owner")).body as unknown as Me;
+    expect(approveGate(detail, numericFields(detail), owner)).toEqual({ kind: "open" });
+    const ok = await call("POST", `/v1/drafts/${draftId}:approve`, "owner", envelope("drafts.approve.v1", { draft_id: draftId, command_type: "purchasing.po.create.v1", edited_payload: null, reason: null }));
     expect(ok.status).toBe(200);
     const po = (await call("GET", `/v1/purchase-orders/${ok.body.entity_id as string}`, "owner")).body as unknown as { po_id: string; status: string; total_minor: number; lines: { po_line_id: string; ingredient_id: string; qty_milli: number; unit: string }[]; supplier: { supplier_id: string }; outlet_ids: string[] };
-    expect([po.status, po.total_minor]).toEqual(["committed", 1_260_000]);
+    // 9 kg at the round-two quote of ₹1,410.00 per kg, worked out by the mock as core would.
+    expect([po.status, po.total_minor]).toEqual(["committed", 1_269_000]);
     const grn = (batch: boolean) => envelope("purchasing.grn.receive.v1", {
       grn_id: uuidv7(), outlet_id: po.outlet_ids[0]!, supplier_id: po.supplier.supplier_id, po_id: po.po_id, received_at: null, note: null,
       lines: po.lines.map((l) => ({ grn_line_id: uuidv7(), po_line_id: l.po_line_id, ingredient_id: l.ingredient_id, qty_milli: l.qty_milli, unit: l.unit, unit_cost_minor: null, currency: "INR", batch: batch ? { batch_id: uuidv7(), batch_code: "HZ-1", expires_on: null, mrp_minor: null } : null })),

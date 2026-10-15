@@ -101,30 +101,24 @@ export function useTillPreview(client: StaffClient, ctx: TillContext | null, lin
 export type PlaceOutcome = { ok: true; orderId: string } | { ok: false; error: MunimError; keep: boolean };
 
 /** One place attempt per thing the person confirmed. A retry after a network error, timeout, 429 or 5xx sends the
- *  same envelope (core replays it: never two orders). A reused key (409 idempotency_conflict) is our bug: one new
- *  attempt is built and sent once. Any other failure ends the attempt. */
+ *  same envelope (core replays it: never two orders). Any other failure ends the attempt, a reused key (409
+ *  idempotency_conflict, our bug) included: nothing is sent again without a tap, and the next tap is a new attempt. */
 export function usePlace(client: StaffClient) {
   const attempt = useRef<PlaceAttempt | null>(null);
   const [busy, setBusy] = useState(false);
   const place = useCallback(async (ctx: TillContext, lines: readonly TillLine[], previewTotalMinor: number): Promise<PlaceOutcome> => {
     setBusy(true);
     try {
-      for (let tries = 0; ; tries++) {
-        const a = placeAttempt(attempt.current, ctx, lines, previewTotalMinor);
-        attempt.current = a;
-        const r = await client.placeOrder(a.body);
-        if (r.ok) {
-          attempt.current = null;
-          return { ok: true, orderId: r.data.entity_id };
-        }
-        if (r.error.kind === "key_reused" && tries === 0) {
-          attempt.current = null;
-          continue;
-        }
-        const keep = retryable(r.error);
-        if (!keep) attempt.current = null;
-        return { ok: false, error: r.error, keep };
+      const a = placeAttempt(attempt.current, ctx, lines, previewTotalMinor);
+      attempt.current = a;
+      const r = await client.placeOrder(a.body);
+      if (r.ok) {
+        attempt.current = null;
+        return { ok: true, orderId: r.data.entity_id };
       }
+      const keep = retryable(r.error);
+      if (!keep) attempt.current = null;
+      return { ok: false, error: r.error, keep };
     } finally {
       setBusy(false);
     }

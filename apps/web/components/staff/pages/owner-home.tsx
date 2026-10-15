@@ -163,7 +163,7 @@ export function OwnerHomePage() {
                 <li>Hand-overs <Inline f={f.shared.handovers} fmt={fmt!} onOpen={open} /></li>
               </ul>
             )}
-          <p className="text-[14px] text-muted">To simulated recipients. Measured on synthetic data. <Link href="/staff/cares">Open Cares</Link></p>
+          <p className="text-[14px] text-muted">To simulated recipients. Measured on synthetic data. <Link href="/staff/cares" className="inline-flex min-h-12 items-center font-semibold">Open Cares</Link></p>
         </div>
       </section>
 

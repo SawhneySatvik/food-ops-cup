@@ -1,5 +1,5 @@
 // scripts/smoke.ts: from 01-api-client.md
-// Exercises the client against the mock: outlets, menu, preview, place, replay, read, stream, 404, 429.
+// Exercises the client against the mock (or the real API): outlets, menu, preview, place, replay, read, stream, 404, 429 (mock only).
 import { createMunimClient, type MunimError } from "../lib/munim/client";
 import { newAttempt, newCartLine, previewRequest, type Cart } from "../lib/munim/checkout";
 import { openStream } from "../lib/munim/stream";
@@ -70,9 +70,13 @@ async function main(): Promise<void> {
   const badKey = await createMunimClient({ baseUrl, storefrontKey: "sfk_wrong_key_000000" }).listOutlets();
   check("bad key is 404", !badKey.ok && badKey.error.kind === "not_found" && badKey.error.status === 404, badKey.ok ? "200?" : why(badKey.error));
 
-  const limited = await createMunimClient({ baseUrl, storefrontKey, extraHeaders: () => ({ "X-Mock-Force-429": "1" }) }).getMenu(outlet.outlet_id);
-  check("429 parsed", !limited.ok && limited.error.kind === "rate_limited" && limited.error.reasonCode === "rate_limited" && limited.error.retryAfterMs === 5000,
-    limited.ok ? "200?" : `${why(limited.error)} retryAfterMs ${limited.error.retryAfterMs}`);
+  // X-Mock-Force-429 is the mock's switch; the real API ignores it.
+  if (!/\/mock$/.test(baseUrl.replace(/\/+$/, ""))) console.log("skip 429 parsed: real API (the forced 429 is a mock switch)");
+  else {
+    const limited = await createMunimClient({ baseUrl, storefrontKey, extraHeaders: () => ({ "X-Mock-Force-429": "1" }) }).getMenu(outlet.outlet_id);
+    check("429 parsed", !limited.ok && limited.error.kind === "rate_limited" && limited.error.reasonCode === "rate_limited" && limited.error.retryAfterMs === 5000,
+      limited.ok ? "200?" : `${why(limited.error)} retryAfterMs ${limited.error.retryAfterMs}`);
+  }
 
   const changed = newAttempt(cart, menu.data, { name: "Smoke Test", phone: null, email: "smoke@example.com", marketing: false }, p.total_minor + 1);
   const refused = await munim.placeOrder(changed.body);

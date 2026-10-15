@@ -1,5 +1,8 @@
 import { Suspense } from "react";
-import { SupplierScreen } from "@/components/staff/pages/suppliers";
+import type { Metadata } from "next";
+import { SupplierScreen } from "@/components/staff/pages/supplier";
+
+export const metadata: Metadata = { title: "A supplier" };
 
 // Staff pages render only after the browser has read the session (see app/staff/layout.tsx).
 export const instant = false;

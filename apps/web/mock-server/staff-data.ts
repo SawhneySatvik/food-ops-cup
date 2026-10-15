@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import type { Schemas } from "@/lib/munim/types";
 import { DEMO_PEOPLE, DEMO_TENANT_ID } from "@/lib/munim/session";
-import { CHANNEL_ID, CURRENCY, DEALS, ITEMS, OUTLETS, PREP_MIN, TAX_CLASS, TZ, TZ_OFFSET_MIN, groupId, id7, itemId, optionId, variantId } from "./data";
+import { CHANNEL_ID, CURRENCY, DEALS, ITEMS, OUTLETS, PREP_MIN, TAX, TAX_CLASS, TZ, TZ_OFFSET_MIN, groupId, id7, itemId, optionId, variantId } from "./data";
 import { price } from "./pricing";
 
 type S = Schemas;
@@ -26,7 +26,8 @@ export const MEMBERS = DEMO_PEOPLE.map((p) => ({
     tenant_id: DEMO_TENANT_ID,
     name: p.name,
     role: p.role,
-    outlet_ids: p.role === "owner" ? ("*" as const) : [HAZRATGANJ],
+    // The owner works in every outlet; the manager at Gomti Nagar; the counter and kitchen staff at Hazratganj.
+    outlet_ids: p.key === "owner" ? ("*" as const) : p.key === "manager" ? [GOMTI_NAGAR] : [HAZRATGANJ],
   } satisfies S["V1Me"],
 }));
 export const OWNER_ID = MEMBERS[0]!.me.member_id;
@@ -260,15 +261,44 @@ export const orderListItem = (o: Order): S["V1OrdersList"]["items"][number] => (
   total_minor: o.total_minor, currency: o.currency, promised_at: o.promised_at, created_at: o.created_at,
 });
 
+/** GET /v1/orders/{id}/receipt as the IN pack prints it: a GST tax invoice, every line split into its CGST and SGST.
+ *  An outlet without both its GSTIN and FSSAI numbers cannot print one: core answers 409 tax_id_missing (Gomti
+ *  Nagar here). Money is added up only here, in the mock, from the order's own line fields. */
+export function receiptOf(o: Order): S["V1OrderReceipt"] | null {
+  const outlet = OUTLETS.find((x) => x.outlet_id === o.outlet_id)!;
+  if (!["GSTIN", "FSSAI"].every((c) => outlet.tax_ids.some((t) => t.code === c))) return null;
+  const split = (taxable: number) => TAX.components.map((c) => ({ code: c.code, rate_bp: c.rateBp, amount_minor: Math.round((taxable * c.rateBp) / 10_000) }));
+  const lines = o.lines.map((l) => {
+    const amount = Math.round((l.qty_milli * l.unit_price_minor) / 1000);
+    const net = amount - l.line_discount_minor;
+    const slug = ITEMS.find((i) => itemId(i.slug) === l.item_id)!.slug;
+    return {
+      line_no: l.line_no, item_id: l.item_id, name_key: `item.${slug}`, qty_milli: l.qty_milli, unit_price_minor: l.unit_price_minor, amount_minor: amount,
+      discount_minor: l.line_discount_minor, net_minor: net, tax_minor: l.tax_minor, total_minor: net + l.tax_minor, tax_class: TAX_CLASS, components: split(net),
+    };
+  });
+  const series = DEVICES.devices.find((d) => d.id === o.device_id)?.invoice_series;
+  const [y, m, d] = businessDate(new Date(o.created_at)).split("-");
+  return {
+    order_id: o.order_id, kind: "tax_invoice", title: "Tax Invoice", operator: null, seller: { name: outlet.name, address: outlet.address }, tax_ids: outlet.tax_ids,
+    number: series && o.invoice_no !== null ? `${series}-${o.invoice_no}` : String(o.ticket_no), date: `${d}/${m}/${y}`, currency: o.currency, lines,
+    net_minor: lines.reduce((s, l) => s + l.net_minor, 0), tax_minor: o.tax_minor, total_minor: o.total_minor,
+    components: TAX.components.map((c) => ({ code: c.code, rate_bp: c.rateBp, amount_minor: lines.reduce((s, l) => s + l.components.find((x) => x.code === c.code)!.amount_minor, 0) })),
+  };
+}
+
 /** The board as core builds it: live tickets (not done; order not completed, rejected or cancelled), amber from
  *  due − 3 min, red at or after due (queued and preparing only), lane "later" while promised − prep is ahead. */
 export function boardOf(outletId: string, station: string | null, orders: Map<string, Placed>, now: Date): S["V1KdsBoard"] {
   const tickets: S["V1KdsBoard"]["tickets"] = [];
-  const stations = new Set<string>(["kitchen", "bar"]);
+  // As core: the stations of the outlet's live tickets (before the station filter), sorted.
+  const stations = new Set<string>();
   for (const p of orders.values()) {
     if (p.order.outlet_id !== outletId || ["completed", "rejected", "cancelled"].includes(p.order.status)) continue;
     for (const t of p.tickets) {
-      if (t.status === "done" || (station && t.station !== station)) continue;
+      if (t.status === "done") continue;
+      stations.add(t.station);
+      if (station && t.station !== station) continue;
       const due = t.due_at ? Date.parse(t.due_at) : null;
       const coloured = t.status === "queued" || t.status === "preparing";
       const colour = !coloured || due === null ? "normal" : now.getTime() >= due ? "red" : now.getTime() >= due - 180_000 ? "amber" : "normal";
@@ -288,11 +318,11 @@ export function boardOf(outletId: string, station: string | null, orders: Map<st
   }
   const rank = { red: 0, amber: 1, normal: 2 } as const;
   tickets.sort((a, b) => rank[a.colour] - rank[b.colour] || (a.due_at ?? "").localeCompare(b.due_at ?? "") || a.ticket_no - b.ticket_no);
-  return { outlet_id: outletId, as_of: now.toISOString(), stations: [...stations], tickets };
+  return { outlet_id: outletId, as_of: now.toISOString(), stations: [...stations].sort(), tickets };
 }
 
 // ---------------------------------------------------------------- snapshots (the only source of AI numbers)
-export const RUN = { waste: id7("run:waste"), kitchen: id7("run:kitchen"), negotiation: id7("run:negotiation"), ask: id7("run:ask"), cares: id7("run:cares") };
+export const RUN = { waste: id7("run:waste"), kitchen: id7("run:kitchen"), negotiation: id7("run:negotiation"), pooled: id7("run:negotiation:pooled"), ask: id7("run:ask") };
 const sha = (rows: unknown) => createHash("sha256").update(JSON.stringify(rows)).digest("hex");
 const col = (name: string, type: "integer" | "text" | "uuid" | "date" | "boolean" | "timestamptz" = "integer") => ({ name, type });
 
@@ -313,15 +343,18 @@ export const TEMPLATE_COLUMNS: Record<string, ReturnType<typeof col>[]> = {
   "cares.impact": [col("kind", "text"), col("handovers"), col("portions_milli"), col("weight_g"), col("volume_ml"), col("units_milli"), col("value_at_cost_minor")],
   "inventory.below_reorder": [col("outlet_id", "uuid"), col("ingredient_id", "uuid"), col("ingredient_name", "text"), col("on_hand_milli"), col("min_qty_milli"), col("par_qty_milli")],
   "purchasing.quote_compare": [col("quote_id", "uuid"), col("supplier_id", "uuid"), col("round"), col("unit_price_minor"), col("qty_milli"), col("min_order_qty_milli"), col("payment_days")],
-  // 14 §10 additions (Cares): batches close to their use-by date, and simulated recipients ranked for some food.
-  "inventory.expiry_risk": [col("outlet_id", "uuid"), col("batch_id", "uuid"), col("ingredient_id", "uuid"), col("ingredient_name", "text"), col("unit", "text"), col("expiry_on", "date"), col("is_sku", "boolean"), col("on_hand_qty_milli"), col("at_risk_qty_milli"), col("at_risk_minor")],
-  "cares.recipient_match": [col("recipient_id", "uuid"), col("name", "text"), col("kind", "text"), col("simulated", "boolean"), col("distance_m"), col("overlap_min"), col("pickup_on", "date"), col("pickup_from", "timestamptz"), col("pickup_to", "timestamptz"), col("capacity_fit", "boolean")],
+  "inventory.expiry_risk": [col("batch_id", "uuid"), col("expiry_on", "date"), col("days_to_expiry"), col("is_sku", "boolean"), col("remaining_qty_milli"), col("use_before_expiry_qty_milli"), col("at_risk_qty_milli"), col("at_risk_minor"), col("ingredient_id", "uuid"), col("unit", "text"), col("supplier_id", "uuid")],
+  "cares.recipient_match": [col("recipient_id", "uuid"), col("name", "text"), col("simulated", "boolean"), col("distance_m"), col("capacity_fit", "boolean"), col("overlap_min"), col("pickup_from", "timestamptz"), col("pickup_to", "timestamptz"), col("pickup_on", "date")],
+  // The negotiation's other inputs, which its purchase-order draft also cites (run-minted only on the mock).
+  "inventory.shortfall": [col("ingredient_id", "uuid"), col("need_qty_milli"), col("proposed_min_qty_milli"), col("proposed_par_qty_milli"), col("on_hand_qty_milli"), col("open_po_qty_milli"), col("shortfall_qty_milli"), col("stockout_on", "date")],
+  "purchasing.price_creep": [col("supplier_id", "uuid"), col("ingredient_id", "uuid"), col("baseline_minor"), col("latest_minor"), col("creep_bp"), col("observations"), col("creep_impact_minor")],
+  "purchasing.deal_inputs": [col("quote_total_minor"), col("quote_payment_days"), col("budget_left_minor"), col("open_commit_qty_milli"), col("need_qty_milli"), col("use_in_shelf_life_qty_milli"), col("margin_at_quote_bp"), col("margin_floor_bp"), col("min_payment_days"), col("margin_rule_applies", "boolean")],
 };
 /** Who may mint each template (core's min_role: staff < manager < advisor < owner/judge). */
 export const TEMPLATE_MIN_ROLE: Record<string, "staff" | "manager" | "advisor" | "owner"> = Object.fromEntries(Object.keys(TEMPLATE_COLUMNS).map((t) => [t, "manager"]));
 
 export const SUPPLIER = { dairy: id7("supplier:dairy"), nuts: id7("supplier:nuts") };
-export const QUOTE = { nutsR1: id7("quote:nuts:1"), nutsR2: id7("quote:nuts:2"), dairyR1: id7("quote:dairy:1") };
+export const QUOTE = { nutsR1: id7("quote:nuts:1"), nutsR2: id7("quote:nuts:2"), dairyR1: id7("quote:dairy:1"), dairyPooled: id7("quote:dairy:pooled") };
 
 /** The run-minted snapshots behind the seeded findings, drafts and Ask answer. */
 export function seedSnapshots(now: Date): Snapshot[] {
@@ -342,69 +375,40 @@ export function seedSnapshots(now: Date): Snapshot[] {
       { ingredient_id: ING("butter"), forecast_qty_milli: 7_400_000, on_hand_qty_milli: 2_100_000, par_qty_milli: 6_000_000, prep_qty_milli: 5_300_000 },
       { ingredient_id: ING("hazelnuts"), forecast_qty_milli: 3_900_000, on_hand_qty_milli: 3_200_000, par_qty_milli: 4_000_000, prep_qty_milli: 700_000 },
     ], { run: RUN.kitchen }, H, at),
+    // Rows in core's order for this template: round, then supplier id.
     snapshotOf(id7("snap:quotes"), "purchasing.quote_compare", { negotiation_run_id: RUN.negotiation }, TEMPLATE_COLUMNS["purchasing.quote_compare"]!, [
       { quote_id: QUOTE.nutsR1, supplier_id: SUPPLIER.nuts, round: 1, unit_price_minor: 152000, qty_milli: 9000, min_order_qty_milli: 5000, payment_days: 7 },
-      { quote_id: QUOTE.nutsR2, supplier_id: SUPPLIER.nuts, round: 2, unit_price_minor: 141000, qty_milli: 9000, min_order_qty_milli: 5000, payment_days: 15 },
       { quote_id: QUOTE.dairyR1, supplier_id: SUPPLIER.dairy, round: 1, unit_price_minor: 158000, qty_milli: 9000, min_order_qty_milli: 10000, payment_days: 0 },
+      { quote_id: QUOTE.nutsR2, supplier_id: SUPPLIER.nuts, round: 2, unit_price_minor: 141000, qty_milli: 9000, min_order_qty_milli: 5000, payment_days: 15 },
     ], { run: RUN.negotiation }, ["*"], at),
     snapshotOf(id7("snap:below"), "inventory.below_reorder", {}, TEMPLATE_COLUMNS["inventory.below_reorder"]!, [
       { outlet_id: HAZRATGANJ, ingredient_id: ING("hazelnuts"), ingredient_name: "Roasted hazelnuts (synthetic)", on_hand_milli: 3_200_000, min_qty_milli: 5_000_000, par_qty_milli: 12_000_000 },
     ], { run: RUN.negotiation }, ["*"], at),
     ...caresSnapshots(now),
+    // What the negotiation started from and was checked against: the shortfall it asked to fill, the last price its
+    // bounds came from, and the deal inputs of the winning quote (budget left).
+    snapshotOf(id7("snap:shortfall"), "inventory.shortfall", { outlet_id: HAZRATGANJ, lead_days: 7 }, TEMPLATE_COLUMNS["inventory.shortfall"]!, [
+      { ingredient_id: ING("hazelnuts"), need_qty_milli: 3_900_000, proposed_min_qty_milli: 5_000_000, proposed_par_qty_milli: 12_000_000, on_hand_qty_milli: 3_200_000, open_po_qty_milli: 0, shortfall_qty_milli: 8_800_000, stockout_on: addDays(today, 5) },
+    ], { run: RUN.negotiation }, ["*"], at),
+    snapshotOf(id7("snap:lastprice"), "purchasing.price_creep", { as_of: today }, TEMPLATE_COLUMNS["purchasing.price_creep"]!, [
+      { supplier_id: SUPPLIER.nuts, ingredient_id: ING("hazelnuts"), baseline_minor: 145_000, latest_minor: 148_000, creep_bp: 207, observations: 1, creep_impact_minor: 0 },
+    ], { run: RUN.negotiation }, ["*"], at),
+    snapshotOf(id7("snap:deal"), "purchasing.deal_inputs", { quote_id: QUOTE.nutsR2, as_of: today }, TEMPLATE_COLUMNS["purchasing.deal_inputs"]!, [
+      { quote_total_minor: 1_269_000, quote_payment_days: 15, budget_left_minor: 2_500_000, open_commit_qty_milli: 0, need_qty_milli: 3_900_000, use_in_shelf_life_qty_milli: 9_000_000, margin_at_quote_bp: 6_200, margin_floor_bp: 5_500, min_payment_days: 7, margin_rule_applies: true },
+    ], { run: RUN.negotiation }, ["*"], at),
+    // A second negotiation: butter for both outlets on one pooled purchase order.
+    snapshotOf(id7("snap:pooled"), "purchasing.quote_compare", { negotiation_run_id: RUN.pooled }, TEMPLATE_COLUMNS["purchasing.quote_compare"]!, [
+      { quote_id: QUOTE.dairyPooled, supplier_id: SUPPLIER.dairy, round: 1, unit_price_minor: 56000, qty_milli: 20000, min_order_qty_milli: 10000, payment_days: 0 },
+    ], { run: RUN.pooled }, ["*"], at),
   ];
 }
 
-// ---------------------------------------------------------------- Cares snapshots (14 §10 additions)
-export const BATCH = { sourdough: id7("batch:sourdough:hzg"), cream: id7("batch:cream:hzg") };
-
-/** Hazratganj's batches that may pass their use-by date before they are used (the expiry watcher's horizon). */
-export function expiryRows(outletId: string | null, now: Date): Snapshot["rows"] {
-  if (outletId !== null && outletId !== HAZRATGANJ) return [];
-  const today = businessDate(now);
-  return [
-    { outlet_id: HAZRATGANJ, batch_id: BATCH.sourdough, ingredient_id: ING("sourdough"), ingredient_name: "Sliced sourdough loaf (synthetic)", unit: "piece", expiry_on: addDays(today, 1), is_sku: true, on_hand_qty_milli: 20_000, at_risk_qty_milli: 12_000, at_risk_minor: 66_000 },
-    { outlet_id: HAZRATGANJ, batch_id: BATCH.cream, ingredient_id: ING("cream"), ingredient_name: "Fresh cream (synthetic)", unit: "ml", expiry_on: addDays(today, 2), is_sku: false, on_hand_qty_milli: 4_000_000, at_risk_qty_milli: 1_500_000, at_risk_minor: 31_500 },
-  ];
-}
-
-/** Minutes since local midnight of an "HH:MM" string. */
-const hm = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-
-/** cares.recipient_match as the template ranks it: simulated recipients in the outlet's city that accept the food
- *  kind, each with the outlet's next pickup window (today's, or tomorrow's once today's has started), ranked by how
- *  long their receiving hours overlap the pickup hours, then by distance. The row order is the rank. */
-export function matchRowsFor(params: Snapshot["params"], now: Date): Snapshot["rows"] {
-  const outlet = CARES_PROFILE.outlets.find((o) => o.outlet_id === params.outlet_id);
-  if (!outlet) return [];
-  const local = (date: string, t: string) => new Date(Date.parse(`${date}T${t}:00Z`) - TZ_OFFSET_MIN * 60_000).toISOString();
-  const today = businessDate(now);
-  const day = Date.parse(local(today, outlet.pickup_from)) > now.getTime() ? today : addDays(today, 1);
-  const from = hm(outlet.pickup_from), to = hm(outlet.pickup_to);
-  const qty = typeof params.qty_milli === "number" ? params.qty_milli : 0;
-  const rows = RECIPIENTS.items
-    .filter((r) => r.simulated && ((params.needs_cooked === true && r.accepts_cooked) || (params.needs_raw === true && r.accepts_raw) || (params.needs_packaged === true && r.accepts_packaged)))
-    .map((r) => {
-      const overlap = Math.max(0, Math.min(to, hm(r.receiving_to)) - Math.max(from, hm(r.receiving_from)));
-      // Rough planar distance in metres from the e6 coordinates (about 0.111 m per micro-degree): enough for a mock.
-      const distance = Math.round(Math.hypot(r.lat_e6 - outlet.lat_e6, r.lng_e6 - outlet.lng_e6) * 0.111);
-      const fits = params.unit === "portion" ? qty / 1000 <= r.capacity_portions_per_day : true;
-      return { recipient_id: r.recipient_id, name: r.name, kind: r.kind, simulated: true, distance_m: distance, overlap_min: overlap, pickup_on: day, pickup_from: local(day, outlet.pickup_from), pickup_to: local(day, outlet.pickup_to), capacity_fit: fits };
-    })
-    .filter((r) => r.overlap_min > 0);
-  rows.sort((a, b) => b.overlap_min - a.overlap_min || a.distance_m - b.distance_m);
-  return rows;
-}
-
-/** The expiry watcher's snapshots behind the Cares finding and proposal. */
-export function caresSnapshots(now: Date): Snapshot[] {
-  const today = businessDate(now);
-  const at = mins(now, -45);
-  const sourdough = expiryRows(HAZRATGANJ, now)[0]!;
-  const params = { outlet_id: HAZRATGANJ, needs_cooked: false, needs_raw: false, needs_packaged: true, qty_milli: sourdough.at_risk_qty_milli as number, unit: "piece", expires_on: sourdough.expiry_on as string };
-  return [
-    snapshotOf(id7("snap:expiry"), "inventory.expiry_risk", { outlet_id: HAZRATGANJ, days: 7, as_of: today }, TEMPLATE_COLUMNS["inventory.expiry_risk"]!, expiryRows(HAZRATGANJ, now), { run: RUN.cares }, [HAZRATGANJ], at),
-    snapshotOf(id7("snap:match"), "cares.recipient_match", params, TEMPLATE_COLUMNS["cares.recipient_match"]!, matchRowsFor(params, now), { run: RUN.cares }, [HAZRATGANJ], at),
-  ];
+/** "2026-10-14" -> "2026-W42": the ISO week holding that date (the week of its Thursday). */
+function isoWeek(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  const thursday = new Date(d.getTime() + (3 - ((d.getUTCDay() + 6) % 7)) * 86_400_000);
+  const week = Math.floor((thursday.getTime() - Date.UTC(thursday.getUTCFullYear(), 0, 1)) / (7 * 86_400_000)) + 1;
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
 /** Rows for a template a member mints on the mock (owner home's stat cards), from the mock's own books. */
@@ -418,17 +422,14 @@ export function mintRows(template: string, params: Snapshot["params"], orders: M
       return [{ tickets: ts.length, timed_tickets: timed, coverage_bp: ts.length ? Math.floor((timed * 10000) / ts.length) : null }];
     }
     case "people.labour_pct":
-      return [{ iso_week: "2026-W42", labour_minor: 4_180_000, net_sales_minor: outlet === GOMTI_NAGAR ? 7_930_000 : outlet ? 12_450_000 : 20_380_000, labour_bp: 2051, target_bp: 2200, excess_labour_minor: 0 }];
+      return [{ iso_week: isoWeek(businessDate(now)), labour_minor: 4_180_000, net_sales_minor: outlet === GOMTI_NAGAR ? 7_930_000 : outlet ? 12_450_000 : 20_380_000, labour_bp: 2051, target_bp: 2200, excess_labour_minor: 0 }];
     case "inventory.waste_week":
       return seedSnapshots(now)[0]!.rows;
     case "inventory.below_reorder":
       return seedSnapshots(now)[4]!.rows;
     case "purchasing.quote_compare":
-      return params.negotiation_run_id === RUN.negotiation ? seedSnapshots(now)[3]!.rows : [];
-    case "inventory.expiry_risk":
-      return expiryRows(outlet, now);
-    case "cares.recipient_match":
-      return matchRowsFor(params, now);
+      return params.negotiation_run_id === RUN.negotiation ? seedSnapshots(now)[3]!.rows
+        : params.negotiation_run_id === RUN.pooled ? seedSnapshots(now).find((x) => x.snapshot_id === id7("snap:pooled"))!.rows : [];
     case "cares.impact": {
       const recorded = listings.filter((l) => (!outlet || l.outlet_id === outlet) && l.handovers.some((h) => h.status === "recorded"));
       const row = (kind: string, ls: typeof recorded) => {
@@ -438,6 +439,10 @@ export function mintRows(template: string, params: Snapshot["params"], orders: M
       };
       return [row("total", recorded), row("donation", recorded.filter((l) => l.kind === "donation")), row("offer", recorded.filter((l) => l.kind === "offer"))];
     }
+    case "inventory.expiry_risk":
+      return params.outlet_id === HAZRATGANJ ? caresSnapshots(now)[0]!.rows : [];
+    case "cares.recipient_match":
+      return matchRowsFor(params, now);
     default:
       return null;
   }
@@ -446,7 +451,6 @@ export function mintRows(template: string, params: Snapshot["params"], orders: M
 // ---------------------------------------------------------------- the AI inbox
 export const snap = (key: string, row: number, column: string) => `⟨snap:${id7(`snap:${key}`)}·${row}·${column}⟩`;
 const bare = (key: string) => `snap:${id7(`snap:${key}`)}`;
-export const quoteRef = (quoteId: string) => `⟨cite:row:intel.supplier_quote:${quoteId}⟩`;
 
 /** Findings: what the specialists noticed. Text never holds a digit; every number is a ref. */
 export function seedFindings(now: Date): Finding[] {
@@ -482,32 +486,9 @@ export function seedFindings(now: Date): Finding[] {
   ];
 }
 
-/** 14 §10: the expiry watcher's finding (sourdough loaves that will pass their date before they sell). */
-export function expiryFinding(now: Date): Finding {
-  const at = mins(now, -45);
-  const value = (row: number, c: string) => ({ ref: snap("expiry", row, c), value: caresSnapshots(now)[0]!.rows[row]![c]! });
-  return {
-    finding_id: id7("finding:expiry"), run_id: RUN.cares, pack: "inventory_purchasing", type: "inventory.expiry_risk", severity: "medium", status: "open",
-    confidence_bp: 8800, dedupe_key: `inventory.expiry_risk:${HAZRATGANJ}:${BATCH.sourdough}`,
-    envelope: {
-      finding_id: id7("finding:expiry"), impact_ref: snap("expiry", 0, "at_risk_minor"), abstained: false, reason_code: null,
-      segments: [
-        { text: `Sliced sourdough loaves at Cobnut Hazratganj may pass their use-by date before they sell: ${snap("expiry", 0, "at_risk_qty_milli")} of them, worth ${snap("expiry", 0, "at_risk_minor")} at cost.`, refs: [bare("expiry")] },
-      ],
-    },
-    resolved_refs: [value(0, "at_risk_qty_milli"), value(0, "at_risk_minor")],
-    created_at: at, updated_at: at,
-  };
-}
-
-export interface SeedDraft {
-  draft: Draft;
-  /** Refs that do not resolve for the viewer (GET /v1/drafts/{id} unverified_refs). */
-  unverified: string[];
-}
-
-/** Drafts: what the specialists propose. Each changes nothing until a named person approves it. */
-export function seedDrafts(now: Date): SeedDraft[] {
+/** Drafts: what the specialists propose. Each changes nothing until a named person approves it. Which refs trace is
+ *  worked out per viewer when a draft is served (staff.ts), as core does. */
+export function seedDrafts(now: Date): Draft[] {
   const today = businessDate(now);
   const at = mins(now, -50);
   const cell = (key: string, row: number, c: string) => seedSnapshots(now).find((s) => s.snapshot_id === id7(`snap:${key}`))!.rows[row]![c]!;
@@ -517,74 +498,88 @@ export function seedDrafts(now: Date): SeedDraft[] {
   });
   return [
     {
-      unverified: [],
-      draft: {
-        ...common(id7("draft:prep_time"), RUN.kitchen, id7("finding:cake"), [HAZRATGANJ]), source: "intel:kitchen",
-        command_type: "kitchen.prep_time.set.v1",
-        payload: { outlet_id: HAZRATGANJ, item_id: itemId("praline_celebration_cake"), station: "kitchen", prep_sec: snap("times", 0, "p80_sec"), valid_from: addDays(today, 1) },
-        resolved_refs: [{ path: "/prep_sec", ref: snap("times", 0, "p80_sec"), value: cell("times", 0, "p80_sec") }],
-        evidence: [bare("times")], based_on: [based("times", 0, "p80_sec", "kitchen.ticket_times")],
-      },
+      ...common(id7("draft:prep_time"), RUN.kitchen, id7("finding:cake"), [HAZRATGANJ]), source: "intel:kitchen",
+      command_type: "kitchen.prep_time.set.v1",
+      payload: { outlet_id: HAZRATGANJ, item_id: itemId("praline_celebration_cake"), station: "kitchen", prep_sec: snap("times", 0, "p80_sec"), valid_from: addDays(today, 1) },
+      resolved_refs: [{ path: "/prep_sec", ref: snap("times", 0, "p80_sec"), value: cell("times", 0, "p80_sec") }],
+      evidence: [bare("times")], based_on: [based("times", 0, "p80_sec", "kitchen.ticket_times")],
     },
     {
-      unverified: [],
-      draft: {
-        ...common(id7("draft:prep_list"), RUN.kitchen, null, [HAZRATGANJ]), source: "intel:kitchen",
-        command_type: "kitchen.prep_list.create.v1",
-        payload: {
-          prep_list_id: id7("prep_list:tomorrow"), outlet_id: HAZRATGANJ, business_date: addDays(today, 1),
-          lines: [
-            { ingredient_id: ING("butter"), qty_milli: snap("prep", 0, "prep_qty_milli"), unit: "g" },
-            { ingredient_id: ING("hazelnuts"), qty_milli: snap("prep", 1, "prep_qty_milli"), unit: "g" },
-          ],
-        },
-        resolved_refs: [
-          { path: "/lines/0/qty_milli", ref: snap("prep", 0, "prep_qty_milli"), value: cell("prep", 0, "prep_qty_milli") },
-          { path: "/lines/1/qty_milli", ref: snap("prep", 1, "prep_qty_milli"), value: cell("prep", 1, "prep_qty_milli") },
-        ],
-        evidence: [bare("prep")], based_on: [based("prep", 0, "prep_qty_milli", "kitchen.prep_need"), based("prep", 1, "prep_qty_milli", "kitchen.prep_need")],
-      },
-    },
-    {
-      // The simulated supplier's quoted price is a quote row, which core does not resolve for the approver: it is
-      // always in unverified_refs, so "Approve" stays hidden and the owner types the price ("Approve with my edits").
-      unverified: [quoteRef(QUOTE.nutsR2)],
-      draft: {
-        ...common(id7("draft:po_nuts"), RUN.negotiation, null, [HAZRATGANJ]), source: "intel:inventory_purchasing",
-        command_type: "purchasing.po.create.v1",
-        payload: {
-          po_id: id7("po:draft:nuts"), supplier_id: SUPPLIER.nuts, outlet_ids: [HAZRATGANJ], currency: CURRENCY, expected_on: addDays(today, 2), negotiation_run_id: RUN.negotiation,
-          lines: [{ ingredient_id: ING("hazelnuts"), qty_milli: snap("quotes", 1, "qty_milli"), unit: "kg", unit_price_minor: quoteRef(QUOTE.nutsR2) }],
-        },
-        resolved_refs: [{ path: "/lines/0/qty_milli", ref: snap("quotes", 1, "qty_milli"), value: cell("quotes", 1, "qty_milli") }],
-        evidence: [bare("quotes"), bare("below")], based_on: [based("quotes", 1, "qty_milli", "purchasing.quote_compare")],
-      },
-    },
-    caresDraft(now),
-  ];
-}
-
-/** 14 §10: the expiry watcher's donation proposal. The code picked the recipient (row 0 of the ranking) and copied its
- *  pickup window; the quantity is a ref to the at-risk cell. Packaged stock only: a cooked line never arrives as a draft. */
-function caresDraft(now: Date): SeedDraft {
-  const [expiry, match] = caresSnapshots(now);
-  const best = match!.rows[0]!;
-  const at = mins(now, -40);
-  const based = (s: Snapshot, key: string, row: number, c: string) => ({ ref: snap(key, row, c), template_id: s.template_id, params: s.params, expected: s.rows[row]![c]! });
-  return {
-    unverified: [],
-    draft: {
-      draft_id: id7("draft:cares"), outlet_ids: [HAZRATGANJ], source: "intel:inventory_purchasing", finding_id: id7("finding:expiry"), run_id: RUN.cares, status: "proposed",
-      created_at: at, updated_at: at, command_type: "cares.listing.publish.v1",
+      ...common(id7("draft:prep_list"), RUN.kitchen, null, [HAZRATGANJ]), source: "intel:kitchen",
+      command_type: "kitchen.prep_list.create.v1",
       payload: {
-        listing_id: id7("listing:proposed"), outlet_id: HAZRATGANJ, kind: "donation", recipient_id: String(best.recipient_id), pickup_from: String(best.pickup_from), pickup_to: String(best.pickup_to),
-        lines: [{ line_id: id7("listing_line:proposed:1"), food_kind: "packaged", item_id: null, ingredient_id: ING("sourdough"), batch_id: BATCH.sourdough, qty_milli: snap("expiry", 0, "at_risk_qty_milli"), unit: "piece", expires_on: String(expiry!.rows[0]!.expiry_on), unit_price_minor: null, currency: null }],
+        prep_list_id: id7("prep_list:tomorrow"), outlet_id: HAZRATGANJ, business_date: addDays(today, 1),
+        lines: [
+          { ingredient_id: ING("butter"), qty_milli: snap("prep", 0, "prep_qty_milli"), unit: "g" },
+          { ingredient_id: ING("hazelnuts"), qty_milli: snap("prep", 1, "prep_qty_milli"), unit: "g" },
+        ],
       },
-      resolved_refs: [{ path: "/lines/0/qty_milli", ref: snap("expiry", 0, "at_risk_qty_milli"), value: expiry!.rows[0]!.at_risk_qty_milli! }],
-      evidence: [bare("expiry"), bare("match")],
-      based_on: [based(match!, "match", 0, "name"), based(expiry!, "expiry", 0, "at_risk_qty_milli")],
+      resolved_refs: [
+        { path: "/lines/0/qty_milli", ref: snap("prep", 0, "prep_qty_milli"), value: cell("prep", 0, "prep_qty_milli") },
+        { path: "/lines/1/qty_milli", ref: snap("prep", 1, "prep_qty_milli"), value: cell("prep", 1, "prep_qty_milli") },
+      ],
+      evidence: [bare("prep")], based_on: [based("prep", 0, "prep_qty_milli", "kitchen.prep_need"), based("prep", 1, "prep_qty_milli", "kitchen.prep_need")],
     },
-  };
+    {
+      // As core's negotiation review drafts it: quantity and price are cells of the run's quote comparison (round two
+      // of the simulated nut supplier, row 2). based_on also holds the shortfall the run asked to fill, the last price
+      // its bounds came from and the budget left, in core's order. The mock scopes these snapshots to every outlet, so
+      // they trace for the owner; a manager of one outlet could not open them and would be offered Reject only (01 §6.1).
+      ...common(id7("draft:po_nuts"), RUN.negotiation, null, [HAZRATGANJ]), source: "intel:inventory_purchasing",
+      command_type: "purchasing.po.create.v1",
+      payload: {
+        po_id: id7("po:draft:nuts"), supplier_id: SUPPLIER.nuts, outlet_ids: [HAZRATGANJ], currency: CURRENCY, expected_on: addDays(today, 2), negotiation_run_id: RUN.negotiation,
+        lines: [{ ingredient_id: ING("hazelnuts"), qty_milli: snap("quotes", 2, "qty_milli"), unit: "kg", unit_price_minor: snap("quotes", 2, "unit_price_minor") }],
+      },
+      resolved_refs: [
+        { path: "/lines/0/qty_milli", ref: snap("quotes", 2, "qty_milli"), value: cell("quotes", 2, "qty_milli") },
+        { path: "/lines/0/unit_price_minor", ref: snap("quotes", 2, "unit_price_minor"), value: cell("quotes", 2, "unit_price_minor") },
+      ],
+      evidence: [bare("quotes"), bare("deal"), bare("shortfall"), bare("lastprice")],
+      based_on: [
+        based("shortfall", 0, "shortfall_qty_milli", "inventory.shortfall"), based("lastprice", 0, "latest_minor", "purchasing.price_creep"),
+        based("deal", 0, "budget_left_minor", "purchasing.deal_inputs"), based("quotes", 2, "unit_price_minor", "purchasing.quote_compare"),
+        based("quotes", 2, "qty_milli", "purchasing.quote_compare"),
+      ],
+    },
+    {
+      // A pooled purchase order for both outlets. Its manager-level type is not what stops Farah (Gomti Nagar only):
+      // she sees it because one of its outlets is hers, but core judges every target outlet, so only the owner decides.
+      // Mock only: no real flow produces a two-outlet draft today; it is here so the outlet gate can be seen and tested.
+      ...common(id7("draft:po_butter_pooled"), RUN.pooled, null, [HAZRATGANJ, GOMTI_NAGAR]), source: "intel:inventory_purchasing",
+      command_type: "purchasing.po.create.v1",
+      payload: {
+        po_id: id7("po:draft:butter_pooled"), supplier_id: SUPPLIER.dairy, outlet_ids: [HAZRATGANJ, GOMTI_NAGAR], currency: CURRENCY, expected_on: addDays(today, 3), negotiation_run_id: RUN.pooled,
+        lines: [{ ingredient_id: ING("butter"), qty_milli: snap("pooled", 0, "qty_milli"), unit: "kg", unit_price_minor: snap("pooled", 0, "unit_price_minor") }],
+      },
+      resolved_refs: [
+        { path: "/lines/0/qty_milli", ref: snap("pooled", 0, "qty_milli"), value: cell("pooled", 0, "qty_milli") },
+        { path: "/lines/0/unit_price_minor", ref: snap("pooled", 0, "unit_price_minor"), value: cell("pooled", 0, "unit_price_minor") },
+      ],
+      evidence: [bare("pooled")],
+      based_on: [based("pooled", 0, "unit_price_minor", "purchasing.quote_compare"), based("pooled", 0, "qty_milli", "purchasing.quote_compare")],
+    },
+    {
+      // Food at risk (inventory.expiry_risk) offered to the top simulated recipient of cares.recipient_match, by code:
+      // the quantity is a ref; the recipient and pickup are the match row's own cells, each also in based_on.
+      ...common(id7("draft:cares_sourdough"), CARES_RUN, id7("finding:expiry"), [HAZRATGANJ]), source: "intel:inventory_purchasing",
+      command_type: "cares.listing.publish.v1",
+      payload: {
+        listing_id: id7("listing:draft:sourdough"), outlet_id: HAZRATGANJ, kind: "donation",
+        recipient_id: String(cell("match", 0, "recipient_id")), pickup_from: String(cell("match", 0, "pickup_from")), pickup_to: String(cell("match", 0, "pickup_to")),
+        lines: [{
+          line_id: id7("listing_line:draft:sourdough:1"), food_kind: "packaged", item_id: null, ingredient_id: ING("sourdough"), batch_id: SOURDOUGH_BATCH,
+          qty_milli: snap("expiry", 0, "at_risk_qty_milli"), unit: "piece", expires_on: String(cell("expiry", 0, "expiry_on")), unit_price_minor: null, currency: null,
+        }],
+      },
+      resolved_refs: [{ path: "/lines/0/qty_milli", ref: snap("expiry", 0, "at_risk_qty_milli"), value: cell("expiry", 0, "at_risk_qty_milli") }],
+      evidence: [bare("expiry"), bare("match")],
+      based_on: [
+        based("expiry", 0, "at_risk_qty_milli", "inventory.expiry_risk"), based("expiry", 0, "expiry_on", "inventory.expiry_risk"),
+        ...["recipient_id", "pickup_from", "pickup_to", "pickup_on"].map((c) => based("match", 0, c, "cares.recipient_match")),
+      ],
+    },
+  ];
 }
 
 // ---------------------------------------------------------------- Ask Munim
@@ -714,15 +709,6 @@ export function seedPurchaseOrders(now: Date): S["V1PurchaseOrder"][] {
     lines: [{ po_line_id: id7("po_line:butter:1"), line_no: 1, ingredient_id: ING("butter"), qty_milli: 10000, unit: "kg", unit_price_minor: 56000 }],
   }];
 }
-/** Last week's butter delivery, recorded against its purchase order (15 §10). */
-export function seedGoodsReceived(now: Date): S["V1GoodsReceived"][] {
-  const po = seedPurchaseOrders(now)[0]!;
-  return [{
-    grn_id: id7("grn:butter"), outlet_id: HAZRATGANJ, supplier: po.supplier, po_id: po.po_id, received_at: mins(now, -60 * 24 * 5), received_by: MEMBERS[0]!.me.member_id, note: "Two cartons, cold on arrival (synthetic)",
-    lines: [{ grn_line_id: id7("grn_line:butter:1"), po_line_id: po.lines[0]!.po_line_id, ingredient_id: ING("butter"), batch_id: id7("batch:butter:grn"), qty_milli: 10000, unit: "kg", unit_cost_minor: 56000, currency: CURRENCY }],
-  }];
-}
-
 export function reorderLevels(outletId: string, now: Date): S["V1InventoryReorderLevels"] {
   return {
     reorder_levels: outletId === HAZRATGANJ
@@ -732,4 +718,84 @@ export function reorderLevels(outletId: string, now: Date): S["V1InventoryReorde
         ]
       : [],
   };
+}
+
+
+// ---------------------------------------------------------------- Cares: food at risk and ranked recipients
+export const CARES_RUN = id7("run:expiry");
+export const SOURDOUGH_BATCH = id7("batch:sourdough:1013");
+const CREAM_BATCH = id7("batch:cream:1011");
+/** An instant from the outlet's calendar date and a "HH:MM" wall time (India: a fixed offset is exact). */
+const localAt = (date: string, hhmm: string) => new Date(Date.parse(`${date}T${hhmm}:00Z`) - TZ_OFFSET_MIN * 60_000).toISOString();
+const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+/** The next overlap of two wall-time windows after now: today's when it starts later today, else tomorrow's (as the template). */
+function nextWindow(now: Date, from: string, to: string) {
+  const today = businessDate(now);
+  const on = Date.parse(localAt(today, from)) > now.getTime() ? today : addDays(today, 1);
+  return { from: localAt(on, from), to: localAt(on, to), on };
+}
+/** Synthetic distances from Cobnut Hazratganj (the template works them out from coordinates). */
+const DISTANCE_M: Record<string, number> = { [RECIPIENT.shelter]: 455, [RECIPIENT.kitchen]: 4208 };
+
+/** cares.recipient_match as core ranks it: simulated recipients in the outlet's city that take every food kind asked for,
+ *  whose receiving hours overlap the outlet's pickup hours, an expiry at least one day after pickup (the pack's
+ *  min_days_left_at_pickup); fitting first, then the longest overlap, then the nearest. */
+export function matchRowsFor(p: Snapshot["params"], now: Date): Snapshot["rows"] {
+  const outlet = CARES_PROFILE.outlets.find((o) => o.outlet_id === p.outlet_id && o.active);
+  if (!outlet) return [];
+  const qty = Number(p.qty_milli);
+  const rows = RECIPIENTS.items
+    .filter((r) => (!p.needs_cooked || r.accepts_cooked) && (!p.needs_raw || r.accepts_raw) && (!p.needs_packaged || r.accepts_packaged))
+    .flatMap((r) => {
+      const from = outlet.pickup_from > r.receiving_from ? outlet.pickup_from : r.receiving_from;
+      const to = outlet.pickup_to < r.receiving_to ? outlet.pickup_to : r.receiving_to;
+      if (to <= from) return [];
+      const w = nextWindow(now, from, to);
+      if (typeof p.expires_on === "string" && p.expires_on < addDays(w.on, 1)) return [];
+      const fit = p.unit === "g" || p.unit === "ml" ? qty <= r.capacity_kg_per_day * 1_000_000 : p.unit === "kg" || p.unit === "l" ? qty <= r.capacity_kg_per_day * 1000 : p.unit === "portion" ? qty <= r.capacity_portions_per_day * 1000 : true;
+      return [{ recipient_id: r.recipient_id, name: r.name, simulated: true, distance_m: DISTANCE_M[r.recipient_id] ?? 0, capacity_fit: fit, overlap_min: minutesOf(to) - minutesOf(from), pickup_from: w.from, pickup_to: w.to, pickup_on: w.on }];
+    });
+  return rows.sort((a, b) => Number(b.capacity_fit) - Number(a.capacity_fit) || b.overlap_min - a.overlap_min || a.distance_m - b.distance_m);
+}
+
+/** Tonight's food at risk at Hazratganj (12 sourdough loaves expire the day after the next pickup), and the recipients
+ *  core would rank for it. Run-minted by the watcher; the finding and the listing draft cite them. */
+export function caresSnapshots(now: Date): Snapshot[] {
+  const at = mins(now, -60);
+  const pickupOn = nextWindow(now, "21:00", "22:30").on;
+  const expiry = [
+    { batch_id: SOURDOUGH_BATCH, expiry_on: addDays(pickupOn, 1), days_to_expiry: pickupOn === businessDate(now) ? 1 : 2, is_sku: true, remaining_qty_milli: 14_000, use_before_expiry_qty_milli: 2_000, at_risk_qty_milli: 12_000, at_risk_minor: 54_000, ingredient_id: ING("sourdough"), unit: "piece", supplier_id: null },
+    { batch_id: CREAM_BATCH, expiry_on: addDays(businessDate(now), 4), days_to_expiry: 4, is_sku: false, remaining_qty_milli: 2_000_000, use_before_expiry_qty_milli: 1_600_000, at_risk_qty_milli: 400_000, at_risk_minor: 9_000, ingredient_id: ING("cream"), unit: "ml", supplier_id: SUPPLIER.dairy },
+  ];
+  const ask = { outlet_id: HAZRATGANJ, needs_cooked: false, needs_raw: false, needs_packaged: true, qty_milli: 12_000, unit: "piece", expires_on: expiry[0]!.expiry_on };
+  return [
+    snapshotOf(id7("snap:expiry"), "inventory.expiry_risk", { outlet_id: HAZRATGANJ, days: 7, as_of: businessDate(now) }, TEMPLATE_COLUMNS["inventory.expiry_risk"]!, expiry, { run: CARES_RUN }, [HAZRATGANJ], at),
+    snapshotOf(id7("snap:match"), "cares.recipient_match", ask, TEMPLATE_COLUMNS["cares.recipient_match"]!, matchRowsFor(ask, now), { run: CARES_RUN }, [HAZRATGANJ], at),
+  ];
+}
+
+/** The finding behind the listing draft. Text holds no digit; every number is a ref. */
+export function expiryFinding(now: Date): Finding {
+  const at = mins(now, -55);
+  const s = caresSnapshots(now)[0]!;
+  const value = (c: string) => ({ ref: snap("expiry", 0, c), value: s.rows[0]![c]! });
+  return {
+    finding_id: id7("finding:expiry"), run_id: CARES_RUN, pack: "inventory_purchasing", type: "inventory.expiry_risk", severity: "low", status: "open",
+    confidence_bp: 8000, dedupe_key: `inventory.expiry_risk:${HAZRATGANJ}:${SOURDOUGH_BATCH}`,
+    envelope: {
+      finding_id: id7("finding:expiry"), impact_ref: snap("expiry", 0, "at_risk_minor"), abstained: false, reason_code: null,
+      segments: [{ text: `Sliced sourdough loaves at Cobnut Hazratganj: ${snap("expiry", 0, "at_risk_qty_milli")} of this batch are not expected to be used before it expires on ${snap("expiry", 0, "expiry_on")}, worth ${snap("expiry", 0, "at_risk_minor")} at cost.`, refs: [bare("expiry")] }],
+    },
+    resolved_refs: [value("at_risk_qty_milli"), value("expiry_on"), value("at_risk_minor")],
+    created_at: at, updated_at: at,
+  };
+}
+
+/** Last week's butter, received against its purchase order. */
+export function seedGoodsReceived(now: Date): S["V1GoodsReceived"][] {
+  const [po] = seedPurchaseOrders(now);
+  return [{
+    grn_id: id7("grn:butter"), outlet_id: HAZRATGANJ, supplier: po!.supplier, po_id: po!.po_id, received_at: mins(now, -60 * 24 * 5), received_by: MEMBERS[1]!.me.member_id, note: null,
+    lines: [{ grn_line_id: id7("grn_line:butter:1"), po_line_id: po!.lines[0]!.po_line_id, ingredient_id: ING("butter"), batch_id: id7("batch:butter:1001"), qty_milli: 10_000, unit: "kg", unit_cost_minor: 56_000, currency: CURRENCY }],
+  }];
 }

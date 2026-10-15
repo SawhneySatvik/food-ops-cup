@@ -7,7 +7,7 @@ import { attemptFor, type CommandAttempt } from "./commands";
 import { MAX_QTY, NOTE_MAX } from "./checkout";
 import { shownName, titleCase } from "./format";
 import type { MunimError } from "./client";
-import { reasonText, staffErrorText } from "./staff-copy";
+import { reasonText, staffWriteErrorText } from "./staff-copy";
 import type { Schemas } from "./types";
 import { uuidv7 } from "./uuid";
 
@@ -194,8 +194,7 @@ export function counterSteps(order: Pick<OrderView, "status" | "channel_id">, co
 /** A failed write (place, tender, a status step) in the person's words. A `network` failure may have reached core
  *  (a 15 s timeout counts as one), so it never says "nothing changed": it says the same tap is safe, because the
  *  retry sends the same envelope and core replays it. Everything else is staff-copy's line. */
-export const writeErrorText = (e: MunimError): string =>
-  e.kind === "network" ? "The connection dropped before Munim answered. Tap again: it's safe and won't happen twice." : staffErrorText(e, "counter");
+export const writeErrorText = (e: MunimError): string => staffWriteErrorText(e, "counter");
 
 /** A preview or place refusal in the person's words. */
 export const tillRefusalText = (code: string): string => reasonText(code) ?? "This line can't be sold right now. Remove it to continue.";

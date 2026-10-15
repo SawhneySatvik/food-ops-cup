@@ -1,16 +1,17 @@
 "use client";
-// /staff/suppliers, /staff/suppliers/[supplierId] and /staff/purchase-orders/[poId] (15). Stock below its minimum,
-// the AI's purchase-order proposals with the simulated suppliers' quotes behind them, a person's own purchase order,
-// the orders themselves and the goods received against them. Every supplier is simulated and wears its badge; every
-// amount is a row field shown as it is or a snapshot cell with its source chip. Nothing is added up or multiplied here:
-// core works out every purchase order's total. Owner, manager and judge only.
+// /staff/suppliers (15). Stock below its minimum, the AI's purchase-order proposals with the simulated suppliers'
+// quotes behind them, a person's own purchase order and the orders themselves. Every supplier is simulated and wears
+// its badge; every amount is a row field shown as it is or a snapshot cell with its source chip (minted on load, on an
+// outlet change and after a decision only: each mint writes a snapshot row). Nothing is added up or multiplied here:
+// core works out every purchase order's total. Owner, manager and judge only. Also exports the pieces the supplier and
+// purchase-order pages (supplier.tsx, purchase-order.tsx) reuse.
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnline } from "@/lib/hooks";
 import type { MunimError } from "@/lib/munim/client";
-import type { Outcome } from "@/lib/munim/draft-decision";
-import { formatDate, formatDayTime, formatMoney, formatQty } from "@/lib/munim/format";
+import type { Outcome } from "@/lib/munim/drafts";
+import { formatDate, formatDayTime, formatMoney } from "@/lib/munim/format";
 import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { RECORDED_ONLY } from "@/lib/munim/copy";
@@ -18,35 +19,46 @@ import { watchFor } from "@/lib/munim/staff-app";
 import { PO_STATUS, staffErrorText } from "@/lib/munim/staff-copy";
 import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
-import { ingredientOf, isPoDraft, lowRowsFor, quoteParams, type GoodsReceived, type PoDraft, type PurchaseOrder, type Supplier } from "@/lib/munim/supply-flow";
+import { ingredientOf, isPoDraft, lowRowsFor, quoteParams, type PoDraft, type PurchaseOrder, type Supplier } from "@/lib/munim/supply-flow";
 import type { Schemas } from "@/lib/munim/types";
-import { SITE, UUID7 } from "@/lib/site";
+import { SITE } from "@/lib/site";
 import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
 import { useStaff } from "../shell";
 import { CannotVerify, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill, type PillTone } from "../source";
 import { NewPoForm } from "../suppliers/new-po";
 import { PoDraftCard } from "../suppliers/po-draft";
-import { QuoteTable } from "../suppliers/quotes";
-import { ReceiveForm } from "../suppliers/receive";
 import { LiveLine } from "./inbox";
 
 type Ingredient = Schemas["V1InventoryIngredients"]["items"][number];
 type Detail = Schemas["V1DraftDetail"] & { draft: PoDraft };
-type Proposal = { detail: Detail; quotes: Snapshot | null | "failed" };
+/** `quotes`: "none" for a proposal that names no negotiation run. */
+type Proposal = { detail: Detail; quotes: Snapshot | null | "failed" | "none" };
 type OpenRef = (snapshotId: string, refToken: string) => void;
 /** A panel's data: null while loading, an error when its call failed. */
 type Panel<T> = T | MunimError | null;
 const failed = <T,>(p: Panel<T>): p is MunimError => p !== null && typeof p === "object" && "kind" in p && "status" in p && !("snapshot_id" in p);
 
-const PO_TONE: Record<string, PillTone> = { committed: "work", received: "done", cancelled: "stop" };
-const NOT_FOUND = <FullPage title="Not found."><p>It may have been removed, or it isn&apos;t in your outlets.</p></FullPage>;
+const STALE = "The numbers behind this changed since it was proposed. It can no longer be approved or rejected; a new proposal will replace it.";
+export const PO_TONE: Record<string, PillTone> = { committed: "work", received: "done", cancelled: "stop" };
 
-function NotForRole() {
+/** An unknown or malformed supplier or purchase-order id. */
+export function NotFoundPage() {
+  return <FullPage title="Not found."><p>It may have been removed, or it isn&apos;t in your outlets.</p></FullPage>;
+}
+
+/** The three supplier routes: the person's role cannot open them. No call is made. */
+export function NotForSuppliers() {
   return (
     <FullPage title="Suppliers are for the owner and managers." action={<Link href="/staff" className="btn btn-primary">Go to my screen</Link>}>
       <p>Ask the owner if you need something ordered.</p>
     </FullPage>
   );
+}
+
+/** A panel that has no data yet: its error with "Try again", or a skeleton at the panel's size. */
+export function PanelWait({ error, onRetry, height }: { error: MunimError | undefined; onRetry: () => void; height: string }) {
+  if (!error) return <div className={`skeleton ${height}`} role="status" aria-label="Loading" />;
+  return <RetryLine error={error} onRetry={onRetry} />;
 }
 
 function RetryLine({ error, onRetry }: { error: MunimError; onRetry: () => void }) {
@@ -65,7 +77,7 @@ function SupplierName({ s }: { s: { name: string; label: string | null } | undef
 }
 
 /** One purchase-order row (the list on /staff/suppliers and on a supplier's page). */
-function PoRow({ po, tz }: { po: PurchaseOrder; tz: string }) {
+export function PoRow({ po, tz }: { po: PurchaseOrder; tz: string }) {
   return (
     <li>
       <Link href={`/staff/purchase-orders/${po.po_id}`} className="card card-link grid gap-1 p-4 no-underline">
@@ -80,13 +92,13 @@ function PoRow({ po, tz }: { po: PurchaseOrder; tz: string }) {
   );
 }
 
-/** "Offline" bar for all three screens. */
+/** "Offline" bar. */
 const Offline = ({ show }: { show: boolean }) => (show ? <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div> : null);
 
 // =============================================================== /staff/suppliers
 export function SuppliersScreen() {
   const { session, outlet } = useStaff();
-  if (!can(session, "suppliers")) return <NotForRole />;
+  if (!can(session, "suppliers")) return <NotForSuppliers />;
   if (!outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
   return <Suppliers key={outlet.id} />;
 }
@@ -109,6 +121,10 @@ function Suppliers() {
   const [live, setLive] = useState<LiveState>("connecting");
   const [drawer, setDrawer] = useState<{ snapshotId: string; refToken: string } | null>(null);
   const formRef = useRef<HTMLElement>(null);
+  // inbox:<tenant> is owner and manager only.
+  const watches = session.me.role === "owner" || session.me.role === "manager";
+  // Each negotiation's quotes, minted once: a refresh, a focus or a live wake-up does not mint them again.
+  const minted = useRef(new Map<string, Snapshot>());
 
   const seen = useCallback((e: MunimError): MunimError | null => {
     if (handleAuth(e)) return null;
@@ -129,18 +145,26 @@ function Suppliers() {
     else { const e = seen(r.error); if (e) setLow(e); }
   }, [client, seen]);
 
-  /** The proposals chain (15 §3): proposed POs for this outlet, each one's detail, then one quote snapshot per run. */
-  const loadProposals = useCallback(async () => {
+  /** The proposals chain (15 §3): proposed POs for this outlet, each one's detail, then one quote snapshot per run,
+   *  minted again only when `remint` (on load and after a decision). */
+  const loadProposals = useCallback(async (remint: boolean) => {
     const list = await client.listDrafts({ status: "proposed", outlet: outlet.id });
     if (!list.ok) { const e = seen(list.error); if (e) setProposals((was) => (was && !failed(was) ? was : e)); return; }
     const details = await Promise.all(list.data.items.filter((i) => isPoDraft(i.draft)).map((i) => client.getDraft(i.draft.draft_id)));
     const kept = details.flatMap((d) => (d.ok && isPoDraft(d.data.draft) && d.data.draft.status === "proposed" ? [d.data as Detail] : (d.ok ? [] : (seen(d.error), []))));
     const runs = [...new Set(kept.flatMap((d) => (d.draft.payload.negotiation_run_id ? [d.draft.payload.negotiation_run_id] : [])))];
-    const minted = new Map(await Promise.all(runs.map(async (run) => {
+    const quotes = new Map<string, Snapshot | "failed">(await Promise.all(runs.map(async (run) => {
+      const had = minted.current.get(run);
+      if (had && !remint) return [run, had] as const;
       const r = await client.mintSnapshot({ template_id: "purchasing.quote_compare", params: quoteParams(run) });
+      if (r.ok) minted.current.set(run, r.data);
+      else seen(r.error);
       return [run, r.ok ? r.data : "failed"] as const;
     })));
-    setProposals(kept.map((detail) => ({ detail, quotes: detail.draft.payload.negotiation_run_id ? (minted.get(detail.draft.payload.negotiation_run_id) ?? "failed") : "failed" })));
+    setProposals(kept.map((detail) => {
+      const run = detail.draft.payload.negotiation_run_id;
+      return { detail, quotes: run ? (quotes.get(run) ?? "failed") : "none" };
+    }));
   }, [client, outlet.id, seen]);
 
   const loadSuppliers = useCallback(async () => {
@@ -156,13 +180,16 @@ function Suppliers() {
     void loadSuppliers();
     void loadPos();
     void mintLow();
-    void loadProposals();
+    void loadProposals(true);
   }, [client, seen, loadSuppliers, loadPos, mintLow, loadProposals]);
 
-  // inbox:<tenant> (owner and manager): a proposal decided on another tablet leaves the list.
-  useEffect(() => watchFor(session, [topic.inbox(session.tenantId)], () => void loadProposals(), setLive), [session, loadProposals]);
+  // inbox:<tenant>: a proposal decided on another tablet leaves the list.
+  useEffect(() => {
+    if (!watches) return;
+    return watchFor(session, [topic.inbox(session.tenantId)], () => void loadProposals(false), setLive);
+  }, [watches, session, loadProposals]);
 
-  const refresh = useCallback(() => { void loadPos(); void loadProposals(); }, [loadPos, loadProposals]);
+  const refresh = useCallback(() => { void loadPos(); void loadProposals(false); }, [loadPos, loadProposals]);
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
     document.addEventListener("visibilitychange", onVisible);
@@ -173,10 +200,10 @@ function Suppliers() {
     if (o.kind === "signed_out") { handleAuth(o.error); return; }
     if (o.kind === "done" && o.type === "purchasing.po.create.v1") { setApproved(o.entityId); say("Approved. The purchase order is recorded."); }
     if (o.kind === "done" && o.type === "drafts.reject.v1") say("Rejected. Nothing was ordered.");
-    if (o.kind === "stale") say("The numbers behind this changed since it was proposed. It can no longer be approved; reject it or wait for a new one.");
+    if (o.kind === "stale") say(STALE);
     if (o.kind === "decided_elsewhere") say("Someone else already decided this. It has been refreshed.");
     if (o.kind === "cannot_verify") say("Cannot verify — some numbers in this draft no longer trace to their source rows.");
-    void loadProposals();
+    void loadProposals(true);
     void loadPos();
   };
   const openForm = (prefill: string | null) => {
@@ -198,7 +225,7 @@ function Suppliers() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h1 className="section-title">Suppliers</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <LiveLine state={live} onRefresh={refresh} />
+              <LiveLine state={watches ? live : "open"} onRefresh={refresh} />
               <button type="button" className="btn btn-primary" onClick={() => openForm(null)}>New purchase order</button>
               <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
             </div>
@@ -243,7 +270,7 @@ function Suppliers() {
                 </p>
               )}
               {proposals === null || !fmt ? <div className="skeleton h-64" role="status" aria-label="Loading" />
-                : failed(proposals) ? <RetryLine error={proposals} onRetry={() => void loadProposals()} />
+                : failed(proposals) ? <RetryLine error={proposals} onRetry={() => void loadProposals(true)} />
                 : proposals.length === 0 ? <p className="text-muted">No proposals waiting.</p>
                 : proposals.map((p) => (
                   <PoDraftCard key={p.detail.draft.draft_id} detail={p.detail} quotes={p.quotes} suppliers={supplierList} ingredients={ingredients} outletName={outletName}
@@ -288,242 +315,6 @@ function Suppliers() {
               )}
           </aside>
         </div>
-      </div>
-      {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
-      <Toast message={toast} />
-    </main>
-  );
-}
-
-// =============================================================== /staff/suppliers/[supplierId]
-export function SupplierScreen() {
-  const { session, outlet } = useStaff();
-  const { supplierId } = useParams<{ supplierId: string }>();
-  if (!can(session, "suppliers")) return <NotForRole />;
-  if (!UUID7.test(supplierId)) return NOT_FOUND;
-  if (!outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
-  return <SupplierPage key={`${supplierId}:${outlet.id}`} supplierId={supplierId} />;
-}
-
-function SupplierPage({ supplierId }: { supplierId: string }) {
-  const { session, client, outlet: chosen, handleAuth } = useStaff();
-  const outlet = chosen!;
-  const router = useRouter();
-  const online = useOnline();
-  const [supplier, setSupplier] = useState<Panel<Supplier>>(null);
-  const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [pos, setPos] = useState<Panel<PurchaseOrder[]>>(null);
-  const [form, setForm] = useState(false);
-
-  const load = useCallback(async () => {
-    const [s, t, i, p] = await Promise.all([client.getSupplier(supplierId), client.getTenant(), client.listIngredients(), client.listPurchaseOrders()]);
-    if (t.ok) setTenant(t.data);
-    if (i.ok) setIngredients(i.data.items);
-    if (s.ok) setSupplier(s.data);
-    else if (!handleAuth(s.error)) setSupplier(s.error);
-    if (p.ok) setPos(p.data.items.filter((x) => x.supplier.supplier_id === supplierId));
-    else if (!handleAuth(p.error)) setPos(p.error);
-  }, [client, supplierId, handleAuth]);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount
-    void load();
-  }, [load]);
-
-  if (failed(supplier) && supplier.kind === "not_found") return NOT_FOUND;
-  const tz = outlet.tz;
-  return (
-    <main className="pb-12">
-      <Offline show={!online || (failed(supplier) && supplier.kind === "network")} />
-      <div className="wrap staff-main space-y-6">
-        <p><Link href="/staff/suppliers">← Suppliers</Link></p>
-        {supplier === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
-          : failed(supplier) ? <RetryLine error={supplier} onRetry={() => void load()} />
-          : (
-            <>
-              <header className="space-y-2">
-                <h1 className="section-title"><SupplierName s={supplier} /></h1>
-                {supplier.payment_days !== null && supplier.payment_days > 0 && <p>Pay within {supplier.payment_days} days</p>}
-                {supplier.notes && <p className="text-muted">{supplier.notes}</p>}
-                {!supplier.active && <span className="pill pill-done">Not active</span>}
-              </header>
-
-              <section aria-labelledby="prices-title" className="card space-y-3 p-5">
-                <h2 id="prices-title" className="text-[24px]">Price list</h2>
-                {supplier.prices.length === 0 ? <p className="text-muted">No prices recorded.</p> : (
-                  <div className="overflow-x-auto">
-                    <table className="snap-table">
-                      <thead><tr><th scope="col">Item</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th><th scope="col">Seen on</th><th scope="col">Source</th></tr></thead>
-                      <tbody>
-                        {supplier.prices.map((p) => (
-                          <tr key={p.price_id}>
-                            <td>{ingredientOf(ingredients, p.ingredient_id).name}</td>
-                            <td>{p.unit}</td>
-                            <td className="num">{formatMoney(p.unit_price_minor, p.currency, SITE.locale)}</td>
-                            <td>{formatDayTime(p.observed_at, tz, SITE.locale)}</td>
-                            <td>{p.source_ref}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              <section aria-labelledby="supplier-pos" className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 id="supplier-pos" className="text-[24px]">Purchase orders</h2>
-                  {supplier.active && <button type="button" className="btn btn-primary" onClick={() => setForm(true)}>New purchase order</button>}
-                </div>
-                {form && tenant && (
-                  <NewPoForm suppliers={[supplier]} ingredients={ingredients} outletId={outlet.id} currency={tenant.base_currency} locale={SITE.locale} tz={tz}
-                    prefillIngredient={null} session={session} client={client} onAuth={handleAuth} onCreated={(poId) => router.push(`/staff/purchase-orders/${poId}`)} />
-                )}
-                {pos === null ? <div className="skeleton h-28" role="status" aria-label="Loading" />
-                  : failed(pos) ? <RetryLine error={pos} onRetry={() => void load()} />
-                  : pos.length === 0 ? <div className="state-box"><p>No purchase orders yet.</p></div>
-                  : <ul className="grid gap-3">{pos.map((po) => <PoRow key={po.po_id} po={po} tz={tz} />)}</ul>}
-              </section>
-            </>
-          )}
-      </div>
-    </main>
-  );
-}
-
-// =============================================================== /staff/purchase-orders/[poId]
-export function PurchaseOrderScreen() {
-  const { session, outlet } = useStaff();
-  const { poId } = useParams<{ poId: string }>();
-  if (!can(session, "suppliers")) return <NotForRole />;
-  if (!UUID7.test(poId)) return NOT_FOUND;
-  if (!outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
-  return <PurchaseOrderPage key={poId} poId={poId} />;
-}
-
-function PurchaseOrderPage({ poId }: { poId: string }) {
-  const { session, client, outlet: chosen, outlets, handleAuth } = useStaff();
-  const outlet = chosen!;
-  const online = useOnline();
-  const [toast, say] = useToast();
-  const [po, setPo] = useState<Panel<PurchaseOrder>>(null);
-  const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [grns, setGrns] = useState<Panel<GoodsReceived[]>>(null);
-  const [quotes, setQuotes] = useState<Snapshot | "failed" | null>(null);
-  const [drawer, setDrawer] = useState<{ snapshotId: string; refToken: string } | null>(null);
-
-  const loadPo = useCallback(async () => {
-    const [p, g] = await Promise.all([client.getPurchaseOrder(poId), client.listGoodsReceived()]);
-    if (p.ok) setPo(p.data);
-    else if (!handleAuth(p.error)) setPo((was) => (was && !failed(was) && p.error.kind !== "not_found" ? was : p.error));
-    if (g.ok) setGrns(g.data.items.filter((x) => x.po_id === poId));
-    else if (!handleAuth(g.error)) setGrns((was) => (was && !failed(was) ? was : g.error));
-    return p.ok ? p.data : null;
-  }, [client, poId, handleAuth]);
-
-  useEffect(() => {
-    void client.getTenant().then((r) => r.ok && setTenant(r.data));
-    void client.listIngredients().then((r) => r.ok && setIngredients(r.data.items));
-    void client.listSuppliers().then((r) => r.ok && setSuppliers(r.data.items));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; the quotes follow the order
-    void loadPo().then((p) => {
-      if (!p?.negotiation_run_id) return;
-      void client.mintSnapshot({ template_id: "purchasing.quote_compare", params: quoteParams(p.negotiation_run_id) }).then((r) => setQuotes(r.ok ? r.data : "failed"));
-    });
-  }, [client, loadPo]);
-  useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === "visible") void loadPo(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadPo]);
-
-  if (failed(po) && po.kind === "not_found") return NOT_FOUND;
-  const tz = outlet.tz;
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
-  const mine = (id: string) => outlets.find((o) => o.id === id);
-  const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
-
-  return (
-    <main className="pb-12">
-      <Offline show={!online || (failed(po) && po.kind === "network")} />
-      <div className="wrap staff-main space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Link href="/staff/suppliers">← Suppliers</Link>
-          <button type="button" className="btn btn-plain" onClick={() => void loadPo()}>Refresh</button>
-        </div>
-        {po === null ? <div className="skeleton h-60" role="status" aria-label="Loading" />
-          : failed(po) ? <RetryLine error={po} onRetry={() => void loadPo()} />
-          : (
-            <>
-              <header className="space-y-2">
-                <h1 className="section-title">Purchase order</h1>
-                <p className="flex flex-wrap items-center gap-2 text-[20px] font-semibold">
-                  <SupplierName s={po.supplier} />
-                  <StatusPill tone={PO_TONE[po.status] ?? "work"}>{PO_STATUS[po.status] ?? po.status}</StatusPill>
-                </p>
-                <p>For {po.outlet_ids.map((id) => mine(id)?.name ?? "another outlet").join(", ")}</p>
-                <p className="text-muted">{po.expected_on ? `Expected ${formatDate(po.expected_on, SITE.locale)}` : "No expected date"} · Placed {formatDayTime(po.created_at, tz, SITE.locale)}</p>
-              </header>
-
-              <section aria-label="Lines" className="card space-y-3 p-5">
-                <div className="overflow-x-auto">
-                  <table className="snap-table">
-                    <thead><tr><th scope="col">Item</th><th scope="col" className="num">Quantity</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th></tr></thead>
-                    <tbody>
-                      {po.lines.map((l) => (
-                        <tr key={l.po_line_id}>
-                          <td>{ingredientOf(ingredients, l.ingredient_id).name}</td>
-                          <td className="num">{formatQty(l.qty_milli, SITE.locale)}</td>
-                          <td>{l.unit}</td>
-                          <td className="num">{formatMoney(l.unit_price_minor, po.currency, SITE.locale)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-[19px]">Total (worked out by Munim) <span className="num font-bold">{formatMoney(po.total_minor, po.currency, SITE.locale)}</span></p>
-                <p className="text-[14px] text-muted">{RECORDED_ONLY}</p>
-                {po.negotiation_run_id && (
-                  <details>
-                    <summary className="min-h-12 cursor-pointer font-semibold">Compare the quotes</summary>
-                    <div className="mt-3">
-                      {quotes === null || !fmt ? <div className="skeleton h-24" role="status" aria-label="Loading" />
-                        : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>
-                        : <QuoteTable snapshot={quotes} suppliers={suppliers} citedQuoteId={null} fmt={fmt} onOpen={open} />}
-                    </div>
-                  </details>
-                )}
-              </section>
-
-              <section aria-labelledby="grn-title" className="space-y-3">
-                <h2 id="grn-title" className="text-[24px]">Goods received</h2>
-                {grns === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
-                  : failed(grns) ? <RetryLine error={grns} onRetry={() => void loadPo()} />
-                  : grns.length === 0 ? <p className="text-muted">Nothing received yet.</p>
-                  : grns.map((g) => (
-                    <article key={g.grn_id} className="card space-y-2 p-4">
-                      <p className="font-semibold">Received {formatDayTime(g.received_at, tz, SITE.locale)}{g.received_by === session.me.member_id ? " · recorded by you" : ""}</p>
-                      <ul className="space-y-1">
-                        {g.lines.map((l) => (
-                          <li key={l.grn_line_id}>
-                            {ingredientOf(ingredients, l.ingredient_id).name} · <span className="num">{formatQty(l.qty_milli, SITE.locale)}</span> {l.unit} · Cost per unit <span className="num">{formatMoney(l.unit_cost_minor, l.currency, SITE.locale)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {g.note && <p className="text-muted">{g.note}</p>}
-                    </article>
-                  ))}
-              </section>
-
-              {po.status === "committed" && tenant && grns !== null && !failed(grns) && (
-                <ReceiveForm po={po} grns={grns} outlets={po.outlet_ids.flatMap((id) => (mine(id) ? [{ id, name: mine(id)!.name }] : []))} ingredients={ingredients}
-                  session={session} client={client} currency={tenant.base_currency} onAuth={handleAuth}
-                  onDone={(text) => { if (text) say(text); void loadPo(); }} />
-              )}
-            </>
-          )}
       </div>
       {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
       <Toast message={toast} />

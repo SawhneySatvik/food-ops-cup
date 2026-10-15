@@ -14,7 +14,7 @@ export function staffErrorText(e: MunimError, where: StaffWhere): string {
     case "already_decided":
       return "Someone else already decided this. It has been refreshed.";
     case "stale_draft":
-      return "The numbers behind this changed since it was proposed. It can no longer be approved; reject it or wait for a new one.";
+      return "The numbers behind this changed since it was proposed. It can no longer be approved or rejected; a new proposal will replace it.";
     case "cannot_verify":
       return "Cannot verify — some numbers in this draft no longer trace to their source rows.";
     case "execution_failed":
@@ -38,6 +38,12 @@ export function staffErrorText(e: MunimError, where: StaffWhere): string {
   if (e.kind === "server") return where === "ask" ? "Munim can't answer right now." : "Something went wrong on our side. Try again.";
   if (where === "sign-in") return "Sign-in didn't work. Try again.";
   return "That didn't work. Please check and try again.";
+}
+
+/** A failed WRITE (any command). A `network` failure may have reached core (a 15 s timeout counts as one), so it
+ *  never says "nothing changed": the same tap is safe, because the retry resends the same envelope and core replays it. */
+export function staffWriteErrorText(e: MunimError, where: StaffWhere): string {
+  return e.kind === "network" ? "The connection dropped before Munim answered. Tap again: it's safe and won't happen twice." : staffErrorText(e, where);
 }
 
 /** Reason codes a staff screen can meet, in the person's words; null = use the generic line. */
@@ -64,6 +70,7 @@ export function reasonText(code: string): string | null {
     listing_expired: "The pickup time has passed. Choose a later time.",
     cooked_hold_exceeded: "Cooked food can't be held that long. Choose an earlier pickup.",
     line_expired: "An item is past its date.",
+    tax_id_missing: "This outlet's tax ids are missing, so a bill can't be printed. The sale is saved.",
     qty_exceeds_on_hand: "That's more than is in stock.",
     qty_exceeds_listed: "That's more than was listed.",
     unit_mismatch: "That unit doesn't match the item's stock unit.",
@@ -150,4 +157,5 @@ export const specialistName = (id: string | null | undefined): string => (id ? (
 export const SIMULATED_SUPPLIER = "Simulated supplier";
 export const SIMULATED_RECIPIENT = "Simulated recipient";
 export const DEMO_SIGN_IN = "Demo sign-in";
+export const DEMO_SIGN_IN_OFF = "Demo sign-in is switched off on this site.";
 export const CANNOT_VERIFY = "Cannot verify";

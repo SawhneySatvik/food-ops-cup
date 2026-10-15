@@ -15,17 +15,17 @@ const COLUMNS = [
   { name: "payment_days", label: "Pay within (days)" },
 ] as const;
 
-export function QuoteTable({ snapshot, suppliers, citedQuoteId, fmt, onOpen }: {
+export function QuoteTable({ snapshot, suppliers, citedRow, fmt, onOpen }: {
   snapshot: Snapshot;
   suppliers: readonly Supplier[];
-  /** The quote the proposal's price cites: its row is marked "Proposed". */
-  citedQuoteId: string | null;
+  /** The row the proposal's price cites (poDraftLines' quoteRow): it is marked "Proposed". */
+  citedRow: number | null;
   fmt: CellFormat;
   onOpen: (snapshotId: string, refToken: string) => void;
 }) {
   const rows = quoteRows(snapshot);
   if (rows.length === 0) return <p className="text-muted">No quotes were recorded for this negotiation.</p>;
-  const cited = rows.find((r) => r.quoteId === citedQuoteId) ?? rows[0]!;
+  const cited = rows.find((r) => r.row === citedRow) ?? rows[0]!;
   return (
     <div className="overflow-x-auto">
       <table className="snap-table">
@@ -39,9 +39,9 @@ export function QuoteTable({ snapshot, suppliers, citedQuoteId, fmt, onOpen }: {
           {rows.map((q) => {
             const s = suppliers.find((x) => x.supplier_id === q.supplierId);
             return (
-              <tr key={q.quoteId} aria-current={q.quoteId === citedQuoteId ? "true" : undefined}>
+              <tr key={q.quoteId} aria-current={q.row === citedRow ? "true" : undefined}>
                 <td>
-                  <span className="flex flex-wrap items-center gap-2">{s?.name ?? "A supplier no longer listed"} <SimulatedSupplier />{q.quoteId === citedQuoteId && <StatusPill tone="new">Proposed</StatusPill>}</span>
+                  <span className="flex flex-wrap items-center gap-2">{s?.name ?? "A supplier no longer listed"} <SimulatedSupplier />{q.row === citedRow && <StatusPill tone="new">Proposed</StatusPill>}</span>
                 </td>
                 {COLUMNS.map((c) => <td key={c.name} className="num">{formatCell(snapshot.rows[q.row]![c.name] ?? null, c.name, fmt)}</td>)}
               </tr>

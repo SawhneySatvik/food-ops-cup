@@ -2,50 +2,46 @@
 "use client";
 // /staff/inbox/[draftId]: one AI draft, decided by a named person. GET /v1/drafts/{id} first (only it carries
 // unverified_refs), then the names its rows need. Every number is a DraftField: the proposed value with its chip, or
-// "Cannot verify"; "Approve" exists only while every number traces; "Approve with my edits" sends what the person typed
-// as {value, typed_by}; Reject always asks for a reason. One attempt = one frozen envelope (01 §4). A 409 or 422 from
-// approve refetches the draft and shows what it says now. Live updates on inbox:<tenant> refetch it too.
+// "Cannot verify". The buttons are 02's DecisionBar on 01's drafts.ts, the same as every other draft card: "Approve"
+// only while every number traces, "Approve with my edits" sends what the person typed as {value, typed_by}, Reject
+// always asks for a reason. Every answer refetches the draft and shows what it says now; live updates on
+// inbox:<tenant> refetch it too.
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useCountdown, useOnline } from "@/lib/hooks";
+import { useOnline } from "@/lib/hooks";
 import type { MunimError } from "@/lib/munim/client";
-import { attemptFor, retryable, type CommandAttempt } from "@/lib/munim/commands";
 import {
-  approveGate, draftTitle, editsReady, fieldLabel, findingTitle, historyWords, lineageLine, numericFields, sourceName, staleChanges, withEdits,
-  type DraftDetail, type NumericField,
+  approveGate, draftTitle, fieldLabel, findingTitle, historyWords, lineageLine, numericFields, sourceName, staleChanges, withEdits,
+  type DraftDetail, type NumericField, type Outcome,
 } from "@/lib/munim/drafts";
-import { formatDate, formatWhen, titleCase } from "@/lib/munim/format";
+import { dayLabel, formatDate, formatTime, formatWhen, titleCase } from "@/lib/munim/format";
 import { columnOf, formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
-import { DRAFT_STATUS, REJECT_REASONS, staffErrorText } from "@/lib/munim/staff-copy";
+import { DRAFT_STATUS, staffErrorText } from "@/lib/munim/staff-copy";
 import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
 import type { Schemas } from "@/lib/munim/types";
 import { SITE, UUID7 } from "@/lib/site";
+import { DecisionBar, useDecision } from "../decision";
 import { DraftField } from "../draft-field";
 import { useStaff } from "../shell";
-import { CannotVerify, DRAFT_TONE, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill } from "../source";
+import { CannotVerify, DRAFT_TONE, SimulatedRecipient, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill } from "../source";
 import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
 import { LiveLine, NotForRole } from "./inbox";
 
-type Approve = CommandAttempt<"drafts.approve.v1", Schemas["DraftsApproveV1"]>;
-type Reject = CommandAttempt<"drafts.reject.v1", Schemas["DraftsRejectV1"]>;
-type ReasonCode = (typeof REJECT_REASONS)[number]["code"];
-type Mode = "view" | "edit" | "reject";
-
-const NOT_TRACED = "Some numbers in this draft don't trace to your books. Type the values you checked, or reject it.";
-const UNTRACEABLE = "Some numbers this draft relies on can't be opened with your access, so it can't be approved. You can reject it.";
-const NOT_FOR_YOU = "Only the owner can decide this one: it changes the whole business.";
-const STALE = "The numbers behind this changed since it was proposed. It can no longer be approved; reject it or wait for a new one.";
+const STALE = "The numbers behind this changed since it was proposed. It can no longer be approved or rejected; a new proposal will replace it.";
 const DECIDED_ELSEWHERE = "Someone else already decided this. It has been refreshed.";
+const PO_LINE = "Munim works out the total when it is approved. Recorded only — Munim does not process payments. Simulated supplier: nothing is sent to a real business.";
 
 /** What the rows need names for (the payload carries ids only). */
 interface Names {
   items: Map<string, string>;
   ingredients: Map<string, string>;
   supplier: Schemas["V1Supplier"] | null;
+  /** A Cares proposal's simulated recipient, by its id. */
+  recipient: string | null;
   finding: string | null;
 }
 
@@ -56,27 +52,17 @@ export function DraftDetailPage() {
   const allowed = can(session, "inbox");
   const [detail, setDetail] = useState<DraftDetail | "not_found" | null>(null);
   const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
-  const [names, setNames] = useState<Names>({ items: new Map(), ingredients: new Map(), supplier: null, finding: null });
+  const [names, setNames] = useState<Names>({ items: new Map(), ingredients: new Map(), supplier: null, recipient: null, finding: null });
   const [loadError, setLoadError] = useState<MunimError | null>(null);
-  const [mode, setMode] = useState<Mode>("view");
+  const [editing, setEditing] = useState(false);
   const [edits, setEdits] = useState<Record<string, number>>({});
-  const [why, setWhy] = useState("");
-  const [rejectCode, setRejectCode] = useState<ReasonCode | "">("");
-  const [rejectNote, setRejectNote] = useState("");
-  const [busy, setBusy] = useState<"approve" | "edited" | "reject" | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const [retryAt, setRetryAt] = useState<number | null>(null);
-  const [result, setResult] = useState<Schemas["CommandResult"] | null>(null);
+  const [result, setResult] = useState<{ type: string; entityId: string } | null>(null);
   const [live, setLive] = useState<LiveState>("connecting");
   const [drawer, setDrawer] = useState<{ snapshotId: string; refToken: string } | null>(null);
   const [toast, setToast] = useToast();
   const online = useOnline();
-  const approveAttempt = useRef<Approve | null>(null);
-  const rejectAttempt = useRef<Reject | null>(null);
-  const busyRef = useRef(false);
   const statusRef = useRef<string | null>(null);
   const valid = UUID7.test(draftId);
-  const waitS = useCountdown(retryAt, () => setRetryAt(null));
 
   const load = useCallback(async (): Promise<DraftDetail | null> => {
     const r = await client.getDraft(draftId);
@@ -91,6 +77,24 @@ export function DraftDetailPage() {
     return null;
   }, [client, draftId, handleAuth]);
 
+  // Every settled approve or reject: say what happened, then show what core says now.
+  const onOutcome = (o: Outcome) => {
+    if (o.kind === "signed_out") {
+      handleAuth(o.error);
+      return;
+    }
+    if (o.kind === "done") {
+      setResult(o);
+      setEditing(false);
+      setEdits({});
+      setToast(o.type === "drafts.reject.v1" ? "Rejected. Nothing was changed." : "Approved and applied.");
+    }
+    if (o.kind === "decided_elsewhere") setToast(DECIDED_ELSEWHERE);
+    void load().then((d) => { statusRef.current = d?.draft.status ?? statusRef.current; });
+  };
+  // The command type is known once the draft has loaded; the bar that sends with it renders only after that.
+  const dec = useDecision(client, { draft_id: draftId, command_type: detail && detail !== "not_found" ? detail.draft.command_type : "" }, "inbox", onOutcome);
+
   useEffect(() => {
     if (!allowed || !valid) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; state is set after the response
@@ -98,40 +102,46 @@ export function DraftDetailPage() {
     void client.getTenant().then((r) => r.ok && setTenant(r.data));
     return watchFor(session, [topic.inbox(session.tenantId)], () => {
       void load().then((d) => {
-        // Decided on another screen while this one was open (not by this person's own tap): say so.
-        if (d && statusRef.current === "proposed" && d.draft.status !== "proposed" && !busyRef.current && d.decision?.decided_by.member_id !== me.member_id) setToast(DECIDED_ELSEWHERE);
+        // Decided on another screen while this one was open, by someone else: say so. (This person's own decision
+        // arrives here too, and is not announced twice.)
+        if (d && statusRef.current === "proposed" && d.draft.status !== "proposed" && d.decision?.decided_by.member_id !== me.member_id) setToast(DECIDED_ELSEWHERE);
         statusRef.current = d?.draft.status ?? statusRef.current;
       });
     }, setLive);
   }, [allowed, valid, client, load, session, me.member_id, setToast]);
 
-  // Names for the rows, once the draft is known: items from the outlet's menu, ingredients, the supplier, the finding.
+  // Names for the rows, once the draft is known: items from the outlet's menu, ingredients, the supplier, the simulated
+  // recipient (from the outlet's recipients), the finding.
   const draft = detail && detail !== "not_found" ? detail.draft : null;
   const draftKey = draft?.draft_id ?? null;
   useEffect(() => {
     if (!draft) return;
     const p = draft.payload as Record<string, unknown>;
-    const outletId = draft.outlet_ids[0] ?? null;
+    // One of the draft's outlets this person works in (a manager sees a two-outlet draft by overlap; asking for the
+    // other outlet's menu or recipients would be a 404). The menu only when the draft names an item.
+    const outletId = draft.outlet_ids.find((o) => outlets.some((x) => x.id === o)) ?? null;
     let live = true;
     void Promise.all([
-      outletId ? client.getMenu(outletId, "counter") : null,
+      outletId && typeof p.item_id === "string" ? client.getMenu(outletId, "counter") : null,
       client.listIngredients(),
       typeof p.supplier_id === "string" ? client.getSupplier(p.supplier_id) : null,
+      typeof p.recipient_id === "string" && outletId ? client.listRecipients(outletId) : null,
       draft.finding_id ? client.listInbox() : null,
-    ]).then(([menu, ing, sup, inbox]) => {
+    ]).then(([menu, ing, sup, rec, inbox]) => {
       if (!live) return;
       const f = inbox?.ok ? inbox.data.items.find((i) => i.kind === "finding" && i.finding.finding_id === draft.finding_id) : undefined;
       setNames({
         items: new Map(menu?.ok ? menu.data.entries.map((e) => [e.item_id, e.display_name ?? titleCase(e.name_key)]) : []),
         ingredients: new Map(ing.ok ? ing.data.items.map((i) => [i.ingredient_id, i.name]) : []),
         supplier: sup?.ok ? sup.data : null,
+        recipient: rec?.ok ? (rec.data.items.find((r) => r.recipient_id === p.recipient_id)?.name ?? null) : null,
         finding: f?.kind === "finding" ? findingTitle(f.finding.type) : null,
       });
     });
     return () => { live = false; };
     // The names depend on the draft, not on each refetch of it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, client]);
+  }, [draftKey, client, outlets]);
 
   if (!allowed) return <NotForRole />;
   if (!valid || detail === "not_found") {
@@ -169,68 +179,25 @@ export function DraftDetailPage() {
     return `${what} · ${base}${unit ? (f.column.endsWith("_minor") ? ` per ${unit}` : ` (${unit})`) : ""}`;
   };
 
-  const settle = async (r: Awaited<ReturnType<typeof client.approveDraft>>, verb: "approve" | "reject") => {
-    if (r.ok) {
-      if (verb === "approve") approveAttempt.current = null;
-      else rejectAttempt.current = null;
-      setResult(r.data);
-      setMode("view");
-      setEdits({});
-      setToast(verb === "approve" ? "Approved and applied." : "Rejected. Nothing was changed.");
-      statusRef.current = (await load())?.draft.status ?? null;
-      return;
-    }
-    if (handleAuth(r.error)) return;
-    if (!retryable(r.error)) {
-      approveAttempt.current = null;
-      rejectAttempt.current = null;
-    }
-    if (r.error.kind === "rate_limited") setRetryAt(Date.now() + (r.error.retryAfterMs ?? 5000));
-    if (r.error.code === "already_decided") setToast(DECIDED_ELSEWHERE);
-    else setNote(staffErrorText(r.error, "inbox"));
-    // The draft may have moved (decided, stale, failed, or numbers that no longer trace): show what it says now.
-    if (r.error.status === 409 || r.error.status === 422 || r.error.kind === "not_found") statusRef.current = (await load())?.draft.status ?? null;
-  };
-
-  const approve = async (withMine: boolean) => {
-    if (busyRef.current) return;
-    const edited = withMine ? withEdits(detail.draft.payload, edits, me.member_id) : null;
-    const reason = withMine ? why.trim() : null;
-    const a = attemptFor(approveAttempt.current, JSON.stringify([draftId, edited, reason]), "drafts.approve.v1", () => ({
-      draft_id: draftId, command_type: detail.draft.command_type, edited_payload: edited, reason,
-    }));
-    approveAttempt.current = a;
-    busyRef.current = true;
-    setBusy(withMine ? "edited" : "approve");
-    setNote(null);
-    const r = await client.approveDraft(draftId, a.body);
-    busyRef.current = false;
-    setBusy(null);
-    await settle(r, "approve");
-  };
-
-  const reject = async () => {
-    const text = rejectNote.trim();
-    if (busyRef.current || !rejectCode || text.length < 1 || text.length > 500) return;
-    const a = attemptFor(rejectAttempt.current, JSON.stringify([draftId, rejectCode, text]), "drafts.reject.v1", () => ({ draft_id: draftId, reason: text, reason_code: rejectCode }));
-    rejectAttempt.current = a;
-    busyRef.current = true;
-    setBusy("reject");
-    setNote(null);
-    const r = await client.rejectDraft(draftId, a.body);
-    busyRef.current = false;
-    setBusy(null);
-    await settle(r, "reject");
-  };
-
-  const locked = busy !== null || retryAt !== null;
   const changes = staleChanges(detail);
+  /** A cited cell in words: a recipient by name, other ids by their last characters, times in the outlet's zone. */
+  const cellText = (value: Parameters<typeof formatCell>[0], column: string): string => {
+    if (typeof value === "string" && column.endsWith("_id")) return column === "recipient_id" && names.recipient ? names.recipient : `…${value.slice(-8)}`;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return formatWhen(value, tz, SITE.locale);
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value, SITE.locale);
+    return formatCell(value, column, fmt);
+  };
   const textRows: [string, React.ReactNode][] = [];
   if (typeof p.item_id === "string") textRows.push(["Item", names.items.get(p.item_id) ?? "An item"]);
   if (typeof p.outlet_id === "string") textRows.push(["Outlet", outletName(p.outlet_id)]);
   if (Array.isArray(p.outlet_ids)) textRows.push(["Outlets", p.outlet_ids.length === 0 ? "Whole business" : p.outlet_ids.map((o) => outletName(String(o))).join(", ")]);
   if (typeof p.station === "string") textRows.push(["Station", titleCase(p.station)]);
   if (typeof p.supplier_id === "string") textRows.push(["Supplier", names.supplier ? <>{names.supplier.name} {names.supplier.kind === "simulated" && <SimulatedSupplier />}</> : "A supplier"]);
+  // A donation: who gets the food (always with its badge: every recipient is simulated) and when it is picked up.
+  if (typeof p.recipient_id === "string") textRows.push(["To", <>{names.recipient ?? "A simulated recipient that is no longer listed"} <SimulatedRecipient /></>]);
+  if (typeof p.pickup_from === "string" && typeof p.pickup_to === "string") {
+    textRows.push(["Pickup", `${dayLabel(p.pickup_from, tz, SITE.locale)} ${formatTime(p.pickup_from, tz, SITE.locale)} – ${formatTime(p.pickup_to, tz, SITE.locale)}`]);
+  }
   if (typeof p.business_date === "string") textRows.push(["For", formatDate(p.business_date, SITE.locale)]);
   if (typeof p.valid_from === "string") textRows.push(["Starts", formatDate(p.valid_from, SITE.locale)]);
   if (typeof p.expected_on === "string") textRows.push(["Expected", formatDate(p.expected_on, SITE.locale)]);
@@ -253,10 +220,13 @@ export function DraftDetailPage() {
             <div key={label} className="draft-field"><p className="font-semibold">{label}</p><p>{value}</p></div>
           ))}
           {fields.map((f) => (
-            <DraftField key={f.path} label={labelOf(f)} value={f.value} edit={edits[f.path] ?? null} editorName={me.name} fmt={fmt} column={f.column} onOpen={open}
-              editing={mode === "edit"} onEdit={mode === "edit" ? (v) => setEdits((e) => { const next = { ...e }; if (v === null) delete next[f.path]; else next[f.path] = v; return next; }) : undefined} />
+            <DraftField key={f.path} label={labelOf(f)} value={f.value} edit={edits[f.path] ?? null} editorName={me.name} fmt={fmt} column={f.column}
+              lineUnit={typeof f.line?.unit === "string" ? f.line.unit : undefined} onOpen={open}
+              editing={editing} onEdit={editing ? (v) => setEdits((e) => { const next = { ...e }; if (v === null) delete next[f.path]; else next[f.path] = v; return next; }) : undefined} />
           ))}
         </div>
+
+        {detail.draft.command_type === "purchasing.po.create.v1" && <p className="text-[14px] text-muted">{PO_LINE}</p>}
 
         {detail.draft.based_on.length > 0 && (
           <div className="space-y-1">
@@ -267,7 +237,7 @@ export function DraftDetailPage() {
                 return (
                   <li key={b.ref}>
                     {templateWords(b.template_id)}:{" "}
-                    {ref ? <SourcedValue text={formatCell(b.expected, columnOf(ref), fmt)} refToken={b.ref} onOpen={open} /> : <CannotVerify />}
+                    {ref ? <SourcedValue text={cellText(b.expected, columnOf(ref))} refToken={b.ref} onOpen={open} /> : <CannotVerify />}
                   </li>
                 );
               })}
@@ -296,60 +266,15 @@ export function DraftDetailPage() {
 
         <p className="lineage">{lineageLine(detail, when, names.finding)}</p>
 
-        {gate.kind === "not_for_you" && <p className="font-semibold">{NOT_FOR_YOU}</p>}
-        {gate.kind === "untraceable" && <p className="font-semibold">{UNTRACEABLE}</p>}
-        {gate.kind === "type_first" && mode !== "reject" && <p className="font-semibold">{NOT_TRACED}</p>}
-
-        {mode === "edit" && (gate.kind === "open" || gate.kind === "type_first") && (
-          <div className="space-y-3">
-            <label className="grid gap-1 font-semibold">
-              Why you changed it
-              <textarea value={why} maxLength={500} rows={2} onChange={(e) => setWhy(e.target.value)} disabled={locked} />
-            </label>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="btn btn-primary" disabled={locked || !editsReady(gate, edits, why)} onClick={() => void approve(true)}>
-                {busy === "edited" ? "Saving…" : `Approve with my edits as ${me.name}`}
-              </button>
-              <button type="button" className="btn btn-plain" disabled={locked} onClick={() => { setMode("view"); setEdits({}); }}>Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {mode === "reject" && gate.kind !== "closed" && gate.kind !== "not_for_you" && (
-          <div className="space-y-3">
-            <label className="grid gap-1 font-semibold">
-              Why reject it?
-              <select value={rejectCode} onChange={(e) => setRejectCode(e.target.value as ReasonCode | "")} disabled={locked}>
-                <option value="">Choose a reason</option>
-                {REJECT_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-1 font-semibold">
-              What&apos;s wrong?
-              <textarea value={rejectNote} maxLength={500} rows={2} onChange={(e) => setRejectNote(e.target.value)} disabled={locked} />
-            </label>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="btn btn-primary" disabled={locked || !rejectCode || rejectNote.trim().length === 0} onClick={() => void reject()}>
-                {busy === "reject" ? "Saving…" : `Reject as ${me.name}`}
-              </button>
-              <button type="button" className="btn btn-plain" disabled={locked} onClick={() => setMode("view")}>Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {mode === "view" && gate.kind !== "closed" && gate.kind !== "not_for_you" && (
-          <div className="flex flex-wrap gap-3">
-            {gate.kind === "open" && (
-              <button type="button" className="btn btn-primary" disabled={locked} onClick={() => void approve(false)}>{busy === "approve" ? "Saving…" : `Approve as ${me.name}`}</button>
-            )}
-            {(gate.kind === "open" || gate.kind === "type_first") && <button type="button" className="btn btn-plain" disabled={locked} onClick={() => setMode("edit")}>Edit</button>}
-            <button type="button" className="btn btn-plain text-danger" disabled={locked} onClick={() => setMode("reject")}>Reject</button>
-          </div>
-        )}
-
-        {note && <ErrorNote>{note}</ErrorNote>}
-        {retryAt !== null && <p className="text-muted" role="status">You can try again in {waitS} s.</p>}
-        {result?.type === "purchasing.po.create.v1" && <Link href={`/staff/purchase-orders/${result.entity_id}`} className="btn btn-secondary">Open the purchase order</Link>}
+        <DecisionBar
+          name={me.name} gate={gate} commandType={detail.draft.command_type} edits={edits} editing={editing}
+          onEdit={(on) => { setEditing(on); if (!on) setEdits({}); }}
+          busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
+          onApprove={() => dec.approve(null, null)}
+          onApproveEdited={(reason) => dec.approve(withEdits(detail.draft.payload, edits, me.member_id), reason)}
+          onReject={dec.reject}
+        />
+        {result?.type === "purchasing.po.create.v1" && <Link href={`/staff/purchase-orders/${result.entityId}`} className="btn btn-secondary">Open the purchase order</Link>}
       </article>
 
       <section aria-labelledby="history-title" className="space-y-2">

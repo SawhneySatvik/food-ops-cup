@@ -1,30 +1,30 @@
 // file: components/staff/suppliers/po-draft.tsx
 "use client";
-// An AI proposal to buy from a simulated supplier (a purchasing.po.create.v1 draft). Its quantity traces to the quote
-// comparison; its price is a simulated supplier's quote, which core does not resolve for the approver, so it always
-// shows "Cannot verify": "Approve" is hidden and the approver types the price they agreed ("Approve with my edits").
-// The quoted price is shown beside the input with its source chip, never copied into it.
+// An AI proposal to buy from a simulated supplier (a purchasing.po.create.v1 draft). Its quantity and price are cells
+// of the negotiation's quote comparison, each with its source chip. It changes nothing until a person taps "Approve as
+// …" or "Approve with my edits as …" (a typed price or quantity, labelled as theirs); the buttons follow 01 §6.1's
+// approveGate, so someone who cannot open the quotes is offered Reject only.
 import { useState } from "react";
-import type { Outcome } from "@/lib/munim/draft-decision";
-import { lineageText } from "@/lib/munim/draft-decision";
+import { approveGate, lineageLine, numericFields, withEdits, type Outcome } from "@/lib/munim/drafts";
 import { formatDate, formatDayTime } from "@/lib/munim/format";
-import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
+import type { CellFormat, Snapshot } from "@/lib/munim/refs";
 import type { Session } from "@/lib/munim/session";
 import type { StaffClient } from "@/lib/munim/staff";
-import { DRAFT_STATUS, specialistName } from "@/lib/munim/staff-copy";
-import { editedPo, ingredientOf, missingEdits, poDraftLines, quoteRows, type PoDraft, type PoEdits, type Supplier } from "@/lib/munim/supply-flow";
+import { DRAFT_STATUS } from "@/lib/munim/staff-copy";
+import { ingredientOf, poDraftLines, type PoDraft, type Supplier } from "@/lib/munim/supply-flow";
 import type { Schemas } from "@/lib/munim/types";
 import { DecisionBar, useDecision } from "../decision";
 import { DraftField } from "../draft-field";
-import { DRAFT_TONE, SimulatedSupplier, SourcedValue, StatusPill } from "../source";
+import { DRAFT_TONE, SimulatedSupplier, StatusPill } from "../source";
 import { QuoteTable } from "./quotes";
 
 type Detail = Schemas["V1DraftDetail"] & { draft: PoDraft };
 
 export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName, session, client, fmt, tz, onOpen, onOutcome }: {
   detail: Detail;
-  /** purchasing.quote_compare minted for this viewer with the proposal's negotiation_run_id; null while loading. */
-  quotes: Snapshot | null | "failed";
+  /** purchasing.quote_compare minted for this viewer with the proposal's negotiation_run_id; null while loading;
+   *  "none" for a proposal that names no negotiation run. */
+  quotes: Snapshot | null | "failed" | "none";
   suppliers: readonly Supplier[];
   ingredients: readonly Schemas["V1InventoryIngredients"]["items"][number][];
   outletName: (id: string) => string;
@@ -39,21 +39,14 @@ export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName
   const lines = poDraftLines(d, detail.unverified_refs);
   const supplier = suppliers.find((s) => s.supplier_id === d.payload.supplier_id);
   const [editing, setEditing] = useState(false);
-  const [edits, setEdits] = useState<PoEdits>({ qty: {}, price: {} });
+  const [edits, setEdits] = useState<Record<string, number>>({});
   const dec = useDecision(client, d, "suppliers", onOutcome);
-  const unverified = lines.some((l) => l.qty.kind === "unverified" || l.price.kind === "unverified");
-  const typedAny = Object.keys(edits.qty).length > 0 || Object.keys(edits.price).length > 0;
-  const proposer = specialistName(d.source.replace(/^intel:/, ""));
-  const put = (field: "qty" | "price", i: number) => (v: number | null) =>
-    setEdits((e) => { const n = { ...e[field] }; if (v === null) delete n[i]; else n[i] = v; return { ...e, [field]: n }; });
-  const quoted = (quoteId: string | null) => {
-    if (!quotes || quotes === "failed" || !quoteId) return null;
-    const q = quoteRows(quotes).find((r) => r.quoteId === quoteId);
-    return q ? <SourcedValue text={formatCell(quotes.rows[q.row]!.unit_price_minor ?? null, "unit_price_minor", fmt)} refToken={snapRef(quotes.snapshot_id, q.row, "unit_price_minor")} onOpen={onOpen} /> : null;
-  };
+  const gate = approveGate(detail, numericFields(detail), session.me);
+  const put = (path: string) => (v: number | null) =>
+    setEdits((e) => { const n = { ...e }; if (v === null) delete n[path]; else n[path] = v; return n; });
 
   return (
-    <article className="card grid gap-3 p-5" aria-label="Proposed purchase order">
+    <article className="card grid grid-cols-1 gap-3 p-5" aria-label="Proposed purchase order">
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="text-[22px]">Order from {supplier?.name ?? "a supplier no longer listed"}</h3>
         <SimulatedSupplier />
@@ -67,10 +60,9 @@ export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName
           <div key={l.index} className="rounded-[var(--radius-field)] border-[1.5px] border-bg-deep p-3">
             <p className="font-semibold">{ing.name}</p>
             <DraftField label={`Quantity (${l.line.unit})`} value={l.qty} column="qty_milli" fmt={fmt} onOpen={onOpen}
-              edit={edits.qty[l.index] ?? null} editorName={session.me.name} editing={editing} onEdit={put("qty", l.index)} />
+              lineUnit={l.line.unit} edit={edits[`/lines/${l.index}/qty_milli`] ?? null} editorName={session.me.name} editing={editing} onEdit={put(`/lines/${l.index}/qty_milli`)} />
             <DraftField label={`Price per ${l.line.unit}`} value={l.price} column="unit_price_minor" fmt={fmt} onOpen={onOpen}
-              edit={edits.price[l.index] ?? null} editorName={session.me.name} editing={editing} onEdit={put("price", l.index)} />
-            {quoted(l.quoteId) && <p className="text-[15px]">The simulated supplier quoted {quoted(l.quoteId)} per unit. Type the price you agreed.</p>}
+              edit={edits[`/lines/${l.index}/unit_price_minor`] ?? null} editorName={session.me.name} editing={editing} onEdit={put(`/lines/${l.index}/unit_price_minor`)} />
           </div>
         );
       })}
@@ -79,21 +71,20 @@ export function PoDraftCard({ detail, quotes, suppliers, ingredients, outletName
         <summary className="min-h-12 cursor-pointer font-semibold">Compare the quotes</summary>
         <div className="mt-3">
           {quotes === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
+            : quotes === "none" ? <p className="text-muted">No quote comparison for this proposal.</p>
             : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>
-            : <QuoteTable snapshot={quotes} suppliers={suppliers} citedQuoteId={lines[0]?.quoteId ?? null} fmt={fmt} onOpen={onOpen} />}
+            : <QuoteTable snapshot={quotes} suppliers={suppliers} citedRow={lines[0]?.quoteRow ?? null} fmt={fmt} onOpen={onOpen} />}
         </div>
       </details>
-      <p className="lineage">{lineageText(detail, proposer, (iso) => formatDayTime(iso, tz, fmt.locale))}</p>
-      {d.status === "proposed" && (
-        <DecisionBar
-          name={session.me.name} unverified={unverified} editing={editing} onEdit={setEditing}
-          editsReady={typedAny && !missingEdits(lines, edits)}
-          busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
-          onApprove={() => dec.approve(null, null)}
-          onApproveEdited={(reason) => dec.approve(editedPo(d.payload, edits, session.me.member_id), reason)}
-          onReject={dec.reject}
-        />
-      )}
+      <p className="lineage">{lineageLine(detail, (iso) => formatDayTime(iso, tz, fmt.locale), null)}</p>
+      <DecisionBar
+        name={session.me.name} gate={gate} commandType={d.command_type} edits={edits} editing={editing}
+        onEdit={(on) => { setEditing(on); if (!on) setEdits({}); }}
+        busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
+        onApprove={() => dec.approve(null, null)}
+        onApproveEdited={(reason) => dec.approve(withEdits(d.payload, edits, session.me.member_id), reason)}
+        onReject={dec.reject}
+      />
     </article>
   );
 }

@@ -10,9 +10,11 @@ const WORDS: Record<string, string> = {
   "inventory.below_reorder": "Stock below its minimum",
   "purchasing.quote_compare": "Quotes from simulated suppliers",
   "cares.impact": "Food shared",
-  // 14 §3: Cares' two templates.
   "inventory.expiry_risk": "Stock close to its use-by date",
   "cares.recipient_match": "Simulated recipients that can take this food",
+  "inventory.shortfall": "Stock short of what is needed",
+  "purchasing.price_creep": "Supplier prices over time",
+  "purchasing.deal_inputs": "What a quote was checked against",
 };
 
 export const templateWords = (templateId: string): string => WORDS[templateId] ?? templateId;

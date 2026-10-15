@@ -1,16 +1,17 @@
 // file: components/staff/cares/listing-draft.tsx
 "use client";
 // An AI proposal to give food at risk to a simulated recipient (a cares.listing.publish.v1 draft). It changes nothing
-// until the owner taps "Approve as …"; a manager sees it but cannot decide it (core refuses: owner and judge only).
+// until the owner taps "Approve as …"; a manager sees it but cannot decide it (core: owner and judge only, which
+// 01 §6.1's approveGate follows, so the bar shows no buttons for them).
 // The quantity is a ref with its source chip, or "Cannot verify"; an edit is labelled as the owner's.
 import { useState } from "react";
-import { caresCan, editedListing, FOOD_KIND, lineName, listingDraftView, unitLabel, type ListingDraft, type Recipient } from "@/lib/munim/cares-flow";
-import { lineageText, type Outcome } from "@/lib/munim/draft-decision";
+import { FOOD_KIND, lineName, listingDraftView, unitLabel, type ListingDraft, type Recipient } from "@/lib/munim/cares-flow";
+import { approveGate, findingTitle, lineageLine, numericFields, withEdits, type Outcome } from "@/lib/munim/drafts";
 import { dayLabel, formatDate, formatDayTime, formatTime } from "@/lib/munim/format";
 import type { CellFormat, Snapshot } from "@/lib/munim/refs";
 import type { Session } from "@/lib/munim/session";
 import type { StaffClient } from "@/lib/munim/staff";
-import { DRAFT_STATUS, specialistName } from "@/lib/munim/staff-copy";
+import { DRAFT_STATUS } from "@/lib/munim/staff-copy";
 import type { Schemas } from "@/lib/munim/types";
 import { DecisionBar, useDecision } from "../decision";
 import { DraftField } from "../draft-field";
@@ -37,17 +38,16 @@ export function ListingDraftCard({ detail, match, recipients, menu, ingredients,
   const d = detail.draft;
   const view = listingDraftView(d, detail.unverified_refs);
   const [editing, setEditing] = useState(false);
-  const [typed, setTyped] = useState<Record<number, number>>({});
+  const [edits, setEdits] = useState<Record<string, number>>({});
   const dec = useDecision(client, d, "cares", onOutcome);
-  const unverified = view.lines.some((l) => l.qty.kind === "unverified");
-  const editsReady = Object.keys(typed).length > 0 && view.lines.every((l) => l.qty.kind !== "unverified" || typed[l.index] !== undefined);
+  const gate = approveGate(detail, numericFields(detail), session.me);
+  const qtyPath = (index: number) => `/lines/${index}/qty_milli`;
   const recipient = recipients.find((r) => r.recipient_id === d.payload.recipient_id);
   const when = (iso: string) => formatDayTime(iso, tz, fmt.locale);
-  const proposer = specialistName(d.source.replace(/^intel:/, ""));
   const pickup = `${formatTime(d.payload.pickup_from, tz, fmt.locale)} – ${formatTime(d.payload.pickup_to, tz, fmt.locale)}`;
 
   return (
-    <article className="card grid gap-3 p-5" aria-label="Proposed donation">
+    <article className="card grid grid-cols-1 gap-3 p-5" aria-label="Proposed donation">
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="text-[22px]">Give food at risk to a simulated recipient</h3>
         <StatusPill tone={DRAFT_TONE[d.status] ?? "new"}>{DRAFT_STATUS[d.status] ?? d.status}</StatusPill>
@@ -61,8 +61,8 @@ export function ListingDraftCard({ detail, match, recipients, menu, ingredients,
           </div>
           <DraftField
             label={`Quantity (${unitLabel(line.unit)})`} value={qty} column="qty_milli" fmt={fmt} onOpen={onOpen}
-            edit={typed[index] ?? null} editorName={session.me.name} editing={editing}
-            onEdit={(v) => setTyped((t) => { const n = { ...t }; if (v === null) delete n[index]; else n[index] = v; return n; })}
+            edit={edits[qtyPath(index)] ?? null} editorName={session.me.name} editing={editing}
+            onEdit={(v) => setEdits((e) => { const n = { ...e }; if (v === null) delete n[qtyPath(index)]; else n[qtyPath(index)] = v; return n; })}
           />
         </div>
       ))}
@@ -87,19 +87,16 @@ export function ListingDraftCard({ detail, match, recipients, menu, ingredients,
         </div>
       </details>
 
-      <p className="lineage">{lineageText(detail, proposer, when)}{d.finding_id ? " · from a finding: food at risk of going to waste" : ""}</p>
+      <p className="lineage">{lineageLine(detail, when, findingTitle("inventory.expiry_risk"))}</p>
 
-      {d.status === "proposed" && (caresCan(session.me.role, "publish") ? (
-        <DecisionBar
-          name={session.me.name} unverified={unverified} editing={editing} onEdit={setEditing} editsReady={editsReady}
-          busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
-          onApprove={() => dec.approve(null, null)}
-          onApproveEdited={(reason) => dec.approve(editedListing(d.payload, typed, session.me.member_id), reason)}
-          onReject={dec.reject}
-        />
-      ) : (
-        <p className="text-muted">Only the owner can approve or reject a donation.</p>
-      ))}
+      <DecisionBar
+        name={session.me.name} gate={gate} commandType={d.command_type} edits={edits} editing={editing}
+        onEdit={(on) => { setEditing(on); if (!on) setEdits({}); }}
+        busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
+        onApprove={() => dec.approve(null, null)}
+        onApproveEdited={(reason) => dec.approve(withEdits(d.payload, edits, session.me.member_id), reason)}
+        onReject={dec.reject}
+      />
     </article>
   );
 }

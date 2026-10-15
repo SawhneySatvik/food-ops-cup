@@ -130,12 +130,6 @@ export function listingDraftView(d: ListingDraft, unverified: readonly string[])
   };
 }
 
-/** The approver's edits: each typed quantity (already in thousandths, parseTyped) replaces that line's ref as
- *  { value, typed_by } (R26). Lines with no typed value keep the proposed ref. */
-export function editedListing(p: ListingPayload, typed: Readonly<Record<number, number>>, memberId: string): ListingPayload {
-  return { ...p, lines: p.lines.map((l, i) => (typed[i] === undefined ? l : { ...l, qty_milli: { value: typed[i]!, typed_by: memberId } })) };
-}
-
 // ---- the owner's own listing (cares.listing.publish.v1, owner and judge) ----
 export interface OwnListing {
   outletId: string;

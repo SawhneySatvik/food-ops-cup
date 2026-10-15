@@ -5,8 +5,10 @@
 //   Mock:     NEXT_PUBLIC_MUNIM_API=http://localhost:3000/mock npx tsx scripts/staff-smoke.ts
 //   Real API: also STAFF_SMOKE_TOKENS=<path to {"owner": "<token>", "scoped": "<token>"}>. Tokens are read from that
 //             file and never printed. "scoped" is a member with a list of outlets (counter staff on the mock).
-// It writes to the API it is pointed at (one order, one payment, one ticket move), never decides a draft, and
-// prints ids, statuses and counts only.
+//             MUNIM_DEMO_TENANT_ID (optional) names the business; otherwise the owner's first one.
+// It writes to the API it is pointed at (one counter order, one card payment recorded, and that order's kitchen ticket
+// moved to done, which completes the order), never decides a draft, and prints ids, statuses and counts only. Run it
+// only against the mock or a local development copy of the API, never against a shared deployment.
 import { readFileSync } from "node:fs";
 import type { MunimError } from "../lib/munim/client";
 import { attemptFor, envelope } from "../lib/munim/commands";
@@ -34,6 +36,9 @@ async function people(): Promise<{ owner: string; scoped: string; tenantId: stri
     return { owner: by("owner"), scoped: by("counter"), tenantId: DEMO_TENANT_ID };
   }
   const t = JSON.parse(readFileSync(tokensFile, "utf8")) as { owner: string; scoped: string };
+  // After a reseed a demo person belongs to several businesses: MUNIM_DEMO_TENANT_ID names the one to test.
+  const named = process.env.MUNIM_DEMO_TENANT_ID;
+  if (named) return { ...t, tenantId: named };
   const tenants = await tenantsFor(baseUrl, t.owner);
   if (!tenants.ok || tenants.data.tenants.length === 0) throw new Error(`tenants: ${tenants.ok ? "none" : why(tenants.error)}`);
   return { ...t, tenantId: tenants.data.tenants[0]!.tenant_id };
@@ -50,7 +55,7 @@ async function main(): Promise<void> {
   if (me.ok) check("me (owner)", me.data.role === "owner" && me.data.outlet_ids === "*", `${me.data.role}, outlets ${me.data.outlet_ids === "*" ? "all" : me.data.outlet_ids.length}`);
   else check("me (owner)", false, why(me.error));
   const meScoped = await scoped.getMe();
-  if (meScoped.ok) check("me (scoped)", Array.isArray(meScoped.data.outlet_ids), `${meScoped.data.role}, ${Array.isArray(meScoped.data.outlet_ids) ? meScoped.data.outlet_ids.length : "all"} outlet(s)`);
+  if (meScoped.ok) check("me (scoped)", Array.isArray(meScoped.data.outlet_ids) && meScoped.data.outlet_ids.length > 0, `${meScoped.data.role}, ${Array.isArray(meScoped.data.outlet_ids) ? meScoped.data.outlet_ids.length : "all"} outlet(s)`);
   else check("me (scoped)", false, why(meScoped.error));
   const tenant = await owner.getTenant();
   if (!tenant.ok) throw new Error(`tenant: ${why(tenant.error)}`);
@@ -123,6 +128,11 @@ async function main(): Promise<void> {
   const tender = await owner.recordTender(orderId, envelope("orders.tender.record.v1", { tender_id: uuidv7(), order_id: orderId, method: "card" as const, tendered_minor: null, amount_minor: due.data.remaining_minor, currency: due.data.currency, ref: "SMOKE-0001" }));
   const paid = await owner.getOrder(orderId);
   check("tender", tender.ok && paid.ok && paid.data.remaining_minor === 0, tender.ok ? `status ${paid.ok ? paid.data.status : "?"}, remaining 0` : why(tender.error));
+  // Hand it over (paid first): the ticket goes to done and core completes the order, so no paid order is left waiting.
+  const ready = await owner.advanceTicket(ticket.ticket_id, envelope("kitchen.ticket.advance.v1", { ticket_id: ticket.ticket_id, from_status: "preparing" as const, to_status: "ready" as const }));
+  const handed = ready.ok ? await owner.advanceTicket(ticket.ticket_id, envelope("kitchen.ticket.advance.v1", { ticket_id: ticket.ticket_id, from_status: "ready" as const, to_status: "done" as const })) : ready;
+  const closed = await owner.getOrder(orderId);
+  check("hand over", handed.ok && closed.ok && closed.data.status === "completed", handed.ok ? `ticket done, order ${closed.ok ? closed.data.status : "?"}` : why(handed.error));
 
   // ---- inbox, drafts, snapshots ----
   const inbox = await owner.listInbox();
@@ -146,12 +156,14 @@ async function main(): Promise<void> {
     const ref = snapRef(snap.data.snapshot_id, 0, "tickets");
     const parts = renderSegment({ text: `Tickets today: ${ref}`, refs: [`snap:${snap.data.snapshot_id}`] }, [{ ref, value: snap.data.rows[0]?.tickets ?? null }]);
     const shown = parts.map((p) => (p.kind === "text" ? p.text : p.kind === "value" ? formatCell(p.value, "tickets", fmt) : "Cannot verify")).join("");
-    check("mint snapshot", snap.status === 201 && parts.some((p) => p.kind === "value"), shown);
+    const tickets = snap.data.rows[0]?.tickets;
+    check("mint snapshot", snap.status === 201 && snap.data.rows.length === 1 && typeof tickets === "number" && Number.isInteger(tickets) && parts.some((p) => p.kind === "value"), shown);
     const reopened = await owner.getSnapshot(snap.data.snapshot_id);
     check("open snapshot", reopened.ok && reopened.data.sha256 === snap.data.sha256, reopened.ok ? `${reopened.data.row_count} row(s)` : why(reopened.error));
   }
+  // A local check of refs.ts (no call): a model-typed number never reaches the screen.
   const forged = renderSegment({ text: "Sales were 4200 today", refs: [] }, []);
-  check("free digits are not shown", forged.length === 1 && forged[0]!.kind === "unverified");
+  check("free digits are not shown (local)", forged.length === 1 && forged[0]!.kind === "unverified");
   const unknown = await owner.getSnapshot(uuidv7());
   check("unknown snapshot is 404", !unknown.ok && unknown.error.kind === "not_found", unknown.ok ? "opened" : why(unknown.error));
 
@@ -172,9 +184,11 @@ async function main(): Promise<void> {
   // ---- Cares and suppliers ----
   const cares = await owner.getCaresProfile();
   check("cares profile", cares.ok && cares.data.labels.data === "Measured on synthetic data", cares.ok ? `available ${cares.data.available}, enabled ${cares.data.enabled}` : why(cares.error));
+  // Every supplier must be simulated and labelled (20 §2); an empty list cannot pass.
   const suppliers = await owner.listSuppliers();
-  const sims = suppliers.ok ? suppliers.data.items.filter((s) => s.kind === "simulated") : [];
-  check("suppliers", suppliers.ok && sims.every((s) => s.label === "Simulated supplier"), suppliers.ok ? `${suppliers.data.items.length} supplier(s), ${sims.length} simulated, all labelled` : why(suppliers.error));
+  const items = suppliers.ok ? suppliers.data.items : [];
+  const labelled = items.filter((s) => s.kind === "simulated" && s.label === "Simulated supplier").length;
+  check("suppliers", items.length > 0 && labelled === items.length, suppliers.ok ? `${items.length} supplier(s), ${labelled} simulated and labelled` : why(suppliers.error));
 
   // ---- credentials and scope ----
   const noToken = await createStaffClient({ baseUrl, token: () => "", tenantId: who.tenantId }).listOutlets();

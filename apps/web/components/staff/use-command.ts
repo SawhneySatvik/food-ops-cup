@@ -3,12 +3,13 @@
 // One person's command from a form (publish a listing, record a hand-over, withdraw, place a purchase order, receive
 // goods): one frozen attempt per thing confirmed (01 §4). Tapping the same button again after a network error, 429
 // or 5xx resends the same envelope (the attempt's fingerprint is unchanged); any change to the form is a new attempt.
-// A 429 disables the button for Retry-After and shows the wait.
+// A 429 disables the button for Retry-After and shows the wait. A network failure may have reached core, so its line is
+// the write one (01 §9 staffWriteErrorText): the same tap is safe.
 import { useRef, useState } from "react";
 import { useCountdown } from "@/lib/hooks";
 import type { MunimError, Result } from "@/lib/munim/client";
 import { retryable, type CommandAttempt, type Envelope } from "@/lib/munim/commands";
-import { staffErrorText, type StaffWhere } from "@/lib/munim/staff-copy";
+import { staffWriteErrorText, type StaffWhere } from "@/lib/munim/staff-copy";
 import type { Schemas } from "@/lib/munim/types";
 
 export function useCommand<T extends string, P>(where: StaffWhere, onAuth: (e: MunimError) => boolean) {
@@ -23,7 +24,7 @@ export function useCommand<T extends string, P>(where: StaffWhere, onAuth: (e: M
   const send = async (
     make: (prev: CommandAttempt<T, P> | null) => CommandAttempt<T, P>,
     call: (body: Envelope<T, P>) => Promise<Result<Schemas["CommandResult"]>>,
-    text: (e: MunimError) => string = (e) => staffErrorText(e, where),
+    text: (e: MunimError) => string = (e) => staffWriteErrorText(e, where),
   ): Promise<Result<Schemas["CommandResult"]> | null> => {
     if (inFlight.current) return null;
     const a = make(attempt.current);

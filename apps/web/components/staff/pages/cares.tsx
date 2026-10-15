@@ -11,8 +11,8 @@ import {
   atRiskParams, atRiskRows, caresCan, caresGate, FOOD_KIND, GATE_TEXT, IMPACT_CELLS, impactParams, isListingDraft, listingDraftView, unitLabel,
   type AtRiskRow, type CaresProfile, type ListingDraft, type Listing, type Recipient,
 } from "@/lib/munim/cares-flow";
-import type { Outcome } from "@/lib/munim/draft-decision";
-import { formatDate, titleCase } from "@/lib/munim/format";
+import type { Outcome } from "@/lib/munim/drafts";
+import { formatClock, formatDate, titleCase } from "@/lib/munim/format";
 import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
@@ -26,7 +26,7 @@ import { ListingCard } from "../cares/listing-card";
 import { ListingDraftCard } from "../cares/listing-draft";
 import { OwnListingForm } from "../cares/own-listing";
 import { useStaff } from "../shell";
-import { CannotVerify, SnapshotDrawer, SourcedValue } from "../source";
+import { CannotVerify, SimulatedRecipient, SnapshotDrawer, SourcedValue } from "../source";
 import { LiveLine } from "./inbox";
 
 type Outlet = Schemas["V1Outlets"]["outlets"][number];
@@ -37,6 +37,8 @@ type Proposal = { detail: Detail; match: Snapshot | null | "failed" };
 /** A panel's data: null while loading, an error when its call failed. */
 type Panel<T> = T | MunimError | null;
 const failed = <T,>(p: Panel<T>): p is MunimError => p !== null && typeof p === "object" && "kind" in p && "status" in p && !("snapshot_id" in p);
+
+const STALE = "The numbers behind this changed since it was proposed. It can no longer be approved or rejected; a new proposal will replace it.";
 
 export function CaresScreen() {
   const { session, outlet } = useStaff();
@@ -55,6 +57,8 @@ function Cares({ outlet }: { outlet: Outlet }) {
   const { session, client, handleAuth } = useStaff();
   const role = session.me.role;
   const insight = caresCan(role, "insight");
+  // inbox:<tenant> is owner and manager only: opening it for anyone else would make the whole stream 404.
+  const watches = role === "owner" || role === "manager";
   const online = useOnline();
   const [toast, say] = useToast();
   const [profile, setProfile] = useState<Panel<CaresProfile>>(null);
@@ -71,6 +75,8 @@ function Cares({ outlet }: { outlet: Outlet }) {
   const [live, setLive] = useState<LiveState>("connecting");
   const [drawer, setDrawer] = useState<{ snapshotId: string; refToken: string } | null>(null);
   const [own, setOwn] = useState<{ prefill: AtRiskRow | null; n: number } | null>(null);
+  // The owner's last own listing, confirmed in place (a toast cannot carry the recipient's badge).
+  const [listed, setListed] = useState<{ name: string; when: string } | null>(null);
   const ownRef = useRef<HTMLElement>(null);
   const today = menu?.business_date ?? null;
   const gate = profile && !failed(profile) ? caresGate(profile, outlet.id) : null;
@@ -130,7 +136,7 @@ function Cares({ outlet }: { outlet: Outlet }) {
     if (ing.ok) setIngredients(ing.data.items);
     if (rec.ok) setRecipients(rec.data.items);
     if (m.ok) setMenu(m.data);
-    for (const r of [t, m, ing, rec]) if (!r.ok && r.error.kind === "not_found") { setNotFound(true); return; }
+    for (const r of [p, t, m, ing, rec]) if (!r.ok && r.error.kind === "not_found") { setNotFound(true); return; }
     for (const r of [t, m, ing, rec]) if (!r.ok) seen(r.error);
     if (!p.ok) { const e = seen(p.error); if (e) setProfile(e); return; }
     setProfile(p.data);
@@ -146,11 +152,11 @@ function Cares({ outlet }: { outlet: Outlet }) {
     void loadAll();
   }, [loadAll]);
 
-  // Owner and manager only: inbox:<tenant> wakes the proposals (staff must never open it: the whole stream would 404).
+  // inbox:<tenant> wakes the proposals, for the roles that may open it.
   useEffect(() => {
-    if (!showInsight) return;
+    if (!showInsight || !watches) return;
     return watchFor(session, [topic.inbox(session.tenantId)], () => void loadProposals(), setLive);
-  }, [showInsight, session, loadProposals]);
+  }, [showInsight, watches, session, loadProposals]);
 
   // There is no live topic for listings: refetch when the tab comes back (snapshots are not re-minted on focus).
   const refresh = useCallback(() => {
@@ -171,9 +177,14 @@ function Cares({ outlet }: { outlet: Outlet }) {
   const onOutcome = (o: Outcome) => {
     if (o.kind === "signed_out") { handleAuth(o.error); return; }
     if (o.kind === "done") say(o.type === "drafts.reject.v1" ? "Rejected. Nothing was listed." : "Approved. The listing is published.");
-    if (o.kind === "stale") say("The numbers behind this changed since it was proposed. It can no longer be approved; reject it or wait for a new one.");
+    if (o.kind === "stale") say(STALE);
     if (o.kind === "decided_elsewhere") say("Someone else already decided this. It has been refreshed.");
     if (o.kind === "cannot_verify") say("Cannot verify — some numbers in this draft no longer trace to their source rows.");
+    // Cares was switched off, or the outlet left it, since the page loaded: load the profile again (the gate card shows).
+    if (o.kind === "refused" && o.error.reasonCode?.startsWith("cares_not_")) {
+      void loadAll();
+      return;
+    }
     void loadProposals();
     afterCommand();
   };
@@ -190,6 +201,7 @@ function Cares({ outlet }: { outlet: Outlet }) {
   const published = listings && !failed(listings) ? listings.filter((l) => l.status === "published") : [];
   const earlier = listings && !failed(listings) ? listings.filter((l) => l.status !== "published") : [];
   const openOwn = (prefill: AtRiskRow | null) => {
+    setListed(null);
     setOwn((o) => ({ prefill, n: (o?.n ?? 0) + 1 }));
     requestAnimationFrame(() => ownRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
@@ -226,7 +238,7 @@ function Cares({ outlet }: { outlet: Outlet }) {
   const profileStrip = profile && !failed(profile) && (
     <section aria-label="Cares profile" className="card space-y-1 p-5">
       <p className="text-[19px] font-semibold">{profile.profile?.public_name ?? outlet.name}</p>
-      {here && <p>Pickup hours {here.pickup_from}–{here.pickup_to}</p>}
+      {here && <p>Pickup hours {formatClock(here.pickup_from, SITE.locale)} – {formatClock(here.pickup_to, SITE.locale)}</p>}
       {here && <p className="text-muted">{titleCase(here.city_code)}</p>}
     </section>
   );
@@ -239,7 +251,7 @@ function Cares({ outlet }: { outlet: Outlet }) {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h1 className="section-title">Munim Cares</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <LiveLine state={showInsight ? live : "open"} onRefresh={refresh} />
+              <LiveLine state={showInsight && watches ? live : "open"} onRefresh={refresh} />
               <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
             </div>
           </div>
@@ -310,12 +322,19 @@ function Cares({ outlet }: { outlet: Outlet }) {
                 {own ? (
                   <OwnListingForm key={`${own.prefill?.batchId ?? "blank"}:${own.n}`} outletId={outlet.id} prefill={own.prefill} menu={menu} ingredients={ingredients}
                     session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onAuth={handleAuth}
-                    onPublished={(text) => { say(text); setOwn(null); afterCommand(); }} />
+                    onPublished={(l) => { setListed(l); setOwn(null); afterCommand(); }} onCancel={() => setOwn(null)} />
                 ) : (
-                  <div className="card flex flex-wrap items-center justify-between gap-3 p-5">
-                    <p className="max-w-[48ch] text-muted">Have something left that Munim didn&apos;t spot? List it for a simulated recipient to collect.</p>
-                    <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>Start a listing</button>
-                  </div>
+                  <>
+                    {listed && (
+                      <p className="card flex flex-wrap items-center gap-2 p-4 font-semibold" role="status">
+                        Listed. {listed.name} <SimulatedRecipient /> can pick it up {listed.when}.
+                      </p>
+                    )}
+                    <div className="card flex flex-wrap items-center justify-between gap-3 p-5">
+                      <p className="max-w-[48ch] text-muted">Have something left that Munim didn&apos;t spot? List it for a simulated recipient to collect.</p>
+                      <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>Start a listing</button>
+                    </div>
+                  </>
                 )}
               </section>
             )}

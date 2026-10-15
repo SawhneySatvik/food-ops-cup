@@ -14,7 +14,7 @@ import { formatWhen } from "@/lib/munim/format";
 import { columnOf, formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
-import { abstainText, DRAFT_STATUS, REJECT_REASONS, specialistName, staffErrorText, VERDICT } from "@/lib/munim/staff-copy";
+import { abstainText, DRAFT_STATUS, REJECT_REASONS, specialistName, staffErrorText, staffWriteErrorText, VERDICT } from "@/lib/munim/staff-copy";
 import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
 import type { Schemas } from "@/lib/munim/types";
@@ -82,7 +82,7 @@ export function FindingCard({ finding, fmt, tz, onOpen, onChanged }: { finding: 
     if (!retryable(r.error)) attempt.current = null;
     // 409 conflict (no reason code): the finding is no longer open. 404: it left this person's scope.
     if (r.error.code === "conflict" || r.error.kind === "not_found") onChanged(ALREADY_DISMISSED);
-    else setNote(staffErrorText(r.error, "inbox"));
+    else setNote(staffWriteErrorText(r.error, "inbox"));
   };
 
   return (

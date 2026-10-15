@@ -3,7 +3,7 @@
 // board's lines have no variant, so it comes from the order), the two lanes, what to announce after a refetch, and
 // the words for a refused step. Every number on the board is a field of GET /v1/kitchen/board.
 import { titleCase } from "./format";
-import { staffErrorText } from "./staff-copy";
+import { staffWriteErrorText } from "./staff-copy";
 import type { MunimError } from "./client";
 import type { Schemas } from "./types";
 
@@ -63,6 +63,5 @@ export const stationLabel = (s: string): string => STATION_LABEL[s] ?? titleCase
  *  timeout counts as one), so it says the same tap is safe: the retry sends the same envelope. */
 export function stepErrorText(e: MunimError): string {
   if (e.kind === "not_found") return "This ticket isn't on the board any more. The board has been refreshed.";
-  if (e.kind === "network") return "The connection dropped before Munim answered. Tap again: it's safe and won't happen twice.";
-  return staffErrorText(e, "kitchen");
+  return staffWriteErrorText(e, "kitchen");
 }

@@ -5,8 +5,7 @@
 import { createMunimClient as createSdkClient } from "@munim/sdk";
 import { settle } from "./client";
 import type { Envelope } from "./commands";
-import type { Client } from "openapi-fetch";
-import type { paths, Schemas } from "./types";
+import type { Schemas } from "./types";
 
 export interface StaffClientOptions {
   /** Same base as the storefront: "/mock" for this app's mock, the real API's URL later. */
@@ -39,13 +38,11 @@ export type PublishListingCommand = Cmd<"cares.listing.publish.v1", Schemas["Car
 export type WithdrawListingCommand = Cmd<"cares.listing.withdraw.v1", Schemas["CaresListingWithdrawV1"]>;
 export type RecordHandoverCommand = Cmd<"cares.handover.record.v1", Schemas["CaresHandoverRecordV1"]>;
 export type CreatePoCommand = Cmd<"purchasing.po.create.v1", Schemas["PurchasingPoCreateV1"]>;
-/** 15 §10 addition: goods received against a purchase order. */
 export type ReceiveGoodsCommand = Cmd<"purchasing.grn.receive.v1", Schemas["PurchasingGrnReceiveV1"]>;
 
 export function createStaffClient(opts: StaffClientOptions) {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
-  // Typed with ./types paths (the SDK workspace package).
-  const sdk = createSdkClient({ baseUrl, token: opts.token, tenantId: opts.tenantId, fetch: opts.fetch }) as unknown as Client<paths>;
+  const sdk = createSdkClient({ baseUrl, token: opts.token, tenantId: opts.tenantId, fetch: opts.fetch });
   const timeoutMs = opts.timeoutMs ?? 15_000;
   /** Per-call options: never cached, time-limited, plus the dev switches. */
   const init = (ms = timeoutMs) => ({ cache: "no-store" as const, signal: AbortSignal.timeout(ms), headers: opts.extraHeaders?.() ?? {} });
@@ -88,6 +85,8 @@ export function createStaffClient(opts: StaffClientOptions) {
     /** The draft with its decision, history and unverified_refs: open this before showing any approve button. */
     getDraft: (draftId: string) => settle(() => sdk.GET("/v1/drafts/{id}", { params: id(draftId), ...init() })),
     getDraftLineage: (draftId: string) => settle(() => sdk.GET("/v1/drafts/{id}/lineage", { params: id(draftId), ...init() })),
+    /** Who approved the change that made a row: `row` is "<schema>.<table>:<id>", e.g. "core.purchase_order:<po id>". */
+    getRowLineage: (row: string) => settle(() => sdk.GET("/v1/lineage", { params: { query: { row } }, ...init() })),
     /** payload.draft_id must equal draftId (else 422). Returns the EXECUTED command's result (its type and entity). */
     approveDraft: (draftId: string, body: ApproveDraftCommand) => settle(() => sdk.POST("/v1/drafts/{id}:approve", { params: id(draftId), body, ...init() })),
     rejectDraft: (draftId: string, body: RejectDraftCommand) => settle(() => sdk.POST("/v1/drafts/{id}:reject", { params: id(draftId), body, ...init() })),
@@ -100,7 +99,9 @@ export function createStaffClient(opts: StaffClientOptions) {
     // ---- Ask Munim (13) ----
     /** Not a command and NOT safe to retry: a resend can append a second turn. On a network error, refetch the thread. */
     ask: (body: Schemas["V1AskRequest"]) => settle(() => sdk.POST("/v1/ask", { body, ...init(ASK_TIMEOUT_MS) })),
-    listThreads: () => settle(() => sdk.GET("/v1/threads", init())),
+    /** Newest first. `specialist`: threads addressed to that desk ("manager" = the main conversation); `cursor` pages. */
+    listThreads: (query: { specialist?: Schemas["V1Thread"]["specialist"] | "manager"; cursor?: string; limit?: number } = {}) =>
+      settle(() => sdk.GET("/v1/threads", { params: { query: { ...query, specialist: query.specialist ?? undefined } }, ...init() })),
     getThread: (threadId: string) => settle(() => sdk.GET("/v1/threads/{id}", { params: id(threadId), ...init() })),
     listSpecialists: () => settle(() => sdk.GET("/v1/specialists", init())),
 
@@ -121,13 +122,13 @@ export function createStaffClient(opts: StaffClientOptions) {
     getPurchaseOrder: (poId: string) => settle(() => sdk.GET("/v1/purchase-orders/{id}", { params: id(poId), ...init() })),
     /** 201. A person's own purchase order; one the AI proposed arrives as a draft and is approved in the inbox instead. */
     createPurchaseOrder: (body: CreatePoCommand) => settle(() => sdk.POST("/v1/purchase-orders", { body, ...init() })),
-    /** 15 §10 addition. Goods-received notes in the person's outlets. */
-    listGoodsReceived: () => settle(() => sdk.GET("/v1/goods-received", init())),
-    getGoodsReceived: (grnId: string) => settle(() => sdk.GET("/v1/goods-received/{id}", { params: id(grnId), ...init() })),
-    /** 201. purchasing.grn.receive.v1: core moves the stock and marks the PO received once every line has come in. */
-    receiveGoods: (body: ReceiveGoodsCommand) => settle(() => sdk.POST("/v1/goods-received", { body, ...init() })),
     listIngredients: (outletId?: string) => settle(() => sdk.GET("/v1/inventory/ingredients", { params: { query: outletId ? { outlet: outletId } : {} }, ...init() })),
     listReorderLevels: (outletId: string) => settle(() => sdk.GET("/v1/inventory/reorder-levels", { params: { query: { outlet: outletId } }, ...init() })),
+    /** Goods received in the person's outlets, newest first (15). */
+    listGoodsReceived: () => settle(() => sdk.GET("/v1/goods-received", init())),
+    getGoodsReceived: (grnId: string) => settle(() => sdk.GET("/v1/goods-received/{id}", { params: id(grnId), ...init() })),
+    /** 201. Stock in at one outlet, optionally against a purchase order (owner, manager, staff). */
+    receiveGoods: (body: ReceiveGoodsCommand) => settle(() => sdk.POST("/v1/goods-received", { body, ...init() })),
   };
 }
 
