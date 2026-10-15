@@ -22,7 +22,7 @@ import { templateWords } from "@/lib/munim/template-words";
 import { ingredientOf, isPoDraft, lowRowsFor, quoteParams, type PoDraft, type PurchaseOrder, type Supplier } from "@/lib/munim/supply-flow";
 import type { Schemas } from "@/lib/munim/types";
 import { SITE } from "@/lib/site";
-import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 import { useStaff } from "../shell";
 import { CannotVerify, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill, type PillTone } from "../source";
 import { NewPoForm } from "../suppliers/new-po";
@@ -92,8 +92,6 @@ export function PoRow({ po, tz }: { po: PurchaseOrder; tz: string }) {
   );
 }
 
-/** "Offline" bar. */
-const Offline = ({ show }: { show: boolean }) => (show ? <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div> : null);
 
 // =============================================================== /staff/suppliers
 export function SuppliersScreen() {
@@ -218,106 +216,108 @@ function Suppliers() {
   const outletName = (id: string) => outlets.find((o) => o.id === id)?.name ?? "another outlet";
 
   return (
-    <main className="pb-12">
-      <Offline show={!online || netDown} />
-      <div className="wrap staff-main space-y-6">
-        <header className="space-y-2">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h1 className="section-title">Suppliers</h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <LiveLine state={watches ? live : "open"} onRefresh={refresh} />
-              <button type="button" className="btn btn-primary" onClick={() => openForm(null)}>New purchase order</button>
-              <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
+    <>
+      <OfflineBanner top="staff" show={!online || netDown} text="You're offline. Showing the last update." />
+      <main className="pb-12">
+        <div className="wrap staff-main space-y-6">
+          <header className="space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h1 className="section-title">Suppliers</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <LiveLine state={watches ? live : "open"} onRefresh={refresh} />
+                <button type="button" className="btn btn-primary" onClick={() => openForm(null)}>New purchase order</button>
+                <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
+              </div>
             </div>
-          </div>
-          <p className="font-semibold">Every supplier here is simulated. Quotes and orders are part of the demo; nothing is sent to a real business.</p>
-        </header>
+            <p className="font-semibold">Every supplier here is simulated. Quotes and orders are part of the demo; nothing is sent to a real business.</p>
+          </header>
 
-        <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-          <div className="grid min-w-0 gap-8">
-            <section aria-labelledby="low-title" className="space-y-3">
-              <h2 id="low-title" className="text-[26px]">Running low</h2>
-              {low === null || !fmt ? <div className="skeleton h-28" role="status" aria-label="Loading" />
-                : failed(low) ? <RetryLine error={low} onRetry={() => void mintLow()} />
-                : lowRowsFor(low, outlet.id).length === 0 ? <p className="text-muted">Nothing at {outlet.name} is below its minimum.</p>
+          <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <div className="grid min-w-0 gap-8">
+              <section aria-labelledby="low-title" className="space-y-3">
+                <h2 id="low-title" className="text-[26px]">Running low</h2>
+                {low === null || !fmt ? <div className="skeleton h-28" role="status" aria-label="Loading" />
+                  : failed(low) ? <RetryLine error={low} onRetry={() => void mintLow()} />
+                  : lowRowsFor(low, outlet.id).length === 0 ? <p className="text-muted">Nothing at {outlet.name} is below its minimum.</p>
+                  : (
+                    <ul className="grid gap-3">
+                      {lowRowsFor(low, outlet.id).map((r) => {
+                        const unit = ingredientOf(ingredients, r.ingredientId).baseUnit;
+                        const cell = (column: string) => {
+                          const v = low.rows[r.row]?.[column];
+                          return v === undefined ? <CannotVerify /> : <SourcedValue text={`${formatCell(v, column, fmt)} ${unit}`.trim()} refToken={snapRef(low.snapshot_id, r.row, column)} onOpen={open} />;
+                        };
+                        return (
+                          <li key={r.ingredientId} className="card grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                            <div className="space-y-1">
+                              <p className="text-[19px] font-semibold">{r.name || ingredientOf(ingredients, r.ingredientId).name}</p>
+                              <p>On hand {cell("on_hand_milli")} · Minimum {cell("min_qty_milli")} · Par {cell("par_qty_milli")}</p>
+                            </div>
+                            <button type="button" className="btn btn-plain" onClick={() => openForm(r.ingredientId)}>Order this</button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+              </section>
+
+              <section aria-labelledby="proposals-title" className="space-y-3">
+                <h2 id="proposals-title" className="text-[26px]">Proposed by Munim</h2>
+                {approved && (
+                  <p className="card flex flex-wrap items-center gap-3 p-4 font-semibold" role="status">
+                    Approved. The purchase order is recorded. <Link href={`/staff/purchase-orders/${approved}`} className="btn btn-plain">Open the purchase order</Link>
+                  </p>
+                )}
+                {proposals === null || !fmt ? <div className="skeleton h-64" role="status" aria-label="Loading" />
+                  : failed(proposals) ? <RetryLine error={proposals} onRetry={() => void loadProposals(true)} />
+                  : proposals.length === 0 ? <p className="text-muted">No proposals waiting.</p>
+                  : proposals.map((p) => (
+                    <PoDraftCard key={p.detail.draft.draft_id} detail={p.detail} quotes={p.quotes} suppliers={supplierList} ingredients={ingredients} outletName={outletName}
+                      session={session} client={client} fmt={fmt} tz={tz} onOpen={open} onOutcome={onOutcome} />
+                  ))}
+              </section>
+
+              {newPo && tenant && (
+                <section ref={formRef} className="scroll-mt-36" aria-label="New purchase order">
+                  <NewPoForm key={`${newPo.prefill ?? "blank"}:${newPo.n}`} suppliers={supplierList} ingredients={ingredients} outletId={outlet.id} currency={tenant.base_currency}
+                    locale={SITE.locale} tz={tz} prefillIngredient={newPo.prefill} session={session} client={client} onAuth={handleAuth}
+                    onCreated={(poId) => router.push(`/staff/purchase-orders/${poId}`)} />
+                </section>
+              )}
+
+              <section aria-labelledby="pos-title" className="space-y-3">
+                <h2 id="pos-title" className="text-[26px]">Purchase orders</h2>
+                {pos === null ? <div className="skeleton h-40" role="status" aria-label="Loading" />
+                  : failed(pos) ? <RetryLine error={pos} onRetry={() => void loadPos()} />
+                  : pos.length === 0 ? <div className="state-box"><p>No purchase orders yet.</p></div>
+                  : <ul className="grid gap-3">{pos.map((po) => <PoRow key={po.po_id} po={po} tz={tz} />)}</ul>}
+              </section>
+            </div>
+
+            <aside aria-labelledby="suppliers-title" className="space-y-3 min-[1100px]:sticky min-[1100px]:top-[132px]">
+              <h2 id="suppliers-title" className="text-[26px]">Suppliers</h2>
+              {suppliers === null ? <div className="skeleton h-40" role="status" aria-label="Loading" />
+                : failed(suppliers) ? <RetryLine error={suppliers} onRetry={() => void loadSuppliers()} />
+                : suppliers.length === 0 ? <p className="text-muted">No suppliers yet.</p>
                 : (
                   <ul className="grid gap-3">
-                    {lowRowsFor(low, outlet.id).map((r) => {
-                      const unit = ingredientOf(ingredients, r.ingredientId).baseUnit;
-                      const cell = (column: string) => {
-                        const v = low.rows[r.row]?.[column];
-                        return v === undefined ? <CannotVerify /> : <SourcedValue text={`${formatCell(v, column, fmt)} ${unit}`.trim()} refToken={snapRef(low.snapshot_id, r.row, column)} onOpen={open} />;
-                      };
-                      return (
-                        <li key={r.ingredientId} className="card grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                          <div className="space-y-1">
-                            <p className="text-[19px] font-semibold">{r.name || ingredientOf(ingredients, r.ingredientId).name}</p>
-                            <p>On hand {cell("on_hand_milli")} · Minimum {cell("min_qty_milli")} · Par {cell("par_qty_milli")}</p>
-                          </div>
-                          <button type="button" className="btn btn-plain" onClick={() => openForm(r.ingredientId)}>Order this</button>
-                        </li>
-                      );
-                    })}
+                    {suppliers.map((s) => (
+                      <li key={s.supplier_id}>
+                        <Link href={`/staff/suppliers/${s.supplier_id}`} className="card card-link grid gap-1 p-4 no-underline">
+                          <span className="font-semibold"><SupplierName s={s} /></span>
+                          {s.payment_days !== null && s.payment_days > 0 && <span className="text-muted">Pay within {s.payment_days} days</span>}
+                          {!s.active && <span className="badge badge-done justify-self-start">Not active</span>}
+                        </Link>
+                      </li>
+                    ))}
                   </ul>
                 )}
-            </section>
-
-            <section aria-labelledby="proposals-title" className="space-y-3">
-              <h2 id="proposals-title" className="text-[26px]">Proposed by Munim</h2>
-              {approved && (
-                <p className="card flex flex-wrap items-center gap-3 p-4 font-semibold" role="status">
-                  Approved. The purchase order is recorded. <Link href={`/staff/purchase-orders/${approved}`} className="btn btn-plain">Open the purchase order</Link>
-                </p>
-              )}
-              {proposals === null || !fmt ? <div className="skeleton h-64" role="status" aria-label="Loading" />
-                : failed(proposals) ? <RetryLine error={proposals} onRetry={() => void loadProposals(true)} />
-                : proposals.length === 0 ? <p className="text-muted">No proposals waiting.</p>
-                : proposals.map((p) => (
-                  <PoDraftCard key={p.detail.draft.draft_id} detail={p.detail} quotes={p.quotes} suppliers={supplierList} ingredients={ingredients} outletName={outletName}
-                    session={session} client={client} fmt={fmt} tz={tz} onOpen={open} onOutcome={onOutcome} />
-                ))}
-            </section>
-
-            {newPo && tenant && (
-              <section ref={formRef} className="scroll-mt-36" aria-label="New purchase order">
-                <NewPoForm key={`${newPo.prefill ?? "blank"}:${newPo.n}`} suppliers={supplierList} ingredients={ingredients} outletId={outlet.id} currency={tenant.base_currency}
-                  locale={SITE.locale} tz={tz} prefillIngredient={newPo.prefill} session={session} client={client} onAuth={handleAuth}
-                  onCreated={(poId) => router.push(`/staff/purchase-orders/${poId}`)} />
-              </section>
-            )}
-
-            <section aria-labelledby="pos-title" className="space-y-3">
-              <h2 id="pos-title" className="text-[26px]">Purchase orders</h2>
-              {pos === null ? <div className="skeleton h-40" role="status" aria-label="Loading" />
-                : failed(pos) ? <RetryLine error={pos} onRetry={() => void loadPos()} />
-                : pos.length === 0 ? <div className="state-box"><p>No purchase orders yet.</p></div>
-                : <ul className="grid gap-3">{pos.map((po) => <PoRow key={po.po_id} po={po} tz={tz} />)}</ul>}
-            </section>
+            </aside>
           </div>
-
-          <aside aria-labelledby="suppliers-title" className="space-y-3 min-[1100px]:sticky min-[1100px]:top-[132px]">
-            <h2 id="suppliers-title" className="text-[26px]">Suppliers</h2>
-            {suppliers === null ? <div className="skeleton h-40" role="status" aria-label="Loading" />
-              : failed(suppliers) ? <RetryLine error={suppliers} onRetry={() => void loadSuppliers()} />
-              : suppliers.length === 0 ? <p className="text-muted">No suppliers yet.</p>
-              : (
-                <ul className="grid gap-3">
-                  {suppliers.map((s) => (
-                    <li key={s.supplier_id}>
-                      <Link href={`/staff/suppliers/${s.supplier_id}`} className="card card-link grid gap-1 p-4 no-underline">
-                        <span className="font-semibold"><SupplierName s={s} /></span>
-                        {s.payment_days !== null && s.payment_days > 0 && <span className="text-muted">Pay within {s.payment_days} days</span>}
-                        {!s.active && <span className="pill pill-done justify-self-start">Not active</span>}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </aside>
         </div>
-      </div>
-      {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
-      <Toast message={toast} />
-    </main>
+        {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

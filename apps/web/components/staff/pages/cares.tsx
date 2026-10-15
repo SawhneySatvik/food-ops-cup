@@ -21,7 +21,7 @@ import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
 import type { Schemas } from "@/lib/munim/types";
 import { SITE } from "@/lib/site";
-import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 import { ListingCard } from "../cares/listing-card";
 import { ListingDraftCard } from "../cares/listing-draft";
 import { OwnListingForm } from "../cares/own-listing";
@@ -244,126 +244,128 @@ function Cares({ outlet }: { outlet: Outlet }) {
   );
 
   return (
-    <main className="pb-12">
-      {(!online || netDown) && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <div className="wrap staff-main space-y-6">
-        <header className="space-y-2">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h1 className="section-title">Munim Cares</h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <LiveLine state={showInsight && watches ? live : "open"} onRefresh={refresh} />
-              <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
+    <>
+      <OfflineBanner top="staff" show={!online || netDown} text="You're offline. Showing the last update." />
+      <main className="pb-12">
+        <div className="wrap staff-main space-y-6">
+          <header className="space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h1 className="section-title">Munim Cares</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <LiveLine state={showInsight && watches ? live : "open"} onRefresh={refresh} />
+                <button type="button" className="btn btn-plain" onClick={refresh}>Refresh</button>
+              </div>
             </div>
-          </div>
-          <p className="font-semibold">Surplus food to simulated recipients · Measured on synthetic data · Check your local food-donation rules</p>
-          {failed(profile) && retryLine(profile, () => void loadAll())}
-        </header>
+            <p className="font-semibold">Surplus food to simulated recipients · Measured on synthetic data · Check your local food-donation rules</p>
+            {failed(profile) && retryLine(profile, () => void loadAll())}
+          </header>
 
-        <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-          <aside className="grid gap-4 min-[1100px]:sticky min-[1100px]:top-[132px] min-[1100px]:col-start-2 min-[1100px]:row-start-1">
-            {profile === null && <div className="skeleton h-28" role="status" aria-label="Loading" />}
-            {profileStrip}
-            {impactCard}
-          </aside>
+          <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <aside className="grid gap-4 min-[1100px]:sticky min-[1100px]:top-[132px] min-[1100px]:col-start-2 min-[1100px]:row-start-1">
+              {profile === null && <div className="skeleton h-28" role="status" aria-label="Loading" />}
+              {profileStrip}
+              {impactCard}
+            </aside>
 
-          <div className="grid min-w-0 gap-8 min-[1100px]:col-start-1 min-[1100px]:row-start-1">
-            {gateCard}
+            <div className="grid min-w-0 gap-8 min-[1100px]:col-start-1 min-[1100px]:row-start-1">
+              {gateCard}
 
-            {showInsight && (
-              <section aria-labelledby="risk-title" className="space-y-3">
-                <h2 id="risk-title" className="text-[26px]">Food at risk</h2>
-                {atRisk === null || !fmt ? <div className="skeleton h-32" role="status" aria-label="Loading" />
-                  : failed(atRisk) ? retryLine(atRisk, () => today && void mintAtRisk(today))
-                  : atRiskRows(atRisk).length === 0 ? <p className="text-muted">Nothing at {outlet.name} is close to its use-by date.</p>
+              {showInsight && (
+                <section aria-labelledby="risk-title" className="space-y-3">
+                  <h2 id="risk-title" className="text-[26px]">Food at risk</h2>
+                  {atRisk === null || !fmt ? <div className="skeleton h-32" role="status" aria-label="Loading" />
+                    : failed(atRisk) ? retryLine(atRisk, () => today && void mintAtRisk(today))
+                    : atRiskRows(atRisk).length === 0 ? <p className="text-muted">Nothing at {outlet.name} is close to its use-by date.</p>
+                    : (
+                      <ul className="grid gap-3">
+                        {atRiskRows(atRisk).map((r) => {
+                          const cell = (column: string, after = "") => {
+                            const v = atRisk.rows[r.row]?.[column];
+                            return v === undefined ? <CannotVerify /> : <SourcedValue text={`${formatCell(v, column, fmt)}${after}`} refToken={snapRef(atRisk.snapshot_id, r.row, column)} onOpen={openDrawer} />;
+                          };
+                          return (
+                            <li key={r.batchId} className="card grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                              <div className="space-y-1">
+                                <p className="flex flex-wrap items-center gap-2 text-[19px] font-semibold">
+                                  {ingName(r.ingredientId) ?? String(atRisk.rows[r.row]?.ingredient_name ?? "Stock item")}
+                                  <span className="badge">{FOOD_KIND[r.foodKind]}</span>
+                                  {proposalBatches.has(r.batchId) && <span className="badge badge-new">A donation is proposed</span>}
+                                </p>
+                                <p className="text-muted">Use by {formatDate(r.expiresOn, SITE.locale)}</p>
+                                <p>At risk: {cell("at_risk_qty_milli", ` ${unitLabel(r.unit)}`)}</p>
+                                <p>Worth {cell("at_risk_minor")} at cost</p>
+                              </div>
+                              {caresCan(role, "publish") && <button type="button" className="btn btn-plain" onClick={() => openOwn(r)}>List this</button>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                </section>
+              )}
+
+              {showInsight && (
+                <section aria-labelledby="proposals-title" className="space-y-3">
+                  <h2 id="proposals-title" className="text-[26px]">Proposed by Munim</h2>
+                  {proposals === null || !fmt ? <div className="skeleton h-64" role="status" aria-label="Loading" />
+                    : failed(proposals) ? retryLine(proposals, () => void loadProposals())
+                    : proposals.length === 0 ? <p className="text-muted">No proposals waiting.</p>
+                    : proposals.map((p) => (
+                      <ListingDraftCard key={p.detail.draft.draft_id} detail={p.detail} match={p.match} recipients={recipients} menu={menu} ingredients={ingredients}
+                        session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onOutcome={onOutcome} />
+                    ))}
+                </section>
+              )}
+
+              {gate === "on" && caresCan(role, "publish") && fmt && (
+                <section ref={ownRef} aria-labelledby={own ? "own-listing" : "own-title"} className="scroll-mt-36 space-y-3">
+                  {!own && <h2 id="own-title" className="text-[26px]">List food yourself</h2>}
+                  {own ? (
+                    <OwnListingForm key={`${own.prefill?.batchId ?? "blank"}:${own.n}`} outletId={outlet.id} prefill={own.prefill} menu={menu} ingredients={ingredients}
+                      session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onAuth={handleAuth}
+                      onPublished={(l) => { setListed(l); setOwn(null); afterCommand(); }} onCancel={() => setOwn(null)} />
+                  ) : (
+                    <>
+                      {listed && (
+                        <p className="card flex flex-wrap items-center gap-2 p-4 font-semibold" role="status">
+                          Listed. {listed.name} <SimulatedRecipient /> can pick it up {listed.when}.
+                        </p>
+                      )}
+                      <div className="card flex flex-wrap items-center justify-between gap-3 p-5">
+                        <p className="max-w-[48ch] text-muted">Have something left that Munim didn&apos;t spot? List it for a simulated recipient to collect.</p>
+                        <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>Start a listing</button>
+                      </div>
+                    </>
+                  )}
+                </section>
+              )}
+
+              <section aria-labelledby="listings-title" className="space-y-4">
+                <h2 id="listings-title" className="text-[26px]">Listings</h2>
+                {listings === null || !tenant ? <div className="skeleton h-48" role="status" aria-label="Loading" />
+                  : failed(listings) ? retryLine(listings, () => void loadListings())
+                  : listings.length === 0 ? <div className="state-box"><p>No food listed today.</p></div>
                   : (
-                    <ul className="grid gap-3">
-                      {atRiskRows(atRisk).map((r) => {
-                        const cell = (column: string, after = "") => {
-                          const v = atRisk.rows[r.row]?.[column];
-                          return v === undefined ? <CannotVerify /> : <SourcedValue text={`${formatCell(v, column, fmt)}${after}`} refToken={snapRef(atRisk.snapshot_id, r.row, column)} onOpen={openDrawer} />;
-                        };
-                        return (
-                          <li key={r.batchId} className="card grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                            <div className="space-y-1">
-                              <p className="flex flex-wrap items-center gap-2 text-[19px] font-semibold">
-                                {ingName(r.ingredientId) ?? String(atRisk.rows[r.row]?.ingredient_name ?? "Stock item")}
-                                <span className="badge">{FOOD_KIND[r.foodKind]}</span>
-                                {proposalBatches.has(r.batchId) && <span className="pill pill-new">A donation is proposed</span>}
-                              </p>
-                              <p className="text-muted">Use by {formatDate(r.expiresOn, SITE.locale)}</p>
-                              <p>At risk: {cell("at_risk_qty_milli", ` ${unitLabel(r.unit)}`)}</p>
-                              <p>Worth {cell("at_risk_minor")} at cost</p>
-                            </div>
-                            {caresCan(role, "publish") && <button type="button" className="btn btn-plain" onClick={() => openOwn(r)}>List this</button>}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <>
+                      <h3 className="text-[20px]">Waiting for pickup</h3>
+                      {published.length === 0 ? <p className="text-muted">No food listed today.</p> : published.map((l) => (
+                        <ListingCard key={l.listing_id} listing={l} recipients={recipients} menu={menu} ingredients={ingredients} session={session} client={client}
+                          tz={tz} locale={SITE.locale} currency={tenant.base_currency} onAuth={handleAuth} onChanged={(text) => { if (text) say(text); afterCommand(); }} />
+                      ))}
+                      {earlier.length > 0 && <h3 className="pt-2 text-[20px]">Earlier</h3>}
+                      {earlier.map((l) => (
+                        <ListingCard key={l.listing_id} listing={l} recipients={recipients} menu={menu} ingredients={ingredients} session={session} client={client}
+                          tz={tz} locale={SITE.locale} currency={tenant.base_currency} onAuth={handleAuth} onChanged={(text) => { if (text) say(text); afterCommand(); }} />
+                      ))}
+                    </>
                   )}
               </section>
-            )}
-
-            {showInsight && (
-              <section aria-labelledby="proposals-title" className="space-y-3">
-                <h2 id="proposals-title" className="text-[26px]">Proposed by Munim</h2>
-                {proposals === null || !fmt ? <div className="skeleton h-64" role="status" aria-label="Loading" />
-                  : failed(proposals) ? retryLine(proposals, () => void loadProposals())
-                  : proposals.length === 0 ? <p className="text-muted">No proposals waiting.</p>
-                  : proposals.map((p) => (
-                    <ListingDraftCard key={p.detail.draft.draft_id} detail={p.detail} match={p.match} recipients={recipients} menu={menu} ingredients={ingredients}
-                      session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onOutcome={onOutcome} />
-                  ))}
-              </section>
-            )}
-
-            {gate === "on" && caresCan(role, "publish") && fmt && (
-              <section ref={ownRef} aria-labelledby={own ? "own-listing" : "own-title"} className="scroll-mt-36 space-y-3">
-                {!own && <h2 id="own-title" className="text-[26px]">List food yourself</h2>}
-                {own ? (
-                  <OwnListingForm key={`${own.prefill?.batchId ?? "blank"}:${own.n}`} outletId={outlet.id} prefill={own.prefill} menu={menu} ingredients={ingredients}
-                    session={session} client={client} fmt={fmt} tz={tz} onOpen={openDrawer} onAuth={handleAuth}
-                    onPublished={(l) => { setListed(l); setOwn(null); afterCommand(); }} onCancel={() => setOwn(null)} />
-                ) : (
-                  <>
-                    {listed && (
-                      <p className="card flex flex-wrap items-center gap-2 p-4 font-semibold" role="status">
-                        Listed. {listed.name} <SimulatedRecipient /> can pick it up {listed.when}.
-                      </p>
-                    )}
-                    <div className="card flex flex-wrap items-center justify-between gap-3 p-5">
-                      <p className="max-w-[48ch] text-muted">Have something left that Munim didn&apos;t spot? List it for a simulated recipient to collect.</p>
-                      <button type="button" className="btn btn-secondary" onClick={() => openOwn(null)}>Start a listing</button>
-                    </div>
-                  </>
-                )}
-              </section>
-            )}
-
-            <section aria-labelledby="listings-title" className="space-y-4">
-              <h2 id="listings-title" className="text-[26px]">Listings</h2>
-              {listings === null || !tenant ? <div className="skeleton h-48" role="status" aria-label="Loading" />
-                : failed(listings) ? retryLine(listings, () => void loadListings())
-                : listings.length === 0 ? <div className="state-box"><p>No food listed today.</p></div>
-                : (
-                  <>
-                    <h3 className="text-[20px]">Waiting for pickup</h3>
-                    {published.length === 0 ? <p className="text-muted">No food listed today.</p> : published.map((l) => (
-                      <ListingCard key={l.listing_id} listing={l} recipients={recipients} menu={menu} ingredients={ingredients} session={session} client={client}
-                        tz={tz} locale={SITE.locale} currency={tenant.base_currency} onAuth={handleAuth} onChanged={(text) => { if (text) say(text); afterCommand(); }} />
-                    ))}
-                    {earlier.length > 0 && <h3 className="pt-2 text-[20px]">Earlier</h3>}
-                    {earlier.map((l) => (
-                      <ListingCard key={l.listing_id} listing={l} recipients={recipients} menu={menu} ingredients={ingredients} session={session} client={client}
-                        tz={tz} locale={SITE.locale} currency={tenant.base_currency} onAuth={handleAuth} onChanged={(text) => { if (text) say(text); afterCommand(); }} />
-                    ))}
-                  </>
-                )}
-            </section>
+            </div>
           </div>
         </div>
-      </div>
-      {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
-      <Toast message={toast} />
-    </main>
+        {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

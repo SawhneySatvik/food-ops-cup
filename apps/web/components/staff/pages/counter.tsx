@@ -21,7 +21,7 @@ import { categoryLabel, NOTE_FIELDS, SITE } from "@/lib/site";
 import { CategoryMotif } from "../../art";
 import { QtyStepper } from "../../cart-bits";
 import { CloseIcon } from "../../icons";
-import { DietBadge, ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { DietBadge, ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 import { useStaff } from "../shell";
 import { SimulateWebOrder } from "../simulate";
 import { ORDER_TONE, StatusPill } from "../source";
@@ -88,95 +88,97 @@ function Till() {
 
   if (load.state === "failed") {
     if (load.error.kind === "not_found") return <FullPage title="Not found."><p>It may have been removed, or it isn&apos;t in your outlets.</p></FullPage>;
-    return <main className="staff-main"><ErrorNote>{staffErrorText(load.error, "counter")}</ErrorNote><button type="button" className="btn btn-plain mt-3" onClick={reload}>Try again</button></main>;
+    return <main className="staff-main-wide"><ErrorNote>{staffErrorText(load.error, "counter")}</ErrorNote><button type="button" className="btn btn-plain mt-3" onClick={reload}>Try again</button></main>;
   }
   if (load.state === "noCounter") return <FullPage title="No counter yet"><p>This business has no counter channel switched on, so the till can&apos;t sell.</p></FullPage>;
 
   return (
-    <main className="staff-main-wide">
-      {!online && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <div className="flex flex-wrap items-center gap-3 pb-3">
-        <div role="tablist" aria-label="Counter" className="flex gap-2">
-          <button type="button" role="tab" aria-selected={view === "new"} className="chip" aria-current={view === "new" ? "true" : undefined} onClick={() => setView("new")}>New order</button>
-          <button type="button" role="tab" aria-selected={view === "orders"} className="chip" aria-current={view === "orders" ? "true" : undefined} onClick={() => setView("orders")}>
-            Today&apos;s orders{orders.items ? ` · ${orders.items.length}${orders.hasMore ? "+" : ""}` : ""}
-          </button>
-        </div>
-        {live.off && (
-          <p className="text-[14px] text-muted">Live updates are off. Tap Refresh to update. <button type="button" className="btn btn-ghost" onClick={orders.refresh}>Refresh</button></p>
-        )}
-        <span className="ml-auto"><SimulateWebOrder onDone={(ok) => { say(ok ? "A simulated web order was sent to the kitchen." : "The simulated order didn't go through."); orders.refresh(); }} /></span>
-      </div>
-
-      {view === "orders" ? (
-        <OrdersList items={orders.items} hasMore={orders.hasMore} error={orders.error ? staffErrorText(orders.error, "counter") : null} onMore={orders.more} onRetry={orders.refresh} counterId={setup?.counter.id ?? null} channels={setup?.channels ?? []} tz={outlet!.tz} />
-      ) : (
-        <div className="pos">
-          <section aria-label="Menu" className="space-y-5">
-            {!setup ? <div className="tile-grid">{Array.from({ length: 9 }, (_, i) => <div key={i} className="skeleton h-[104px]" aria-hidden="true" />)}</div>
-              : setup.menu.entries.length === 0 ? <p className="state-box">Nothing is on sale at this counter right now.</p>
-              : grouped(setup.menu.entries).map(([cat, entries]) => (
-                <div key={cat}>
-                  <h2 className="mb-2 flex items-center gap-2 text-[22px]"><CategoryMotif slug={cat} size={26} /> {categoryLabel(cat)}</h2>
-                  <div className="tile-grid">
-                    {entries.map((e) => (
-                      <Tile key={`${e.item_id}:${e.variant_id ?? "-"}`} entry={e} onAdd={(x) => (needsSheet(x, !!NOTE_FIELDS[x.name_key]) ? setSheet(x) : setLines((ls) => addLine(ls, newTillLine(x, []))))} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </section>
-
-          <aside className="card cart-rail" aria-label="This order">
-            <h2 className="text-[24px]">New order</h2>
-            <div role="radiogroup" aria-label="Order kind" className="grid grid-cols-2 gap-2">
-              {(["takeaway", "dine_in"] as const).map((k) => (
-                <button key={k} type="button" role="radio" aria-checked={kind === k} className={`btn ${kind === k ? "btn-primary" : "btn-plain"}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>
-              ))}
-            </div>
-            {kind === "dine_in" && (
-              <label className="block font-semibold">Table (optional)<input value={table} maxLength={20} onChange={(e) => setTable(e.target.value)} /></label>
-            )}
-            {lines.length === 0 ? <p className="text-muted">Tap an item to start an order.</p> : (
-              <div aria-busy={loading}>
-                {lines.map((l, i) => {
-                  const label = tillLineLabel(l);
-                  const pl = preview && !refused ? preview.lines[i] : undefined;
-                  const why = refused?.filter((r) => r.line_no === i + 1) ?? [];
-                  return (
-                    <div key={l.key}>
-                      <CartRailLine name={label.name} detail={label.detail} note={l.note} qty={l.qty} lineTotal={pl ? money(pl.line_total_minor, preview!.currency) : null} disabled={busy} onQty={(q) => setLines((ls) => setQty(ls, l.key, Math.min(q, MAX_QTY)))} />
-                      {why.map((r) => <p key={r.reason_code} className="font-semibold text-danger">{tillRefusalText(r.reason_code)}</p>)}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {refused ? (
-              <div className="space-y-1">{refused.filter((r) => r.line_no === null).map((r) => <ErrorNote key={r.reason_code}>{tillRefusalText(r.reason_code)}</ErrorNote>)}<p className="text-muted">Fix the lines above to see the total.</p></div>
-            ) : preview && lines.length > 0 ? (
-              <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1" aria-busy={loading}>
-                <dt>Subtotal <span className="badge">Preview</span></dt><dd className="num text-right">{money(preview.subtotal_minor, preview.currency)}</dd>
-                {preview.discount_minor > 0 && (<><dt>Discount</dt><dd className="num text-right">−{money(preview.discount_minor, preview.currency)}</dd></>)}
-                <dt>Tax</dt><dd className="num text-right">{money(preview.tax_minor, preview.currency)}</dd>
-                <dt className="text-[20px] font-bold">Total</dt><dd className="num text-right text-[24px] font-bold">{money(preview.total_minor, preview.currency)}</dd>
-              </dl>
-            ) : null}
-            {previewError && previewError.kind !== "auth" && (
-              <div className="space-y-1"><ErrorNote>{staffErrorText(previewError, "counter")}</ErrorNote><button type="button" className="btn btn-plain" onClick={() => setBump((b) => b + 1)}>Try again</button></div>
-            )}
-            {placeError && <ErrorNote>{placeError}</ErrorNote>}
-            <button type="button" className="btn btn-primary pay-btn" disabled={!canPlace} onClick={() => void doPlace()}>
-              {busy ? "Placing…" : wait > 0 ? `Try again in ${wait} s` : preview && !refused && lines.length > 0 ? `Place order · ${money(preview.total_minor, preview.currency)}` : "Place order"}
+    <>
+      <OfflineBanner top="staff" show={!online} text="You're offline. Showing the last update." />
+      <main className="staff-main-wide">
+        <div className="flex flex-wrap items-center gap-3 pb-3">
+          <div role="tablist" aria-label="Counter" className="flex gap-2">
+            <button type="button" role="tab" aria-selected={view === "new"} className="chip" aria-current={view === "new" ? "true" : undefined} onClick={() => setView("new")}>New order</button>
+            <button type="button" role="tab" aria-selected={view === "orders"} className="chip" aria-current={view === "orders" ? "true" : undefined} onClick={() => setView("orders")}>
+              Today&apos;s orders{orders.items ? ` · ${orders.items.length}${orders.hasMore ? "+" : ""}` : ""}
             </button>
-            {lines.length > 0 && <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setLines([])}>Clear order</button>}
-            <p className="text-[14px] text-muted">Payment is recorded on the next screen. Recorded only — Munim does not process payments.</p>
-          </aside>
+          </div>
+          {live.off && (
+            <p className="text-[14px] text-muted">Live updates are off. Tap Refresh to update. <button type="button" className="btn btn-ghost" onClick={orders.refresh}>Refresh</button></p>
+          )}
+          <span className="ml-auto"><SimulateWebOrder onDone={(ok) => { say(ok ? "A simulated web order was sent to the kitchen." : "The simulated order didn't go through."); orders.refresh(); }} /></span>
         </div>
-      )}
-      <OptionsSheet entry={sheet} onClose={() => setSheet(null)} onAdd={(line) => { setLines((ls) => addLine(ls, line)); setSheet(null); }} />
-      <Toast message={toast} />
-    </main>
+
+        {view === "orders" ? (
+          <OrdersList items={orders.items} hasMore={orders.hasMore} error={orders.error ? staffErrorText(orders.error, "counter") : null} onMore={orders.more} onRetry={orders.refresh} counterId={setup?.counter.id ?? null} channels={setup?.channels ?? []} tz={outlet!.tz} />
+        ) : (
+          <div className="pos">
+            <section aria-label="Menu" className="space-y-5">
+              {!setup ? <div className="tile-grid">{Array.from({ length: 9 }, (_, i) => <div key={i} className="skeleton h-[104px]" aria-hidden="true" />)}</div>
+                : setup.menu.entries.length === 0 ? <p className="state-box">Nothing is on sale at this counter right now.</p>
+                : grouped(setup.menu.entries).map(([cat, entries]) => (
+                  <div key={cat}>
+                    <h2 className="mb-2 flex items-center gap-2 text-[22px]"><CategoryMotif slug={cat} size={26} /> {categoryLabel(cat)}</h2>
+                    <div className="tile-grid">
+                      {entries.map((e) => (
+                        <Tile key={`${e.item_id}:${e.variant_id ?? "-"}`} entry={e} onAdd={(x) => (needsSheet(x, !!NOTE_FIELDS[x.name_key]) ? setSheet(x) : setLines((ls) => addLine(ls, newTillLine(x, []))))} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </section>
+
+            <aside className="card cart-rail" aria-label="This order">
+              <h2 className="text-[24px]">New order</h2>
+              <div role="radiogroup" aria-label="Order kind" className="grid grid-cols-2 gap-2">
+                {(["takeaway", "dine_in"] as const).map((k) => (
+                  <button key={k} type="button" role="radio" aria-checked={kind === k} className={`btn ${kind === k ? "btn-primary" : "btn-plain"}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>
+                ))}
+              </div>
+              {kind === "dine_in" && (
+                <label className="block font-semibold">Table (optional)<input value={table} maxLength={20} onChange={(e) => setTable(e.target.value)} /></label>
+              )}
+              {lines.length === 0 ? <p className="text-muted">Tap an item to start an order.</p> : (
+                <div aria-busy={loading}>
+                  {lines.map((l, i) => {
+                    const label = tillLineLabel(l);
+                    const pl = preview && !refused ? preview.lines[i] : undefined;
+                    const why = refused?.filter((r) => r.line_no === i + 1) ?? [];
+                    return (
+                      <div key={l.key}>
+                        <CartRailLine name={label.name} detail={label.detail} note={l.note} qty={l.qty} lineTotal={pl ? money(pl.line_total_minor, preview!.currency) : null} disabled={busy} onQty={(q) => setLines((ls) => setQty(ls, l.key, Math.min(q, MAX_QTY)))} />
+                        {why.map((r) => <p key={r.reason_code} className="font-semibold text-danger">{tillRefusalText(r.reason_code)}</p>)}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {refused ? (
+                <div className="space-y-1">{refused.filter((r) => r.line_no === null).map((r) => <ErrorNote key={r.reason_code}>{tillRefusalText(r.reason_code)}</ErrorNote>)}<p className="text-muted">Fix the lines above to see the total.</p></div>
+              ) : preview && lines.length > 0 ? (
+                <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1" aria-busy={loading}>
+                  <dt>Subtotal <span className="badge">Preview</span></dt><dd className="num text-right">{money(preview.subtotal_minor, preview.currency)}</dd>
+                  {preview.discount_minor > 0 && (<><dt>Discount</dt><dd className="num text-right">−{money(preview.discount_minor, preview.currency)}</dd></>)}
+                  <dt>Tax</dt><dd className="num text-right">{money(preview.tax_minor, preview.currency)}</dd>
+                  <dt className="text-[20px] font-bold">Total</dt><dd className="num text-right text-[24px] font-bold">{money(preview.total_minor, preview.currency)}</dd>
+                </dl>
+              ) : null}
+              {previewError && previewError.kind !== "auth" && (
+                <div className="space-y-1"><ErrorNote>{staffErrorText(previewError, "counter")}</ErrorNote><button type="button" className="btn btn-plain" onClick={() => setBump((b) => b + 1)}>Try again</button></div>
+              )}
+              {placeError && <ErrorNote>{placeError}</ErrorNote>}
+              <button type="button" className="btn btn-primary pay-btn" disabled={!canPlace} onClick={() => void doPlace()}>
+                {busy ? "Placing…" : wait > 0 ? `Try again in ${wait} s` : preview && !refused && lines.length > 0 ? `Place order · ${money(preview.total_minor, preview.currency)}` : "Place order"}
+              </button>
+              {lines.length > 0 && <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setLines([])}>Clear order</button>}
+              <p className="text-[14px] text-muted">Payment is recorded on the next screen. Recorded only — Munim does not process payments.</p>
+            </aside>
+          </div>
+        )}
+        <OptionsSheet entry={sheet} onClose={() => setSheet(null)} onAdd={(line) => { setLines((ls) => addLine(ls, line)); setSheet(null); }} />
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }
 
@@ -275,7 +277,7 @@ function OrdersList({ items, hasMore, error, onMore, onRetry, counterId, channel
   if (!items) return <div className="grid gap-2">{Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton h-16" aria-hidden="true" />)}</div>;
   if (items.length === 0) return <p className="state-box">No orders yet today.</p>;
   return (
-    <div className="card overflow-x-auto p-2">
+    <div className="card relative overflow-x-auto p-2">
       {error && <ErrorNote>{error}</ErrorNote>}
       <table className="snap-table text-[16px]">
         <thead><tr><th scope="col">Ticket</th><th scope="col">Time</th><th scope="col">Kind</th><th scope="col">From</th><th scope="col">Status</th><th scope="col" className="num">Total</th><th scope="col"><span className="sr-only">Open</span></th></tr></thead>

@@ -1,6 +1,7 @@
 // file: app/staff/layout.tsx
-// Every /staff route: the staff stylesheet and the shell. The root layout above it still renders the demo bar.
+// Every /staff route: the demo bar in the staff screens' words, the staff stylesheet and the shell.
 import { Suspense } from "react";
+import { DemoBar } from "@/components/chrome";
 import { StaffShell } from "@/components/staff/shell";
 import "./staff.css";
 
@@ -11,8 +12,11 @@ export const instant = false;
 export default function StaffLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // The shell reads the pathname, which on a dynamic route is only known at request time: keep it inside Suspense.
   return (
-    <Suspense fallback={<div className="min-h-[100dvh]" aria-busy="true" />}>
-      <StaffShell>{children}</StaffShell>
-    </Suspense>
+    <>
+      <DemoBar staff />
+      <Suspense fallback={<div className="min-h-[100dvh]" aria-busy="true" />}>
+        <StaffShell>{children}</StaffShell>
+      </Suspense>
+    </>
   );
 }

@@ -6,7 +6,7 @@
 // /staff/sign-in. Screens never read sessionStorage themselves.
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { MunimError } from "@/lib/munim/client";
 import { SAMPLE_DATA } from "@/lib/munim/copy";
 import { can, readOutlet, readSession, signOut, writeOutlet, type Session } from "@/lib/munim/session";
@@ -41,15 +41,25 @@ export const useStaff = (): Staff => {
   return s;
 };
 
-const NAV = [
+/** `also`: other routes that belong under the tab (a purchase order is reached from Suppliers). */
+const NAV: readonly { href: string; label: string; screen: string; also?: string }[] = [
   { href: "/staff/counter", label: "Counter", screen: "counter" },
   { href: "/staff/kitchen", label: "Kitchen", screen: "kitchen" },
   { href: "/staff/home", label: "Home", screen: "home" },
   { href: "/staff/inbox", label: "Inbox", screen: "inbox" },
   { href: "/staff/ask", label: "Ask Munim", screen: "ask" },
   { href: "/staff/cares", label: "Cares", screen: "cares" },
-  { href: "/staff/suppliers", label: "Suppliers", screen: "suppliers" },
-] as const;
+  { href: "/staff/suppliers", label: "Suppliers", screen: "suppliers", also: "/staff/purchase-orders" },
+];
+
+// "sm" and up, as Tailwind's: the bar keeps everything in one row there; on a phone the outlet and the labels move under it.
+const WIDE = "(min-width: 640px)";
+const subscribeWide = (cb: () => void) => {
+  const m = window.matchMedia(WIDE);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+};
+const useWide = () => useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
 
 export function StaffShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -63,6 +73,25 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
   // GET /v1/tenant's is_demo; a failed read shows the badge (saying "sample" wrongly is the safe mistake).
   const [demoData, setDemoData] = useState(true);
   const signIn = path === "/staff/sign-in";
+  const wide = useWide();
+  const navRef = useRef<HTMLElement>(null);
+
+  // Whatever sticks under the bar (the offline banner, the till's cart) needs its real height, and the bar wraps on tablets.
+  const barRef = useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    const publish = () => document.documentElement.style.setProperty("--staff-bar-h", `${el.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => { ro.disconnect(); document.documentElement.style.removeProperty("--staff-bar-h"); };
+  }, []);
+
+  // On a phone the tabs scroll: bring the current one into view, or Suppliers sits off-screen.
+  useEffect(() => {
+    const nav = navRef.current;
+    const here = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && here) nav.scrollLeft = here.offsetLeft - (nav.clientWidth - here.offsetWidth) / 2;
+  }, [path, session, wide]);
 
   useEffect(() => {
     const s = readSession();
@@ -124,38 +153,48 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
     <main className="wrap staff-main"><div className="state-box"><p>You aren&apos;t set up at any outlet yet. Ask the owner.</p></div></main>
   ) : children;
 
+  const outletPick = outlets.length > 1 ? (
+    <label className="flex items-center gap-2 font-semibold">
+      Outlet
+      <select className="min-w-0 flex-1 sm:w-auto sm:flex-none" value={outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
+        {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+      </select>
+    </label>
+  ) : outlet ? <span className="font-semibold">{outlet.name}</span> : null;
+  const sample = demoData && <span className="badge badge-sim">{SAMPLE_DATA}</span>;
+  const demoSignIn = session.demo && <span className="badge badge-sim">{DEMO_SIGN_IN}</span>;
+
   return (
     <StaffContext.Provider value={value}>
-      <header className="staff-bar">
+      <header ref={barRef} className="staff-bar">
         <div className="staff-bar-row">
-          <Link href="/staff" className="text-ink no-underline" aria-label="Cobnut Bakehouse staff, home"><Wordmark /></Link>
-          <span className="badge hidden sm:inline-flex">Staff</span>
-          {outlets.length > 1 ? (
-            <label className="order-last flex w-full items-center gap-2 font-semibold sm:order-none sm:w-auto">
-              Outlet
-              <select className="min-w-0 flex-1 sm:w-auto sm:flex-none" value={outletId ?? ""} onChange={(e) => setOutlet(e.target.value)}>
-                {outlets.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            </label>
-          ) : outlet ? <span className="order-last w-full font-semibold sm:order-none sm:w-auto">{outlet.name}</span> : null}
-          {demoData && <span className="sim-badge order-last sm:order-none">{SAMPLE_DATA}</span>}
-          {session.demo && <span className="sim-badge order-last sm:hidden">{DEMO_SIGN_IN}</span>}
-          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <Link href="/staff" className="inline-flex min-h-12 items-center text-ink no-underline" aria-label="Cobnut Bakehouse staff, home"><Wordmark compact /></Link>
+          {wide && <span className="badge">Staff</span>}
+          {wide && outletPick}
+          {wide && sample}
+          <span className="ml-auto flex items-center gap-2">
             {/* The named person every action is taken as: shortened to the first name on phones, never hidden. */}
             <span className="font-semibold md:hidden">{session.me.name.split(" ")[0]}</span>
             <span className="hidden font-semibold md:inline">{session.me.name}</span>
             <span className="hidden text-muted md:inline">· {ROLE_LABEL[session.me.role]}</span>
-            {session.demo && <span className="sim-badge hidden sm:inline-flex">{DEMO_SIGN_IN}</span>}
+            {wide && demoSignIn}
             <button type="button" className="btn btn-plain px-4 sm:px-[22px]" onClick={() => { signOut(); router.replace("/staff/sign-in"); }}
               aria-label={`Sign out ${session.me.name}`}>Sign out</button>
           </span>
         </div>
-        <nav aria-label="Staff" className="staff-nav">
+        <nav ref={navRef} aria-label="Staff" className="staff-nav">
           {NAV.filter((n) => can(session, n.screen)).map((n) => (
-            <Link key={n.href} href={n.href} className="chip" aria-current={path.startsWith(n.href) ? "page" : undefined}>{n.label}</Link>
+            <Link key={n.href} href={n.href} className="chip" aria-current={[n.href, n.also].some((h) => h && path.startsWith(h)) ? "page" : undefined}>{n.label}</Link>
           ))}
         </nav>
       </header>
+      {!wide && (
+        <div className="staff-context">
+          {outletPick && <div className="w-full">{outletPick}</div>}
+          {sample}
+          {demoSignIn}
+        </div>
+      )}
       {body}
       <MockPanel staff />
     </StaffContext.Provider>

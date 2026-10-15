@@ -140,13 +140,13 @@ export function SnapshotDrawer({ client, open, onClose, fmt, tz, label }: {
 }
 
 /** Wherever a supplier's name appears. */
-export const SimulatedSupplier = () => <span className="sim-badge">{SIMULATED_SUPPLIER}</span>;
+export const SimulatedSupplier = () => <span className="badge badge-sim">{SIMULATED_SUPPLIER}</span>;
 /** Wherever a donation recipient's name appears (the name keeps its "(simulated)"). */
-export const SimulatedRecipient = () => <span className="sim-badge">{SIMULATED_RECIPIENT}</span>;
+export const SimulatedRecipient = () => <span className="badge badge-sim">{SIMULATED_RECIPIENT}</span>;
 
 export type PillTone = "new" | "work" | "ready" | "done" | "stop" | "warn" | "late";
 /** A status in words, with a tone. Never colour alone: the word is always there. */
-export const StatusPill = ({ tone, children }: { tone: PillTone; children: React.ReactNode }) => <span className={`pill pill-${tone}`}>{children}</span>;
+export const StatusPill = ({ tone, children }: { tone: PillTone; children: React.ReactNode }) => <span className={`badge badge-${tone}`}>{children}</span>;
 export const ORDER_TONE: Record<string, PillTone> = { placed: "new", accepted: "work", preparing: "work", ready: "ready", completed: "done", rejected: "stop", cancelled: "stop" };
 export const TICKET_TONE: Record<string, PillTone> = { queued: "new", preparing: "work", ready: "ready", done: "done" };
 export const DRAFT_TONE: Record<string, PillTone> = { proposed: "new", executing: "work", executed: "ready", failed: "stop", rejected: "done", stale: "warn" };

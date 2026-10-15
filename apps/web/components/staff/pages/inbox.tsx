@@ -21,7 +21,7 @@ import type { Schemas } from "@/lib/munim/types";
 import { SITE } from "@/lib/site";
 import { useStaff } from "../shell";
 import { AiSegment, CannotVerify, DRAFT_TONE, SnapshotDrawer, SourcedValue, StatusPill, type PillTone } from "../source";
-import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 
 type Finding = Schemas["V1Finding"];
 type InboxItem = Schemas["V1InboxResponse"]["items"][number];
@@ -200,54 +200,56 @@ export function InboxPage() {
   const waiting = items?.length ?? 0;
 
   return (
-    <main className="wrap staff-main space-y-5">
-      {!online && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="section-title">Inbox</h1>
-        <LiveLine state={live} onRefresh={() => void load()} />
-      </div>
-      <div className="flex gap-2" role="tablist" aria-label="Inbox">
-        <button type="button" role="tab" aria-selected={tab === "waiting"} className="chip" aria-current={tab === "waiting" ? "page" : undefined} onClick={() => setTab("waiting")}>
-          Waiting for you{items ? ` · ${waiting}${cursor ? "+" : ""}` : ""}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "decided"} className="chip" aria-current={tab === "decided" ? "page" : undefined} onClick={() => setTab("decided")}>
-          Decided{decided ? ` · ${decided.items.length}${decided.has_more ? "+" : ""}` : ""}
-        </button>
-      </div>
-      <p className="text-[15px] text-muted">Munim&apos;s AI proposes; nothing changes until a person approves it.</p>
-
-      {error && items === null && (
-        <div className="space-y-2">
-          <ErrorNote>{staffErrorText(error, "inbox")}</ErrorNote>
-          <button type="button" className="btn btn-plain" onClick={() => void load()}>Try again</button>
+    <>
+      <OfflineBanner top="staff" show={!online} text="You're offline. Showing the last update." />
+      <main className="wrap staff-main space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="section-title">Inbox</h1>
+          <LiveLine state={live} onRefresh={() => void load()} />
         </div>
-      )}
-      {(items === null || !fmt) && !error && <div className="grid gap-4" role="status" aria-label="Loading">{[0, 1, 2].map((k) => <div key={k} className="skeleton h-40" />)}</div>}
+        <div className="flex gap-2" role="tablist" aria-label="Inbox">
+          <button type="button" role="tab" aria-selected={tab === "waiting"} className="chip" aria-current={tab === "waiting" ? "page" : undefined} onClick={() => setTab("waiting")}>
+            Waiting for you{items ? ` · ${waiting}${cursor ? "+" : ""}` : ""}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "decided"} className="chip" aria-current={tab === "decided" ? "page" : undefined} onClick={() => setTab("decided")}>
+            Decided{decided ? ` · ${decided.items.length}${decided.has_more ? "+" : ""}` : ""}
+          </button>
+        </div>
+        <p className="text-[15px] text-muted">Munim&apos;s AI proposes; nothing changes until a person approves it.</p>
 
-      {fmt && items && tab === "waiting" && (
-        items.length === 0 ? (
-          <div className="state-box"><p>Nothing waiting for you.</p></div>
-        ) : (
-          <div className="grid gap-4">
-            {items.map((it) => it.kind === "finding"
-              ? <FindingCard key={it.finding.finding_id} finding={it.finding} fmt={fmt} tz={tz} onOpen={(s, r) => setDrawer({ snapshotId: s, refToken: r })} onChanged={changed} />
-              : <DraftRow key={it.draft.draft_id} draft={it.draft} decision={null} outletName={outletName} tz={tz} />)}
-            {cursor && <button type="button" className="btn btn-plain justify-self-center" onClick={() => void loadMore()}>Show more</button>}
+        {error && items === null && (
+          <div className="space-y-2">
+            <ErrorNote>{staffErrorText(error, "inbox")}</ErrorNote>
+            <button type="button" className="btn btn-plain" onClick={() => void load()}>Try again</button>
           </div>
-        )
-      )}
-      {fmt && decided && tab === "decided" && (
-        decided.items.length === 0 ? (
-          <div className="state-box"><p>Nothing decided yet.</p></div>
-        ) : (
-          <div className="grid gap-4">
-            {decided.items.map((d) => <DraftRow key={d.draft.draft_id} draft={d.draft} decision={d.decision} outletName={outletName} tz={tz} />)}
-          </div>
-        )
-      )}
+        )}
+        {(items === null || !fmt) && !error && <div className="grid gap-4" role="status" aria-label="Loading">{[0, 1, 2].map((k) => <div key={k} className="skeleton h-40" />)}</div>}
 
-      {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
-      <Toast message={toast} />
-    </main>
+        {fmt && items && tab === "waiting" && (
+          items.length === 0 ? (
+            <div className="state-box"><p>Nothing waiting for you.</p></div>
+          ) : (
+            <div className="grid gap-4">
+              {items.map((it) => it.kind === "finding"
+                ? <FindingCard key={it.finding.finding_id} finding={it.finding} fmt={fmt} tz={tz} onOpen={(s, r) => setDrawer({ snapshotId: s, refToken: r })} onChanged={changed} />
+                : <DraftRow key={it.draft.draft_id} draft={it.draft} decision={null} outletName={outletName} tz={tz} />)}
+              {cursor && <button type="button" className="btn btn-plain justify-self-center" onClick={() => void loadMore()}>Show more</button>}
+            </div>
+          )
+        )}
+        {fmt && decided && tab === "decided" && (
+          decided.items.length === 0 ? (
+            <div className="state-box"><p>Nothing decided yet.</p></div>
+          ) : (
+            <div className="grid gap-4">
+              {decided.items.map((d) => <DraftRow key={d.draft.draft_id} draft={d.draft} decision={d.decision} outletName={outletName} tz={tz} />)}
+            </div>
+          )
+        )}
+
+        {fmt && <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />}
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

@@ -3,15 +3,9 @@
    staff see. Imported once by app/staff/layout.tsx. Contrast of every new pair is measured in 02 §2. Written for this
    project. */
 :root {
-  --staff-max: 1240px;   /* one content width for the bar and every screen, so their left edges line up */
+  --staff-max: 1240px;   /* one content width for the bar and every screen but the till and kitchen, so their left edges line up */
   --staff-gutter: 20px;
-  --warn: #7a4b00;      /* "Due soon": text and edge on --warn-bg or card */
-  --warn-bg: #fde7b8;
-  --late: #9b1c12;      /* "Late": text and edge on --late-bg or card */
-  --late-bg: #fbd9d3;
-  --ok-bg: #e1f0dc;     /* "Ready", "Applied": with --ok text */
-  --src: #5b3a78;       /* source chip: plum ink, the colour of a ledger stamp */
-  --src-bg: #efe4f6;
+  --staff-bar-h: 121px;  /* the bar's real height is written here by the shell (it wraps on tablets); this is the desktop value */
 }
 @media (max-width: 639px) {
   :root { --staff-gutter: 16px; }
@@ -20,21 +14,32 @@
 @layer components {
   /* ---- shell ---- */
   .staff-bar { position: sticky; top: 0; z-index: 30; background: var(--bg); border-bottom: 1.5px solid var(--line); }
-  .staff-bar-row, .staff-nav { max-width: var(--staff-max); margin-inline: auto; padding-inline: var(--staff-gutter); }
-  .staff-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 64px; padding-block: 8px; }
-  .staff-bar-row select { min-height: 44px; padding-right: 36px; font-weight: 600; }
-  .staff-nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+  .staff-bar-row, .staff-nav, .staff-context { max-width: var(--staff-max); margin-inline: auto; padding-inline: var(--staff-gutter); }
+  .staff-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 56px; padding-block: 4px; }
+  @media (min-width: 640px) { .staff-bar-row { min-height: 64px; padding-block: 8px; } }
+  .staff-bar-row select { padding-right: 36px; font-weight: 600; }
+  /* Phones: the outlet and the labels sit under the bar and scroll away; only the person and the tabs stay stuck. */
+  .staff-context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-block: 8px 0; }
+  .staff-nav {
+    position: relative; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none;
+    /* The tabs fade out at both edges while more of them lie that way. The end padding is as wide as the fade, so at the
+       end of the row the last tab sits clear of it and nothing is faded. */
+    padding-inline-end: 40px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black var(--staff-gutter), black calc(100% - 40px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, black var(--staff-gutter), black calc(100% - 40px), transparent 100%);
+  }
   .staff-nav::-webkit-scrollbar { display: none; }
   /* Quiet tabs: only the current screen is filled, so the bar reads as navigation, not as a row of buttons. */
-  .staff-nav .chip { min-height: 44px; padding: 0 16px; border-color: transparent; background: transparent; font-size: 16px; }
+  .staff-nav .chip { padding: 0 16px; border-color: transparent; background: transparent; font-size: 16px; }
   .staff-nav .chip:hover { background: var(--bg-deep); }
   .staff-nav .chip[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
   .staff-main { padding-block: 20px; }
   .staff-main.wrap { max-width: var(--staff-max); padding-inline: var(--staff-gutter); }
+  /* The till and the kitchen are the only full-bleed screens; they keep the bar's gutter. */
   .staff-main-wide { padding: 16px var(--staff-gutter); max-width: none; }
   /* Screens that lay out their own sections with .wrap use the staff width too. */
   body:has(.staff-bar) .wrap { max-width: var(--staff-max); padding-inline: var(--staff-gutter); }
-  .staff-main .section-title { font-size: clamp(28px, 4vw, 34px); }
+  .staff-main .section-title, .staff-main-wide .section-title { font-size: clamp(28px, 4vw, 34px); }
 
   /* ---- source chip, Cannot verify, snapshot drawer ---- */
   .src-value { font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
@@ -56,25 +61,9 @@
   .snap-table tr[aria-current="true"] td { background: var(--src-bg); }
   .snap-table td[aria-current="true"] { outline: 2px solid var(--src); outline-offset: -2px; font-weight: 700; }
 
-  /* ---- badges and pills ---- */
-  .sim-badge {
-    display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
-    background: var(--card); color: var(--ink); border: 1.5px dashed var(--ink); border-radius: var(--radius-pill);
-    font-size: 14px; font-weight: 650; white-space: nowrap;
-  }
-  .snap-table .sim-badge, .snap-table .pill { min-height: 24px; padding: 0 8px; font-size: 12.5px; }
+  /* ---- badges in tables ---- */
+  .snap-table .badge { min-height: 24px; padding: 0 8px; font-size: 12.5px; }
   .snap-table th { font-size: 13px; color: var(--muted); font-weight: 700; vertical-align: bottom; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: var(--radius-pill);
-    border: 1.5px solid var(--line); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 650; white-space: nowrap;
-  }
-  .pill-new { background: var(--accent); color: var(--on-accent); border-color: var(--primary); }
-  .pill-work { background: var(--card); border-color: var(--primary); color: var(--primary); }
-  .pill-ready { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
-  .pill-done { background: var(--bg-deep); color: var(--muted); border-color: var(--line); }
-  .pill-stop { background: var(--card); color: var(--danger); border-color: var(--danger); }
-  .pill-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
-  .pill-late { background: var(--late-bg); color: var(--late); border-color: var(--late); }
 
   /* ---- stat card (owner home) ---- */
   .stat { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 22px; }
@@ -96,7 +85,7 @@
   .ticket-no { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
   .ticket-timer { font-size: 22px; font-weight: 750; font-variant-numeric: tabular-nums; }
   .ticket-lines { padding: 10px 16px 14px; display: grid; gap: 10px; justify-items: start; }
-  .ticket-lines > :not(.pill) { justify-self: stretch; }
+  .ticket-lines > :not(.badge) { justify-self: stretch; }
   .ticket { container-type: inline-size; }
   .ticket-meta { text-align: right; }
   @container (max-width: 340px) {
@@ -130,12 +119,11 @@
   .tile[aria-disabled="true"] { background: var(--bg-deep); color: var(--muted); cursor: not-allowed; box-shadow: none; }
   .tile-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
   .tile-price { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary); }
-  .cart-rail { position: sticky; top: 132px; display: grid; gap: 12px; padding: 16px; max-height: calc(100dvh - 148px); overflow: auto; }
+  .cart-rail { position: sticky; top: calc(var(--staff-bar-h) + 16px); display: grid; gap: 12px; padding: 16px; max-height: calc(100dvh - var(--staff-bar-h) - 32px); overflow: auto; }
   .cart-line { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--bg-deep); }
   .pay-btn { min-height: 64px; font-size: 20px; width: 100%; }
   @media (max-width: 899px) { .pos { grid-template-columns: 1fr; } .cart-rail { position: static; max-height: none; } }
 
   /* ---- states ---- */
   .state-box { display: grid; justify-items: center; gap: 10px; padding: 36px 20px; text-align: center; color: var(--muted); }
-  .offline-bar { background: var(--ink); color: #ffffff; font-weight: 650; padding: 10px 16px; }
 }

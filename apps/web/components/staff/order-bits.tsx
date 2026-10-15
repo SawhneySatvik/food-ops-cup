@@ -81,7 +81,7 @@ export function TenderPanel({ client, order, meId, meName, onChanged, onAuth }: 
         <dt className="font-bold">Left to pay</dt><dd className="num text-right text-[24px] font-bold">{money(order.remaining_minor, c)}</dd>
       </dl>
       {last && (
-        <p className="rounded-[14px] p-3 text-[18px] font-semibold" style={{ background: "var(--ok-bg)", color: "var(--ok)" }} role="status">
+        <p className="note-ok text-[18px] font-semibold" role="status">
           {TENDER_METHOD[last.method]} {money(last.amount_minor, c)} recorded{last.recorded_by === meId ? ` by ${meName}` : ""}.
           {last.change_minor !== null && last.change_minor > 0 && <span className="block text-[26px] font-bold">Change to give: {money(last.change_minor, c)}</span>}
           {last.rounding_minor !== null && last.rounding_minor !== 0 && <span className="block text-[15px]">Cash rounding: {money(last.rounding_minor, c)}</span>}

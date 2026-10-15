@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { DemoBar } from "@/components/chrome";
 import { body, display } from "./fonts";
 import "./globals.css";
 
@@ -14,7 +13,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en-IN" className={`${display.variable} ${body.variable}`}>
       <body className="flex min-h-dvh flex-col">
-        <DemoBar />
         <div className="flex-1">{children}</div>
       </body>
     </html>

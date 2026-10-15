@@ -28,7 +28,7 @@ import { DecisionBar, useDecision } from "../decision";
 import { DraftField } from "../draft-field";
 import { useStaff } from "../shell";
 import { CannotVerify, DRAFT_TONE, SimulatedRecipient, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill } from "../source";
-import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 import { LiveLine, NotForRole } from "./inbox";
 
 const STALE = "The numbers behind this changed since it was proposed. It can no longer be approved or rejected; a new proposal will replace it.";
@@ -203,96 +203,98 @@ export function DraftDetailPage() {
   if (typeof p.expected_on === "string") textRows.push(["Expected", formatDate(p.expected_on, SITE.locale)]);
 
   return (
-    <main className="wrap staff-main max-w-[860px] space-y-5">
-      {!online && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <Link href="/staff/inbox" className="btn btn-plain">← Inbox</Link>
-      <article className="card space-y-4 p-6" aria-labelledby="draft-title">
-        <header className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusPill tone={DRAFT_TONE[detail.draft.status] ?? "new"}>{DRAFT_STATUS[detail.draft.status] ?? detail.draft.status}</StatusPill>
-            <span className="text-[15px] text-muted">{sourceName(detail.draft.source)} · {detail.draft.outlet_ids.length === 0 ? "Whole business" : detail.draft.outlet_ids.map(outletName).join(", ")}</span>
+    <>
+      <OfflineBanner top="staff" show={!online} text="You're offline. Showing the last update." />
+      <main className="wrap staff-main space-y-5">
+        <Link href="/staff/inbox" className="btn btn-plain">← Inbox</Link>
+        <article className="card space-y-4 p-6" aria-labelledby="draft-title">
+          <header className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill tone={DRAFT_TONE[detail.draft.status] ?? "new"}>{DRAFT_STATUS[detail.draft.status] ?? detail.draft.status}</StatusPill>
+              <span className="text-[15px] text-muted">{sourceName(detail.draft.source)} · {detail.draft.outlet_ids.length === 0 ? "Whole business" : detail.draft.outlet_ids.map(outletName).join(", ")}</span>
+            </div>
+            <h1 id="draft-title" className="section-title">{draftTitle(detail.draft.command_type)}</h1>
+          </header>
+
+          <div>
+            {textRows.map(([label, value]) => (
+              <div key={label} className="draft-field"><p className="font-semibold">{label}</p><p>{value}</p></div>
+            ))}
+            {fields.map((f) => (
+              <DraftField key={f.path} label={labelOf(f)} value={f.value} edit={edits[f.path] ?? null} editorName={me.name} fmt={fmt} column={f.column}
+                lineUnit={typeof f.line?.unit === "string" ? f.line.unit : undefined} onOpen={open}
+                editing={editing} onEdit={editing ? (v) => setEdits((e) => { const next = { ...e }; if (v === null) delete next[f.path]; else next[f.path] = v; return next; }) : undefined} />
+            ))}
           </div>
-          <h1 id="draft-title" className="text-[30px]">{draftTitle(detail.draft.command_type)}</h1>
-        </header>
 
-        <div>
-          {textRows.map(([label, value]) => (
-            <div key={label} className="draft-field"><p className="font-semibold">{label}</p><p>{value}</p></div>
-          ))}
-          {fields.map((f) => (
-            <DraftField key={f.path} label={labelOf(f)} value={f.value} edit={edits[f.path] ?? null} editorName={me.name} fmt={fmt} column={f.column}
-              lineUnit={typeof f.line?.unit === "string" ? f.line.unit : undefined} onOpen={open}
-              editing={editing} onEdit={editing ? (v) => setEdits((e) => { const next = { ...e }; if (v === null) delete next[f.path]; else next[f.path] = v; return next; }) : undefined} />
-          ))}
-        </div>
+          {detail.draft.command_type === "purchasing.po.create.v1" && <p className="text-[14px] text-muted">{PO_LINE}</p>}
 
-        {detail.draft.command_type === "purchasing.po.create.v1" && <p className="text-[14px] text-muted">{PO_LINE}</p>}
+          {detail.draft.based_on.length > 0 && (
+            <div className="space-y-1">
+              <p className="font-semibold">Based on</p>
+              <ul className="space-y-1">
+                {detail.draft.based_on.map((b) => {
+                  const ref = parseRef(b.ref);
+                  return (
+                    <li key={b.ref}>
+                      {templateWords(b.template_id)}:{" "}
+                      {ref ? <SourcedValue text={cellText(b.expected, columnOf(ref))} refToken={b.ref} onOpen={open} /> : <CannotVerify />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
-        {detail.draft.based_on.length > 0 && (
-          <div className="space-y-1">
-            <p className="font-semibold">Based on</p>
-            <ul className="space-y-1">
-              {detail.draft.based_on.map((b) => {
-                const ref = parseRef(b.ref);
-                return (
-                  <li key={b.ref}>
-                    {templateWords(b.template_id)}:{" "}
-                    {ref ? <SourcedValue text={cellText(b.expected, columnOf(ref))} refToken={b.ref} onOpen={open} /> : <CannotVerify />}
-                  </li>
-                );
-              })}
-            </ul>
+          {detail.draft.status === "stale" && (
+            <div className="space-y-2">
+              <p className="font-semibold">{STALE}</p>
+              <ul className="space-y-1">
+                {changes.map((c) => {
+                  const was = parseRef(c.ref);
+                  const now = c.now_ref ? parseRef(c.now_ref) : null;
+                  return (
+                    <li key={c.ref}>
+                      Was {was ? <SourcedValue text={formatCell(c.value, columnOf(was), fmt)} refToken={c.ref} onOpen={open} /> : <CannotVerify />}
+                      {" · now "}
+                      {now && c.now_ref ? <SourcedValue text={formatCell(c.now, columnOf(now), fmt)} refToken={c.now_ref} onOpen={open} /> : <CannotVerify />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <p className="lineage">{lineageLine(detail, when, names.finding)}</p>
+
+          <DecisionBar
+            name={me.name} gate={gate} commandType={detail.draft.command_type} edits={edits} editing={editing}
+            onEdit={(on) => { setEditing(on); if (!on) setEdits({}); }}
+            busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
+            onApprove={() => dec.approve(null, null)}
+            onApproveEdited={(reason) => dec.approve(withEdits(detail.draft.payload, edits, me.member_id), reason)}
+            onReject={dec.reject}
+          />
+          {result?.type === "purchasing.po.create.v1" && <Link href={`/staff/purchase-orders/${result.entityId}`} className="btn btn-secondary">Open the purchase order</Link>}
+        </article>
+
+        <section aria-labelledby="history-title" className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="history-title" className="text-[22px]">What happened</h2>
+            <LiveLine state={live} onRefresh={() => void load()} />
           </div>
-        )}
+          <ol className="space-y-1">
+            {detail.history.map((h, i) => (
+              <li key={i} className="text-[15px]">
+                {historyWords(h)} · {when(h.at)}{h.reason ? <> · “<span>{h.reason}</span>”</> : null}
+              </li>
+            ))}
+          </ol>
+        </section>
 
-        {detail.draft.status === "stale" && (
-          <div className="space-y-2">
-            <p className="font-semibold">{STALE}</p>
-            <ul className="space-y-1">
-              {changes.map((c) => {
-                const was = parseRef(c.ref);
-                const now = c.now_ref ? parseRef(c.now_ref) : null;
-                return (
-                  <li key={c.ref}>
-                    Was {was ? <SourcedValue text={formatCell(c.value, columnOf(was), fmt)} refToken={c.ref} onOpen={open} /> : <CannotVerify />}
-                    {" · now "}
-                    {now && c.now_ref ? <SourcedValue text={formatCell(c.now, columnOf(now), fmt)} refToken={c.now_ref} onOpen={open} /> : <CannotVerify />}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        <p className="lineage">{lineageLine(detail, when, names.finding)}</p>
-
-        <DecisionBar
-          name={me.name} gate={gate} commandType={detail.draft.command_type} edits={edits} editing={editing}
-          onEdit={(on) => { setEditing(on); if (!on) setEdits({}); }}
-          busy={dec.busy} error={dec.error} retry={dec.retry} wait={dec.wait}
-          onApprove={() => dec.approve(null, null)}
-          onApproveEdited={(reason) => dec.approve(withEdits(detail.draft.payload, edits, me.member_id), reason)}
-          onReject={dec.reject}
-        />
-        {result?.type === "purchasing.po.create.v1" && <Link href={`/staff/purchase-orders/${result.entityId}`} className="btn btn-secondary">Open the purchase order</Link>}
-      </article>
-
-      <section aria-labelledby="history-title" className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="history-title" className="text-[22px]">What happened</h2>
-          <LiveLine state={live} onRefresh={() => void load()} />
-        </div>
-        <ol className="space-y-1">
-          {detail.history.map((h, i) => (
-            <li key={i} className="text-[15px]">
-              {historyWords(h)} · {when(h.at)}{h.reason ? <> · “<span>{h.reason}</span>”</> : null}
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />
-      <Toast message={toast} />
-    </main>
+        <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

@@ -64,13 +64,14 @@ export function CategoryMotif({ slug, size = 30 }: { slug: string; size?: number
   }
 }
 
-/** The wordmark: a hazelnut beside the name in the serif. */
-export function Wordmark() {
+/** The wordmark: a hazelnut beside the name in the serif. `compact` drops "Bakehouse" on phones, in the two page bars
+ *  (shop: Staff and Cart beside it; staff: the person and Sign out), where the full name does not fit one row. */
+export function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
       <Hazelnut size={30} />
       <span className="display text-[22px] leading-none">
-        Cobnut <span className="italic text-secondary">Bakehouse</span>
+        Cobnut <span className={`italic text-secondary${compact ? " max-sm:hidden" : ""}`}>Bakehouse</span>
       </span>
     </span>
   );

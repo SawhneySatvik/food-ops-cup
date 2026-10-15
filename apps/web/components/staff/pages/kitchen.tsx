@@ -12,7 +12,7 @@ import { stationLabel, stepErrorText, type Ticket } from "@/lib/munim/kitchen";
 import { can } from "@/lib/munim/session";
 import { reasonText, staffErrorText } from "@/lib/munim/staff-copy";
 import { SITE } from "@/lib/site";
-import { ErrorNote, FullPage, Toast, useToast } from "../../ui";
+import { ErrorNote, FullPage, OfflineBanner, Toast, useToast } from "../../ui";
 import { TicketCard } from "../kitchen-ticket";
 import { useStaff } from "../shell";
 import { SimulateWebOrder } from "../simulate";
@@ -91,74 +91,76 @@ function Board({ outletId, tz }: { outletId: string; tz: string }) {
   if (!b.board && err) {
     if (err.kind === "not_found") return <FullPage title="Not found."><p>It may have been removed, or it isn&apos;t in your outlets.</p></FullPage>;
     if (err.reasonCode === "not_applicable") return <FullPage title="No kitchen display"><p>{reasonText("not_applicable")}</p></FullPage>;
-    if (err.kind !== "network") return <main className="staff-main"><ErrorNote>{staffErrorText(err, "kitchen")}</ErrorNote><button type="button" className="btn btn-plain mt-3" onClick={b.refresh}>Try again</button></main>;
+    if (err.kind !== "network") return <main className="staff-main-wide"><ErrorNote>{staffErrorText(err, "kitchen")}</ErrorNote><button type="button" className="btn btn-plain mt-3" onClick={b.refresh}>Try again</button></main>;
   }
   const stations = [...new Set([...(b.board?.stations ?? []), ...(station ? [station] : [])])];
   const offline = !online || err?.kind === "network";
 
   return (
-    <main className="staff-main-wide">
-      {offline && <div className="offline-bar" role="status">Offline. Showing the last board; changes will need a retry.</div>}
-      <div className="flex flex-wrap items-center gap-3 pb-3">
-        <h1 className="text-[30px]">Kitchen</h1>
-        <div role="radiogroup" aria-label="Station" className="flex flex-wrap gap-2">
-          <button type="button" role="radio" aria-checked={station === null} className="chip" aria-current={station === null ? "true" : undefined} onClick={() => chooseStation(null)}>All stations</button>
-          {stations.map((s) => (
-            <button key={s} type="button" role="radio" aria-checked={station === s} className="chip" aria-current={station === s ? "true" : undefined} onClick={() => chooseStation(s)}>{stationLabel(s)}</button>
-          ))}
+    <>
+      <OfflineBanner top="staff" show={offline} text="Offline. Showing the last board; changes will need a retry." />
+      <main className="staff-main-wide">
+        <div className="flex flex-wrap items-center gap-3 pb-3">
+          <h1 className="section-title">Kitchen</h1>
+          <div role="radiogroup" aria-label="Station" className="flex flex-wrap gap-2">
+            <button type="button" role="radio" aria-checked={station === null} className="chip" aria-current={station === null ? "true" : undefined} onClick={() => chooseStation(null)}>All stations</button>
+            {stations.map((s) => (
+              <button key={s} type="button" role="radio" aria-checked={station === s} className="chip" aria-current={station === s ? "true" : undefined} onClick={() => chooseStation(s)}>{stationLabel(s)}</button>
+            ))}
+          </div>
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            {b.live === "open" && <span className="badge badge-ready">Live</span>}
+            {b.liveOff && <span className="text-[14px] text-muted">Live updates are off. Tap Refresh to update.</span>}
+            <button type="button" className="btn btn-plain" onClick={b.refresh}>Refresh</button>
+            <SimulateWebOrder onDone={(ok) => { say(ok ? "A simulated web order was sent to the kitchen." : "The simulated order didn't go through."); b.refresh(); }} />
+          </span>
         </div>
-        <span className="ml-auto flex flex-wrap items-center gap-2">
-          {b.live === "open" && <span className="pill pill-ready">Live</span>}
-          {b.liveOff && <span className="text-[14px] text-muted">Live updates are off. Tap Refresh to update.</span>}
-          <button type="button" className="btn btn-plain" onClick={b.refresh}>Refresh</button>
-          <SimulateWebOrder onDone={(ok) => { say(ok ? "A simulated web order was sent to the kitchen." : "The simulated order didn't go through."); b.refresh(); }} />
-        </span>
-      </div>
-      {err?.kind === "rate_limited" && <p className="pb-2 font-semibold">{staffErrorText(err, "kitchen")}</p>}
+        {err?.kind === "rate_limited" && <p className="pb-2 font-semibold">{staffErrorText(err, "kitchen")}</p>}
 
-      {!b.board ? (
-        <div className="kds-grid">{Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton h-72" aria-hidden="true" />)}</div>
-      ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]">
-          <section aria-labelledby="lane-now">
-            <h2 id="lane-now" className="pb-2 text-[22px]">Now · {b.lanes.now.length}</h2>
-            {b.lanes.now.length === 0 ? <p className="state-box">No tickets right now.</p> : (
-              <div className="kds-grid">
-                {b.lanes.now.map((t) => (
-                  <TicketCard key={t.ticket_id} ticket={t} asOf={b.board!.as_of} tz={tz} locale={SITE.locale} names={b.names} sizeOf={(n) => b.sizeOf(t.order_id, n)} busy={busy === t.ticket_id || checking === t.ticket_id} onAdvance={(x, to) => void onAdvance(x, to)} />
-                ))}
-              </div>
-            )}
-          </section>
-          <section aria-labelledby="lane-later">
-            <h2 id="lane-later" className="pb-2 text-[22px]">Later · {b.lanes.later.length}</h2>
-            {b.lanes.later.length === 0 ? <p className="text-muted">Nothing scheduled for later.</p> : (
-              <div className="grid gap-3">
-                {b.lanes.later.map((t) => (
-                  <div key={t.ticket_id} className="space-y-1">
-                    <p className="text-[15px] font-semibold">{t.promised_at ? `Pickup ${formatTime(t.promised_at, tz, SITE.locale)}` : "Scheduled"}{t.surface_at ? ` · on the board from ${formatTime(t.surface_at, tz, SITE.locale)}` : ""}</p>
-                    <TicketCard ticket={t} asOf={b.board!.as_of} tz={tz} locale={SITE.locale} names={b.names} sizeOf={(n) => b.sizeOf(t.order_id, n)} busy={busy === t.ticket_id || checking === t.ticket_id} onAdvance={(x, to) => void onAdvance(x, to)} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-
-      <dialog ref={dialog} className="modal" aria-labelledby="unpaid-title" onClose={() => setConfirm(null)}>
-        {confirm && (
-          <div className="grid gap-4 p-6">
-            <h2 id="unpaid-title" className="text-[28px]">Not paid yet</h2>
-            <p className="text-[20px]">{confirm.text}</p>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="btn btn-primary min-h-16 flex-1" onClick={() => setConfirm(null)}>Not yet</button>
-              <button type="button" className="btn btn-plain min-h-16 flex-1" onClick={() => { const t = confirm.ticket; setConfirm(null); void step(t, "done"); }}>Handed over anyway</button>
-            </div>
+        {!b.board ? (
+          <div className="kds-grid">{Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton h-72" aria-hidden="true" />)}</div>
+        ) : (
+          <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]">
+            <section aria-labelledby="lane-now">
+              <h2 id="lane-now" className="pb-2 text-[22px]">Now · {b.lanes.now.length}</h2>
+              {b.lanes.now.length === 0 ? <p className="state-box">No tickets right now.</p> : (
+                <div className="kds-grid">
+                  {b.lanes.now.map((t) => (
+                    <TicketCard key={t.ticket_id} ticket={t} asOf={b.board!.as_of} tz={tz} locale={SITE.locale} names={b.names} sizeOf={(n) => b.sizeOf(t.order_id, n)} busy={busy === t.ticket_id || checking === t.ticket_id} onAdvance={(x, to) => void onAdvance(x, to)} />
+                  ))}
+                </div>
+              )}
+            </section>
+            <section aria-labelledby="lane-later">
+              <h2 id="lane-later" className="pb-2 text-[22px]">Later · {b.lanes.later.length}</h2>
+              {b.lanes.later.length === 0 ? <p className="text-muted">Nothing scheduled for later.</p> : (
+                <div className="grid gap-3">
+                  {b.lanes.later.map((t) => (
+                    <div key={t.ticket_id} className="space-y-1">
+                      <p className="text-[15px] font-semibold">{t.promised_at ? `Pickup ${formatTime(t.promised_at, tz, SITE.locale)}` : "Scheduled"}{t.surface_at ? ` · on the board from ${formatTime(t.surface_at, tz, SITE.locale)}` : ""}</p>
+                      <TicketCard ticket={t} asOf={b.board!.as_of} tz={tz} locale={SITE.locale} names={b.names} sizeOf={(n) => b.sizeOf(t.order_id, n)} busy={busy === t.ticket_id || checking === t.ticket_id} onAdvance={(x, to) => void onAdvance(x, to)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
-      </dialog>
-      <Toast message={toast} />
-    </main>
+
+        <dialog ref={dialog} className="modal" aria-labelledby="unpaid-title" onClose={() => setConfirm(null)}>
+          {confirm && (
+            <div className="grid gap-4 p-6">
+              <h2 id="unpaid-title" className="text-[28px]">Not paid yet</h2>
+              <p className="text-[20px]">{confirm.text}</p>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" className="btn btn-primary min-h-16 flex-1" onClick={() => setConfirm(null)}>Not yet</button>
+                <button type="button" className="btn btn-plain min-h-16 flex-1" onClick={() => { const t = confirm.ticket; setConfirm(null); void step(t, "done"); }}>Handed over anyway</button>
+              </div>
+            </div>
+          )}
+        </dialog>
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

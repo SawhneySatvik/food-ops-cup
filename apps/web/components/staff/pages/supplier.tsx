@@ -15,7 +15,7 @@ import { SITE, UUID7 } from "@/lib/site";
 import { useStaff } from "../shell";
 import { SimulatedSupplier } from "../source";
 import { NewPoForm } from "../suppliers/new-po";
-import { ErrorNote } from "../../ui";
+import { ErrorNote, OfflineBanner } from "../../ui";
 import { NotForSuppliers, NotFoundPage, PanelWait, PoRow } from "./suppliers";
 
 type Outlet = Schemas["V1Outlets"]["outlets"][number];
@@ -86,56 +86,60 @@ function SupplierOutlet({ outlet, supplierId }: { outlet: Outlet; supplierId: st
   const offline = !online || error?.kind === "network" || ordersError?.kind === "network";
 
   return (
-    <main className="wrap staff-main max-w-[960px] space-y-5">
-      {offline && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <header className="space-y-2">
-        <h1 className="section-title flex flex-wrap items-center gap-3">{supplier.name} {supplier.label && <SimulatedSupplier />}</h1>
-        <div className="scallop" aria-hidden="true" />
-        {supplier.payment_days !== null && <p>Pay within {supplier.payment_days} days</p>}
-        {supplier.notes && <p className="whitespace-pre-wrap text-muted">{supplier.notes}</p>}
-        {!supplier.active && <p className="font-semibold">Not active</p>}
-      </header>
-
-      <section aria-labelledby="prices-title" className="card space-y-3 p-5">
-        <h2 id="prices-title" className="text-[24px]">Price list</h2>
-        {supplier.prices.length === 0 ? <p className="text-muted">No prices recorded.</p> : (
-          <div className="overflow-x-auto">
-            <table className="snap-table">
-              <thead>
-                <tr><th scope="col">Item</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th><th scope="col">Seen on</th></tr>
-              </thead>
-              <tbody>
-                {supplier.prices.map((p) => (
-                  <tr key={p.price_id}>
-                    <td>{ingredientOf(ingredients, p.ingredient_id).name}</td>
-                    <td>{p.unit}</td>
-                    <td className="num">{formatMoney(p.unit_price_minor, p.currency, SITE.locale)}</td>
-                    <td>{formatDate(dayKey(p.observed_at, tz), SITE.locale)} <span className="text-muted">· {p.source_ref}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <>
+      <OfflineBanner top="staff" show={offline} text="You're offline. Showing the last update." />
+      <main className="wrap staff-main space-y-5">
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="section-title">{supplier.name}</h1>
+            {supplier.label && <SimulatedSupplier />}
           </div>
+          {supplier.payment_days !== null && <p>Pay within {supplier.payment_days} days</p>}
+          {supplier.notes && <p className="whitespace-pre-wrap text-muted">{supplier.notes}</p>}
+          {!supplier.active && <p className="font-semibold">Not active</p>}
+        </header>
+
+        <section aria-labelledby="prices-title" className="card space-y-3 p-5">
+          <h2 id="prices-title" className="text-[24px]">Price list</h2>
+          {supplier.prices.length === 0 ? <p className="text-muted">No prices recorded.</p> : (
+            <div className="overflow-x-auto">
+              <table className="snap-table">
+                <thead>
+                  <tr><th scope="col">Item</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th><th scope="col">Seen on</th></tr>
+                </thead>
+                <tbody>
+                  {supplier.prices.map((p) => (
+                    <tr key={p.price_id}>
+                      <td>{ingredientOf(ingredients, p.ingredient_id).name}</td>
+                      <td>{p.unit}</td>
+                      <td className="num">{formatMoney(p.unit_price_minor, p.currency, SITE.locale)}</td>
+                      <td>{formatDate(dayKey(p.observed_at, tz), SITE.locale)} <span className="text-muted">· {p.source_ref}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section aria-labelledby="orders-title" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="orders-title" className="text-[24px]">Purchase orders</h2>
+            {supplier.active && <button type="button" className="btn btn-primary" onClick={() => setForm(true)}>New purchase order</button>}
+          </div>
+          {!orders ? <PanelWait error={ordersError} onRetry={() => void loadOrders()} height="h-32" />
+            : orders.length === 0 ? <div className="state-box"><p>No purchase orders yet.</p></div>
+            : <ul className="grid gap-3">{orders.map((po) => <PoRow key={po.po_id} po={po} tz={tz} />)}</ul>}
+        </section>
+
+        {form && (
+          // Only this supplier is offered, so the form opens with it chosen.
+          <NewPoForm
+            suppliers={[supplier]} ingredients={ingredients} outletId={outlet.id} currency={tenant.base_currency} locale={SITE.locale} tz={tz}
+            prefillIngredient={null} session={session} client={client} onAuth={handleAuth} onCreated={(poId) => router.push(`/staff/purchase-orders/${poId}`)}
+          />
         )}
-      </section>
-
-      <section aria-labelledby="orders-title" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="orders-title" className="text-[24px]">Purchase orders</h2>
-          {supplier.active && <button type="button" className="btn btn-primary" onClick={() => setForm(true)}>New purchase order</button>}
-        </div>
-        {!orders ? <PanelWait error={ordersError} onRetry={() => void loadOrders()} height="h-32" />
-          : orders.length === 0 ? <div className="state-box"><p>No purchase orders yet.</p></div>
-          : <ul className="grid gap-3">{orders.map((po) => <PoRow key={po.po_id} po={po} tz={tz} />)}</ul>}
-      </section>
-
-      {form && (
-        // Only this supplier is offered, so the form opens with it chosen.
-        <NewPoForm
-          suppliers={[supplier]} ingredients={ingredients} outletId={outlet.id} currency={tenant.base_currency} locale={SITE.locale} tz={tz}
-          prefillIngredient={null} session={session} client={client} onAuth={handleAuth} onCreated={(poId) => router.push(`/staff/purchase-orders/${poId}`)}
-        />
-      )}
-    </main>
+      </main>
+    </>
   );
 }

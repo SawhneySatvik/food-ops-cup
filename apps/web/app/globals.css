@@ -21,6 +21,15 @@
   --danger: #b42318;
   --ok: #2e6b34;
   --focus: #9e2f4e;
+  /* Status tones (text and edge on the tint or on a card; every pair ≥ 4.5 : 1, README). --late is --danger. */
+  --warn: #7a4b00;
+  --warn-bg: #fde7b8;
+  --late: var(--danger);
+  --late-bg: #fbd9d3;
+  --ok-bg: #e1f0dc;
+  /* The ledger stamp next to every figure Munim shows: plum, the one colour used for nothing else. */
+  --src: #5b3a78;
+  --src-bg: #efe4f6;
 
   --radius-card: 22px;
   --radius-field: 14px;
@@ -192,7 +201,18 @@
     font-weight: 600;
     white-space: nowrap;
   }
-  .badge-accent { background: var(--accent); color: var(--on-accent); border-color: var(--primary); }
+  /* Status variants: always a word beside the tone, never colour alone. */
+  .badge-accent, .badge-new { background: var(--accent); color: var(--on-accent); border-color: var(--primary); }
+  .badge-work { color: var(--primary); border-color: var(--primary); }
+  .badge-ready { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+  .badge-done { background: var(--bg-deep); color: var(--muted); }
+  .badge-stop { color: var(--danger); border-color: var(--danger); }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+  .badge-late { background: var(--late-bg); color: var(--late); border-color: var(--late); }
+  /* "Simulated supplier", "Sample data", "Demo sign-in": dashed, so it never reads as a status. */
+  .badge-sim { color: var(--ink); border: 1.5px dashed var(--ink); }
+  /* A recorded-payment note: the Ready tone as a block, text and tint from the same tokens as .badge-ready. */
+  .note-ok { padding: 12px; background: var(--ok-bg); color: var(--ok); border-radius: var(--radius-field); }
 
   /* A scalloped edge, like the paper doily under a cake. */
   .scallop {
@@ -250,6 +270,7 @@
     padding: 0;
   }
   dialog.modal {
+    margin: auto; /* preflight's `margin: 0` beats the UA's `margin: auto`, which is what centres a modal dialog */
     width: min(560px, calc(100vw - 24px));
     max-height: 90dvh;
     border-radius: var(--radius-card);

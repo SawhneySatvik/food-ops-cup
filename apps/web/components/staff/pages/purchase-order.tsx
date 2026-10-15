@@ -21,7 +21,7 @@ import { useStaff } from "../shell";
 import { SimulatedSupplier, SnapshotDrawer, StatusPill } from "../source";
 import { QuoteTable } from "../suppliers/quotes";
 import { ReceiveForm } from "../suppliers/receive";
-import { ErrorNote, Toast, useToast } from "../../ui";
+import { ErrorNote, OfflineBanner, Toast, useToast } from "../../ui";
 import { NotForSuppliers, NotFoundPage, PO_TONE } from "./suppliers";
 
 /** The rest of the page, loaded once: the tenant (currency), the stock items (names) and the suppliers (quote rows). */
@@ -137,96 +137,97 @@ function PurchaseOrderView({ poId }: { poId: string }) {
   const name = (ingredientId: string) => ingredientOf(base.ingredients, ingredientId).name;
 
   return (
-    <main className="wrap staff-main max-w-[960px] space-y-5">
-      {offline && <div className="offline-bar" role="status">You&apos;re offline. Showing the last update.</div>}
-      <header className="space-y-2">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="section-title">Purchase order</h1>
-          <button type="button" className="btn btn-plain" onClick={() => void loadOrder()}>Refresh</button>
-        </div>
-        <div className="scallop" aria-hidden="true" />
-        <p className="flex flex-wrap items-center gap-2 text-[20px] font-semibold">
-          {po.supplier.name} {po.supplier.label && <SimulatedSupplier />}
-          <StatusPill tone={PO_TONE[po.status] ?? "new"}>{PO_STATUS[po.status] ?? po.status}</StatusPill>
-        </p>
-        <p>For {po.outlet_ids.map(outletName).join(", ")}</p>
-        <p>{po.expected_on ? `Expected ${formatDate(po.expected_on, SITE.locale)}` : "No expected date"}</p>
-        <p className="text-[15px] text-muted">Placed {formatDayTime(po.created_at, tz, SITE.locale)}</p>
-        {approval && approval.verdict !== "rejected" && (
-          <p className="text-[15px] text-muted">{VERDICT[approval.verdict]} by {personName(approval.decided_by)} · {formatDayTime(approval.decided_at, tz, SITE.locale)}</p>
-        )}
-      </header>
-
-      <section aria-label="Lines" className="card space-y-3 p-5">
-        <div className="overflow-x-auto">
-          <table className="snap-table">
-            <thead>
-              <tr><th scope="col">Item</th><th scope="col" className="num">Quantity</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th></tr>
-            </thead>
-            <tbody>
-              {po.lines.map((l) => (
-                <tr key={l.po_line_id}>
-                  <td>{name(l.ingredient_id)}</td>
-                  <td className="num">{formatQty(l.qty_milli, SITE.locale)}</td>
-                  <td>{l.unit}</td>
-                  <td className="num">{formatMoney(l.unit_price_minor, po.currency, SITE.locale)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-[20px] font-semibold">Total (worked out by Munim) <span className="num">{formatMoney(po.total_minor, po.currency, SITE.locale)}</span></p>
-        <p className="text-[14px] text-muted">Recorded only — Munim does not process payments.</p>
-      </section>
-
-      {po.negotiation_run_id && (
-        <details className="card p-5">
-          <summary className="min-h-12 cursor-pointer font-semibold">Quotes from simulated suppliers</summary>
-          <div className="mt-3">
-            {quotes === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
-              : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>
-              : <QuoteTable snapshot={quotes} suppliers={base.suppliers} citedRow={null} fmt={fmt} onOpen={(snapshotId, refToken) => setDrawer({ snapshotId, refToken })} />}
+    <>
+      <OfflineBanner top="staff" show={offline} text="You're offline. Showing the last update." />
+      <main className="wrap staff-main space-y-5">
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h1 className="section-title">Purchase order</h1>
+            <button type="button" className="btn btn-plain" onClick={() => void loadOrder()}>Refresh</button>
           </div>
-        </details>
-      )}
+          <p className="flex flex-wrap items-center gap-2 text-[20px] font-semibold">
+            {po.supplier.name} {po.supplier.label && <SimulatedSupplier />}
+            <StatusPill tone={PO_TONE[po.status] ?? "new"}>{PO_STATUS[po.status] ?? po.status}</StatusPill>
+          </p>
+          <p>For {po.outlet_ids.map(outletName).join(", ")}</p>
+          <p>{po.expected_on ? `Expected ${formatDate(po.expected_on, SITE.locale)}` : "No expected date"}</p>
+          <p className="text-[15px] text-muted">Placed {formatDayTime(po.created_at, tz, SITE.locale)}</p>
+          {approval && approval.verdict !== "rejected" && (
+            <p className="text-[15px] text-muted">{VERDICT[approval.verdict]} by {personName(approval.decided_by)} · {formatDayTime(approval.decided_at, tz, SITE.locale)}</p>
+          )}
+        </header>
 
-      <section aria-labelledby="grn-title" className="space-y-3">
-        <h2 id="grn-title" className="text-[24px]">Goods received</h2>
-        {grns.length === 0 ? <p className="text-muted">Nothing received yet.</p> : grns.map((g) => (
-          <article key={g.grn_id} className="card space-y-2 p-5">
-            <p className="font-semibold">Received {formatDayTime(g.received_at, tz, SITE.locale)}{g.received_by === me.member_id ? " · recorded by you" : ""}</p>
-            <div className="overflow-x-auto">
-              <table className="snap-table">
-                <thead>
-                  <tr><th scope="col">Item</th><th scope="col" className="num">Quantity</th><th scope="col">Unit</th><th scope="col" className="num">Cost per unit</th></tr>
-                </thead>
-                <tbody>
-                  {g.lines.map((l) => (
-                    <tr key={l.grn_line_id}>
-                      <td>{name(l.ingredient_id)}</td>
-                      <td className="num">{formatQty(l.qty_milli, SITE.locale)}</td>
-                      <td>{l.unit}</td>
-                      <td className="num">{formatMoney(l.unit_cost_minor, l.currency, SITE.locale)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <section aria-label="Lines" className="card space-y-3 p-5">
+          <div className="overflow-x-auto">
+            <table className="snap-table">
+              <thead>
+                <tr><th scope="col">Item</th><th scope="col" className="num">Quantity</th><th scope="col">Unit</th><th scope="col" className="num">Price per unit</th></tr>
+              </thead>
+              <tbody>
+                {po.lines.map((l) => (
+                  <tr key={l.po_line_id}>
+                    <td>{name(l.ingredient_id)}</td>
+                    <td className="num">{formatQty(l.qty_milli, SITE.locale)}</td>
+                    <td>{l.unit}</td>
+                    <td className="num">{formatMoney(l.unit_price_minor, po.currency, SITE.locale)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[20px] font-semibold">Total (worked out by Munim) <span className="num">{formatMoney(po.total_minor, po.currency, SITE.locale)}</span></p>
+          <p className="text-[14px] text-muted">Recorded only — Munim does not process payments.</p>
+        </section>
+
+        {po.negotiation_run_id && (
+          <details className="card p-5">
+            <summary className="min-h-12 cursor-pointer font-semibold">Quotes from simulated suppliers</summary>
+            <div className="mt-3">
+              {quotes === null ? <div className="skeleton h-24" role="status" aria-label="Loading" />
+                : quotes === "failed" ? <p className="text-muted">The quotes can&apos;t be opened.</p>
+                : <QuoteTable snapshot={quotes} suppliers={base.suppliers} citedRow={null} fmt={fmt} onOpen={(snapshotId, refToken) => setDrawer({ snapshotId, refToken })} />}
             </div>
-            {g.note && <p className="whitespace-pre-wrap">{g.note}</p>}
-          </article>
-        ))}
-      </section>
+          </details>
+        )}
 
-      {po.status === "committed" && mine.length > 0 && (
-        // Keyed on what has come in, so the form starts empty again after a part delivery.
-        <ReceiveForm
-          key={grns.length} po={po} grns={grns} outlets={mine} ingredients={base.ingredients} session={session} client={client} currency={po.currency}
-          onAuth={handleAuth} onDone={(text) => { if (text) setToast(text); void loadOrder(); }}
-        />
-      )}
+        <section aria-labelledby="grn-title" className="space-y-3">
+          <h2 id="grn-title" className="text-[24px]">Goods received</h2>
+          {grns.length === 0 ? <p className="text-muted">Nothing received yet.</p> : grns.map((g) => (
+            <article key={g.grn_id} className="card space-y-2 p-5">
+              <p className="font-semibold">Received {formatDayTime(g.received_at, tz, SITE.locale)}{g.received_by === me.member_id ? " · recorded by you" : ""}</p>
+              <div className="overflow-x-auto">
+                <table className="snap-table">
+                  <thead>
+                    <tr><th scope="col">Item</th><th scope="col" className="num">Quantity</th><th scope="col">Unit</th><th scope="col" className="num">Cost per unit</th></tr>
+                  </thead>
+                  <tbody>
+                    {g.lines.map((l) => (
+                      <tr key={l.grn_line_id}>
+                        <td>{name(l.ingredient_id)}</td>
+                        <td className="num">{formatQty(l.qty_milli, SITE.locale)}</td>
+                        <td>{l.unit}</td>
+                        <td className="num">{formatMoney(l.unit_cost_minor, l.currency, SITE.locale)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {g.note && <p className="whitespace-pre-wrap">{g.note}</p>}
+            </article>
+          ))}
+        </section>
 
-      <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />
-      <Toast message={toast} />
-    </main>
+        {po.status === "committed" && mine.length > 0 && (
+          // Keyed on what has come in, so the form starts empty again after a part delivery.
+          <ReceiveForm
+            key={grns.length} po={po} grns={grns} outlets={mine} ingredients={base.ingredients} session={session} client={client} currency={po.currency}
+            onAuth={handleAuth} onDone={(text) => { if (text) setToast(text); void loadOrder(); }}
+          />
+        )}
+
+        <SnapshotDrawer client={client} open={drawer} onClose={() => setDrawer(null)} fmt={fmt} tz={tz} label={templateWords} />
+        <Toast message={toast} />
+      </main>
+    </>
   );
 }

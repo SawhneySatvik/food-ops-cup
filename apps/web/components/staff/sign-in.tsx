@@ -24,14 +24,14 @@ export function StaffSignIn() {
     else setError(!IS_MOCK && r.error.kind === "not_found" ? DEMO_SIGN_IN_OFF : staffErrorText(r.error, "sign-in"));
   };
   return (
-    <main className="wrap max-w-[1040px] py-10 sm:py-14">
+    <main className="wrap staff-main py-10 sm:py-14">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="text-ink no-underline" aria-label="Cobnut Bakehouse, the shop"><Wordmark /></Link>
+        <Link href="/" className="inline-flex min-h-12 items-center text-ink no-underline" aria-label="Cobnut Bakehouse, the shop"><Wordmark /></Link>
         <Link href="/" className="btn btn-ghost">Back to the shop</Link>
       </div>
       <h1 className="section-title mt-10">Staff sign-in</h1>
       <p className="mt-4 flex max-w-[62ch] flex-wrap items-center gap-x-2 gap-y-1 text-muted">
-        <span className="sim-badge">Demo sign-in</span> Choose who you are for this demo. These people are invented; anyone can sign in as them.
+        <span className="badge badge-sim">Demo sign-in</span> Choose who you are for this demo. These people are invented; anyone can sign in as them.
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {DEMO_PEOPLE.map((p) => (

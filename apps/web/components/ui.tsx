@@ -18,17 +18,17 @@ export function SiteHeader({ count, onCart }: { count?: number; onCart?: () => v
   return (
     <header className="sticky top-0 z-30 border-b-[1.5px] border-line bg-bg">
       <div className="wrap flex min-h-[64px] items-center justify-between gap-3">
-        <Link href="/" className="shrink-0 whitespace-nowrap text-ink no-underline" aria-label={`${SITE.name}, home`}>
-          <Wordmark />
+        <Link href="/" className="inline-flex min-h-12 shrink-0 items-center whitespace-nowrap text-ink no-underline" aria-label={`${SITE.name}, home`}>
+          <Wordmark compact />
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1">
           <Link href="/story" className="hidden min-h-12 items-center px-3 font-semibold text-ink no-underline sm:inline-flex">Our story</Link>
           <Link href="/cares" className="hidden min-h-12 items-center px-3 font-semibold text-ink no-underline sm:inline-flex">Cares</Link>
-          <Link href="/staff/sign-in" className="btn btn-plain no-underline">
+          <Link href="/staff/sign-in" className="btn btn-plain px-4 no-underline sm:px-[22px]">
             <span className="sm:hidden">Staff</span><span className="hidden sm:inline">Staff sign-in</span>
           </Link>
           {onCart && (
-            <button type="button" className="btn btn-plain" onClick={onCart} aria-label={count ? `Cart, ${count} ${count === 1 ? "item" : "items"}` : "Cart, empty"}>
+            <button type="button" className="btn btn-plain px-4 sm:px-[22px]" onClick={onCart} aria-label={count ? `Cart, ${count} ${count === 1 ? "item" : "items"}` : "Cart, empty"}>
               <BagIcon />
               {count ? <span className="num">{count}</span> : null}
             </button>
@@ -70,10 +70,13 @@ export function StateIcon({ state }: { state: Accepting["state"] }) {
   return <MoonIcon size={18} />;
 }
 
-export function OfflineBanner({ show, text }: { show: boolean; text: string }) {
+/** Sticks under the page's bar: the shop header is 65px tall; the staff bar publishes its own height (shell.tsx). */
+const BANNER_TOP = { shop: "top-[65px]", staff: "top-[var(--staff-bar-h)]" };
+
+export function OfflineBanner({ show, text, top = "shop" }: { show: boolean; text: string; top?: keyof typeof BANNER_TOP }) {
   if (!show) return null;
   return (
-    <div className="sticky top-[65px] z-30 border-b-[1.5px] border-line bg-ink text-white" role="status">
+    <div className={`sticky ${BANNER_TOP[top]} z-30 border-b-[1.5px] border-line bg-ink text-white`} role="status">
       <div className="wrap flex min-h-12 items-center gap-2 py-2 font-semibold">
         <OfflineIcon size={20} className="flex-none" /> {text}
       </div>
