@@ -3,7 +3,10 @@ import { Api } from "./api.ts";
 import { makeCtx } from "./ctx.ts";
 import { dryFetch } from "./dry.ts";
 
-export const WORLDS = ["restaurant_group", "cloud_kitchen", "store", "au_outlet"] as const;
+/** The eval worlds: each has an answer key, a recompute and the determinism gates (the tests iterate these). */
+export const EVAL_WORLDS = ["restaurant_group", "cloud_kitchen", "store", "au_outlet"] as const;
+/** Every world `make seed` builds: the eval worlds and `cobnut`, the demo bakery behind apps/web (no answer key; cli.ts reseeds it fresh). */
+export const WORLDS = [...EVAL_WORLDS, "cobnut"] as const;
 export type WorldName = (typeof WORLDS)[number];
 
 export const DEFAULT_SEED = "munim-worldgen-v1";
@@ -31,7 +34,8 @@ export interface RunOptions {
   operator?: boolean;
 }
 
-export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log: string; api: Api }> {
+/** `state` is what the world handed on (Ctx.s), e.g. cobnut's storefront key for cli.ts to write out. */
+export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log: string; api: Api; state: Record<string, unknown> }> {
   const seed = o.seed ?? DEFAULT_SEED;
   const mod = await loadWorld(o.world);
   const dry = o.baseUrl === undefined;
@@ -42,5 +46,5 @@ export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log:
   });
   const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}) });
   await mod.build(c);
-  return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days} live_days=${c.liveDays}\n${api.logText()}`, api };
+  return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days} live_days=${c.liveDays}\n${api.logText()}`, api, state: c.s };
 }

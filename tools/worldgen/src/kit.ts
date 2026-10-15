@@ -152,27 +152,43 @@ export async function ingredient(c: Ctx, key: string, name: string, unit: string
   return { id, unit, name };
 }
 
-export interface Item { id: string; key: string; name: string }
+export interface Item {
+  id: string; key: string; name: string;
+  /** Variant key → id, and `<group>:<option>` → option id (only items given variants or option groups). */
+  variants?: Record<string, string>; options?: Record<string, string>;
+}
 
 /** Owner-entered display text (0029, T-099): synthetic, original names; sent only when given (absent = unchanged). */
 export interface Display { name: string; description?: string; diet?: "veg" | "non_veg" | "egg" | "vegan" }
 
-export async function item(c: Ctx, key: string, o: { category: string; kind?: "dish" | "sku"; stock?: Ingredient; barcode?: string; mrp?: { minor: number; currency: string }; brand?: string | null; display?: Display }): Promise<Item> {
+/** A size or other variant (priced on its own) and an option group (price deltas), with the owner's display text. */
+export interface VariantSpec { key: string; name: string }
+export interface GroupSpec { key: string; name: string; description: string | null; min: number; max: number; options: Array<{ key: string; name: string; deltaMinor: number }> }
+
+export async function item(c: Ctx, key: string, o: { category: string; kind?: "dish" | "sku" | "combo"; stock?: Ingredient; barcode?: string; mrp?: { minor: number; currency: string }; brand?: string | null; display?: Display;
+  variants?: VariantSpec[]; groups?: GroupSpec[] }): Promise<Item> {
   const id = c.api.id(`item:${key}`);
+  const variants = Object.fromEntries((o.variants ?? []).map((v) => [v.key, c.api.id(`variant:${key}:${v.key}`)]));
+  const options = Object.fromEntries((o.groups ?? []).flatMap((g) => g.options.map((x) => [`${g.key}:${x.key}`, c.api.id(`option:${key}:${g.key}:${x.key}`)])));
   await c.api.cmd("owner", "/v1/catalogue/items", "catalogue.item.upsert.v1", `item:${key}`, {
     item_id: id, name_key: key.replaceAll(/[^a-z0-9]+/g, "_"), category: o.category, brand_id: o.brand ?? null, barcode: o.barcode ?? null,
-    mrp_minor: o.mrp?.minor ?? null, currency: o.mrp?.currency ?? null, active: true, variants: [], option_groups: [],
+    mrp_minor: o.mrp?.minor ?? null, currency: o.mrp?.currency ?? null, active: true,
+    variants: (o.variants ?? []).map((v) => ({ variant_id: variants[v.key], name_key: v.key, barcode: null, active: true, display_name: v.name, description: null })),
+    option_groups: (o.groups ?? []).map((g) => ({
+      option_group_id: c.api.id(`group:${key}:${g.key}`), name_key: g.key, min_select: g.min, max_select: g.max, required: g.min > 0, display_name: g.name, description: g.description,
+      options: g.options.map((x) => ({ option_id: options[`${g.key}:${x.key}`], name_key: x.key, price_delta_minor: x.deltaMinor, currency: c.s.currency, active: true, ingredient_deltas: [], display_name: x.name, description: null })),
+    })),
     kind: o.kind ?? "dish", stock_ingredient_id: o.stock?.id ?? null,
     ...(o.display ? { display_name: o.display.name, description: o.display.description ?? null, diet: o.display.diet ?? null } : {}),
   });
-  return { id, key, name: key };
+  return { id, key, name: key, ...(o.variants?.length ? { variants } : {}), ...(o.groups?.length ? { options } : {}) };
 }
 
-/** One price per outlet and channel kind, valid from the start of the timeline. */
-export async function price(c: Ctx, it: Item, outletId: string, channelKind: string, amountMinor: number, taxClass: string, validFrom: string, o: { validTo?: string; tag?: string } = {}) {
-  const key = `price:${it.key}:${outletId.slice(0, 8)}:${channelKind}:${o.tag ?? validFrom}`;
+/** One price per outlet and channel kind, valid from the start of the timeline; `variant` (a key of the item's variants) prices that variant. */
+export async function price(c: Ctx, it: Item, outletId: string, channelKind: string, amountMinor: number, taxClass: string, validFrom: string, o: { validTo?: string; tag?: string; variant?: string } = {}) {
+  const key = `price:${it.key}${o.variant ? `:${o.variant}` : ""}:${outletId.slice(0, 8)}:${channelKind}:${o.tag ?? validFrom}`;
   await c.api.cmd("owner", "/v1/catalogue/prices", "catalogue.price.set.v1", key, {
-    price_id: c.api.id(key), item_id: it.id, variant_id: null, outlet_id: outletId, channel_kind: channelKind, amount_minor: amountMinor,
+    price_id: c.api.id(key), item_id: it.id, variant_id: o.variant ? it.variants![o.variant]! : null, outlet_id: outletId, channel_kind: channelKind, amount_minor: amountMinor,
     currency: (c.s.currency as string), tax_class: taxClass, valid_from: validFrom, valid_to: o.validTo ?? null,
   });
 }
@@ -188,10 +204,13 @@ export async function recipe(c: Ctx, it: Item, from: string, lines: Array<{ ing:
 // ---- suppliers, purchasing -----------------------------------------------------------------------------------
 
 /** Suppliers are always simulated (hard rule 5): the read model carries the "Simulated supplier" label. */
-export async function supplier(c: Ctx, key: string, name: string, paymentDays = 15): Promise<string> {
+export async function supplier(c: Ctx, key: string, name: string, paymentDays = 15, prices: Array<{ key: string; ing: Ingredient; priceMinor: number; at: string }> = []): Promise<string> {
   const id = c.api.id(`supplier:${key}`);
   await c.api.cmd("owner", "/v1/suppliers", "purchasing.supplier.upsert.v1", `supplier:${key}`, {
-    supplier_id: id, name, kind: "simulated", a2a_card_url: null, terms: { payment_days: paymentDays, notes: "Synthetic, simulated supplier" }, prices: [],
+    supplier_id: id, name, kind: "simulated", a2a_card_url: null, terms: { payment_days: paymentDays, notes: "Synthetic, simulated supplier" },
+    prices: prices.map((p) => ({
+      price_id: c.api.id(`supplier:${key}:price:${p.key}`), ingredient_id: p.ing.id, unit: p.ing.unit, unit_price_minor: p.priceMinor, currency: c.s.currency, observed_at: p.at, source_ref: "Price list (synthetic)",
+    })),
   });
   return id;
 }
@@ -395,7 +414,8 @@ export async function flushImports(c: Ctx): Promise<void> {
 
 // ---- orders (server-stamped: they land on the day the seed runs — see the report's clock note) -------------------
 
-export interface OrderLine { item: Item; qtyMilli: number; barcode?: string }
+/** `variant`: a key of the item's variants; `options`: `<group>:<option>` keys of its option groups. */
+export interface OrderLine { item: Item; qtyMilli: number; barcode?: string; variant?: string; options?: string[] }
 
 export async function placeOrder(c: Ctx, key: string, biz: Business, outlet: OutletInfo, channelKind: string, kind: "dine_in" | "takeaway" | "pickup" | "delivery", lines: OrderLine[],
   o: { externalRef?: string; coupons?: string[]; persona?: string; table?: string; expect?: number[]; brand?: string | null; refusedWith?: string } = {}) {
@@ -404,7 +424,10 @@ export async function placeOrder(c: Ctx, key: string, biz: Business, outlet: Out
     order_id: c.api.id(key), outlet_id: outlet.id, channel_id: biz.channels[channelKind], brand_id: o.brand ?? null,
     device_id: channelKind === "counter" ? outlet.device : null, kind, table_ref: o.table ?? null, pickup_window_id: null, promised_at: null,
     external_ref: aggregator ? (o.externalRef ?? key) : null,
-    lines: lines.map((l, i) => ({ line_id: c.api.id(`${key}:l${i}`), item_id: l.item.id, variant_id: null, option_ids: [], qty_milli: l.qtyMilli, barcode: l.barcode ?? null, note: null })),
+    lines: lines.map((l, i) => ({
+      line_id: c.api.id(`${key}:l${i}`), item_id: l.item.id, variant_id: l.variant ? l.item.variants![l.variant]! : null, option_ids: (l.options ?? []).map((x) => l.item.options![x]!),
+      qty_milli: l.qtyMilli, barcode: l.barcode ?? null, note: null,
+    })),
     coupon_codes: o.coupons ?? [], loyalty_redeem_points: 0, preview_total_minor: null, client_totals: null,
   }, { ...(o.expect ? { expect: o.expect } : {}), ...(o.refusedWith ? { refusedWith: o.refusedWith } : {}) });
 }
@@ -422,6 +445,12 @@ export async function tenderUpi(c: Ctx, key: string, orderKey: string, amountMin
   }, { params: { id: c.api.id(orderKey) } });
 }
 
+/** UPI for what the order still owes (core's own remaining_minor, read back; in plan mode the read is a placeholder). */
+export async function tenderUpiFull(c: Ctx, key: string, orderKey: string, persona = "owner") {
+  const order = await c.api.get(persona, "/v1/orders/{id}", { params: { id: c.api.id(orderKey) } });
+  await tenderUpi(c, key, orderKey, order.remaining_minor as number, persona);
+}
+
 export async function shiftOpen(c: Ctx, key: string, outlet: OutletInfo, floatMinor: number, persona = "owner") {
   await c.api.cmd(persona, "/v1/shifts", "orders.shift.open.v1", key, { shift_id: c.api.id(key), outlet_id: outlet.id, device_id: outlet.device, float_minor: floatMinor, currency: c.s.currency });
 }
@@ -430,11 +459,69 @@ export async function shiftClose(c: Ctx, key: string, countedMinor: number, pers
   await c.api.cmd(persona, "/v1/shifts/{id}:close", "orders.shift.close.v1", `${key}:close`, { shift_id: c.api.id(key), counted_cash_minor: countedMinor }, { params: { id: c.api.id(key) } });
 }
 
-export async function coupon(c: Ctx, key: string, code: string, o: { bp: number; from: string; cap?: number | null; perCustomerCap?: number; requiresCustomer?: boolean }) {
+/** `to`: the last valid date (valid_to is the next midnight, UTC as `from` is). */
+export async function coupon(c: Ctx, key: string, code: string, o: { bp: number; from: string; cap?: number | null; perCustomerCap?: number; requiresCustomer?: boolean; minSpendMinor?: number; outletIds?: string[]; to?: string }) {
   await c.api.cmd("owner", "/v1/catalogue/coupons", "catalogue.coupon.set.v1", `coupon:${key}`, {
-    coupon_id: c.api.id(`coupon:${key}`), code, kind: "percent", value_bp: o.bp, value_minor: null, currency: c.s.currency, min_spend_minor: 0,
-    global_cap: o.cap ?? null, per_customer_cap: o.perCustomerCap ?? null, requires_customer: o.requiresCustomer ?? false, outlet_ids: [], valid_from: `${o.from}T00:00:00.000Z`, valid_to: null, active: true,
+    coupon_id: c.api.id(`coupon:${key}`), code, kind: "percent", value_bp: o.bp, value_minor: null, currency: c.s.currency, min_spend_minor: o.minSpendMinor ?? 0,
+    global_cap: o.cap ?? null, per_customer_cap: o.perCustomerCap ?? null, requires_customer: o.requiresCustomer ?? false, outlet_ids: o.outletIds ?? [], valid_from: `${o.from}T00:00:00.000Z`,
+    valid_to: o.to ? `${addDays(o.to, 1)}T00:00:00.000Z` : null, active: true,
   });
+}
+
+/** A percent-off deal on some items, in weekly outlet-local windows, at every outlet. */
+export async function deal(c: Ctx, key: string, o: { bp: number; itemIds: string[]; windows: Array<{ days: number[]; from: string; to: string }>; from: string }) {
+  await c.api.cmd("owner", "/v1/catalogue/deals", "catalogue.deal.upsert.v1", `deal:${key}`, {
+    deal_id: c.api.id(`deal:${key}`), name_key: `deal.${key}`, rule: { kind: "percent_off", bp: o.bp, item_ids: o.itemIds }, windows: o.windows, outlet_ids: [],
+    valid_from: o.from, valid_to: null, active: true,
+  });
+}
+
+/** Sold out (false) or back on sale at one outlet. */
+export async function availability(c: Ctx, it: Item, outletId: string, available: boolean) {
+  await c.api.cmd("owner", "/v1/catalogue/availability", "catalogue.availability.set.v1", `avail:${it.key}:${outletId.slice(0, 8)}:${available}`, {
+    outlet_id: outletId, item_id: it.id, variant_id: null, available,
+  });
+}
+
+/** An item's expected prep time at a kitchen station (which station its tickets go to). */
+export async function prepTime(c: Ctx, it: Item, outletId: string, station: string, prepSec: number, validFrom: string) {
+  await c.api.cmd("owner", "/v1/kitchen/prep-times", "kitchen.prep_time.set.v1", `prep:${it.key}:${outletId.slice(0, 8)}:${validFrom}`, {
+    outlet_id: outletId, item_id: it.id, station, prep_sec: prepSec, valid_from: validFrom,
+  });
+}
+
+/** Pickup slots for one outlet-local business date. */
+export async function pickupWindows(c: Ctx, key: string, outletId: string, date: string, from: string, to: string, slotMinutes: number, capacity: number) {
+  await c.api.cmd("owner", "/v1/pickup-windows", "orders.pickup_window.generate.v1", `windows:${key}`, {
+    outlet_id: outletId, business_date: date, from_local: from, to_local: to, slot_minutes: slotMinutes, capacity_orders: capacity,
+  });
+}
+
+/** Outlet settings the owner changes after onboarding (phone, accepting-orders state …): `patch` is tenancy.outlet.update.v1's fields. */
+export async function outletSettings(c: Ctx, key: string, outlet: OutletInfo, patch: J) {
+  await c.api.cmd("owner", "/v1/outlets/{id}:update", "tenancy.outlet.update.v1", `settings:${key}`, { outlet_id: outlet.id, ...patch }, { params: { id: outlet.id } });
+}
+
+/** Moves an outlet's live kitchen tickets on, as `persona` at the KDS: `moves[i]` is the status path of the i-th ticket in ticket order (e.g.
+ *  ["preparing", "ready"]). Ticket ids are server-minted (aliased in the request log); plan mode has no board, so nothing moves there. */
+export async function advanceTickets(c: Ctx, key: string, outlet: OutletInfo, persona: string, moves: string[][]) {
+  if (c.api.lenient) return;
+  const board = await c.api.get(persona, "/v1/kitchen/board", { query: { outlet: outlet.id } });
+  const tickets = ((board.tickets as J[]) ?? []).filter((t) => t.status === "queued").sort((x, y) => (x.ticket_no as number) - (y.ticket_no as number) || String(x.station).localeCompare(String(y.station)));
+  for (const [i, path] of moves.entries()) {
+    const t = tickets[i];
+    if (!t) throw new Error(`advanceTickets ${key}: only ${tickets.length} queued ticket(s)`);
+    const id = c.api.alias(t.ticket_id as string, `ticket:${key}:${i}`);
+    let from = "queued";
+    for (const to of path) {
+      await c.api.cmd(persona, "/v1/kitchen/tickets/{id}:advance", "kitchen.ticket.advance.v1", `advance:${key}:${i}:${to}`, { ticket_id: id, from_status: from, to_status: to }, { params: { id } });
+      from = to;
+    }
+  }
+}
+
+export async function device(c: Ctx, key: string, outletId: string, kind: "pos" | "kds", series: string | null = null) {
+  await c.api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", key, { device_id: c.api.id(key), outlet_id: outletId, kind, invoice_series: series });
 }
 
 // ---- people with logins -----------------------------------------------------------------------------------------
@@ -585,9 +672,9 @@ export function shortLines(bills: Array<{ no: string; date: string; gross: numbe
 
 /** The owner creates a storefront key for the own-site channel; the raw key is returned once and never logged. Seeding a world again finds the
  *  key already made (409) and has no raw key to use: null, and the storefront legs, already in the books, are skipped. */
-export async function storefrontKey(c: Ctx, biz: Business): Promise<string | null> {
+export async function storefrontKey(c: Ctx, biz: Business, origins = ["https://order.example.test"]): Promise<string | null> {
   try {
-    const r = await c.api.post("owner", "/v1/storefront-keys", { key_id: c.api.id("sfkey:1"), channel_id: biz.channels["own_site"], allowed_origins: ["https://order.example.test"] });
+    const r = await c.api.post("owner", "/v1/storefront-keys", { key_id: c.api.id("sfkey:1"), channel_id: biz.channels["own_site"], allowed_origins: origins });
     return (r.key as string | undefined) ?? "plan-key";
   } catch (e) {
     if (e instanceof CommandRefused && e.status === 409) return null;
@@ -649,17 +736,19 @@ export async function platformDraft(c: Ctx, key: string, target: string, patch: 
   await c.api.post("operator", "/platform/v1/config-drafts/{id}:approve", {}, { params: { id: draft }, noTenant: true });
 }
 
-export interface CaresRecipient { key: string; name: string; kind: "ngo" | "food_bank"; cooked: boolean; raw: boolean; packaged: boolean; kg: number; portions: number; lat: number; lng: number }
+/** `id`: a fixed recipient id (default: from the seed); `from`/`to`: receiving hours (default 09:00-19:00). */
+export interface CaresRecipient { key: string; name: string; kind: "ngo" | "food_bank"; cooked: boolean; raw: boolean; packaged: boolean; kg: number; portions: number; lat: number; lng: number;
+  id?: string; from?: string; to?: string }
 
 /** The operator side: one city, simulated recipients (every name says so), and this tenant's enablement. Each is an approved config draft. */
 export async function caresOperator(c: Ctx, city: { code: string; country: string; name: string }, recipients: CaresRecipient[]): Promise<Record<string, string>> {
   await platformDraft(c, "cares_city", `cares_city:${city.code}`, { country_code: city.country, name: city.name, status: "active" });
   const ids: Record<string, string> = {};
   for (const r of recipients) {
-    const id = (ids[r.key] = c.api.id(`cares:recipient:${r.key}`));
+    const id = (ids[r.key] = r.id ?? c.api.id(`cares:recipient:${r.key}`));
     await platformDraft(c, `cares_recipient:${r.key}`, `cares_recipient:${id}`, {
       city_code: city.code, name: r.name, kind: r.kind, accepts_cooked: r.cooked, accepts_raw: r.raw, accepts_packaged: r.packaged,
-      capacity_kg_per_day: r.kg, capacity_portions_per_day: r.portions, receiving_from: "09:00", receiving_to: "19:00", lat_e6: r.lat, lng_e6: r.lng, status: "active",
+      capacity_kg_per_day: r.kg, capacity_portions_per_day: r.portions, receiving_from: r.from ?? "09:00", receiving_to: r.to ?? "19:00", lat_e6: r.lat, lng_e6: r.lng, status: "active",
     });
   }
   await platformDraft(c, "cares_enablement", `cares_enablement:${c.api.tenantId}`, { enabled: true });

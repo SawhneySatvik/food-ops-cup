@@ -8,10 +8,11 @@ import { idemOf, idOf } from "./ids.ts";
 
 export type J = Record<string, unknown>;
 
-/** Who a persona is to the IdP. The email is verified, so onboarding and invite → bind pass. */
+/** Who a persona is to the IdP. The email is verified, so onboarding and invite → bind pass. Cobnut's four people are the site's demo
+ *  accounts, `<key>@cobnut-demo.invalid` (interface.md; the `.invalid` TLD never receives mail); its operator is an ordinary persona. */
 export const personaIdentity = (world: string, persona: string) => ({
   sub: `worldgen-${world}-${persona}`,
-  email: `${persona}@${world.replaceAll("_", "-")}.synthetic.test`,
+  email: world === "cobnut" && persona !== "operator" ? `${persona}@cobnut-demo.invalid` : `${persona}@${world.replaceAll("_", "-")}.synthetic.test`,
   email_verified: true,
 });
 
