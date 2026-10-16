@@ -635,8 +635,9 @@ const NEW_LISTS = ["inventory.counts", "market.goals", "purchasing.invoices"];
 const MC1E_V2 = ["finance.settlement_vs_orders", "finance.missing_payouts", "finance.tender_vs_bank", "finance.gst_check", "customers.coupon_current",
   "compliance.licence_calendar", "compliance.log_coverage", "people.overtime_drift", "kitchen.ticket_times"];
 /** Later version 2s with their own gates: 0025 intel.investigation_cost_estimate (tests/w3close.test.ts), 0026
- *  people.labour_vs_demand (tests/w3decisions.test.ts), 0033 kitchen.prep_need and forecast.points (tests/forecast-outlet-0033.test.ts). */
-const LATER_V2 = ["intel.investigation_cost_estimate", "people.labour_vs_demand", "kitchen.prep_need", "forecast.points"];
+ *  people.labour_vs_demand (tests/w3decisions.test.ts), 0033 kitchen.prep_need and forecast.points (tests/forecast-outlet-0033.test.ts),
+ *  0035 customers.consented_audience (tests/consent-0035.test.ts). */
+const LATER_V2 = ["intel.investigation_cost_estimate", "people.labour_vs_demand", "kitchen.prep_need", "forecast.points", "customers.consented_audience"];
 
 describe("A1 / A2 — version 2 of the templates", () => {
   let fx: McFixture;

@@ -11,16 +11,16 @@ type Of<T extends { _output: unknown }> = T["_output"];
 const iso = (d: Date | string): string => new Date(d).toISOString();
 const int = (v: string | number | null): number | null => (v === null ? null : Number(v));
 
-/** The record's `consent` as the view's {email, sms}. A customer's own grant is {marketing, at} (accounts/handlers.ts); staff can
- *  only withdraw, which writes email/sms false (records.ts). A channel's own flag wins over `marketing`, so a withdrawal holds. */
-const consentFlags = (c: Record<string, unknown>): { email?: boolean; sms?: boolean } => {
-  const marketing = typeof c.marketing === "boolean" ? c.marketing : undefined;
-  const out: { email?: boolean; sms?: boolean } = {};
-  for (const ch of ["email", "sms"] as const) {
-    const v = typeof c[ch] === "boolean" ? c[ch] : marketing;
-    if (v !== undefined) out[ch] = v;
-  }
-  return out;
+/** The record's `consent` as the view's {email, sms} (R71). A customer's own grant is {marketing, at} (accounts/handlers.ts), and
+ *  "Send me offers" is consent for email only: sms needs its own flag. Staff can only withdraw, which writes email/sms false
+ *  (records.ts); a channel's own flag wins over `marketing`, so a withdrawal holds. A value that is not a boolean counts as not
+ *  set — the rule of the customers.consented_audience template (0035), which counts the audience a campaign cites. */
+const consentFlags = (c: Record<string, unknown>): { email: boolean; sms: boolean } => {
+  const flag = (k: string): boolean | undefined => {
+    const v = c[k];
+    return typeof v === "boolean" ? v : undefined;
+  };
+  return { email: flag("email") ?? flag("marketing") ?? false, sms: flag("sms") ?? false };
 };
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);

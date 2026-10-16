@@ -8,7 +8,7 @@ the result.
 
 | Path | What it is |
 |---|---|
-| `migrations/` | 34 numbered SQL files, `0001` to `0034` |
+| `migrations/` | 35 numbered SQL files, `0001` to `0035` |
 | `migrate.ts` | The runner. Applies files in order, one transaction each, from `0002` on under `SET LOCAL ROLE munim_migrator`. Records each file's SHA-256 in `munim_meta.schema_migrations` and refuses an applied file whose bytes changed. A `-- requires: vector` header skips a file loudly where the extension is missing. |
 | `seeds/packs.ts` | Seeds `platform.country_pack` from `packages/contracts/packs/*.json`. Idempotent; a changed document for a published version is refused. |
 | `scripts/bootstrap-roles.ts` | Sets a fresh random password on each login role and writes `.run/db-roles.json` (mode 0600). Re-running rotates every password. |
@@ -107,10 +107,11 @@ Files are named `NNNN_<name>.sql` in `migrations/`.
 | `0032` | Command authority for a person's request for quotes |
 | `0033` | Per-outlet versions of six forecast-reading templates |
 | `0034` | Storefront page versions and publishes; command authority for recording a campaign as sent on a demo business |
+| `0035` | Version 2 of the consented-audience template: "Send me offers" counts as email consent only; SMS needs its own consent |
 
 ## Tests
 
-`pnpm -F @munim/db test` starts an embedded Postgres 18, applies the migrations (33 apply; `0013` is skipped there) and runs the
+`pnpm -F @munim/db test` starts an embedded Postgres 18, applies the migrations (34 apply; `0013` is skipped there) and runs the
 gates. The hand-written `tests/manifest.ts` lists every table and its properties, and the gates compare the live catalog to it
 in both directions.
 

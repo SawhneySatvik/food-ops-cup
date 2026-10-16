@@ -97,8 +97,9 @@ def expected_generated() -> int:
     # Cross-check literals: 96 entries - 26 "@2" rows (0025: investigation_cost_estimate v2; 0026: labour_vs_demand v2)
     # - 2 "@3" rows (0024: settlement_vs_orders; 0026: deal_inputs) = 68 ids; + 0028's five v1 ids = 73; 73 - 11 = 62 reads;
     # 24 proposal lines - 6 = 18. 0033 (T-127) adds six later versions of existing ids (2 "@2", 3 "@3", 1 "@4"): 107 entries, ids unchanged.
-    assert (len(entries), len(templates), len(exposed), len(proposals)) == (107, 73, 62, 24)
-    assert len([e for e in entries if e.endswith("@2")]) == 28
+    # 0035 (R71) adds one: customers.consented_audience@2 (already exposed) → 108 entries, 29 "@2" rows, ids and reads unchanged.
+    assert (len(entries), len(templates), len(exposed), len(proposals)) == (108, 73, 62, 24)
+    assert len([e for e in entries if e.endswith("@2")]) == 29
     return (len(proposals) - 6) + len(exposed)
 
 

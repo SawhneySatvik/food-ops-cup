@@ -15456,7 +15456,7 @@
     },
     {
       "id": "customers.consented_audience",
-      "version": 1,
+      "version": 2,
       "min_role": "manager",
       "agent_exposed": true,
       "tool": "read_customers_consented_audience",
@@ -23754,7 +23754,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "0a37132062573ac6a3aa921a51abd5c8e979d2b6405fa3ed062b40a500d4d4ad",
+      "sha256": "265b0a4f7948de2fb32802f525f77578be07931a00a21ee7fd8e1148e18e3afe",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23790,6 +23790,7 @@
         "db/migrations/0032_rfq_authority.sql": "b06db355bfdbb5946663355dd152743fef4c6044525c4b791e746382fb5d1f14",
         "db/migrations/0033_forecast_per_outlet.sql": "af502f55800c9954fe035939bcb9c679e9a94bdf9bc658d31b16cf752863a67f",
         "db/migrations/0034_t128_storefront_page_campaign_sent.sql": "8caa9fd051561d6ec062de252d7ef873e0bb30f5e73301710e0f403fea50df83",
+        "db/migrations/0035_r71_consented_audience.sql": "19a356ce69290f293ac36fda59457eae71410f81505592afc8ddf719af81125e",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -23859,6 +23860,6 @@
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "9bae4f70acfae5271acb0ad45c2ea279ae684b662c6b247546bf463ada5d45a5"
+    "body_sha256": "bf17e7783f3be5c154d36fa31baa20f83ce4628faf2b105aa65d3fc34e2ab8b5"
   }
 }
