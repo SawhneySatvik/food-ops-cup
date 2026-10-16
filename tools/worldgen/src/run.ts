@@ -1,4 +1,6 @@
 // Runs one world against an API (or a fake one, in plan mode) and returns what was planted and the request log.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { Api } from "./api.ts";
 import { makeCtx } from "./ctx.ts";
 import { dryFetch } from "./dry.ts";
@@ -6,9 +8,12 @@ import { completeOnboarding } from "./kit.ts";
 
 /** The eval worlds: each has an answer key, a recompute and the determinism gates (the tests iterate these). */
 export const EVAL_WORLDS = ["restaurant_group", "cloud_kitchen", "store", "au_outlet"] as const;
-/** Every world `make seed` builds: the eval worlds and `cobnut`, the demo bakery behind apps/web (no answer key; cli.ts reseeds it fresh). */
+/** Every world the CLI knows: the eval worlds and `cobnut`, the demo bakery behind apps/web (no answer key; cli.ts reseeds it fresh). */
 export const WORLDS = [...EVAL_WORLDS, "cobnut"] as const;
 export type WorldName = (typeof WORLDS)[number];
+
+/** The worlds whose module file is present. A trimmed copy of this tool (the Cup export carries cobnut only) offers just those. */
+export const availableWorlds = (dir: string = join(import.meta.dirname, "worlds")): WorldName[] => WORLDS.filter((w) => existsSync(join(dir, `${w}.ts`)));
 
 export const DEFAULT_SEED = "munim-worldgen-v1";
 

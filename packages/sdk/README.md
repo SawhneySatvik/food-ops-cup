@@ -11,13 +11,13 @@ storefronts, not for redistribution).
 ## Install
 
 ```bash
-# from the folder that holds munim-sdk-0.3.0.tgz (downloaded, or built in the Munim repository with
+# from the folder that holds munim-sdk-0.3.1.tgz (downloaded, or built in the Munim repository with
 # node packages/sdk/scripts/pack.mjs --out <dir>, which writes the .tgz and its .sha256)
-npm install ./munim-sdk-0.3.0.tgz        # or: pnpm add ./munim-sdk-0.3.0.tgz
+npm install ./munim-sdk-0.3.1.tgz        # or: pnpm add ./munim-sdk-0.3.1.tgz
 ```
 
 The tarball ships compiled JavaScript and `.d.ts` files, so no `transpilePackages` setting is needed. The one dependency,
-`openapi-fetch`, is installed for you. Check the download with `shasum -a 256 munim-sdk-0.3.0.tgz` against `munim-sdk-0.3.0.tgz.sha256`.
+`openapi-fetch`, is installed for you. Check the download with `shasum -a 256 munim-sdk-0.3.1.tgz` against `munim-sdk-0.3.1.tgz.sha256`.
 
 ## Clients
 

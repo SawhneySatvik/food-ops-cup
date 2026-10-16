@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# make deploy-gcp (T-121): builds the images with Cloud Build and deploys them to Cloud Run in asia-south1.
+# scripts/deploy-gcp.sh: builds the images with Cloud Build and deploys them to Cloud Run in asia-south1.
 # Create-or-update only (`gcloud run deploy`), so re-running is safe. Needs the one-time setup in infra/gcp/README.md first.
 #   scripts/deploy-gcp.sh --project <id> [--tag <tag>] [--only <svc,svc>] [--skip-build] [--dry-run]
 #   PROJECT_ID=<id> is read when --project is absent. Services: intel, suppliers-sim, core-api, core-worker, web.
@@ -21,7 +21,7 @@ dry_run=0
 die() { echo "deploy-gcp: $*" >&2; exit 2; }
 usage() { sed -n '2,6p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
-# Both `--flag value` and `--flag=value`; a value flag without a value is refused, an unknown flag is refused (gotcha 17).
+# Both `--flag value` and `--flag=value`; a value flag without a value is refused, an unknown flag is refused.
 needs_value() { [ -n "${2:-}" ] && [[ "$2" != --* ]] || die "$1 needs a value"; }
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -79,7 +79,7 @@ url() { echo "https://munim-$1-$number.$REGION.run.app"; }
 core_url="$(url core-api)"; sim_url="$(url suppliers-sim)"; intel_url="$(url intel)"; web_url="$(url web)"
 
 # Both pool URLs name the same Cloud SQL instance through Cloud Run's built-in connection (a unix socket; Cloud SQL has no
-# pooler). No credentials in it: each role logs in as itself with MUNIM_DB_PASSWORD_<ROLE> (T-122 makes the code do that).
+# pooler). No credentials in it: each role logs in as itself with MUNIM_DB_PASSWORD_<ROLE>.
 db_url="postgres://localhost/munim?host=/cloudsql/$project:$REGION:$SQL_INSTANCE"
 bucket="$project-munim-blobs"
 sa() { echo "munim-$1@$project.iam.gserviceaccount.com"; }
@@ -135,9 +135,9 @@ deploy_sim() {
     --set-env-vars "SUPPLIERS_SIM_PUBLIC_URL=$sim_url"
 }
 
-# core-api: min 1 and CPU always allocated (gotcha 8: a throttled instance stalls the LISTEN connection behind /v1/stream).
+# core-api: min 1 and CPU always allocated (a throttled instance stalls the LISTEN connection behind /v1/stream).
 # Request timeout 3600 s (Cloud Run's cap) with streams ended at 3300 s so the client reconnects before the cut.
-# One instance, MUNIM_DB_POOL_MAX=3: the connection arithmetic is in infra/gcp/README.md (gotcha 24).
+# One instance, MUNIM_DB_POOL_MAX=3: the connection arithmetic is in infra/gcp/README.md.
 # MUNIM_TRUSTED_PROXY_HOPS is left unset (0: the rate limiters key on the socket address) until measured (infra/gcp/README.md,
 # deploy step 8). Once measured, add it to the --set-env-vars list below: that list replaces the environment on every deploy.
 deploy_core_api() {

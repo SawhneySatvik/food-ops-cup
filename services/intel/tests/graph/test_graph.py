@@ -1,14 +1,9 @@
-"""T-058 gates. One contract suite over every backend: the Postgres-edges adapter always (embedded Postgres + core-api's own
-batch writers); a graph database only when the `graphdb` module and MUNIM_GRAPHDB_URL are both present — skipped before any
-connect otherwise. Expected values are the hand-computed ones in graph_world.py."""
+"""T-058 gates. The contract suite over the Postgres-edges adapter (embedded Postgres + core-api's own batch writers).
+Expected values are the hand-computed ones in graph_world.py."""
 
 from __future__ import annotations
 
 import asyncio
-import importlib.util
-import os
-import sys
-import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, cast
@@ -17,7 +12,6 @@ import pytest
 
 import graph_world as fx
 from bridge import Bridge, BridgeReader, BridgeWriter
-from conftest import REPO
 from munim_intel.contracts_gen.models import Edge
 from munim_intel.graph import Graph, GraphError, PostgresGraph, project
 from munim_intel.runtime.internal_client import CoreError
@@ -64,35 +58,13 @@ def first_load(bridge: Bridge) -> Any:
     return res, {w: (after[w][0] - before[w][0], after[w][1] - before[w][1]) for w in "AB"}
 
 
-def graph_database() -> Iterator[Backend]:
-    url = os.environ.get("MUNIM_GRAPHDB_URL")
-    if not url or importlib.util.find_spec("graphdb") is None:
-        pytest.skip("graph database: no `graphdb` module or no MUNIM_GRAPHDB_URL (F7: optional, skipped with no server)")
-    path = REPO / "adapters/dev/graph-db/graph_db.py"
-    spec = importlib.util.spec_from_file_location("graph_db", path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["graph_db"] = mod
-    spec.loader.exec_module(mod)
-    ta, tb = f"t-{uuid.uuid4()}", f"t-{uuid.uuid4()}"
-    ga, gb = mod.GraphDatabase(url, ta), mod.GraphDatabase(url, tb)
-    load(ga, fx.entities(), fx.CORE_A, with_claims=True)
-    load(gb, fx.entities(" (B)", ((fx.IDLI, "item", "Idli (B)"),)), fx.CORE_B)
-    yield Backend("graphdb", ga, gb)
-    ga.delete_tenant()
-    gb.delete_tenant()
-
-
-@pytest.fixture(params=["postgres", "graphdb"])
+@pytest.fixture(params=["postgres"])
 def backend(request: pytest.FixtureRequest, bridge: Bridge, first_load: Any) -> Iterator[Backend]:
-    if request.param == "postgres":
-        yield Backend(
-            "postgres",
-            PostgresGraph(BridgeWriter(bridge, "A"), BridgeReader(bridge, "A")),
-            PostgresGraph(BridgeWriter(bridge, "B"), BridgeReader(bridge, "B")),
-        )
-    else:
-        yield from graph_database()
+    yield Backend(
+        "postgres",
+        PostgresGraph(BridgeWriter(bridge, "A"), BridgeReader(bridge, "A")),
+        PostgresGraph(BridgeWriter(bridge, "B"), BridgeReader(bridge, "B")),
+    )
 
 
 def tuples(template: str, rows: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
@@ -206,7 +178,7 @@ def test_core_refuses_what_check_args_refuses_and_another_tenant_gets_no_rows(br
 
 def test_an_id_seen_again_with_other_content_is_refused(backend: Backend) -> None:
     """The port's rule (graph/port.py): idempotent by id; the same id with other content is an error — core's 409 for
-    Postgres (the bridge raises it), `idempotency_conflict` from the graph-database adapter (never a silent MERGE). Paired:
+    Postgres (the bridge raises it), never a silent overwrite. Paired:
     the same content again is `existing`."""
     [rice] = [e for e in fx.entities() if e.id.root == fx.RICE]
     again = run(backend.a.upsert([rice], []))
