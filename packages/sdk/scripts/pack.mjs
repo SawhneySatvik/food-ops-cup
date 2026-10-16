@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const sdk = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repo = resolve(sdk, "../..");
 const tsc = join(sdk, "node_modules/typescript/bin/tsc");
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 export const FILE = `munim-sdk-${VERSION}.tgz`;
 
 /** The only files a consumer gets; check-pack.mjs compares `npm pack --dry-run` to this list. */
