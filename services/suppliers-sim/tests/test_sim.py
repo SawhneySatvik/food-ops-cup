@@ -5,6 +5,7 @@ by hand below; the discounter's minimum order sits only in the terms sentence. I
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -13,7 +14,8 @@ from a2a.client import A2ACardResolver, ClientConfig, ClientFactory
 from a2a.helpers import get_message_text, new_data_message
 from a2a.types.a2a_pb2 import Role, SendMessageRequest
 
-from suppliers_sim.app import PublicUrlError, build_app
+from suppliers_sim.agent import MAX_OFFERS, OFFER_TTL_S, SupplierAgent, load_data
+from suppliers_sim.app import MAX_BODY_BYTES, PublicUrlError, build_app
 
 PUBLIC = "https://suppliers-sim.example.test"
 LABEL = "Simulated supplier"
@@ -97,3 +99,89 @@ def test_a_counter_above_the_concession_is_met_never_raised() -> None:
 def test_ten_clause_phrasings_all_name_the_minimum() -> None:
     texts = [asyncio.run(_say(build_app(PUBLIC, clause=i), "discounter", [RFQ]))[0] for i in range(10)]
     assert len(set(texts)) == 10 and all("60 pc" in t for t in texts)
+
+
+# -- C1 S3-5 (R64 X-4): the sim is public with no secret, so every input is bounded --------------------------------------
+
+NOT_UNDERSTOOD = "we did not understand that request."
+
+
+def test_an_out_of_range_rfq_is_not_understood_and_echoes_nothing() -> None:
+    """Hand list of out-of-range fields; each gets the fixed reply, quickly (10**7 minor units once took ~9 s to format),
+    and no reply carries the buyer's text. Paired: the in-range RFQ with minor_unit 0 and 3 is quoted."""
+    long_item = "Boxes " + "x" * 200
+    bad: list[dict[str, Any]] = [
+        {"minor_unit": 10**7},
+        {"minor_unit": 1},
+        {"minor_unit": -2},
+        {"minor_unit": 2.5},
+        {"item": long_item},
+        {"item": ""},
+        {"unit": "pc-" + "y" * 40},
+        {"currency": "INRR"},
+        {"qty_milli": 10**15},
+        {"qty_milli": 0},
+        {"qty_milli": 1.5},
+        {"reference_price_minor": 1e308},
+        {"reference_price_minor": "800"},
+        {"reference_price_minor": True},
+    ]
+    app = build_app(PUBLIC, clause=0)
+    t0 = time.monotonic()
+    out = [asyncio.run(_say(app, "steady", [{**RFQ, **b}]))[0] for b in bad]
+    took = time.monotonic() - t0
+    print(f"{len(out)} refused in {took:.2f}s")
+    assert all(r.endswith(NOT_UNDERSTOOD) for r in out), out
+    assert not any(long_item in r or "yyyy" in r or "INRR" in r for r in out)
+    assert took < 5
+    zero = asyncio.run(_say(app, "steady", [{**RFQ, "minor_unit": 0, "reference_price_minor": 80}]))[0]
+    three = asyncio.run(_say(app, "steady", [{**RFQ, "currency": "KWD", "minor_unit": 3, "reference_price_minor": 8000}]))[0]
+    # Hand: 80 x 1.02 = 81.6 → 82 (half up); 8000 x 1.02 = 8160 → KWD 8.160.
+    assert "INR 82 per pc" in zero and "KWD 8.160 per pc" in three
+
+
+def test_a_counter_out_of_range_is_not_understood_and_leaves_the_offer() -> None:
+    app = build_app(PUBLIC, clause=0)
+    out = asyncio.run(
+        _say(app, "steady", [RFQ, {"kind": "counter", "unit_price_minor": 10**13}, {"kind": "counter", "unit_price_minor": 720}])
+    )
+    # The refused counter concedes nothing: the next one is the first concession (10050 bp = 804).
+    assert out[1].endswith(NOT_UNDERSTOOD) and "INR 8.04 per pc" in out[2]
+
+
+def test_open_offers_expire_and_are_capped() -> None:
+    p = load_data()["personalities"][0]
+    t = [0.0]
+    agent = SupplierAgent(p, LABEL, load_data()["moq_clauses"], 0, now=lambda: t[0])
+    assert "per pc" in agent.reply("a", RFQ)
+    t[0] = OFFER_TTL_S - 1
+    assert "revised price" in agent.reply("a", {"kind": "counter", "unit_price_minor": 720})
+    t[0] = OFFER_TTL_S
+    assert agent.reply("a", {"kind": "counter", "unit_price_minor": 720}).endswith("no open request in this conversation.")
+    for i in range(MAX_OFFERS + 1):
+        agent.reply(f"c{i}", RFQ)
+    assert len(agent.offers) == MAX_OFFERS and "c0" not in agent.offers and f"c{MAX_OFFERS}" in agent.offers
+    assert agent.reply("z" * 201, RFQ).endswith(NOT_UNDERSTOOD) and len(agent.offers) == MAX_OFFERS
+
+
+def test_a_body_over_the_limit_is_413_before_any_handler() -> None:
+    """By Content-Length and as a chunked stream (no length declared); a body at the limit still reaches the JSON-RPC
+    handler (which answers it as a malformed request, not 413)."""
+    app = build_app(PUBLIC)
+    big = b"{" + b" " * MAX_BODY_BYTES + b"}"
+
+    async def chunks() -> Any:
+        for _ in range(4):
+            yield b" " * (MAX_BODY_BYTES // 2)
+
+    async def post() -> list[int]:
+        async with _client(app) as http:
+            declared = await http.post(f"{PUBLIC}/steady", content=big, headers={"content-type": "application/json"})
+            streamed = await http.post(f"{PUBLIC}/steady", content=chunks(), headers={"content-type": "application/json"})
+            small = await http.post(f"{PUBLIC}/steady", content=b"{}", headers={"content-type": "application/json"})
+            assert declared.json()["error"]["message"] == "Request too large"
+            return [declared.status_code, streamed.status_code, small.status_code]
+
+    codes = asyncio.run(post())
+    print(f"declared, streamed, small: {codes}")
+    assert codes[:2] == [413, 413] and codes[2] != 413

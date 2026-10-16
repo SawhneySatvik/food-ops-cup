@@ -2,6 +2,7 @@
 // app.command_type, runs the handler, appends audit entries and outbox rows, and stores the result; after
 // commit the transaction's outbox rows are published. Publishing never fails the request.
 import { REPLAYED_HEADER, type CommandEnvelope, type CommandResult } from "@munim/contracts";
+import { refuseOnDemo } from "../lib/demo-guard.ts";
 import type { Queryable } from "../runtoken/index.ts";
 import { canonicalJson, sha256Hex, uuidv7 } from "./canonical.ts";
 import { parseStoredEvent, publishCommitted, type OutboxRow, type PublishDeps } from "./outbox.ts";
@@ -151,6 +152,8 @@ export async function executeCommand(ctx: CommandContext, command: CommandEnvelo
       return { body: prior.rows[0].body, replayed: true, rows: [] as OutboxRow[] };
     }
 
+    // R64 X-2: after the replay lookup (a stored result still replays), before anything is written.
+    await refuseOnDemo(c, command.type);
     await c.query(`SELECT set_config('app.command_type', $1, true)`, [command.type]);
     await setShopperRole(c, ctx, true);
     const out = await handler.run(c, command);

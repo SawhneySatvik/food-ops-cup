@@ -78,7 +78,8 @@ const memberOf = (c: Context<AppEnv>): MemberP => {
   return p;
 };
 
-/** A member's own command: the guard judges role and outlet scope against core.command_authority. */
+/** A member's own command: the guard judges role and outlet scope against core.command_authority on book tables; a handler
+ *  writing only an operational table (devices) checks the same row itself. */
 async function memberCommand(c: Context<AppEnv>, handler: (m: MemberP) => CommandHandler, status: 200 | 201 = 200, check?: (e: CommandEnvelope) => void) {
   const m = memberOf(c);
   const env = envelope(await json(c));

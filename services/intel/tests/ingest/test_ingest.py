@@ -26,7 +26,13 @@ from google.genai.errors import ClientError
 
 from conftest import GEMINI_KEY
 from munim_intel.config import load_config
-from munim_intel.contracts_gen.models import InternalBatchResponse, InternalDraftsResponse, InternalTracesBatchRequest, PlatformModelRoles
+from munim_intel.contracts_gen.models import (
+    InternalBatchResponse,
+    InternalDraftsResponse,
+    InternalSpendRequest,
+    InternalTracesBatchRequest,
+    PlatformModelRoles,
+)
 from munim_intel.decide import mimic
 from munim_intel.decide.mimic import LlmMimic
 from munim_intel.decide.port import EgressRefused, egress_payload
@@ -46,6 +52,7 @@ from munim_intel.runtime.context import RunContext
 from munim_intel.runtime.internal_client import CoreError
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.trace.buffer import TraceBuffer
+from munim_intel.trace.spend import Meter, SpendBuffer, estimate_input_tokens
 
 from . import corpus as C
 
@@ -528,13 +535,15 @@ class _Echo(RecordedLlm):
     quotes a secret and the prompt."""
 
     raise_with: str | None = None
+    #: What the provider reports it counted (None: no count, as a recorded replay).
+    usage: types.GenerateContentResponseUsageMetadata | None = None
     calls: ClassVar[int] = 0
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
         _Echo.calls += 1
         if self.raise_with is not None:
             raise RuntimeError(self.raise_with)
-        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text='{"claims": []}')]))
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text='{"claims": []}')]), usage_metadata=self.usage)
 
 
 def _ingest_with(llm: RecordedLlm, budget: Budget) -> tuple[Ingest, RunState, FakeSink, list[InternalTracesBatchRequest]]:
@@ -593,6 +602,37 @@ def test_a_spent_budget_makes_no_call() -> None:
     state.budget = Budget(max_model_calls=1)
     asyncio.run(quarantine.call(llm, extract_request(llm, C.SUPPLY_TEXT), ExtractedClaims, state))
     assert _Echo.calls == 1 and state.budget.model_calls == 1
+
+
+def test_every_quarantined_call_that_reaches_the_provider_is_one_spend_row() -> None:
+    """C1 S2-6 (R47, 04 §10): charged on the run's meter buffer as `extract` or `vision` (never the meter's own role), at
+    the provider's count when it reports one (thinking billed as output), else the request-size estimate; a provider error
+    is still one row; a spent budget makes no call and no row. Rows = calls that reached the provider (_Echo.calls)."""
+    posted: list[InternalSpendRequest] = []
+
+    async def sink(req: InternalSpendRequest) -> object:
+        posted.append(req)
+        return None
+
+    buffer = SpendBuffer(sink, "INR")
+    state, _ = new_state()
+    state.meter = Meter(buffer, "reason", "gemini", "recorded/reason", None)
+    _Echo.calls = 0
+    counted = types.GenerateContentResponseUsageMetadata(prompt_token_count=120, candidates_token_count=30, thoughts_token_count=5)
+    extract = extract_request(_Echo(model="echo/extract"), C.SUPPLY_TEXT)
+    asyncio.run(quarantine.call(_Echo(model="echo/extract", usage=counted), extract, ExtractedClaims, state))
+    asyncio.run(quarantine.call(_Echo(model="echo/vision"), extract, ExtractedClaims, state, role="vision"))
+    with pytest.raises(quarantine.ModelUnavailable):
+        asyncio.run(quarantine.call(_Echo(model="echo/extract", raise_with="boom"), extract, ExtractedClaims, state))
+    state.budget = Budget(max_model_calls=3, model_calls=3)
+    with pytest.raises(quarantine.ModelUnavailable, match="ai_budget_cap"):
+        asyncio.run(quarantine.call(_Echo(model="echo/extract"), extract, ExtractedClaims, state))
+    asyncio.run(buffer.flush())
+    rows = [(e["role"], e["model_id"], e["input_tokens"], e["output_tokens"]) for r in posted for e in r.model_dump(mode="json")["entries"]]
+    print(f"calls {_Echo.calls}; rows {rows}")
+    estimate = estimate_input_tokens(extract)
+    assert _Echo.calls == 3 and estimate > 0
+    assert rows == [("extract", "echo/extract", 120, 35), ("vision", "echo/vision", estimate, 0), ("extract", "echo/extract", estimate, 0)]
 
 
 # -- R-C F10: a claim's quote names its subject and object --------------------------------------------------------------

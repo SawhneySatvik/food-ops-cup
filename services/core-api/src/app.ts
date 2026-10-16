@@ -1,7 +1,8 @@
 // The core-api Hono app. Dependencies are injected (server.ts builds them from config; gates pass embedded-
 // Postgres pools and idp-local), so no gate ever reads `.env`.
 import { AccountMissing } from "@munim/core-domain/finance";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { CommandTypeMismatch, IdempotencyConflict } from "./commit/index.ts";
 import { ApiError, errorBody, fromSqlState } from "./lib/errors.ts";
@@ -30,11 +31,26 @@ export interface AppOptions {
   corsOrigins?: readonly string[];
 }
 
+// C1 S2-5: every request body is capped before any route reads it (a Content-Length over the cap is refused unread). 256 KiB
+// fits every member, storefront and platform command; the upload route takes a 5 MiB file as base64 (6.7 MiB) in JSON; intel's
+// batches (service secret and run token, checked before any body is read) reach ~12 MB at the contracts' maxima (500 chunks of
+// 8000 three-byte characters).
+const KIB = 1024;
+const tooLarge = (c: Parameters<MiddlewareHandler>[0]) => c.json(errorBody("bad_request"), 413);
+const limit = (maxSize: number) => bodyLimit({ maxSize, onError: tooLarge });
+const LIMITS: ReadonlyArray<[RegExp, MiddlewareHandler]> = [
+  [/^\/internal\/intel\/v1\//, limit(16 * 1024 * KIB)],
+  [/^\/v1\/imports\/documents$/, limit(8 * 1024 * KIB)],
+];
+const DEFAULT_LIMIT = limit(256 * KIB);
+const bodyLimits: MiddlewareHandler = (c, next) => (LIMITS.find(([path]) => path.test(c.req.path))?.[1] ?? DEFAULT_LIMIT)(c, next);
+
 export async function createApp(deps: Deps, opts: AppOptions = {}): Promise<Hono<AppEnv>> {
   await loadContracts();
   const app = new Hono<AppEnv>();
   // First: a preflight is answered before any router (and its rate limiter) sees it.
   app.use(cors(opts.corsOrigins ?? []));
+  app.use(bodyLimits);
   app.use(async (c, next) => {
     c.set("deps", deps);
     await next();

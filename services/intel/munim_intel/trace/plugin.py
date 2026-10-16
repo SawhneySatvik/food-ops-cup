@@ -4,7 +4,8 @@ Every Runner of a run gets a MunimPlugin over the same RunState, so budget, tain
 per run, not per Runner. Each callback counts itself in `RunState.fired`; the fired gate reads the count, so a
 misspelt hook (never called by ADK) shows up as 0.
 
-What reaches a trace: kinds, actors, agent and registered tool names, outcomes, exception class names, and in live mode
+What reaches a trace: kinds, actors, agent and registered tool names, outcomes, exception class names (label-safe:
+buffer.error_label — ADK's `_ResourceExhaustedError` for a 429 starts with an underscore), and in live mode
 the path that served each model call (`route` {model_path}: live / recorded-fallback / abstained, T-125). Never the
 member's message, model text, tool arguments or results, or an exception's message (rule 8; ADR-014 §6.4 rule 5).
 
@@ -37,7 +38,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from munim_intel.runtime.state import ACTOR, RunState, check_actor
-from munim_intel.trace.buffer import Payload
+from munim_intel.trace.buffer import Payload, error_label
 from munim_intel.trace.served import served_by
 from munim_intel.trace.spend import Usage, estimate_input_tokens
 
@@ -155,7 +156,7 @@ class MunimPlugin(BasePlugin):
     async def on_run_error_callback(self, *, invocation_context: InvocationContext, error: Exception) -> None:
         # after_run_callback is skipped when the run errors (runners.py, `run_error is None`): flush here too.
         self._fire("on_run_error_callback")
-        await self._trace("error", {"where": "run", "error": type(error).__name__})
+        await self._trace("error", {"where": "run", "error": error_label(error)})
         await self._flush()
 
     # -- agent --------------------------------------------------------------------------------------------------
@@ -170,7 +171,7 @@ class MunimPlugin(BasePlugin):
 
     async def on_agent_error_callback(self, *, agent: BaseAgent, callback_context: CallbackContext, error: Exception) -> None:
         self._fire("on_agent_error_callback")
-        await self._trace("error", {"where": "agent", "agent": agent.name, "error": type(error).__name__})
+        await self._trace("error", {"where": "agent", "agent": agent.name, "error": error_label(error)})
 
     # -- model --------------------------------------------------------------------------------------------------
 
@@ -187,10 +188,7 @@ class MunimPlugin(BasePlugin):
 
     async def after_model_callback(self, *, callback_context: CallbackContext, llm_response: LlmResponse) -> None:
         self._fire("after_model_callback")
-        # Live mode (T-125): which path served the call, a label (trace/served.py). A recorded replay carries none.
-        path = served_by(llm_response)
-        if path is not None and not llm_response.partial:
-            await self._trace("route", {"model_path": path})
+        # Spend first: nothing below (a trace, its flush) may stand between a provider call and its row.
         usage = llm_response.usage_metadata
         if usage is not None:
             self.state.budget.input_tokens += usage.prompt_token_count or 0
@@ -202,15 +200,20 @@ class MunimPlugin(BasePlugin):
                 self.state.meter.record(Usage(usage.prompt_token_count, out))
             else:
                 self.state.meter.record(Usage(self._estimate, 0, estimated=True))
+        # Live mode (T-125): which path served the call, a label (trace/served.py). A recorded replay carries none.
+        path = served_by(llm_response)
+        if path is not None and not llm_response.partial:
+            await self._trace("route", {"model_path": path})
 
     async def on_model_error_callback(self, *, callback_context: CallbackContext, llm_request: LlmRequest, error: Exception) -> None:
         self._fire("on_model_error_callback")
+        # Spend first (a failed or rate-limited call may still be billed), then the traces.
+        if self.state.meter is not None:
+            self.state.meter.record(Usage(self._estimate, 0, estimated=True))
         path = served_by(error)
         if path is not None:
             await self._trace("route", {"model_path": path})
-        await self._trace("error", {"where": "model", "error": type(error).__name__})
-        if self.state.meter is not None:
-            self.state.meter.record(Usage(self._estimate, 0, estimated=True))
+        await self._trace("error", {"where": "model", "error": error_label(error)})
 
     # -- tool ---------------------------------------------------------------------------------------------------
 
@@ -248,4 +251,4 @@ class MunimPlugin(BasePlugin):
         self, *, tool: BaseTool, tool_args: dict[str, Any], tool_context: ToolContext, error: Exception
     ) -> None:
         self._fire("on_tool_error_callback")
-        await self._tool_result(tool, tool_context, {"outcome": "error", "error": type(error).__name__})
+        await self._tool_result(tool, tool_context, {"outcome": "error", "error": error_label(error)})

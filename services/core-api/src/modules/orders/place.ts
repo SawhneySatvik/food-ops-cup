@@ -86,6 +86,15 @@ async function judgedAt(c: Queryable, outletId: string, promised: string | null,
 const cartLines = (lines: Array<{ item_id: string; variant_id: string | null; option_ids: string[]; qty_milli: number }>) =>
   lines.map((l, i) => ({ line_no: i + 1, item_id: l.item_id, variant_id: l.variant_id, option_ids: l.option_ids, qty_milli: l.qty_milli }));
 
+/** C1 S2-5: a cart's size, judged before any line is read or priced (pricing runs several queries per line, and the storefront
+ *  preview prices twice): at most 100 lines, 20 options a line and a million units a line (qty_milli 10⁹). Over → 422. */
+export const CART_BOUNDS = { lines: 100, options: 20, qty_milli: 1_000_000_000 } as const;
+export function assertCartBounds(lines: ReadonlyArray<{ option_ids: readonly unknown[]; qty_milli: number }>): void {
+  if (lines.length > CART_BOUNDS.lines || lines.some((l) => l.option_ids.length > CART_BOUNDS.options || l.qty_milli > CART_BOUNDS.qty_milli)) {
+    throw new ApiError("invalid_payload");
+  }
+}
+
 // ── Preview ────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** The `previewOrder` route: WRITES NOTHING — a READ ONLY transaction, and it is asserted that no transaction id
@@ -94,6 +103,7 @@ export async function previewOrder(ctx: OrdersCtx, request: unknown) {
   const p = shopper(ctx.principal);
   const parsed = OrdersPreviewRequest.safeParse(request);
   if (!parsed.success) throw new ApiError("invalid_payload");
+  assertCartBounds(parsed.data.lines);
   return withContext(ctx.deps.pools.core, contextOf(p, { coupon_codes: parsed.data.coupon_codes }), async (c) => {
     await c.query("SET TRANSACTION READ ONLY");
     const out = await previewIn(c, p, parsed.data);
@@ -309,6 +319,7 @@ export async function placeOrder(ctx: OrdersCtx, command: CommandEnvelope, opts:
   const p = shopper(ctx.principal);
   const payload = OrdersPlaceV1.safeParse(command.payload);
   if (!payload.success) throw new ApiError("invalid_payload");
+  assertCartBounds(payload.data.lines);
   const pool = ctx.deps.pools.core;
   if (p.kind === "member") {
     await withContext(pool, contextOf(p), (c) => authorise(c, p, "orders.place.v1", payload.data.outlet_id));

@@ -2,6 +2,7 @@
 // target_tables (db/README "Book guard"); the role/scope verdict is the database's (MB001/MB008 → 403).
 // Currency, FY start, zones, aggregators and tax-id formats come from the country pack, never the payload.
 import type { CommandEnvelope } from "@munim/contracts";
+import { evaluateAuthority } from "@munim/core-domain/authority";
 import {
   DemoSessionStartV1, NEGOTIATION_DEFAULTS, TenancyBrandCreateV1, TenancyChannelCreateV1, TenancyDeviceRegisterV1, TenancyMemberBindV1, TenancyMemberDeactivateV1,
   TenancyMemberInviteV1, TenancyMemberRoleSetV1, TenancyOnboardV1, TenancyOutletCreateV1, TenancyOutletUpdateV1, TenancyPolicySetV1, TenancyTenantUpdateV1,
@@ -53,10 +54,17 @@ export function assertOutletInScope(m: Member, outlet_id: string): void {
 
 /** Self-serve: a signed-in person becomes owner of a new tenant. The owner member row carries the verified
  *  IdP subject, so requireMember works on the very next request. */
+/** R64 X-4: how many businesses one sign-in may create self-serve. A retry of the same envelope replays before this runs. */
+export const ONBOARD_TENANT_CAP = 5;
+
 export const onboardHandler = (who: { sub: string; email: string }): CommandHandler => ({
   type: TYPES.onboard,
   async run(c, cmd) {
     const p = payload(TenancyOnboardV1, cmd);
+    // Serialised per sign-in, so two onboardings in parallel cannot both take the last place.
+    await c.query(`SELECT pg_advisory_xact_lock(hashtextextended('tenancy.onboard:' || $1, 0))`, [who.sub]);
+    const owned = await c.query<{ n: string }>(`SELECT count(*) AS n FROM core.memberships_for_sub($1) WHERE role = 'owner'`, [who.sub]);
+    if (Number(owned.rows[0]!.n) >= ONBOARD_TENANT_CAP) throw new ApiError("forbidden");
     const r = await provisionTenant(c, {
       tenant_id: p.tenant_id, name: p.business_name, country_code: p.country_code, kind: p.kind, is_demo: false, onboarded: true,
       owner: { member_id: p.owner_member_id, name: p.owner_name, email: who.email, idp_sub: who.sub, role: "owner" },
@@ -271,7 +279,14 @@ export const deviceRegisterHandler = (m: Member): CommandHandler => ({
   type: TYPES.deviceRegister,
   async run(c, cmd) {
     const p = payload(TenancyDeviceRegisterV1, cmd);
-    assertOutletInScope(m, p.outlet_id);
+    // core.device is operational, so the book guard never judges this write: role and outlet scope are core.command_authority's,
+    // checked here (C1 S2-7: a staff member must not register a POS device with its own invoice series).
+    const row = (await c.query<{ allowed_roles: string[]; scope: string }>(
+      `SELECT allowed_roles, scope FROM core.command_authority WHERE command_type = $1`, [TYPES.deviceRegister])).rows[0];
+    const verdict = row && evaluateAuthority(
+      { command_type: TYPES.deviceRegister, role: m.role, outlet_scope: m.outlet_ids === "*" ? ["*"] : m.outlet_ids, target_outlet_id: p.outlet_id },
+      [{ command_type: TYPES.deviceRegister, ...row, max_amount_minor: null }]);
+    if (!verdict?.allow) throw new ApiError("forbidden", "authority_denied");
     if ((p.kind === "pos") === (p.invoice_series === null)) throw new ApiError("invalid_payload", null, { refs: ["device:invoice_series"] });
     await assertOutlets(c, [p.outlet_id]);
     await c.query(`INSERT INTO core.device (tenant_id, id, outlet_id, kind, invoice_series, created_by) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`,

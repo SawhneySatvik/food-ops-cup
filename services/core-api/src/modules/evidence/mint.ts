@@ -16,7 +16,8 @@ import { TEMPLATE_RANK, bindNamedParams, runTemplate } from "../approvals/index.
 const RANK = TEMPLATE_RANK;
 
 export type Minter =
-  | { kind: "run"; run_id: string; scope: OutletScope }
+  /** `actor`: the run token's (a member id, or "watcher:<pack>" / "brief" for a run no person started). */
+  | { kind: "run"; run_id: string; actor: string; scope: OutletScope }
   | { kind: "member"; member_id: string; role: string; scope: OutletScope };
 
 type ParamsSchema = { properties?: Record<string, { enum?: unknown[] }>; required?: string[]; additionalProperties?: boolean };
@@ -53,6 +54,15 @@ export async function mintSnapshot(c: Queryable, tenantId: string, minter: Minte
   const tpl = t.rows[0];
   if (!tpl || tpl.min_role === "operator") throw new ApiError("not_found");
   if (minter.kind === "member" && (RANK[minter.role] ?? 0) < (RANK[tpl.min_role] ?? 99)) throw new ApiError("not_found");
+  // C1 S2-4: a run a member started (Ask, Request quotes, an Auto step) reads no template above that member's CURRENT role, as
+  // the member's own mint would not; an inactive member reads none. A watcher's or the brief's run has no person to rank.
+  if (minter.kind === "run" && UUID.test(minter.actor)) {
+    const r = await c.query<{ role: string }>(
+      `SELECT ms.role FROM core.membership ms JOIN core.member m ON m.tenant_id = ms.tenant_id AND m.id = ms.member_id
+        WHERE ms.member_id = $1 AND ms.active AND m.active`, [minter.actor]);
+    const role = r.rows[0]?.role;
+    if (!role || (RANK[role] ?? 0) < (RANK[tpl.min_role] ?? 99)) throw new ApiError("not_found");
+  }
   checkParams(tpl.params_schema, bindNamedParams(tpl.sql).names, params, minter.scope);
   let out: Awaited<ReturnType<typeof runTemplate>>;
   try {

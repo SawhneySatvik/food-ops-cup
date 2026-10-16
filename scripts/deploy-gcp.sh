@@ -138,7 +138,8 @@ deploy_sim() {
 # core-api: min 1 and CPU always allocated (gotcha 8: a throttled instance stalls the LISTEN connection behind /v1/stream).
 # Request timeout 3600 s (Cloud Run's cap) with streams ended at 3300 s so the client reconnects before the cut.
 # One instance, MUNIM_DB_POOL_MAX=3: the connection arithmetic is in infra/gcp/README.md (gotcha 24).
-# MUNIM_TRUSTED_PROXY_HOPS is left unset (0) until measured: how many X-Forwarded-For hops arrive through web is UNVERIFIED.
+# MUNIM_TRUSTED_PROXY_HOPS is left unset (0: the rate limiters key on the socket address) until measured (infra/gcp/README.md,
+# deploy step 8). Once measured, add it to the --set-env-vars list below: that list replaces the environment on every deploy.
 deploy_core_api() {
   gc run deploy munim-core-api --image "$(image core-api)" "${common[@]}" --service-account "$(sa core-api)" \
     --set-cloudsql-instances "$project:$REGION:$SQL_INSTANCE" \

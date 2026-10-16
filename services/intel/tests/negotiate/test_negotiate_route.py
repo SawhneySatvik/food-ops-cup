@@ -11,6 +11,8 @@ replay unchanged (no model request names an outlet), and the expected PO is S1's
   (3) AI off (`narration` template) → `model_blocked` before anything is forecast or sent; no supplier → `no_suppliers`;
       over the month's AI cap with AI on, in live mode (T-127, R58) → the models are built capped and the run goes on, while
       AI switched off, no budget for the month or recorded mode stay `model_blocked` with no model built;
+  (5) spend (C1 S2-6, R47): every model request of the run — the chooser's and the quarantined extractor's — is one spend
+      row of its own role, counted independently at the model boundary;
   (4) the HTTP route: the same 401 without the secret or with a non-`ask` token, 400 when the body's outlets are not the
       token's scope, 503 when core gives no run-frame — none of them reaches a supplier or a model.
 Every snapshot the route mints is checked against its template's params schema as core reads it (the latest version, in
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import Counter
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
@@ -262,6 +265,18 @@ def test_two_outlets_forecast_then_one_po_draft_covering_both(tmp_path: Path) ->
     # The RFQ's anchor was the lower last price (800), the cell the draft cites as what the bounds came from.
     assert any(cell(core, b) == WORLD["rfq"]["reference_price_minor"] for b in d["based_on"])
     assert sim.requests > 0
+
+
+def test_every_model_request_of_the_negotiation_is_one_spend_row_of_its_role(tmp_path: Path) -> None:
+    """C1 S2-6 (R47, 04 §10): the quarantined extractor's calls are charged like the chooser's, so the month's cap sees them.
+    Expected counts are the requests that reached each model (CountingLlm.log, the model boundary), not the meter's own."""
+    before = len(CountingLlm.log)
+    status, _, core, _ = run(tmp_path)
+    calls = Counter(model for model, _ in CountingLlm.log[before:])
+    rows = Counter((e["role"], e["model_id"]) for req in core.spend for e in req.model_dump(mode="json")["entries"])
+    print(f"model requests {dict(calls)}; spend rows {dict(rows)}")
+    assert status == "drafted" and calls["recorded/extract"] > 0 and calls["recorded/reason"] > 0
+    assert rows == {("extract", "recorded/extract"): calls["recorded/extract"], ("reason", "recorded/reason"): calls["recorded/reason"]}
 
 
 def test_no_shortfall_contacts_no_supplier_and_calls_no_model(tmp_path: Path) -> None:

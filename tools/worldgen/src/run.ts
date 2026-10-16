@@ -2,6 +2,7 @@
 import { Api } from "./api.ts";
 import { makeCtx } from "./ctx.ts";
 import { dryFetch } from "./dry.ts";
+import { completeOnboarding } from "./kit.ts";
 
 /** The eval worlds: each has an answer key, a recompute and the determinism gates (the tests iterate these). */
 export const EVAL_WORLDS = ["restaurant_group", "cloud_kitchen", "store", "au_outlet"] as const;
@@ -49,5 +50,6 @@ export async function runWorld(o: RunOptions): Promise<{ planted: string[]; log:
   const c = makeCtx({ api, world: o.world, seed, asOf: o.asOf, days: o.days, ...(o.liveDays !== undefined ? { liveDays: o.liveDays } : {}),
     ...(o.simUrl !== undefined ? { simUrl: o.simUrl } : {}) });
   await mod.build(c);
+  await completeOnboarding(c);
   return { planted: [...c.planted].sort(), log: `# world=${o.world} seed=${seed} as_of=${o.asOf} days=${o.days} live_days=${c.liveDays}\n${api.logText()}`, api, state: c.s };
 }

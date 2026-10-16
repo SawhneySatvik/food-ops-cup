@@ -65,7 +65,7 @@ export const router = new Hono<AppEnv>()
     const one = body.data.params.outlet_id;
     const scope: OutletScope = run.scope[0] === "*" && typeof one === "string" && UUID.test(one) ? [one] : run.scope;
     const out = await runTx(c.var.deps, { tenantId: run.tenantId, scope }, (q) =>
-      mintSnapshot(q, run.tenantId, { kind: "run", run_id: run.runId, scope }, body.data.template_id, body.data.params));
+      mintSnapshot(q, run.tenantId, { kind: "run", run_id: run.runId, actor: run.actor, scope }, body.data.template_id, body.data.params));
     return c.json(out, 201);
   })
   .post(`${P}/findings`, post(201, writeFinding))

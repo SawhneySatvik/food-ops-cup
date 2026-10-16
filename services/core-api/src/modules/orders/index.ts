@@ -32,7 +32,7 @@ import { orderView, receiptView, shiftView } from "./read.ts";
 import { readRoutes } from "./routes.ts";
 
 export { advanceOrder, applyReprice, mover, orderStatusHandler, quoteReprice, refuseIfTendered } from "./lifecycle.ts";
-export { placeHandler, placeOrder, previewBody, previewIn, previewOrder } from "./place.ts";
+export { assertCartBounds, CART_BOUNDS, placeHandler, placeOrder, previewBody, previewIn, previewOrder } from "./place.ts";
 export { setOrderSeams } from "./seams.ts";
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";

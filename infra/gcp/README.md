@@ -92,16 +92,17 @@ A budget **emails** billing admins; it does not stop spending. The hard stop is
 
 ```bash
 gcloud artifacts repositories create munim --repository-format=docker --location="$REGION" --description="Munim images"
-gcloud storage buckets create "gs://$PROJECT_ID-munim-build" --location="$REGION" --uniform-bucket-level-access
+gcloud storage buckets create "gs://$PROJECT_ID-munim-build" --location="$REGION" --uniform-bucket-level-access --public-access-prevention
 gcloud storage buckets create "gs://$PROJECT_ID-munim-blobs" --location="$REGION" --uniform-bucket-level-access --public-access-prevention
 ```
 
-`-munim-build` holds the source Cloud Build uploads; `-munim-blobs` holds uploaded documents (the BlobStore, T-120).
+`-munim-build` holds the source Cloud Build uploads; `-munim-blobs` holds uploaded documents (the BlobStore, T-120). Neither
+can be made public (`--public-access-prevention`).
 
 ### 4. Service accounts, least privilege
 
 One account per service, plus the build and the demo-account job. Nothing gets a project-wide role except the two
-that must (logging, Cloud SQL).
+that must (logging, Cloud SQL); the seed account's Identity Platform role is granted only while a job needs it.
 
 ```bash
 for n in build core-api core-worker intel sim web seed; do
@@ -122,11 +123,16 @@ done
 gcloud storage buckets add-iam-policy-binding "gs://$PROJECT_ID-munim-blobs" --member="$(sa core-api)" --role=roles/storage.objectAdmin
 gcloud storage buckets add-iam-policy-binding "gs://$PROJECT_ID-munim-blobs" --member="$(sa core-worker)" --role=roles/storage.objectViewer
 
-# demo accounts (T-124 runs the job): create users in Identity Platform
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$(sa seed)" --role=roles/firebaseauth.admin --condition=None
+# demo accounts: NOT granted up front. Deploy step 4 creates the users as you, from your laptop. Only if you run
+# adapters/gcp/idp-identity-platform/demo-accounts.ts as a Cloud Run job instead, grant this for that run and remove it
+# right after (it can create, change and delete every user in the project):
+#   gcloud projects add-iam-policy-binding    "$PROJECT_ID" --member="$(sa seed)" --role=roles/firebaseauth.admin --condition=None
+#   gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="$(sa seed)" --role=roles/firebaseauth.admin --condition=None
 ```
 
 Secret access is granted per secret in setup step 6. intel and suppliers-sim get no database and no storage role.
+core-api keeps `roles/storage.objectAdmin` on the blobs bucket: uploads are content-addressed, so a repeat upload rewrites
+the same object, which `objectCreator` refuses without a create-only precondition in the GCS adapter (not made yet).
 
 ### 5. Cloud SQL Postgres — `--edition=ENTERPRISE` (gotcha 7), `db-g1-small`
 
@@ -136,14 +142,15 @@ Without `--edition=ENTERPRISE`, Postgres 16+ defaults to Enterprise Plus, which 
 openssl rand -hex 24 | mk munim-db-admin-password          # the `postgres` password; only you read it
 gcloud sql instances create munim-db --region="$REGION" --database-version=POSTGRES_17 \
   --edition=ENTERPRISE --tier=db-g1-small --storage-type=SSD --storage-size=10 --availability-type=zonal \
-  --backup-start-time=21:00 \
+  --backup-start-time=21:00 --ssl-mode=ENCRYPTED_ONLY \
   --root-password="$(gcloud secrets versions access latest --secret=munim-db-admin-password)"
 gcloud sql databases create munim --instance=munim-db
 ```
 
 The instance has a public IP and **no authorised networks**, so nothing can reach it except Cloud Run's built-in connection
-and Cloud SQL's auth proxy, both IAM-gated. Postgres 17 is the version the migrations were measured on; they use nothing
-newer than 15 (`db/README.md`, hosted-items list, item 6). `--backup-start-time` is UTC (21:00 is 02:30 IST).
+and Cloud SQL's auth proxy, both IAM-gated; `--ssl-mode=ENCRYPTED_ONLY` refuses any unencrypted connection (both connectors
+encrypt their own leg, so neither is affected; `UNVERIFIED` until the first deploy). Postgres 17 is the version the
+migrations were measured on; they use nothing newer than 15 (`db/README.md`, hosted-items list, item 6). `--backup-start-time` is UTC (21:00 is 02:30 IST).
 
 **Why `db-g1-small` — the connection arithmetic (gotcha 24).** Worst case, from the code:
 
@@ -256,8 +263,10 @@ Secret Manager `:latest`.
 `HOSTNAME`, `SUPPLIERS_SIM_HOST`.
 
 **Deliberately unset:**
-- `MUNIM_TRUSTED_PROXY_HOPS`: how many `X-Forwarded-For` hops arrive through web and Cloud Run's front end is `UNVERIFIED`;
-  measure it on the first deploy (send a spoofed header through the web origin and read what core-api sees) before setting it.
+- `MUNIM_TRUSTED_PROXY_HOPS` (0: the rate limiters key on the socket address): no hop count has been measured, and a
+  guessed one can make the limiters' key a value the client types. Measure it after the first deploy (deploy step 8), then
+  add it to `deploy_core_api`'s `--set-env-vars` in `scripts/deploy-gcp.sh` (that list replaces the whole environment on
+  every deploy, so a `gcloud run services update` alone is lost on the next one).
 - `MUNIM_CORS_ORIGINS`: the browser is same-origin through web's `/api` rewrite.
 - `MUNIM_CRON_SECRET` and `MUNIM_TICK_*`: no tick route; core-worker runs the jobs.
 - `MUNIM_RUN_DIR` and any local-database URL: dev only.
@@ -317,18 +326,82 @@ advance (`https://munim-<service>-<project number>.asia-south1.run.app`), which 
 other before either exists. Check: `curl -s "$(gcloud run services describe munim-core-api --region $REGION --format='value(status.url)')/health"`
 returns 200 with the migration version.
 
-### 4. Seed Cobnut (T-124 finishes this; the constraints are here)
+### 4. Seed Cobnut as a demo business, with the synthetic seed operator (R64 X-1)
 
-The seed runs through core-api's public `/v1` API: `MUNIM_API_URL=<core-api URL> MUNIM_SEED_TOKENS='{…}' make seed WORLD=cobnut`.
-It makes a **fresh tenant every run** and prints the tenant id; it writes `storefront-key` and `site.env` under
-`.run/cobnut/` (git-ignored). What is not solved yet:
-- `adapters/gcp/idp-identity-platform/demo-accounts.ts` takes its admin token from the Cloud Run metadata server, so it runs
-  as a job under `munim-seed`, not on a laptop (unless T-124 adds a token override). It prints ID tokens on stdout, which on
-  a job lands in Cloud Logging: avoid that.
-- It emits no `operator` token, so worldgen sets **no AI budget** and, per R47, the AI declines. With live Gemini that
-  matters. T-122/T-124 need the operator path (the founder's answer: a synthetic hosted operator, which needs its
-  `platform.operator` row).
-- Identity Platform accepting `*@cobnut-demo.invalid` addresses is `UNVERIFIED`.
+The seed runs from your laptop through core-api's public `/v1` API with five sign-ins: the four demo people and the
+**synthetic seed operator**, the same one every other hosted seed uses (`worldgen-cobnut-operator`; not a person and not a
+demo account). With an operator token worldgen provisions the tenant as a **demo business** (`is_demo`, so every staff screen
+shows "Sample data", hard rule 5), prices the live AI roles at ₹0 and writes the ₹100 monthly AI budget (R59), each an
+operator-approved config draft (R24). Without it the Cobnut seed refuses before writing anything. It makes a **fresh tenant
+every run**, prints the tenant id, and writes `storefront-key` and `site.env` under `.run/cobnut/` (git-ignored, 0600).
+
+Every account is made by you, with the same Identity Toolkit calls `adapters/gcp/idp-identity-platform/demo-accounts.ts` makes,
+so no job runs and no token reaches Cloud Logging. Passwords stay in 0600 files and go to `curl` on stdin, never as an argument.
+`UNVERIFIED` until the first run: the admin calls with your own credentials (they need the `X-Goog-User-Project` header), a
+fixed `localId` on create, and Identity Platform accepting `*@cobnut-demo.invalid` and `*.synthetic.test` addresses.
+
+```bash
+NUM=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+CORE="https://munim-core-api-$NUM.$REGION.run.app"; SIM="https://munim-suppliers-sim-$NUM.$REGION.run.app"   # as intel has them
+IDT=https://identitytoolkit.googleapis.com/v1
+WEBKEY=$(gcloud secrets versions access latest --secret=munim-idp-web-api-key)
+mkdir -p -m 0700 .run/cobnut
+(umask 077; for f in demo-password operator-password; do [ -s ".run/cobnut/$f" ] || openssl rand -hex 24 > ".run/cobnut/$f"; done)
+
+admin() { curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "X-Goog-User-Project: $PROJECT_ID" -H 'content-type: application/json' --data @- "$IDT/projects/$PROJECT_ID/$1"; }
+# put_user <uid> <email> <password file>: create the user, verified; on a re-run (400: it exists) set the same password again
+put_user() {
+  local body s; body=$(printf '{"localId":"%s","email":"%s","password":"%s","emailVerified":true}' "$1" "$2" "$(tr -d '\n' < "$3")")
+  s=$(printf %s "$body" | admin accounts); [ "$s" = 400 ] && s=$(printf %s "$body" | admin accounts:update); echo "$2: HTTP $s"
+}
+# id_token <email> <password file>: the password grant web's demo sign-in makes; prints the ID token (valid 1 h), or fails
+id_token() {
+  printf '{"email":"%s","password":"%s","returnSecureToken":true}' "$1" "$(tr -d '\n' < "$2")" |
+    curl -sS -H 'content-type: application/json' --data @- "$IDT/accounts:signInWithPassword?key=$WEBKEY" |
+    node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const t=JSON.parse(s||"{}").idToken;if(!t)process.exit(1);process.stdout.write(t)})'
+}
+
+for k in owner manager counter kitchen; do put_user "cobnut-demo-$k" "$k@cobnut-demo.invalid" .run/cobnut/demo-password; done
+put_user worldgen-cobnut-operator operator@cobnut.synthetic.test .run/cobnut/operator-password      # each line: HTTP 200
+
+# The operator's platform.operator row. No route creates operators, so this is the one SQL step: as the admin login, through
+# the proxy and MUNIM_DB_URL_SESSION from deploy step 1, with the id worldgen's own test stack gives it (tools/worldgen/src/ids.ts).
+node --input-type=module -e '
+import pg from "pg"; import { idOf } from "./tools/worldgen/src/ids.ts";
+const c = new pg.Client({ connectionString: process.env.MUNIM_DB_URL_SESSION }); await c.connect();
+const r = await c.query("INSERT INTO platform.operator (id, idp_sub, email) VALUES ($1, $2, $3) ON CONFLICT (idp_sub) DO NOTHING",
+  [idOf("gcp", "cobnut", "operator"), "worldgen-cobnut-operator", "operator@cobnut.synthetic.test"]);
+await c.end(); console.log(`platform.operator: ${r.rowCount ? "added" : "already there"}`);'
+
+(umask 077
+ for k in owner manager counter kitchen; do id_token "$k@cobnut-demo.invalid" .run/cobnut/demo-password > ".run/cobnut/token-$k" || echo "FAIL: $k"; done
+ id_token operator@cobnut.synthetic.test .run/cobnut/operator-password > .run/cobnut/operator-token || echo "FAIL: operator")
+MUNIM_API_URL="$CORE" SUPPLIERS_SIM_PUBLIC_URL="$SIM" MUNIM_SEED_TOKENS="$(printf '{"owner":"%s","manager":"%s","counter":"%s","kitchen":"%s","operator":"%s"}' \
+  "$(cat .run/cobnut/token-owner)" "$(cat .run/cobnut/token-manager)" "$(cat .run/cobnut/token-counter)" "$(cat .run/cobnut/token-kitchen)" \
+  "$(cat .run/cobnut/operator-token)")" make seed WORLD=cobnut
+rm -f .run/cobnut/token-*                       # keep operator-token for step 5 (OPERATOR_TOKEN=$(cat .run/cobnut/operator-token))
+```
+
+It prints `worldgen: cobnut seeded (…); tenant <id>` and `live AI roles priced at 0 INR (R59): …`; it exits 1, naming the gap,
+if live AI could not be made ready. An ID token lasts an hour: for a later step 5, run the `id_token operator…` line again.
+
+**Then close the doors behind the seed (R64 X-4):**
+- **Self-serve sign-up off.** The demo needs no sign-up: the accounts above are made by an admin, and sign-in keeps working.
+  Console: Identity Platform → Settings → User actions → clear "Enable create (sign-up)" → Save. Or (`UNVERIFIED` field name,
+  from the Identity Toolkit admin v2 reference):
+
+  ```bash
+  printf '{"client":{"permissions":{"disabledUserSignup":true}}}' | curl -sS -o /dev/null -w '%{http_code}\n' -X PATCH \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "X-Goog-User-Project: $PROJECT_ID" -H 'content-type: application/json' \
+    --data @- "https://identitytoolkit.googleapis.com/admin/v2/projects/$PROJECT_ID/config?updateMask=client.permissions.disabledUserSignup"
+  ```
+
+  Check: a sign-up with the web key (`$IDT/accounts:signUp?key=…`) is refused (expected `ADMIN_ONLY_OPERATION`, `UNVERIFIED`),
+  and the demo sign-in on web still works.
+  core-api also caps how many tenants one sign-in can onboard through `/v1/onboarding`, in case sign-up is ever turned back on.
+- **The seed account's Identity Platform role**, if you granted it for a job (setup step 4):
+  `gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="$(sa seed)" --role=roles/firebaseauth.admin --condition=None`.
 
 ### 5. The reasoning role on gemini-3.5-flash-lite
 
@@ -367,9 +440,33 @@ Run `grant web …` and `grant seed …` again if you have not. The script refus
 ### 7. Open the door and check
 
 1. Add the web host to Identity Platform's authorised domains (setup step 6).
-2. `https://munim-web-<project number>.asia-south1.run.app/` loads; the demo sign-in works; "Simulated supplier" shows on the supplier screens.
+2. `https://munim-web-<project number>.asia-south1.run.app/` loads; the demo sign-in works; "Sample data" shows on every staff
+   screen (the tenant is a demo business, step 4); "Simulated supplier" shows on the supplier screens.
 3. Streaming: `curl -sN -H 'Authorization: Bearer …' -H 'X-Munim-Tenant: …' '<web URL>/api/v1/stream?topics=…'` shows `event: ready` at once, a `: hb` about every 20 s and `event: reconnect` near 3300 s. That proves web's rewrite streams without buffering (`UNVERIFIED`).
 4. `…/internal/cron/v1/tick` on core-api answers 404 (the tick route is off).
+
+### 8. Measure `MUNIM_TRUSTED_PROXY_HOPS` (until then it stays 0)
+
+The rate limiters key a request on the `X-Forwarded-For` entry `N` from the right, `N = MUNIM_TRUSTED_PROXY_HOPS`; at 0, on the
+socket address. `N` must count only proxies that **append** the address they saw. One too many and the key is an entry the client
+typed, so a limiter can be dodged with a made-up header; one too few and everyone behind a proxy shares one bucket. Nothing has
+been measured: how Cloud Run's front end and web's rewrite fill the header is `UNVERIFIED`. INFERENCE: core-api is public, so a
+direct caller's header passes only Cloud Run's front end, and any `N` above 1 is spoofable by a direct caller.
+
+The probe is the credential-free Cares route, 60 requests a minute per key, on core-api's single instance (so the count is exact).
+Set a candidate `N` (add `MUNIM_TRUSTED_PROXY_HOPS=N` to `deploy_core_api`'s `--set-env-vars` and redeploy core-api), then:
+
+```bash
+WEB="https://munim-web-$NUM.$REGION.run.app"
+probe() { for i in $(seq 1 61); do curl -s -o /dev/null -w '%{http_code}\n' -H "X-Forwarded-For: 198.51.100.$i" "$1"; done | sort | uniq -c; }
+probe "$CORE/v1/cares-network/cities"       # direct: must end in one 429; 61 x 200 = the typed header became the key, N too high
+sleep 61; probe "$WEB/api/v1/cares-network/cities"   # through web: the same rule
+```
+
+Then the sharing test through web: right after a 61-request run from one network, send one request from a second network (a phone
+hotspot). 429 means both share a bucket (the key is a proxy's address); 200 means they do not. Keep the largest `N` whose two probes
+still end in a 429. If that `N` still shares a bucket through web, the limiters count per web egress address, not per visitor:
+record that in the deploy notes rather than raise `N`.
 
 ## Reseed Cobnut
 
@@ -446,5 +543,6 @@ All figures are `INFERENCE` from public list prices and `UNVERIFIED` for `asia-s
 6. An organisation policy that forbids `allUsers` would block `--allow-unauthenticated`.
 7. `SHOW max_connections;` on the new instance is at least 50.
 8. The Gemini key stays on the free tier.
-9. The `X-Forwarded-For` hop count (above), and SSE through web's rewrite without buffering.
+9. The `X-Forwarded-For` hop count (deploy step 8; `MUNIM_TRUSTED_PROXY_HOPS` stays 0 until then), and SSE through web's rewrite
+   without buffering.
 10. The images have not been built by Docker anywhere yet; the first Cloud Build is the first Docker build.

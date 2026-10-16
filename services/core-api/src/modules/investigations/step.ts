@@ -21,7 +21,7 @@ import {
 import { snapRef } from "@munim/contracts";
 import { ApiError } from "../../lib/errors.ts";
 import type { OutletScope, Queryable } from "../../runtoken/index.ts";
-import { type Member, TEMPLATE_RANK } from "../approvals/index.ts";
+import { type Member } from "../approvals/index.ts";
 import { mintSnapshot } from "../evidence/index.ts";
 
 export interface ChecklistEntry {
@@ -107,17 +107,13 @@ export async function runStep(q: Queryable, m: Member, id: string, stepNo: numbe
   if (stepNo !== inv.steps_done + 1) throw new ApiError("sequence_gap");
 
   await q.query(`SELECT set_config('app.outlet_ids', $1, true)`, [scope[0] === "*" ? "{*}" : `{${scope.join(",")}}`]);
-  const minter = auto ? { kind: "run" as const, run_id: auto.run_id, scope } : { kind: "member" as const, member_id: m.member_id, role: m.role, scope };
+  const minter = auto ? { kind: "run" as const, run_id: auto.run_id, actor: m.member_id, scope } : { kind: "member" as const, member_id: m.member_id, role: m.role, scope };
   const minted = new Map<string, Snap | null>();
   async function mint(templateId: string, params: Record<string, unknown>): Promise<Snap | null> {
     const key = `${templateId} ${JSON.stringify(params)}`;
     if (!minted.has(key)) {
       try {
-        // A run mint has no role check of its own (mint.ts): an Auto step reads no template above its creator's current role.
-        if (auto) {
-          const t = await q.query<{ min_role: string }>(`SELECT min_role FROM evidence.snapshot_template WHERE id = $1 ORDER BY version DESC LIMIT 1`, [templateId]);
-          if ((TEMPLATE_RANK[m.role] ?? 0) < (TEMPLATE_RANK[t.rows[0]?.min_role ?? ""] ?? 99)) throw new ApiError("not_found");
-        }
+        // An Auto step's run mint ranks its creator's current role in mint.ts, as the member's own mint does.
         const s = await mintSnapshot(q, m.tenant_id, minter, templateId, params);
         minted.set(key, { snapshot_id: s.snapshot_id, rows: s.rows as Snap["rows"] });
       } catch (e) {

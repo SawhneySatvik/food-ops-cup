@@ -6,6 +6,11 @@
 .git
 **/.env*
 **/.run
+**/*.pem
+**/*.key
+**/*-key.json
+**/credentials*.json
+**/service-account*.json
 **/node_modules
 **/.next
 **/.venv

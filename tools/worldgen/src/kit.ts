@@ -41,7 +41,7 @@ const OWN_CHANNELS = {
 
 /** ON1–ON3. Hard rule 5: every world is a demo tenant (`is_demo`, which drives the "Sample data" badge). Only the operator route can create one
  *  with the owner we need, so with an operator: the operator provisions the tenant with the owner member, the owner binds (their first sign-in),
- *  then creates every outlet, the brand, the channels and the devices and completes onboarding, all as the owner. Without an operator the world is
+ *  then creates every outlet, the brand, the channels and the devices, all as the owner (completeOnboarding ends the seed). Without an operator the world is
  *  onboarded self-serve (a real, not-demo tenant) and the CLI says so. */
 export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
   const { api } = c;
@@ -81,7 +81,8 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
     if (spec.kind !== "shop") {
       await api.cmd("owner", "/v1/devices", "tenancy.device.register.v1", "kds:1", { device_id: api.id("kds:1"), outlet_id: outlets[0]!.id, kind: "kds", invoice_series: null });
     }
-    await api.cmd("owner", "/v1/tenant:update", "tenancy.tenant.update.v1", "onboarding:complete", { complete_onboarding: true });
+    // Onboarding is completed by runWorld once the whole world is built (completeOnboarding): R64 X-2 freezes an onboarded demo
+    // business's people, so the demo people are invited before it.
   } else {
     const tenant = api.id("tenant"); // sent for the envelope shape only
     const first = api.id("outlet:1");
@@ -145,6 +146,13 @@ export async function onboard(c: Ctx, spec: OnboardSpec): Promise<Business> {
     }
   }
   return { country: spec.country, currency, outlets, channels };
+}
+
+/** Completes an operator-provisioned (demo) business's onboarding: the last command of a seed (run.ts). From here core refuses the
+ *  commands that would break the demo for its visitors (member invite, role change, deactivation; storefront key revoke; AI cap). */
+export async function completeOnboarding(c: Ctx): Promise<void> {
+  if (!c.api.hasOperator) return; // self-serve onboarding is complete from its first command
+  await c.api.cmd("owner", "/v1/tenant:update", "tenancy.tenant.update.v1", "onboarding:complete", { complete_onboarding: true });
 }
 
 /** The operator approves a draft it proposed (R27: its own command is its approval). Reseeding the same world into the same database

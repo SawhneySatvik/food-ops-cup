@@ -1,6 +1,7 @@
 """The ASGI app: one A2A agent per personality, each at `/<key>` (JSON-RPC) with its card at
 `/<key>/.well-known/agent-card.json`. The card's interface URL is `<public_url>/<key>`: the public URL is required
-and never defaulted, so a card can never advertise localhost by accident (gotcha 6).
+and never defaulted, so a card can never advertise localhost by accident (gotcha 6). A request body over
+MAX_BODY_BYTES is refused 413 before any handler reads it (public, no secret: C1 S3-5, R64 X-4).
 """
 
 from __future__ import annotations
@@ -14,11 +15,56 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types.a2a_pb2 import AgentCapabilities, AgentCard, AgentInterface, AgentProvider, AgentSkill
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from suppliers_sim.agent import SupplierAgent, load_data
+
+#: An RFQ or counter is a few hundred bytes.
+MAX_BODY_BYTES = 64 * 1024
+TOO_LARGE = JSONResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Request too large"}}, status_code=413)
+
+
+class BodyLimit:
+    """413 by the declared Content-Length (the server delivers no more than it declares); a body sent without one
+    (chunked) is read here, at most `limit` bytes, and handed on whole — the JSON-RPC handler catches any error raised
+    while it reads, so the limit is judged before it runs."""
+
+    def __init__(self, app: ASGIApp, limit: int = MAX_BODY_BYTES) -> None:
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None:
+            if not declared.isdigit() or int(declared) > self.limit:
+                await TOO_LARGE(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+        body = b""
+        while True:
+            msg = await receive()
+            if msg["type"] != "http.request":
+                return
+            body += msg.get("body", b"")
+            if len(body) > self.limit:
+                await TOO_LARGE(scope, receive, send)
+                return
+            if not msg.get("more_body", False):
+                break
+        whole: list[Message] = [{"type": "http.request", "body": body, "more_body": False}]
+
+        async def replay() -> Message:
+            return whole.pop() if whole else await receive()
+
+        await self.app(scope, replay, send)
 
 
 class PublicUrlError(ValueError):
@@ -74,6 +120,6 @@ def build_app(public_url: str | None, *, data: dict[str, Any] | None = None, cla
     async def health(_: Request) -> JSONResponse:
         return JSONResponse({"ok": True, "label": label, "agents": len(cards)})
 
-    app = Starlette(routes=[Route("/health", health), *routes])
+    app = Starlette(routes=[Route("/health", health), *routes], middleware=[Middleware(BodyLimit)])
     app.state.cards = cards
     return app

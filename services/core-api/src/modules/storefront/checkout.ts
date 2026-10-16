@@ -15,6 +15,7 @@ import type { AppEnv, Deps } from "../../lib/types.ts";
 import type { Context } from "hono";
 import type { Queryable } from "../../runtoken/index.ts";
 import { priceLines, type PriceResult, tenantPack } from "../catalogue/index.ts";
+import { assertCartBounds } from "../orders/index.ts";
 import { seam } from "./config.ts";
 import { channelKind, outletRow, ownRefusals, type PackRef, pricedPack, type StorefrontKind } from "./read.ts";
 
@@ -102,6 +103,7 @@ async function windowStart(c: Queryable, id: string): Promise<string> {
 
 export async function previewFlow(deps: Deps, principal: CustomerPrincipal, body: unknown): Promise<ReturnType<typeof StorefrontPreviewResponse.parse>> {
   const req = parse(OrdersPreviewRequest, body);
+  assertCartBounds(req.lines);
   // Key's channel wins; the request's channel_id is overwritten. Redeeming points needs a signed-in profile.
   const request = { ...req, channel_id: principal.channel_id, loyalty_redeem_points: principal.profile ? req.loyalty_redeem_points : 0 };
   // One snapshot (REPEATABLE READ, READ ONLY): the preview and the detail read the same committed rows, so a price or
@@ -147,6 +149,7 @@ export interface Placed {
 export async function placeFlow(c0: Context<AppEnv>, principal: CustomerPrincipal, body: unknown): Promise<{ placed: Placed; replayed: boolean }> {
   const deps = c0.var.deps;
   const req = parse(StorefrontOrderPlaceRequest, body);
+  assertCartBounds(req.order.payload.lines);
   const signedIn = principal.sub !== null;
   if (signedIn === (req.guest !== null)) throw new ApiError("bad_request"); // signed in: no guest block; guest: required.
   const key = req.order.idempotency_key;

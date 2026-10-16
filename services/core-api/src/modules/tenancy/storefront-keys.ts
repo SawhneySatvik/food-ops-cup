@@ -7,6 +7,7 @@ import { StorefrontKeyCreateRequest } from "@munim/contracts/tenancy";
 import type { Context } from "hono";
 import { contextOf } from "../../auth/resolve.ts";
 import { withContext } from "../../lib/db.ts";
+import { refuseOnDemo } from "../../lib/demo-guard.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 
@@ -56,6 +57,7 @@ export async function listKeys(c: Context<AppEnv>) {
 export async function revokeKey(c: Context<AppEnv>, id: string) {
   const p = owner(c);
   const at = await withContext(c.var.deps.pools.core, contextOf(p), async (db) => {
+    await refuseOnDemo(db, "tenancy.storefront_key.revoke");
     const r = await db.query<{ revoked_at: Date }>(
       `UPDATE core.storefront_key SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING revoked_at`, [id]);
     if (!r.rows[0]) {

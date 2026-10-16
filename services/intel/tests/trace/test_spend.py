@@ -140,3 +140,66 @@ def test_a_flush_is_idempotent_and_a_refused_flush_keeps_its_rows_for_the_next()
     asyncio.run(buf.flush())
     asyncio.run(buf.flush())
     assert sent == [[buf.entries[0]["id"]]], "re-sent once, under the id it was buffered with; nothing after"
+
+
+class _ResourceExhaustedError(RuntimeError):
+    """Named as ADK's own wrapper of a provider 429 (google_llm.py): a class name with a leading underscore."""
+
+
+class RateLimited(BaseLlm):
+    model: str = "gemini-3.8-flash"
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        raise _ResourceExhaustedError("429 RESOURCE_EXHAUSTED quota for key AIza-not-a-real-key")
+        yield  # an async generator, never reached
+
+
+def test_a_rate_limited_call_is_charged_and_traced_under_a_valid_label() -> None:
+    """Production (16 Oct): `_ResourceExhaustedError` is not a label (no leading underscore), so on_model_error raised,
+    the error trace was lost and the call's estimate never reached the meter. Now: one estimated row, the error traced as
+    `ResourceExhaustedError` (the message never), and the run fails as the provider's error, not the trace check's."""
+    posted: list[dict[str, Any]] = []
+    events: list[dict[str, Any]] = []
+
+    async def spend_sink(req: InternalSpendRequest) -> None:
+        posted.extend(e.model_dump(mode="json") for e in req.entries)
+
+    async def trace_sink(req: Any) -> None:
+        events.extend(e.model_dump(mode="json") for e in req.events)
+
+    state = RunState(
+        traces=TraceBuffer(trace_sink), meter=Meter(SpendBuffer(spend_sink, "INR"), "reason", "gemini", "gemini-3.8-flash", PRICE)
+    )
+    agent = LlmAgent(name="munim", model=RateLimited(), instruction="Say done.")
+    with pytest.raises(RunFailed) as failed:
+        asyncio.run(run_agent(agent, CTX, "hello", load_config(env={}), state=state))
+    errors = [e["payload"] for e in events if e["kind"] == "error" and e["payload"].get("where") == "model"]
+    print(f"run failed as {failed.value.kind}; model errors {errors}; spend rows {len(posted)}")
+    assert failed.value.kind == "_ResourceExhaustedError"
+    assert errors == [{"where": "model", "error": "ResourceExhaustedError"}]
+    assert len(posted) == 1 and posted[0]["input_tokens"] > 0 and posted[0]["output_tokens"] == 0
+    assert "AIza" not in repr(events)
+
+
+class FailingTraces(TraceBuffer):
+    """A trace buffer whose error traces fail (as a flush to an unreachable core would, at that event)."""
+
+    async def append(self, kind: str, *args: Any, **kwargs: Any) -> str:
+        if kind == "error":
+            raise RuntimeError("core down")
+        return await super().append(kind, *args, **kwargs)
+
+
+def test_a_failed_calls_spend_is_recorded_before_any_trace_can_fail() -> None:
+    """on_model_error charges first: a trace that fails after it (any cause) cannot lose the call's estimate."""
+
+    async def trace_sink(_: Any) -> None:
+        return None
+
+    meter = Meter(SpendBuffer(lambda _: asyncio.sleep(0), "INR"), "reason", "gemini", "gemini-3.8-flash", PRICE)
+    state = RunState(traces=FailingTraces(trace_sink), meter=meter)
+    agent = LlmAgent(name="munim", model=RateLimited(), instruction="Say done.")
+    with pytest.raises(RunFailed):
+        asyncio.run(run_agent(agent, CTX, "hello", load_config(env={}), state=state))
+    assert state.fired["on_model_error_callback"] == 1
+    assert len(meter.buffer.entries) == 1 and meter.buffer.entries[0]["input_tokens"] > 0

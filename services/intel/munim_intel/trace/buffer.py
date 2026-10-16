@@ -46,6 +46,13 @@ class TraceLabelError(ValueError):
     """A payload value is not a label. The message names the key only, never the value."""
 
 
+def error_label(e: BaseException) -> str:
+    """An exception's class name as a label (never its message). ADK wraps a provider 429 as `_ResourceExhaustedError`, and
+    no label may start with an underscore: leading separators and characters outside the label set are dropped."""
+    name = re.sub(r"[^A-Za-z0-9_.:/-]", "", type(e).__name__).lstrip("_.:/-")[:200]
+    return name if LABEL.match(name) else "error"
+
+
 def check_payload(payload: Payload) -> Payload:
     for k, v in payload.items():
         for label in v if isinstance(v, list) else [v]:
