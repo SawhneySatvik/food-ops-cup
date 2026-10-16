@@ -1,0 +1,5 @@
+#!/bin/sh
+# Test double: records the URL it was given and answers with $STUB_HEALTH (empty: a failed request). Reaches nobody.
+for a in "$@"; do case "$a" in http*) printf '%s\n' "$a" >> "$CURL_LOG" ;; esac; done
+[ -n "${STUB_HEALTH:-}" ] || exit 7
+printf '%s' "$STUB_HEALTH"

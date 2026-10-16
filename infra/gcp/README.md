@@ -1,7 +1,8 @@
 # infra/gcp — Munim on Google Cloud (the Cup deploy)
 
 Five Cloud Run services in `asia-south1` (Mumbai), one Cloud SQL Postgres, two Cloud Storage buckets, Identity Platform for
-sign-in, Secret Manager for every secret. Built by Cloud Build, deployed by `scripts/deploy-gcp.sh`.
+sign-in, Secret Manager for every secret. Built by Cloud Build, deployed by `scripts/deploy-gcp.sh`: from your laptop, and
+after the first deploy also from a GitHub trigger on every push to `main` ("Continuous deployment from GitHub").
 
 Everything here is **synthetic data, simulated suppliers, recorded payments**. `munim-suppliers-sim` answers
 `/health` with the label "Simulated supplier"; no real supplier, customer or money is involved. Gemini runs **live** on the
@@ -26,6 +27,8 @@ free tier under the in-product monthly AI spend cap; every test and gate stays r
 | `docker/<service>.Dockerfile` | One image per service, built from the repo root. Each has its own `<name>.Dockerfile.dockerignore`, an allowlist, so `.env`, `.run/` and keys never enter a build. |
 | `entries/core-api.mjs`, `entries/core-worker.mjs` | Cloud Run entries, copied into the image as `cloud-run-entry.mjs`. The services' own entries bind `127.0.0.1` and read `.env` and `.run/`; these read the process environment only and listen on `$PORT`. |
 | `cloudbuild.yaml`, `cloudbuild-web.yaml` | Build one image and push it to Artifact Registry. web is separate because Next fixes the core-api origin and the storefront key at build time. |
+| `cloudbuild-deploy.yaml` | What the GitHub trigger runs: all five images in parallel, pushed with the commit's short SHA as the tag, then `scripts/deploy-gcp.sh --skip-build`. |
+| `test/` | `deploy-gcp.test.sh` runs the script against a stub `gcloud`; `cloudbuild-deploy.test.py` runs `cloudbuild-deploy.yaml`'s steps against stub `docker`, `gcloud` and `curl` (needs PyYAML: `uv run python infra/gcp/test/cloudbuild-deploy.test.py`). No Google calls. |
 | `gcloudignore` | What `gcloud builds submit` uploads: secrets and local state never, and no folder an image does not read. |
 | `../../scripts/deploy-gcp.sh` | Builds and deploys. Create-or-update, flags as `--x v` or `--x=v`, `--dry-run` prints every command and runs none. |
 
@@ -223,8 +226,8 @@ grant web         munim-idp-web-api-key munim-demo-password
 grant seed        munim-idp-web-api-key
 ```
 
-`munim-db-admin-password` and `munim-storefront-key` have no service reader: the first is yours, the second is read by the
-deploy script as you.
+`munim-db-admin-password` has no service reader: it is yours. `munim-storefront-key` is read by the deploy script as you and,
+once continuous deployment is set up, by `munim-deploy` for web's build (its one secret).
 
 ## Environment names — one table
 
@@ -477,6 +480,128 @@ hotspot). 429 means both share a bucket (the key is a proxy's address); 200 mean
 still end in a 429. If that `N` still shares a bucket through web, the limiters count per web egress address, not per visitor:
 record that in the deploy notes rather than raise `N`.
 
+## Continuous deployment from GitHub
+
+After the first deploy, every push to `main` of the GitHub repository (`SawhneySatvik/food-ops-cup`) can build and deploy all
+five services. A Cloud Build trigger runs `infra/gcp/cloudbuild-deploy.yaml`, whose steps run in this order:
+1. `check`: refuses a missing or malformed `_DEMO_TENANT_ID` before any image is built.
+2. The five image builds, in parallel. core-worker runs after core-api because it reuses core-api's build stage.
+3. The five pushes to Artifact Registry, each tagged with the commit's short SHA.
+4. `schema`: refuses if the database lacks a migration the commit carries.
+5. `deploy`: `scripts/deploy-gcp.sh --project <id> --tag <short sha> --skip-build`, with the same flags, environment, secrets and
+   service order as a laptop run.
+
+What it does not do:
+- **It creates nothing.** The one-time setup and deploy steps 1 to 8 stay laptop runs. The first deploy creates the services, the
+  secrets and the seeded tenant, and continuous deployment only replaces revisions.
+- **It runs no migrations**, and neither does the script. For a push that adds a migration, first run `node db/migrate.ts`
+  from your laptop (deploy step 1: the proxy and the admin login), then push. Migrations only add, so the running code keeps
+  working on the newer schema. If you push first, the `schema` step refuses the deploy and names the migration the database
+  lacks. The images are already pushed by then: after migrating, run the trigger again (step 4 below) or deploy that tag by hand
+  with `--skip-build`.
+- **It runs on pushes to `main` only, never on pull requests.** A pull request from a fork would otherwise run with the deploy
+  account's rights.
+
+Every block below uses the `sa` helper from the one-time setup.
+
+### 1. The deploy account
+
+The trigger runs as its own service account, `munim-deploy`. `munim-build` stays the laptop builds' account and gets no deploy
+rights.
+
+```bash
+gcloud iam service-accounts create munim-deploy --display-name="munim deploy (GitHub trigger)"
+
+# push images, write its build log
+gcloud artifacts repositories add-iam-policy-binding munim --location="$REGION" --member="$(sa deploy)" --role=roles/artifactregistry.writer
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$(sa deploy)" --role=roles/logging.logWriter --condition=None
+
+# deploy the five services and keep the public ones public (--allow-unauthenticated sets a service's IAM policy;
+# roles/run.developer cannot). It also covers the script's read of the project number.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$(sa deploy)" --role=roles/run.admin --condition=None
+
+# run each service as its own account: act as these five and no other (not munim-seed, not munim-build)
+for n in core-api core-worker intel sim web; do
+  gcloud iam service-accounts add-iam-policy-binding "munim-$n@$PROJECT_ID.iam.gserviceaccount.com" \
+    --member="$(sa deploy)" --role=roles/iam.serviceAccountUser
+done
+
+# web's build reads the storefront key (public by design: it ships to browsers)
+gcloud secrets add-iam-policy-binding munim-storefront-key --member="$(sa deploy)" \
+  --role=roles/secretmanager.secretAccessor --condition=None
+```
+
+The account gets no Cloud SQL role and no database secret. The build never connects to the database, and the `schema` step
+reads core-api's public `/health`.
+
+### 2. Connect the repository (once)
+
+The console is the easier path, because the GitHub side needs a browser anyway:
+1. Open Cloud Build, then Repositories, and choose the **2nd gen** tab.
+2. Choose Create host connection, then GitHub. Set the region to `asia-south1` and the name to `munim-github`.
+3. Authorise the Cloud Build GitHub App.
+4. Install the app on `SawhneySatvik/food-ops-cup` only, not on all repositories.
+5. Choose Link repository and pick `food-ops-cup`.
+
+Or with gcloud:
+
+```bash
+gcloud builds connections create github munim-github --region="$REGION"   # prints a link: open it and authorise the app
+gcloud builds connections describe munim-github --region="$REGION"        # installationState COMPLETE; if it shows a link, open it
+                                                                          # and install the app on food-ops-cup only
+gcloud builds repositories create food-ops-cup --remote-uri=https://github.com/SawhneySatvik/food-ops-cup.git \
+  --connection=munim-github --region="$REGION"
+```
+
+If `connections create` is refused for a permission, use the console: it grants what the connection needs.
+
+### 3. The trigger
+
+`_DEMO_TENANT_ID` is the one value the trigger supplies. It is the same tenant id as `MUNIM_DEMO_TENANT_ID` in deploy step 6, so
+export it again if this is a new shell.
+
+```bash
+gcloud builds triggers create github --name=munim-deploy-main --region="$REGION" \
+  --repository="projects/$PROJECT_ID/locations/$REGION/connections/munim-github/repositories/food-ops-cup" \
+  --branch-pattern='^main$' --build-config=infra/gcp/cloudbuild-deploy.yaml \
+  --service-account="projects/$PROJECT_ID/serviceAccounts/munim-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+  --substitutions="_DEMO_TENANT_ID=$MUNIM_DEMO_TENANT_ID"
+```
+
+- A trigger fills a missing substitution with an empty value instead of failing, so `check` is what refuses one.
+- Leave `--include-logs-with-status` off. The repository is public, and that flag posts build logs to it.
+- Optional: `--require-approval` makes each push wait for your approval under Cloud Build, History before any step runs.
+
+### 4. Run it, and watch a build
+
+```bash
+gcloud builds triggers run munim-deploy-main --region="$REGION" --branch=main   # the first one by hand, without a push
+gcloud builds list --region="$REGION" --limit=5                                 # newest first: id, status, duration
+gcloud builds log BUILD_ID --region="$REGION" --stream                          # follow one
+gcloud run services describe munim-web --region "$REGION" --format='value(spec.template.spec.containers[0].image)'   # ends in :<short sha>
+```
+
+A build takes roughly 10 to 20 minutes, and the first is the slowest because it has no cache (`INFERENCE`). Two pushes close
+together start two builds, and whichever finishes last deploys last. If an older one finishes last, run the trigger again on
+`main`.
+
+### 5. Roll back
+
+- **Shift traffic** (web, core-api, intel, suppliers-sim):
+  `gcloud run services update-traffic munim-core-api --region "$REGION" --to-revisions REVISION_NAME=100`. It holds: once traffic
+  names a revision, later deploys add revisions that get no traffic until `--to-latest`. core-worker takes no traffic, so the next
+  push still replaces it.
+- **Pause continuous deployment while you look.** Run
+  `gcloud builds triggers update github munim-deploy-main --region="$REGION" --require-approval`. Each push then waits for your
+  approval; `--no-require-approval` resumes.
+- **Redeploy an earlier commit.**
+  - With a build: `gcloud builds triggers run munim-deploy-main --region="$REGION" --sha=<full commit sha>` builds and deploys it
+    the same way.
+  - Without a build: `scripts/deploy-gcp.sh --project "$PROJECT_ID" --skip-build --tag <its short sha>` from your laptop. Export
+    `MUNIM_DEMO_TENANT_ID` first if web is included.
+  - For a lasting rollback, `git revert` and push.
+- **The database does not roll back with the code:** see "Rollback" below.
+
 ## Reseed Cobnut
 
 Same as deploy steps 4 and 6 (step 5 is platform-wide and stays done): each seed is a new tenant with a new storefront key, and the books are append-only, so the old tenants
@@ -484,9 +609,14 @@ stay. Add a **new version** of `munim-storefront-key` (and of `munim-demo-passwo
 with the new tenant id: `MUNIM_DEMO_TENANT_ID=<new id> scripts/deploy-gcp.sh --project "$PROJECT_ID" --only web`. web is rebuilt
 because the key is baked into its build.
 
+With continuous deployment on, also give the trigger the new tenant id, or the next push deploys web against the old tenant:
+`gcloud builds triggers update github munim-deploy-main --region="$REGION" --update-substitutions="_DEMO_TENANT_ID=$MUNIM_DEMO_TENANT_ID"`.
+The storefront key needs nothing more: the build reads the secret's latest version.
+
 ## Rollback
 
-Every build has a unique tag (`<UTC time>-<git sha>[-dirty]`), and Artifact Registry keeps them.
+Every laptop build has a unique tag (`<UTC time>-<git sha>[-dirty]`); a build from the GitHub trigger is tagged with the
+commit's short SHA. Artifact Registry keeps them all. With continuous deployment on, see also its own "5. Roll back".
 
 ```bash
 # what is running, and what tags exist
@@ -525,7 +655,9 @@ All figures are `INFERENCE` from public list prices and `UNVERIFIED` for `asia-s
   gcloud run services update munim-intel --region "$REGION" --min-instances=0
   ```
 - **Parking after the event.** Scale the two always-on services down and stop the database; storage is still billed.
-  A later `scripts/deploy-gcp.sh` puts min instances back to 1.
+  A later `scripts/deploy-gcp.sh` puts min instances back to 1, and with continuous deployment on, so does any push to
+  `main`. Pause the trigger first (`gcloud builds triggers update github munim-deploy-main --region="$REGION" --require-approval`)
+  or delete it (`gcloud builds triggers delete munim-deploy-main --region="$REGION"`).
 
   ```bash
   gcloud run services update munim-core-api    --region "$REGION" --min-instances=0 --cpu-throttling
@@ -537,6 +669,10 @@ All figures are `INFERENCE` from public list prices and `UNVERIFIED` for `asia-s
   sees the hint before the cut and reconnects.
 - **Gemini** is free-tier, with a recorded fallback for a failed call, behind the in-product cap; Cloud Build and Artifact Registry are
   small at this size.
+- **Continuous deployment** is one build per push to `main` on an 8 vCPU machine (`E2_HIGHCPU_8`), billed per build-minute. The
+  free build-minutes cover only the default machine (`INFERENCE`). The 40-minute timeout caps a stuck build. Artifact Registry
+  keeps every commit's five images, so delete old tags now and then:
+  `gcloud artifacts docker images delete "$REGION-docker.pkg.dev/$PROJECT_ID/munim/web:OLD_TAG" --delete-tags`.
 
 ## First deploy: what is unverified
 
@@ -554,3 +690,9 @@ All figures are `INFERENCE` from public list prices and `UNVERIFIED` for `asia-s
 9. The `X-Forwarded-For` hop count (deploy step 8; `MUNIM_TRUSTED_PROXY_HOPS` stays 0 until then), and SSE through web's rewrite
    without buffering.
 10. The images have not been built by Docker anywhere yet; the first Cloud Build is the first Docker build.
+11. Continuous deployment has run only against stubs (`infra/gcp/test/cloudbuild-deploy.test.py`). Unverified: the two builder
+    images (`gcr.io/cloud-builders/docker`; `gcr.io/google.com/cloudsdktool/cloud-sdk:slim` with bash and curl); 2nd-gen
+    GitHub connections in `asia-south1`; `roles/run.admin` being enough for the script's `gcloud projects describe` (Google's
+    role reference lists `resourcemanager.projects.get` in it) and for the Cloud SQL API check `gcloud run deploy` makes for
+    `--set-cloudsql-instances`; and five parallel builds fitting the 8 GB of `E2_HIGHCPU_8` (web's `next build` is the largest;
+    if one is killed for memory, use `E2_HIGHCPU_32` in `cloudbuild-deploy.yaml`).

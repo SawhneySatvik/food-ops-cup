@@ -1,0 +1,4 @@
+#!/bin/sh
+# Test double: records every call (with DOCKER_BUILDKIT and each argument kept whole), builds and pushes nothing.
+{ printf 'BUILDKIT=%s' "${DOCKER_BUILDKIT:-}"; for a in "$@"; do printf '\037%s' "$a"; done; printf '\n'; } >> "$DOCKER_LOG"
+exit 0
