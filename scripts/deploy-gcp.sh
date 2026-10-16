@@ -92,7 +92,7 @@ if has web; then
     storefront_key="<STOREFRONT_KEY>"; demo_tenant="${demo_tenant:-<MUNIM_DEMO_TENANT_ID>}"
   else
     [[ "$demo_tenant" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] \
-      || die "web needs MUNIM_DEMO_TENANT_ID=<the Cobnut tenant id the seed printed> (see infra/gcp/README.md, step 5)"
+      || die "web needs MUNIM_DEMO_TENANT_ID=<the Cobnut tenant id the seed printed> (see infra/gcp/README.md, deploy step 6)"
     if [ "$skip_build" = 0 ]; then
       # Public by design (it ships to browsers), but read from Secret Manager rather than typed into a shell.
       storefront_key="$(gcloud --project "$project" secrets versions access latest --secret=munim-storefront-key)"

@@ -191,7 +191,7 @@ spend cap (R47) is the second limit; the budget alert in setup step 2 is the thi
 
 **Identity Platform and its web API key.**
 1. Console, Identity Platform: click Enable. Providers: add Email/Password and turn it on.
-2. After `munim-web` exists (deploy step 6 below): Settings, Authorized domains, add the `munim-web-<project number>.asia-south1.run.app` host.
+2. After `munim-web` exists (deploy step 7 below): Settings, Authorized domains, add the `munim-web-<project number>.asia-south1.run.app` host.
 3. The API key for the server-side demo sign-in (public by design; restricted to the one API):
 
 ```bash
@@ -201,7 +201,7 @@ gcloud services api-keys get-key-string "$KEY" --format='value(keyString)' | tr 
 ```
 
 **Three more secrets come later** (they do not exist yet): `munim-db-password-munim-core`, `-munim-svc`, `-munim-platform`
-after deploy step 2; `munim-storefront-key` and `munim-demo-password` after the seed (deploy step 5).
+after deploy step 2; `munim-storefront-key` and `munim-demo-password` after the seed (deploy step 6).
 
 **Per-secret access.** Run this after the later secrets exist (or re-run it; it is idempotent):
 
@@ -330,7 +330,28 @@ It makes a **fresh tenant every run** and prints the tenant id; it writes `store
   `platform.operator` row).
 - Identity Platform accepting `*@cobnut-demo.invalid` addresses is `UNVERIFIED`.
 
-### 5. The two secrets the seed produces, then web
+### 5. The reasoning role on gemini-3.5-flash-lite
+
+The live demo's reasoning role (`reason`: the Ask Manager, its fan-out branches and the supplier negotiation's chooser) runs on
+`gemini-3.5-flash-lite`, whose free-tier daily quota is larger than `gemini-3.8-flash`'s; at the default the Ask answers "Cannot
+verify" once the 3.8 quota is spent. It is a platform setting, changed only through an operator's approved config draft, at 0 INR
+per 1M tokens (the free-tier key bills nothing). Do it once, after the first seed (a reseed does not undo it). `OPERATOR_TOKEN` is
+the synthetic seed operator's sign-in token (step 4), read in with `read -rs OPERATOR_TOKEN`, never typed as an argument.
+
+```bash
+CORE="$(gcloud run services describe munim-core-api --region "$REGION" --format='value(status.url)')"
+# propose (core mints the draft id and answers with the draft), then approve it, then read the roles back
+DRAFT=$(printf 'Authorization: Bearer %s\n' "$OPERATOR_TOKEN" | curl -sf -X POST "$CORE/platform/v1/config-drafts" -H @- \
+  -H 'content-type: application/json' -d '{"target":"model_role:reason","patch":{"provider":"gemini","model_id":"gemini-3.5-flash-lite","input_price_per_mtok_minor":0,"output_price_per_mtok_minor":0,"price_currency":"INR"}}' \
+  | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>console.log(JSON.parse(s).id))')
+printf 'Authorization: Bearer %s\n' "$OPERATOR_TOKEN" | curl -sf -X POST "$CORE/platform/v1/config-drafts/$DRAFT:approve" -H @- -H 'content-type: application/json' -d '{}'
+printf 'Authorization: Bearer %s\n' "$OPERATOR_TOKEN" | curl -s "$CORE/platform/v1/model-roles" -H @-   # reason: gemini-3.5-flash-lite, 0/0 INR
+```
+
+The approval answers with the draft `"status":"applied"`. The `router`, `narrate` and `extract` roles are already on flash-lite;
+`vision` (invoice reading, not the Ask) stays on gemini-3.8-flash.
+
+### 6. The two secrets the seed produces, then web
 
 ```bash
 tr -d '\n' < .run/cobnut/storefront-key | mk munim-storefront-key                  # the key the seed printed a path for
@@ -343,7 +364,7 @@ If the demo accounts were made by a Cloud Run job there is no local password fil
 Run `grant web …` and `grant seed …` again if you have not. The script refuses to deploy web without a well-formed
 `MUNIM_DEMO_TENANT_ID` (otherwise demo sign-in would answer 503).
 
-### 6. Open the door and check
+### 7. Open the door and check
 
 1. Add the web host to Identity Platform's authorised domains (setup step 6).
 2. `https://munim-web-<project number>.asia-south1.run.app/` loads; the demo sign-in works; "Simulated supplier" shows on the supplier screens.
@@ -352,7 +373,7 @@ Run `grant web …` and `grant seed …` again if you have not. The script refus
 
 ## Reseed Cobnut
 
-Same as deploy steps 4–5: each seed is a new tenant with a new storefront key, and the books are append-only, so the old tenants
+Same as deploy steps 4 and 6 (step 5 is platform-wide and stays done): each seed is a new tenant with a new storefront key, and the books are append-only, so the old tenants
 stay. Add a **new version** of `munim-storefront-key` (and of `munim-demo-password` if the accounts changed), then redeploy web
 with the new tenant id: `MUNIM_DEMO_TENANT_ID=<new id> scripts/deploy-gcp.sh --project "$PROJECT_ID" --only web`. web is rebuilt
 because the key is baked into its build.
