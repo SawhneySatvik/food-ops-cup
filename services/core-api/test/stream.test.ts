@@ -546,6 +546,9 @@ describe("inbox and trace channels", () => {
     });
     const f2 = await finding([A.outlets[1]]);
     const f1 = await finding([A.outlets[0]]);
+    // A feed sends one event per `updated_at` it reads, so an update that commits before its first read of the new row folds
+    // `open` and `resolved` into one event: wait for `open` on both before resolving.
+    await until(() => owner.msgs.some((m) => m.id === f1) && mgr.msgs.some((m) => m.id === f1), 5_000, "f1 open");
     await db.withContext("munim_svc", svc, (c) => c.query(`UPDATE intel.finding SET status = 'resolved' WHERE tenant_id = $1 AND id = $2`, [A.tenant, f1]));
     await until(() => owner.msgs.length === 5 && mgr.msgs.length === 3, 2_000, "findings");
     expect(owner.msgs.slice(2).map((m) => [m.id, m.type, m.data.status])).toEqual([

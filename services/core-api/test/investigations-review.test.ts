@@ -198,9 +198,12 @@ describe("R-D item 2: verdicts redacted per viewer", () => {
     await Promise.all([owner.ready, mgr.ready]);
     // A fresh plan, approved while both listen: created, approved, step 1, stopped at waiting.
     const sid = await create(A, A.ownerSub, "plan", { outlet_scope: [A.outlets[0]] });
-    expect((await call(A, A.ownerSub, `/v1/investigations/${sid}:approve-plan`, {})).status).toBe(200);
     const mine = (e: Ev) => e.type === "inbox.investigation" && e.id === sid;
-    expect(await until(() => owner.events.some((e) => mine(e) && e.data.stop_reason === "waiting") && mgr.events.filter(mine).length >= 2, 5_000)).toBe(true);
+    // A feed sends one event per `updated_at` it reads, so a change that commits before its first read of the new row folds both
+    // states into one event: wait for the creation on both before approving, or `>= 2` below races the runner's speed.
+    expect(await until(() => owner.events.some(mine) && mgr.events.some(mine), 15_000)).toBe(true);
+    expect((await call(A, A.ownerSub, `/v1/investigations/${sid}:approve-plan`, {})).status).toBe(200);
+    expect(await until(() => owner.events.some((e) => mine(e) && e.data.stop_reason === "waiting") && mgr.events.filter(mine).length >= 2, 15_000)).toBe(true);
     expect(owner.events.filter(mine).some((e) => e.data.status === "waiting")).toBe(true);
     expect(new Set(mgr.events.filter(mine).map((e) => `${e.data.status}/${e.data.stop_reason}`))).toEqual(new Set(["restricted/null"]));
     owner.close();
@@ -220,12 +223,16 @@ describe("R-D item 2: verdicts redacted per viewer", () => {
     const other = await subscribe(A, mgr2Sub, server.port);
     await Promise.all([owner.ready, mgr.ready, other.ready]);
     const cid = await create(A, A.managerSub, "plan");
+    // Each viewer must have the creation before the stop commits: a feed sends one event per `updated_at` it reads, so a stop that
+    // lands before a feed's first read of the new row folds the two states into one event and the pairs below never both arrive.
+    const born = (e: Ev) => e.type === "inbox.investigation" && e.id === cid;
+    expect(await until(() => [owner, mgr, other].every((s) => s.events.some(born)), 15_000)).toBe(true);
     // core-worker's ceiling stop, as auto.ts writes it (a plan row keeps its mode; 0027).
     await db.withContext("munim_svc", { tenant_id: A.tenant, outlet_ids: "*" }, (c) =>
       c.query(`UPDATE core.investigation SET stop_reason = 'ceiling' WHERE id = $1`, [cid]));
     const mine = (e: Ev) => e.type === "inbox.investigation" && e.id === cid && e.data.stop_reason !== null;
     const ceil = (e: Ev) => e.type === "inbox.investigation" && e.id === cid && e.data.status === "restricted";
-    expect(await until(() => mgr.events.some(mine) && owner.events.some(mine) && other.events.filter(ceil).length >= 2, 5_000)).toBe(true);
+    expect(await until(() => mgr.events.some(mine) && owner.events.some(mine) && other.events.filter(ceil).length >= 2, 15_000)).toBe(true);
     const shown = (s: { events: Ev[] }) => [...new Set(s.events.filter((e) => e.type === "inbox.investigation" && e.id === cid).map((e) => `${e.data.status}/${e.data.stop_reason}`))].sort();
     expect(shown(mgr)).toEqual(["restricted/ceiling", "restricted/null"]);
     expect(shown(other)).toEqual(["restricted/null"]);

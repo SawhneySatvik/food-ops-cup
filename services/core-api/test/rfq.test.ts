@@ -118,7 +118,10 @@ describe("POST /v1/rfq-requests", () => {
       item_ids: expect.arrayContaining([T.item]),
     });
     expect(call.body.item_ids.length).toBe(2);
-    const run = (await db.admin(`SELECT trigger, actor, outlet_scope::text[] AS scope, ended_at IS NOT NULL AS ended FROM intel.run WHERE tenant_id = $1 ORDER BY issued_at DESC, id DESC LIMIT 1`, [T.tenant])).rows[0];
+    // The run is the one the token names: `issued_at` is the token's iat in whole seconds, so "the newest run" can be the world's
+    // own watch_sweep run when the two fall in the same second. (The signature was already checked by fakeIntel.)
+    const runId = (JSON.parse(Buffer.from(call.token.split(".")[1]!, "base64url").toString("utf8")) as { run_id: string }).run_id;
+    const run = (await db.admin(`SELECT trigger, actor, outlet_scope::text[] AS scope, ended_at IS NOT NULL AS ended FROM intel.run WHERE tenant_id = $1 AND id = $2`, [T.tenant, runId])).rows[0];
     expect(run).toEqual({ trigger: "ask", actor: T.owner, scope: [T.outlets[0], T.outlets[1]], ended: true });
     expect(await runs()).toBe(runs0 + 1);
     // The ended run's token no longer verifies.

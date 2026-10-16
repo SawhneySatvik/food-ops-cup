@@ -515,6 +515,9 @@ describe("SSE: progress on inbox:<tenant> while the approving request runs", () 
       },
     });
     id = await openPlan(A, A.ownerSub);
+    // A feed sends one event per `updated_at` it reads, so a change that commits before its first read of the new row folds
+    // both states into one event: see the creation first, or the count below depends on the runner's speed.
+    expect(await until(() => owner.events.some(mine), 15_000)).toBe(true);
     expect((await approve(A, A.ownerSub, id)).status).toBe(200);
     expect(midRequest).toBe(true);
     expect(await until(() => owner.events.some((e) => mine(e) && e.data.stop_reason === "waiting"), 5_000)).toBe(true);
