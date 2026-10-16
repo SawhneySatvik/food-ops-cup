@@ -21,10 +21,16 @@ Spend (W3 close ruling): one buffer per ask, in the month's budget currency; the
 
 Taint: a tainted thread starts the run tainted through the Assembler (T-082a, the one carry into RunState); the
 response returns RunState.tainted. An early exit runs nothing and returns the thread's own taint.
+
+Time (go-live E-2): with `MUNIM_ASK_BUDGET_S` set, the Manager's run stops once that long has passed since the ask
+began (the route counts), its traces and spend flushed as on any other exit, and the ask stores what it has: the
+submitted answer, else `missing_ref`. Core waits `MUNIM_ASK_TIMEOUT_S`, set above it, so the stored answer is there when
+core reads it. Unset: no limit beyond each call's own timeout.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable
 from dataclasses import dataclass
@@ -193,6 +199,7 @@ async def answer_ask(
 ) -> ThreadsIntelAskResponse:
     """`models`: the models, or the factory that builds them — called only once the ask needs a model (R-E 2-A)."""
     actor = f"specialist:{req.addressed_to}" if req.addressed_to else "manager"
+    deadline = None if cfg.ask_budget_s is None else asyncio.get_running_loop().time() + cfg.ask_budget_s
     thread_tainted = req.thread is not None and req.thread.tainted
     spend = SpendBuffer(client.write_spend, spend_currency(frame))
 
@@ -242,10 +249,14 @@ async def answer_ask(
         before_model_callback=p.assembler.before_model,
     )
     try:
-        await run_agent(agent, ctx, req.question, cfg, state=p.state, actor=actor)
+        async with asyncio.timeout_at(deadline):
+            await run_agent(agent, ctx, req.question, cfg, state=p.state, actor=actor)
     except RunFailed as e:
         # Rule 11: the ask degrades to "cannot verify"; the failure's class name only, never its text.
         log.warning("intel: ask run %s failed: %s", ctx.run_id, e.kind)
+    except TimeoutError:
+        # MUNIM_ASK_BUDGET_S: cancelled where it stood; run_agent's `finally` has flushed its traces and spend.
+        log.warning("intel: ask run %s stopped at its time budget", ctx.run_id)
     envelope = p.submit.envelope or abstained(req, NO_ANSWER)
     if follow_up is not None:
         envelope = envelope.model_copy(update={"follow_up": follow_up})

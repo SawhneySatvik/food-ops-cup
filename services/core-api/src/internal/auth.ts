@@ -43,7 +43,13 @@ export function runTx<T>(deps: Deps, run: Pick<Run, "tenantId" | "scope">, fn: (
   return withContext(deps.pools.svc, { tenant_id: run.tenantId, outlet_ids: run.scope[0] === "*" ? "*" : run.scope, role: "service" }, fn);
 }
 
-export async function authenticate(c: Context<AppEnv>): Promise<{ run: Run; cfg: InternalConfig }> {
+/** How long after core ends a run (its HTTP wait for intel is over: answered, failed or timed out) the run's spend and
+ *  traces are still taken (`afterEnd`). intel may still be finishing calls it already made; refusing their spend would
+ *  leave them off the month's AI cap (R47). 300 s: no function on the Hobby plan (R55) runs longer, so no intel request
+ *  outlives core's wait by more. Every other route refuses an ended run at once. */
+export const ENDED_GRACE_S = 300;
+
+export async function authenticate(c: Context<AppEnv>, o: { afterEnd?: boolean } = {}): Promise<{ run: Run; cfg: InternalConfig }> {
   const deps = c.var.deps;
   const cfg = configs.get(deps);
   if (!cfg) throw new ApiError("unavailable");
@@ -53,7 +59,7 @@ export async function authenticate(c: Context<AppEnv>): Promise<{ run: Run; cfg:
   const v = await verifyRunToken({
     ...cfg.keys, ...(cfg.now ? { now: cfg.now } : {}),
     svc: (scope, fn) => runTx(deps, { tenantId: scope.tenantId, scope: scope.outletScope }, fn),
-  }, m[1]!);
+  }, m[1]!, o.afterEnd ? { endedGraceS: ENDED_GRACE_S } : {});
   if (!v.ok) throw new ApiError("not_found");
   const k = v.claims;
   return { run: { tenantId: k.tenant_id, runId: k.run_id, scope: k.outlet_scope as OutletScope, actor: k.actor, trigger: k.trigger }, cfg };

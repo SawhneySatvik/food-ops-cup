@@ -21,6 +21,7 @@ import { SITE } from "@/lib/site";
 import { OfflineBanner } from "../../ui";
 import { useStaff } from "../shell";
 import { CannotVerify, SnapshotDrawer, SourcedValue, StatCard } from "../source";
+import { RequestQuotes } from "../suppliers/request-quotes";
 import { LiveLine, NotForRole, type OpenRef } from "./inbox";
 
 
@@ -46,7 +47,7 @@ function Inline({ f, fmt, onOpen, unit }: { f: Figure | null; fmt: CellFormat; o
 }
 
 export function OwnerHomePage() {
-  const { session, client, outlet, handleAuth } = useStaff();
+  const { session, client, outlet, outlets, handleAuth } = useStaff();
   const allowed = can(session, "home");
   const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
   const [today, setToday] = useState<string | null>(null);
@@ -209,12 +210,16 @@ export function OwnerHomePage() {
               : (
                 <ul className="space-y-2">
                   {f.lowStock.map((r, i) => (
-                    <li key={r.ingredientId ?? i}>
+                    <li key={r.ingredientId ?? i} className="space-y-2">
                       <p className="font-semibold">{r.name ?? ing(r.ingredientId)?.name ?? "An ingredient"}</p>
                       <p className="text-[15px]">
                         On hand <Inline f={r.onHand} fmt={fmt!} onOpen={open} unit={ing(r.ingredientId)?.base_unit} /> · minimum{" "}
                         <Inline f={r.minimum} fmt={fmt!} onOpen={open} unit={ing(r.ingredientId)?.base_unit} />
                       </p>
+                      {r.ingredientId && (
+                        <RequestQuotes key={outlet.id} ingredientId={r.ingredientId} ingredientName={r.name ?? ing(r.ingredientId)?.name ?? "this ingredient"}
+                          outlets={outlets} current={outlet.id} client={client} onAuth={handleAuth} />
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -101,6 +101,9 @@ export interface Config {
   /** `MUNIM_STREAM_MAX_AGE_S` × 1000: when core-api ends an SSE stream with a reconnect hint. Whole seconds 10–86400,
    *  default 3300 (55 min); a host that cuts requests sooner (e.g. at 300 s) sets it below its limit. */
   streamMaxAgeMs: number;
+  /** `MUNIM_ASK_TIMEOUT_S` × 1000: how long `POST /v1/ask` waits for intel's answer. Whole seconds 10–600, default 90. A host
+   *  that cuts requests (the deploy platform Hobby: 300 s) sets it under that limit and above intel's own `MUNIM_ASK_BUDGET_S`. */
+  askTimeoutMs: number;
   /** `MUNIM_DB_POOL_MAX`: a ceiling on core-api's app pools (3–50; below 3 is refused: untested, and a request that
    *  holds one connection while asking for another would wait forever), for a host that runs many small instances
    *  against one pooler; unset → undefined (each pool keeps its own size). */
@@ -208,6 +211,7 @@ export function loadConfig(opts: LoadOptions = {}): Config {
     return n;
   };
   const streamMaxAgeMs = wholeNumber("MUNIM_STREAM_MAX_AGE_S", 10, 86_400, 3_300)! * 1000;
+  const askTimeoutMs = wholeNumber("MUNIM_ASK_TIMEOUT_S", 10, 600, 90)! * 1000;
   const dbPoolMax = wholeNumber("MUNIM_DB_POOL_MAX", 3, 50, undefined);
   const tickPeriodMinutes = wholeNumber("MUNIM_TICK_PERIOD_MIN", 1, 1_440, 1_440)!;
   const tickBudgetMs = wholeNumber("MUNIM_TICK_BUDGET_S", 1, 3_600, 240)! * 1000;
@@ -320,6 +324,7 @@ export function loadConfig(opts: LoadOptions = {}): Config {
       return v;
     },
     streamMaxAgeMs,
+    askTimeoutMs,
     dbPoolMax,
     tickPeriodMinutes,
     tickBudgetMs,

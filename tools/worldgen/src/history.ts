@@ -191,6 +191,22 @@ export class Plan {
     return Math.ceil(milli * 1.1);
   }
 
+  /** What core's consumption draws from one ingredient at one outlet over the history, exactly (milli-units): per bill, the
+   *  recipe quantity grossed up by its waste allowance `wasteBp` and rounded half up once per ingredient, as core-domain's
+   *  consume-order does, plus the waste logs. For a world that must end with a known amount on hand (need() only bounds it). */
+  draw(outletIdx: number, ing: Ingredient, wasteBp: number): number {
+    const items = new Map(this.#cfg.items.map((i) => [i.key, i]));
+    let milli = 0;
+    for (const b of this.bills) {
+      if (b.outlet !== outletIdx || b.voided) continue;
+      let raw = 0;
+      for (const l of b.lines) for (const [g, q] of items.get(l.item)!.recipe) if (g.id === ing.id) raw += l.qty * q;
+      milli += Math.floor((raw * (10_000 + wasteBp) + 5_000) / 10_000);
+    }
+    for (const x of this.waste) if (x.outlet === outletIdx && x.ing.id === ing.id) milli += x.qtyMilli;
+    return milli;
+  }
+
   /** Aggregator bills of one outlet and channel inside [from, to] (a payout cycle): the lines its statement lists, with the bill's tax. */
   aggregatorBills(outletIdx: number, channel: string, from: string, to: string): Array<{ no: string; date: string; gross: number; tax: number }> {
     return this.bills.filter((b) => !b.voided && b.outlet === outletIdx && b.channel === channel && b.date >= from && b.date <= to)

@@ -9,7 +9,7 @@ import { DEMO_TENANT_ID } from "@/lib/munim/session";
 import { CHANNEL_ID, CURRENCY, ITEMS, PREP_MIN, id7, itemId } from "./data";
 import { BadRequest, outletById, price } from "./pricing";
 import {
-  CARES_PROFILE, CHANNELS, COUNTER_CHANNEL_ID, DEVICES, INGREDIENTS, MEMBERS, MEMBER_OUTLETS, RECIPIENTS, SPECIALISTS, TEMPLATE_COLUMNS, TEMPLATE_MIN_ROLE, TENANT,
+  CARES_PROFILE, CHANNELS, COUNTER_CHANNEL_ID, DEVICES, ING, INGREDIENTS, MEMBERS, MEMBER_OUTLETS, RECIPIENTS, SPECIALISTS, TEMPLATE_COLUMNS, TEMPLATE_MIN_ROLE, TENANT,
   addressedTo, answerFor, boardOf, buildOrder, businessDate, menuFor, mintRows, orderListItem, posDevice, receiptOf, reorderLevels, seedDrafts, seedFindings, seedListings,
   seedGoodsReceived, seedOrders, seedPurchaseOrders, seedSnapshots, seedSuppliers, seedThreads, snapshotOf, type Placed,
 } from "./staff-data";
@@ -640,6 +640,31 @@ function createPo(w: World, who: Who, body: unknown, now: Date): Response {
   return once(w, who, cmd, 201, () => result(cmd, execute(w, "purchasing.po.create.v1", p as unknown as Json, now, { member_id: who.m.member_id, role: who.m.role }, null)));
 }
 
+/** The statuses core's request for quotes can answer (contracts IntelNegotiateResponse). */
+const NEGOTIATION = ["drafted", "draft_refused", "no_shortfall", "no_suppliers", "no_reference_price", "no_quote", "no_passing_quote", "model_blocked", "not_simulated"];
+/** A person asks the simulated suppliers for quotes, as core's purchasing.rfq.request.v1 (rfq.ts): owner, manager or judge, every
+ *  chosen outlet in their scope (403 authority_denied), an active ingredient (400). The outcome rides in two headers on the first
+ *  execution only; a replay is the stored body with neither. The mock negotiates nothing: hazelnuts come back drafted as its
+ *  seeded nut purchase order, anything else has no shortfall, and X-Mock-Force-Negotiation picks any status core answers. */
+function requestQuotes(w: World, who: Who, body: unknown, req: Request): Response {
+  const cmd = envelopeOf<S["PurchasingRfqRequestV1"]>(body, "purchasing.rfq.request.v1");
+  const p = cmd.payload;
+  if (!UUID7.test(String(p.rfq_id)) || !Array.isArray(p.outlet_ids) || p.outlet_ids.length === 0 || new Set(p.outlet_ids).size !== p.outlet_ids.length) refuse(422, "invalid_payload");
+  allow(who.m, DECIDE_ROLES);
+  if (!p.outlet_ids.every((o) => outletById(o) && sees(who.m, o))) refuse(403, "forbidden", "authority_denied");
+  if (!INGREDIENTS.items.some((i) => i.ingredient_id === p.ingredient_id && i.active)) refuse(400, "bad_request");
+  const forced = req.headers.get("X-Mock-Force-Negotiation");
+  if (forced !== null && !NEGOTIATION.includes(forced)) refuse(400, "bad_request");
+  let outcome: Record<string, string> = {};
+  const res = once(w, who, cmd, 201, () => {
+    const status = forced ?? (p.ingredient_id === ING("hazelnuts") ? "drafted" : "no_shortfall");
+    outcome = { "X-Munim-Negotiation": status, ...(status === "drafted" ? { "X-Munim-Draft-Id": id7("draft:po_nuts") } : {}) };
+    return result(cmd, p.rfq_id);
+  });
+  for (const [k, v] of Object.entries(outcome)) res.headers.set(k, v);
+  return res;
+}
+
 /** Goods in, as core's purchasing.grn.receive.v1: a batch for batch-tracked stock and none for the rest (400), a null cost
  *  takes the PO line's price, a PO that is not committed is 409, and the PO turns received once every line has come in
  *  (only for someone who sees all its outlets). Stock levels are not modelled. */
@@ -954,6 +979,7 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       if (r) return withdrawListing(w, who, r[1]!, body);
       if (path === "/v1/cares/handovers") return recordHandover(w, who, body, now);
       if (path === "/v1/purchase-orders") return createPo(w, who, body, now);
+      if (path === "/v1/rfq-requests") return requestQuotes(w, who, body, req);
       if (path === "/v1/goods-received") return receiveGoods(w, who, body, now);
       if (path === "/v1/_mock/web-order") return webOrder(w, who, body, now);
       return notFound();

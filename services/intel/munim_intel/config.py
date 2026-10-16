@@ -76,6 +76,17 @@ class Config:
             if not 0 < seconds <= 600:
                 raise ConfigError(f"{name} must be in (0, 600] seconds")
             self.model_timeouts_s[role] = seconds
+        # The whole ask's own time limit (`MUNIM_ASK_BUDGET_S`, seconds; not a secret): past it the Manager stops and the ask
+        # stores "cannot verify", so intel answers before core stops waiting (core's MUNIM_ASK_TIMEOUT_S, set above it). Unset:
+        # no limit (each call keeps its per-role timeout).
+        raw = (env.get("MUNIM_ASK_BUDGET_S") or "").strip()
+        try:
+            budget = float(raw) if raw else None
+        except ValueError:
+            raise ConfigError("MUNIM_ASK_BUDGET_S must be a number of seconds") from None
+        if budget is not None and not 0 < budget <= 600:
+            raise ConfigError("MUNIM_ASK_BUDGET_S must be in (0, 600] seconds")
+        self.ask_budget_s: float | None = budget
 
     def _register(self, label: str, value: str) -> None:
         if len(value) >= 4 and (label, value) not in self._secrets:

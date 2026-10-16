@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { createApp, TENANT_HEADER, type Deps } from "../src/app.ts";
 import { svcTx, testKeys } from "../src/commit/testkit.ts";
+import { ENDED_GRACE_S } from "../src/internal/auth.ts";
 import { configureInternal } from "../src/internal/index.ts";
 import { endRun, mintRunToken, type OutletScope } from "../src/runtoken/index.ts";
 import { openDb } from "./db.ts";
@@ -146,6 +147,28 @@ describe("auth: service secret + run token, scope only from the token", () => {
     const bare = await createApp({ ...deps });
     const r = await bare.request("/internal/intel/v1/events:claim", { method: "POST", headers: { authorization: `Bearer ${F.tokA}`, "x-munim-service-secret": SECRET }, body: "{}" });
     expect(r.status).toBe(503);
+  });
+
+  it("an ended run: its spend and traces are taken for ENDED_GRACE_S more, never past it; every other route refuses it at once (404)", async () => {
+    const { token, claims } = await run(A, ["*"]);
+    await endRun({ svc: svcTx(db) }, A.tenant, claims.run_id);
+    const spend = (id = uuidv7()) => ({ entries: [{ id, role: "reason", provider: "gemini", model_id: "gemini-3.8-flash", input_tokens: 900, output_tokens: 120, amount_minor: 0, currency: "INR" }] });
+    const trace = (seq: number) => ({ events: [{ id: uuidv7(), seq, parent_id: null, actor: "specialist:inventory_purchasing", at: new Date().toISOString(), kind: "tool_call", payload: { tool: "read_below_reorder" } }] });
+    // Core's wait ended (here: just now); intel's late flush still lands, under the same run.
+    expect((await intel(token, "spend", spend())).status).toBe(201);
+    expect((await intel(token, "traces:batch", trace(1))).status).toBe(201);
+    // No other route widens: an answer, a draft, a snapshot, a claim and the run-frame are the same 404 as before.
+    for (const [path, method] of [["answers", "POST"], ["drafts", "POST"], ["snapshots", "POST"], ["events:claim", "POST"], ["run-frame", "GET"]] as const) {
+      const r = await intel(token, path, method === "POST" ? {} : undefined, { method });
+      expect([path, r.status, (await r.json()).error.code]).toEqual([path, 404, "not_found"]);
+    }
+    // Past the window (ended_at moved back by hand): spend and traces are refused too, and nothing more is stored.
+    await db.admin(`UPDATE intel.run SET ended_at = now() - make_interval(secs => $2) WHERE id = $1`, [claims.run_id, ENDED_GRACE_S + 5]);
+    for (const r of [await intel(token, "spend", spend()), await intel(token, "traces:batch", trace(2))]) {
+      expect([r.status, (await r.json()).error.code]).toEqual([404, "not_found"]);
+    }
+    expect(await count(`SELECT count(*) n FROM intel.intel_spend WHERE run_id = $1`, [claims.run_id])).toBe(1);
+    expect(await count(`SELECT count(*) n FROM intel.trace_event WHERE run_id = $1`, [claims.run_id])).toBe(1);
   });
 
   it("events:claim: first 200, repeat 409 (1 row); watch:claim: go, then not within the window, another pack goes", async () => {

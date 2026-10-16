@@ -141,6 +141,57 @@ export function receiveErrorText(e: MunimError): string {
 }
 
 /** An ingredient's name and base unit; lines and rows carry ids only. */
+// ---- a request for quotes (purchasing.rfq.request.v1): the simulated suppliers quote one ingredient for chosen outlets ----
+export type RfqAttempt = CommandAttempt<"purchasing.rfq.request.v1", Schemas["PurchasingRfqRequestV1"]>;
+
+/** One attempt per ingredient and set of outlets confirmed: tapping again for the same sends the same envelope, so a lost
+ *  answer never starts a second negotiation. No quantity is typed: core asks for the shortfall it reads itself. */
+export function rfqAttempt(prev: RfqAttempt | null, ingredientId: string, outletIds: readonly string[]): RfqAttempt {
+  const outlets = [...outletIds].sort();
+  return attemptFor(prev, JSON.stringify([ingredientId, outlets]), "purchasing.rfq.request.v1", () => ({ rfq_id: uuidv7(), ingredient_id: ingredientId, outlet_ids: outlets }));
+}
+
+export interface RfqOutcome {
+  text: string;
+  /** The purchase-order draft to open, when one was made. */
+  draftId: string | null;
+  /** A draft waits in the inbox (or may: a replay cannot say). */
+  inbox: boolean;
+}
+
+const RFQ_WORDS: Record<string, string> = {
+  drafted: "Quotes requested — a purchase order is waiting for approval.",
+  draft_refused: "Quotes came back, but no purchase order could be drafted from them. Nothing is waiting for approval.",
+  no_shortfall: "No shortfall yet. What's on hand covers the coming days, so no supplier was asked.",
+  no_suppliers: "No simulated supplier can be asked for quotes yet. Nothing was sent.",
+  no_reference_price: "No supplier has a recorded price for this yet, so there is nothing to weigh quotes against. Nothing was sent.",
+  no_quote: "No supplier could quote. Nothing was drafted.",
+  no_passing_quote: "Quotes came back, but none fit the budget and terms. Nothing was drafted.",
+  model_blocked: "AI is switched off or this month's AI budget is spent, so no supplier reply can be read. Nothing was sent.",
+  not_simulated: "Only simulated suppliers can be asked. Nothing was sent.",
+};
+
+/** What came of a request for quotes, from core's status header. None (a replay of the same tap): the request is on record
+ *  and its draft, if any, is in the inbox. */
+export function rfqOutcome(negotiation: string | null, draftId: string | null): RfqOutcome {
+  if (negotiation === null) return { text: "Quotes were already requested with this tap. Any purchase order drafted from them is in your inbox.", draftId: null, inbox: true };
+  const text = RFQ_WORDS[negotiation];
+  if (!text) return { text: "Quotes requested. Any purchase order drafted from them is in your inbox.", draftId: null, inbox: true };
+  return { text, draftId: negotiation === "drafted" ? draftId : null, inbox: negotiation === "drafted" };
+}
+
+/** The answer was lost on the way back (a dropped connection, the browser's timeout or a gateway's 504): core may have the
+ *  request, so only the same envelope may be sent again. */
+export const lostRfq = (e: MunimError): boolean => e.kind === "network" || e.status === 504;
+
+/** A request for quotes that failed. 503: core recorded the request but could not reach the negotiation, so nothing was drafted
+ *  and the next tap is a new request. A dropped connection may have reached core: look in the inbox before asking again. */
+export function rfqErrorText(e: MunimError): string {
+  if (lostRfq(e)) return "The connection dropped while the simulated suppliers were being asked. Look in your inbox for a purchase order before asking again; tapping again is safe.";
+  if (e.status === 503) return "The simulated suppliers couldn't be asked just now. Nothing was drafted. Try again in a moment.";
+  return staffErrorText(e, "suppliers");
+}
+
 export const ingredientOf = (ingredients: readonly Ingredient[], id: string): { name: string; baseUnit: string } => {
   const i = ingredients.find((x) => x.ingredient_id === id);
   return { name: i?.name ?? "Stock item", baseUnit: i?.base_unit ?? "" };

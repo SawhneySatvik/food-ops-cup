@@ -5,10 +5,6 @@ import { DemoBar } from "@/components/chrome";
 import { StaffShell } from "@/components/staff/shell";
 import "./staff.css";
 
-// The shell renders a page only once the browser has read the person's session (sessionStorage), so the server can
-// never render a staff page ahead of a navigation. Opt the staff segments out of Next's instant-navigation check.
-export const instant = false;
-
 export default function StaffLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // The shell reads the pathname, which on a dynamic route is only known at request time: keep it inside Suspense.
   return (

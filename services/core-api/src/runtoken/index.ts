@@ -110,7 +110,9 @@ export async function mintRunToken(deps: RunTokenDeps, input: MintInput) {
   return deps.svc({ tenantId: input.tenantId, outletScope: input.outletScope }, (c) => mintRunTokenIn(c, deps, input));
 }
 
-export async function verifyRunToken(deps: RunTokenDeps, token: string): Promise<VerifyResult> {
+/** `endedGraceS`: a run core ended less than this many seconds ago (by the database clock that stamped `ended_at`) still
+ *  verifies — for the routes that take a run's late spend and traces only (internal/auth.ts); unset = ended is refused. */
+export async function verifyRunToken(deps: RunTokenDeps, token: string, o: { endedGraceS?: number } = {}): Promise<VerifyResult> {
   const decoded = decodeVerified(token, deps.publicKey);
   if (!decoded.ok) return decoded;
   const { claims } = decoded;
@@ -118,8 +120,9 @@ export async function verifyRunToken(deps: RunTokenDeps, token: string): Promise
   if (claims.exp <= nowS) return { ok: false, reason: "expired" };
   // RLS context is the token's own tenant, so a row of any other tenant is invisible here.
   const row = await deps.svc({ tenantId: claims.tenant_id, outletScope: claims.outlet_scope }, async (c) => {
-    const r = await c.query<{ trigger: string; actor: string; outlet_scope: string[]; expires_s: number; ended: boolean }>(
-      `SELECT trigger, actor, outlet_scope, extract(epoch FROM expires_at)::float8 AS expires_s, ended_at IS NOT NULL AS ended
+    const r = await c.query<{ trigger: string; actor: string; outlet_scope: string[]; expires_s: number; ended: boolean; ended_s: number | null }>(
+      `SELECT trigger, actor, outlet_scope, extract(epoch FROM expires_at)::float8 AS expires_s, ended_at IS NOT NULL AS ended,
+              extract(epoch FROM now() - ended_at)::float8 AS ended_s
          FROM intel.run WHERE tenant_id = $1 AND id = $2`,
       [claims.tenant_id, claims.run_id],
     );
@@ -129,7 +132,7 @@ export async function verifyRunToken(deps: RunTokenDeps, token: string): Promise
       || row.outlet_scope.join(",") !== claims.outlet_scope.join(",") || row.expires_s !== claims.exp) {
     return { ok: false, reason: "unknown_run" };
   }
-  if (row.ended) return { ok: false, reason: "ended" };
+  if (row.ended && !(o.endedGraceS !== undefined && row.ended_s !== null && row.ended_s <= o.endedGraceS)) return { ok: false, reason: "ended" };
   return { ok: true, claims };
 }
 

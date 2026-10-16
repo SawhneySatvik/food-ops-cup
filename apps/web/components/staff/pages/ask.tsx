@@ -153,8 +153,8 @@ export function AskPage() {
       return;
     }
     if (handleAuth(r.error)) return setPending(null);
-    if (r.error.kind === "network") {
-      // Lost on the way back (or timed out): look for it, never resend.
+    if (r.error.kind === "network" || r.error.status === 504) {
+      // Lost on the way back, timed out, or cut by a gateway while core was still waiting for intel: look for it, never resend.
       const found = await findLostAnswer(client, me.member_id, threadId, turnsBefore, before);
       setPending(null);
       if (found && !threadId) router.push(`/staff/ask/${found}`);

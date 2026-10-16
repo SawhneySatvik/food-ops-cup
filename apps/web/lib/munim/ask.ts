@@ -45,7 +45,7 @@ export function withMention(question: string, s: Specialist): string {
 export const signatureWords = (sig: Answer["signature"]): string =>
   sig.key === "answer.signature.via_manager" ? `${specialistName(sig.specialist)} · via Manager` : "Manager";
 
-/** After a lost POST /v1/ask (network error, or the 95 s timeout): looks, never resends. Core writes the turn (and,
+/** After a lost POST /v1/ask (network error, the client's timeout, or a gateway's 504): looks, never resends. Core writes the turn (and,
  *  for a first question, the thread) only after the answer is stored, so a turn past `turnsBefore` in this thread,
  *  or a thread of this person's that was not in `before`, is the answer. Returns that thread's id, or null when it
  *  is not there (yet: core may still be working on it). */

@@ -183,12 +183,17 @@ export async function build(c: Ctx): Promise<void> {
     waste: [{ outlet: 1, ing: cream, qtyMilli: [200, 600] }, { outlet: 1, ing: milk, qtyMilli: [500, 1500] }],
   });
   const cost: Array<[k.Ingredient, number]> = [[butter, 56000], [hazelnuts, 148000], [flour, 4200], [cream, 21000], [chocolate, 62000], [milk, 6000], [tin, 30000]];
-  // Hazelnuts at Hazratganj open at what the history draws (plan.need, which carries a 10% margin) plus 3 kg, so they end at most 3 kg + 1/11 of that
-  // draw: under the reorder minimum set from the same number below (inventory.below_reorder on the owner home). Everything else opens 10 kg over.
-  const hazelNeed = plan.need(0, hazelnuts);
+  // Hazelnuts open at each outlet at exactly what the history draws there (plan.draw: core's own waste gross-up and rounding) plus two days of that
+  // draw, so the seed day ends with about two days on hand (less today's counter orders below): together far under the six days of need a request
+  // for quotes reads (inventory.shortfall at the negotiation's LEAD_DAYS), so it finds a shortfall with no stock count (go-live B-2), and Hazratganj
+  // is under its reorder minimum (inventory.below_reorder on the owner home). Everything else opens 10 kg over the history's draw (with a margin).
+  const hazelDraw = biz.outlets.map((_, oi) => plan.draw(oi, hazelnuts, k.RECIPE_WASTE_BP));
+  const hazelLeft = hazelDraw.map((d) => Math.ceil((2 * d) / c.days));
   for (const [oi, o] of biz.outlets.entries()) {
-    await k.openingStock(c, `open:${oi + 1}`, o.id, stockAt, cost.map(([ing, costMinor]) => ({ ing, qtyMilli: (oi === 0 && ing === hazelnuts ? 3000 : 10000) + plan.need(oi, ing), costMinor })));
+    await k.openingStock(c, `open:${oi + 1}`, o.id, stockAt, cost.map(([ing, costMinor]) =>
+      ({ ing, qtyMilli: ing === hazelnuts ? hazelDraw[oi]! + hazelLeft[oi]! : 10000 + plan.need(oi, ing), costMinor })));
   }
+  c.s.hazelnutsLeftMilli = hazelLeft;
   plan.queue();
   await k.flushImports(c);
 
@@ -214,7 +219,8 @@ export async function build(c: Ctx): Promise<void> {
   for (let i = 0; i < MONTHS; i++) {
     await k.budget(c, i === 0 ? "purchases" : `purchases:+${i}`, { month: k.monthAfter(live, i), category: "purchases", amountMinor: 5_000_000 });
   }
-  const hazelMin = 3000 + Math.ceil(hazelNeed / 11) + 2000;
+  // A week of Hazratganj's average draw: above the two days it opens the seed day with.
+  const hazelMin = Math.ceil((7 * hazelDraw[0]!) / c.days);
   await k.reorderLevel(c, hzg.id, hazelnuts, hazelMin, hazelMin + 8000);
   await k.reorderLevel(c, hzg.id, butter, 4000, 10000);
 

@@ -9,6 +9,7 @@
     "test": "vitest run",
     "smoke": "tsx scripts/smoke.ts",
     "staff-smoke": "tsx scripts/staff-smoke.ts",
+    "nav-smoke": "tsx scripts/nav-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
+    "playwright-core": "1.64.0",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "6.0.3",

@@ -298,14 +298,15 @@ describe("env-only config (envOnly: true)", () => {
     expect(() => loadConfig({ env: { MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM: PUB } }).runTokenKeyPems()).toThrow(/both .* or neither/);
   });
 
-  it("cron secret, stream max age, pool ceiling and tick settings: defaults, bounds, refusals (gotcha 17)", () => {
+  it("cron secret, stream max age, ask timeout, pool ceiling and tick settings: defaults, bounds, refusals (gotcha 17)", () => {
     const d = loadConfig({ env: {} });
-    expect([d.cronSecret(), d.streamMaxAgeMs, d.dbPoolMax, d.tickPeriodMinutes, d.tickBudgetMs]).toEqual([null, 3_300_000, undefined, 1440, 240_000]);
-    const s = loadConfig({ env: { MUNIM_CRON_SECRET: "cron-secret-0123456789", MUNIM_STREAM_MAX_AGE_S: "270", MUNIM_DB_POOL_MAX: "3", MUNIM_TICK_PERIOD_MIN: "15", MUNIM_TICK_BUDGET_S: "60" } });
-    expect([s.cronSecret(), s.streamMaxAgeMs, s.dbPoolMax, s.tickPeriodMinutes, s.tickBudgetMs]).toEqual(["cron-secret-0123456789", 270_000, 3, 15, 60_000]);
+    expect([d.cronSecret(), d.streamMaxAgeMs, d.askTimeoutMs, d.dbPoolMax, d.tickPeriodMinutes, d.tickBudgetMs]).toEqual([null, 3_300_000, 90_000, undefined, 1440, 240_000]);
+    const s = loadConfig({ env: { MUNIM_CRON_SECRET: "cron-secret-0123456789", MUNIM_STREAM_MAX_AGE_S: "270", MUNIM_ASK_TIMEOUT_S: "240", MUNIM_DB_POOL_MAX: "3", MUNIM_TICK_PERIOD_MIN: "15", MUNIM_TICK_BUDGET_S: "60" } });
+    expect([s.cronSecret(), s.streamMaxAgeMs, s.askTimeoutMs, s.dbPoolMax, s.tickPeriodMinutes, s.tickBudgetMs]).toEqual(["cron-secret-0123456789", 270_000, 240_000, 3, 15, 60_000]);
     expect(s.redact("cron-secret-0123456789")).toBe("[redacted:cron secret]");
     expect(() => loadConfig({ env: { MUNIM_CRON_SECRET: "short" } }).cronSecret()).toThrow(/at least 16/);
     for (const [name, bad] of [["MUNIM_STREAM_MAX_AGE_S", "9"], ["MUNIM_STREAM_MAX_AGE_S", "270s"], ["MUNIM_DB_POOL_MAX", "2"], ["MUNIM_DB_POOL_MAX", "51"],
+      ["MUNIM_ASK_TIMEOUT_S", "9"], ["MUNIM_ASK_TIMEOUT_S", "601"], ["MUNIM_ASK_TIMEOUT_S", "240s"],
       ["MUNIM_TICK_PERIOD_MIN", "1441"], ["MUNIM_TICK_BUDGET_S", "1.5"], ["MUNIM_TICK_BUDGET_S", "-1"]] as const) {
       expect(() => loadConfig({ env: { [name]: bad } }), `${name}=${bad}`).toThrow(ConfigError);
     }

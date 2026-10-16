@@ -265,11 +265,14 @@ export async function price(c: Ctx, it: Item, outletId: string, channelKind: str
   });
 }
 
+/** The waste allowance a recipe line gets when its world names none (basis points). */
+export const RECIPE_WASTE_BP = 200;
+
 export async function recipe(c: Ctx, it: Item, from: string, lines: Array<{ ing: Ingredient; qtyMilli: number; wasteBp?: number }>) {
   const key = `recipe:${it.key}:${from}`;
   await c.api.cmd("owner", "/v1/catalogue/recipes", "catalogue.recipe.version.create.v1", key, {
     recipe_version_id: c.api.id(key), item_id: it.id, variant_id: null, version: 1, valid_from: from, valid_to: null, yield_qty_milli: 1000,
-    lines: lines.map((l) => ({ ingredient_id: l.ing.id, qty_milli: l.qtyMilli, unit: l.ing.unit, waste_pct_bp: l.wasteBp ?? 200 })),
+    lines: lines.map((l) => ({ ingredient_id: l.ing.id, qty_milli: l.qtyMilli, unit: l.ing.unit, waste_pct_bp: l.wasteBp ?? RECIPE_WASTE_BP })),
   });
 }
 

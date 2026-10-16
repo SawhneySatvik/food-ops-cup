@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -224,6 +225,50 @@ def test_a_400_on_a_logprobs_request_with_no_fixture_is_still_retried_without_lo
     served = asyncio.run(decide(LOOKUP_FINANCE))
     assert (served.model_calls, served.answer, served.model_path) == (1, "lookup", "recorded-fallback") and len(provider.calls) == 3
     assert served.band != "unscored" and served.probs_bp is not None
+
+
+# -- the ask's own time budget (go-live E-2): intel answers before core stops waiting --------------------------------
+
+
+def test_past_its_time_budget_the_ask_stops_and_stores_cannot_verify_with_its_spend_and_traces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MUNIM_ASK_BUDGET_S: a Manager step that would outlast the ask's budget (its own per-call timeout is the default 60 s)
+    is cut at the budget; the ask still stores its answer ("cannot verify") and posts the router's spend and the run's
+    traces, so core finds an answer, not a 503, and the calls made are counted. Paired: the same ask with no budget set
+    waits for the step."""
+
+    def slow(seconds: float) -> Answer:
+        async def answer(req: LlmRequest) -> LlmResponse:
+            if req.model == ROUTER:
+                return text("B")  # explain
+            await asyncio.sleep(seconds)
+            return submit("Too late to matter.")
+
+        return answer
+
+    budget = load_config(env={"MUNIM_MODEL_MODE": "live", "GEMINI_API_KEY": GEMINI_KEY, "MUNIM_ASK_BUDGET_S": "0.5"}, run_dir=tmp_path)
+    assert budget.ask_budget_s == 0.5
+    provider = Provider(monkeypatch, slow(5))
+    started = time.monotonic()
+    core = live_ask(budget, NOBODY, router_dir=None, reason_dir=None)
+    took = time.monotonic() - started
+    assert took < 3, f"the ask took {took:.1f} s against a 0.5 s budget"
+    assert provider.calls == [ROUTER, REASON]
+    [answer] = core.answers
+    assert answer["envelope"]["abstained"] is True and answer["envelope"]["reason_code"] == "missing_ref"
+    assert [r["role"] for r in core.spend] == ["router"]
+    assert any(e["kind"] == "route" and e["payload"].get("intent") == "explain" for e in core.traces)
+
+    # Paired: no budget — the same step is waited for to its end (a shorter step keeps the test quick).
+    unbounded = load_config(env={"MUNIM_MODEL_MODE": "live", "GEMINI_API_KEY": GEMINI_KEY}, run_dir=tmp_path)
+    assert unbounded.ask_budget_s is None
+    provider = Provider(monkeypatch, slow(1.0))
+    started = time.monotonic()
+    live_ask(unbounded, NOBODY, router_dir=None, reason_dir=None)
+    assert time.monotonic() - started >= 1.0 and provider.calls[:2] == [ROUTER, REASON]
+    with pytest.raises(Exception, match="MUNIM_ASK_BUDGET_S"):
+        load_config(env={"MUNIM_ASK_BUDGET_S": "0"}, run_dir=tmp_path)
 
 
 # -- a successful live call: used as is, traced live ------------------------------------------------------------------

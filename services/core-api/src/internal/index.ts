@@ -10,6 +10,7 @@
 // T-040b (batches.ts, frame.ts):
 //   POST entities:batch · aliases:batch · chunks:batch · claims:batch · edges:batch · quotes:batch · spend
 //                       → 201 {inserted, existing} (idempotent by id; same id + other body → 409)
+//   traces:batch and spend also take a run core ended up to ENDED_GRACE_S ago (auth.ts); every other route refuses it
 //   POST embeddings:batch → 201, or 503 where 0013 (pgvector) is not applied
 //   POST wiki:batch      → 201 {pages[{status: stored | existing | abstained}]}
 //   POST forecasts:batch → 201 {run_inserted, inserted, existing}
@@ -39,9 +40,9 @@ const P = "/internal/intel/v1";
 const WATCH_WINDOW_MS = 15 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-const post = (status: 200 | 201, fn: (q: Queryable, run: Run, body: unknown, cfg: InternalConfig) => Promise<object | string>) =>
+const post = (status: 200 | 201, fn: (q: Queryable, run: Run, body: unknown, cfg: InternalConfig) => Promise<object | string>, auth: { afterEnd?: boolean } = {}) =>
   async (c: Context<AppEnv>) => {
-    const { run, cfg } = await authenticate(c);
+    const { run, cfg } = await authenticate(c, auth);
     const body: unknown = await c.req.json().catch(() => undefined);
     if (body === undefined) throw new ApiError("bad_request");
     const out = await runTx(c.var.deps, run, (q) => fn(q, run, body, cfg));
@@ -70,7 +71,8 @@ export const router = new Hono<AppEnv>()
   .post(`${P}/findings`, post(201, writeFinding))
   .post(`${P}/drafts`, post(201, writeDraft))
   .post(`${P}/answers`, post(201, writeAnswer))
-  .post(`${P}/:seg{traces:batch}`, post(201, writeTraces))
+  // A run's spend and traces are taken for ENDED_GRACE_S after core ends it (auth.ts); nothing else is.
+  .post(`${P}/:seg{traces:batch}`, post(201, writeTraces, { afterEnd: true }))
   .get(`${P}/model-roles`, async (c) => {
     const { run } = await authenticate(c);
     return c.json(await runTx(c.var.deps, run, modelRoles), 200);
@@ -84,7 +86,7 @@ export const router = new Hono<AppEnv>()
   .post(`${P}/:seg{wiki:batch}`, post(201, refusing(writeWiki)))
   .post(`${P}/:seg{forecasts:batch}`, post(201, refusing(writeForecasts)))
   .post(`${P}/:seg{quotes:batch}`, post(201, refusing(writeQuotes)))
-  .post(`${P}/spend`, post(201, refusing(writeSpend)))
+  .post(`${P}/spend`, post(201, refusing(writeSpend), { afterEnd: true }))
   .post(`${P}/:seg{graph:query}`, post(200, graphQuery))
   .get(`${P}/brief-items`, async (c) => {
     const { run, cfg } = await authenticate(c);

@@ -12,13 +12,15 @@ export interface MockControls {
   decision?: ForcedDecision | null;
   /** Ask answers 503 (AI unavailable: hide the surface) or an abstention (model_blocked). */
   ai?: ForcedAi | null;
+  /** A request for quotes answers this negotiation status (core's X-Munim-Negotiation values). */
+  negotiation?: string | null;
 }
 
 const STORAGE_KEY = "munim.mock.controls";
 export const MOCK_CONTROLS_ENABLED = process.env.NEXT_PUBLIC_MUNIM_MOCK_CONTROLS === "1";
 
 export function readMockControls(): MockControls {
-  const none: MockControls = { accepting: null, force429: false, decision: null, ai: null };
+  const none: MockControls = { accepting: null, force429: false, decision: null, ai: null, negotiation: null };
   if (!MOCK_CONTROLS_ENABLED || typeof window === "undefined") return none;
   try {
     return { ...none, ...(JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<MockControls>) };
@@ -42,5 +44,6 @@ export function mockHeaders(): Record<string, string> {
   if (c.force429) h["X-Mock-Force-429"] = "1";
   if (c.decision) h["X-Mock-Force-Decision"] = c.decision;
   if (c.ai) h["X-Mock-Force-Ai"] = c.ai;
+  if (c.negotiation) h["X-Mock-Force-Negotiation"] = c.negotiation;
   return h;
 }

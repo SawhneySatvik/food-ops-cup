@@ -22,13 +22,13 @@ const AS_OF_DAYS = 70;
 /** Any URL serves (nothing here calls the simulator); the cards must be on it, by the brief's paths (T-127). */
 const SIM = "http://127.0.0.1:4423";
 let stack: Stack;
-const seeded: Array<{ tenantId: string; storefrontKey: string; aiPricing: unknown; api: Api; seed: string }> = [];
+const seeded: Array<{ tenantId: string; storefrontKey: string; aiPricing: unknown; api: Api; seed: string; hazelLeft: number[] }> = [];
 
 before(async () => {
   stack = await startStack();
   for (const seed of ["cobnut-gate-1", "cobnut-gate-2"]) {
     const r = await runWorld({ world: "cobnut", seed, asOf: businessToday(new Date(), "Asia/Kolkata"), days: AS_OF_DAYS, baseUrl: stack.baseUrl, token: stack.token("cobnut"), operator: true, simUrl: SIM });
-    seeded.push({ tenantId: r.api.tenantId!, storefrontKey: String(r.state.storefrontKey), aiPricing: r.state.aiPricing, api: r.api, seed });
+    seeded.push({ tenantId: r.api.tenantId!, storefrontKey: String(r.state.storefrontKey), aiPricing: r.state.aiPricing, api: r.api, seed, hazelLeft: r.state.hazelnutsLeftMilli as number[] });
   }
 });
 after(async () => {
@@ -136,6 +136,26 @@ describe("cobnut", () => {
     await api.post("operator", "/platform/v1/config-drafts", { draft_id: proposed, target: `llm_budget:${tenantId}`, patch: { month: "2030-01-01", limit_minor: 1, currency: "INR" } }, { noTenant: true });
     await api.post("operator", "/platform/v1/config-drafts/{id}:reject", { reason: "red-proof: not applied" }, { params: { id: proposed }, noTenant: true });
     await assert.rejects(operatorApprove(c, proposed), /is rejected, not applied/);
+  });
+
+  test("go-live B-2: hazelnuts end the history at the planned two days per outlet, so a request for quotes finds a shortfall with no stock count", async () => {
+    for (const { tenantId, hazelLeft } of seeded) {
+      // From core's own stock movements: the history (before today in Lucknow), today's counter orders, the last 28 days' sales draw.
+      const rows = (await stack.admin(`WITH today AS (SELECT (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata') AS t)
+        SELECT o.name, sum(m.qty_milli) FILTER (WHERE m.at < t)::int AS closed, sum(m.qty_milli)::int AS on_hand,
+               (-sum(m.qty_milli) FILTER (WHERE m.kind = 'sale_consumption' AND m.at >= t - interval '28 days' AND m.at < t))::int AS drew_28d
+          FROM core.stock_movement m CROSS JOIN today JOIN core.outlet o ON o.tenant_id = m.tenant_id AND o.id = m.outlet_id
+          JOIN core.ingredient i ON i.tenant_id = m.tenant_id AND i.id = m.ingredient_id
+         WHERE m.tenant_id = '${tenantId}' AND i.name = 'Roasted hazelnuts (synthetic)' GROUP BY o.name ORDER BY o.name`)).rows as
+        Array<{ name: string; closed: number; on_hand: number; drew_28d: number }>;
+      // core's consumption of the history equals the seed's own count of it (Plan.draw): each outlet closes yesterday at its planned remainder.
+      assert.deepEqual(rows.map((r) => [r.name, r.closed]), [["Cobnut Gomti Nagar", hazelLeft[1]], ["Cobnut Hazratganj", hazelLeft[0]]]);
+      // Today's counter orders never take an outlet below zero…
+      for (const r of rows) assert.ok(r.on_hand >= 0 && r.on_hand <= r.closed, `${r.name}: ${r.on_hand} on hand of ${r.closed}`);
+      // …and both outlets together hold under three days of their recent draw, so a six-day need (the RFQ's shortfall) is over it.
+      const [held, drew] = [rows.reduce((a, r) => a + r.on_hand, 0), rows.reduce((a, r) => a + r.drew_28d, 0)];
+      assert.ok(held > 0 && held * 28 < 3 * drew, `${held} on hand against ${drew} drawn in 28 days`);
+    }
   });
 
   test("the storefront menu equals apps/web/mock-server/data.ts at both outlets, in its order", async () => {

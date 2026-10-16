@@ -21,8 +21,9 @@ export interface StaffClientOptions {
   fetch?: typeof fetch;
 }
 
-/** POST /v1/ask is answered only after the AI has finished (core waits up to 90 s). */
-export const ASK_TIMEOUT_MS = 95_000;
+/** POST /v1/ask is answered only after the AI has finished: core waits MUNIM_ASK_TIMEOUT_S (90 s by default, 240 s on the
+ *  the deploy platform deploy). The browser waits longer than any core, so core's own answer (or its 503) arrives first. */
+export const ASK_TIMEOUT_MS = 250_000;
 
 type Cmd<T extends string, P> = Envelope<T, P>;
 export type PlaceOrderCommand = Cmd<"orders.place.v1", Schemas["OrdersPlaceV1"]>;
@@ -39,6 +40,10 @@ export type WithdrawListingCommand = Cmd<"cares.listing.withdraw.v1", Schemas["C
 export type RecordHandoverCommand = Cmd<"cares.handover.record.v1", Schemas["CaresHandoverRecordV1"]>;
 export type CreatePoCommand = Cmd<"purchasing.po.create.v1", Schemas["PurchasingPoCreateV1"]>;
 export type ReceiveGoodsCommand = Cmd<"purchasing.grn.receive.v1", Schemas["PurchasingGrnReceiveV1"]>;
+export type RfqCommand = Cmd<"purchasing.rfq.request.v1", Schemas["PurchasingRfqRequestV1"]>;
+
+/** POST /v1/rfq-requests is answered once the negotiation with the simulated suppliers is over (core waits up to 120 s). */
+export const RFQ_TIMEOUT_MS = 130_000;
 
 export function createStaffClient(opts: StaffClientOptions) {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
@@ -122,6 +127,20 @@ export function createStaffClient(opts: StaffClientOptions) {
     getPurchaseOrder: (poId: string) => settle(() => sdk.GET("/v1/purchase-orders/{id}", { params: id(poId), ...init() })),
     /** 201. A person's own purchase order; one the AI proposed arrives as a draft and is approved in the inbox instead. */
     createPurchaseOrder: (body: CreatePoCommand) => settle(() => sdk.POST("/v1/purchase-orders", { body, ...init() })),
+    /** 201. A person asks the simulated suppliers to quote one ingredient for outlets in their scope; a purchase order comes
+     *  back only as a draft to approve. What came of it is in two headers on the first answer only (`negotiation`, a status
+     *  code, and `draftId`); a replay of the same envelope carries neither. Resend only the same envelope: a new one starts a
+     *  second negotiation. */
+    requestQuotes: async (body: RfqCommand) => {
+      const outcome = { negotiation: null as string | null, draftId: null as string | null };
+      const result = await settle(async () => {
+        const a = await sdk.POST("/v1/rfq-requests", { body, ...init(RFQ_TIMEOUT_MS) });
+        outcome.negotiation = a.response.headers.get("X-Munim-Negotiation");
+        outcome.draftId = a.response.headers.get("X-Munim-Draft-Id");
+        return a;
+      });
+      return { result, ...outcome };
+    },
     listIngredients: (outletId?: string) => settle(() => sdk.GET("/v1/inventory/ingredients", { params: { query: outletId ? { outlet: outletId } : {} }, ...init() })),
     listReorderLevels: (outletId: string) => settle(() => sdk.GET("/v1/inventory/reorder-levels", { params: { query: { outlet: outletId } }, ...init() })),
     /** Goods received in the person's outlets, newest first (15). */

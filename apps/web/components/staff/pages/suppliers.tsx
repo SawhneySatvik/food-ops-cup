@@ -27,6 +27,7 @@ import { useStaff } from "../shell";
 import { CannotVerify, SimulatedSupplier, SnapshotDrawer, SourcedValue, StatusPill, type PillTone } from "../source";
 import { NewPoForm } from "../suppliers/new-po";
 import { PoDraftCard } from "../suppliers/po-draft";
+import { RequestQuotes } from "../suppliers/request-quotes";
 import { LiveLine } from "./inbox";
 
 type Ingredient = Schemas["V1InventoryIngredients"]["items"][number];
@@ -254,6 +255,10 @@ function Suppliers() {
                               <p>On hand {cell("on_hand_milli")} · Minimum {cell("min_qty_milli")} · Par {cell("par_qty_milli")}</p>
                             </div>
                             <button type="button" className="btn btn-plain" onClick={() => openForm(r.ingredientId)}>Order this</button>
+                            <div className="sm:col-span-2">
+                              <RequestQuotes ingredientId={r.ingredientId} ingredientName={r.name || ingredientOf(ingredients, r.ingredientId).name}
+                                outlets={outlets} current={outlet.id} client={client} onAuth={handleAuth} />
+                            </div>
                           </li>
                         );
                       })}

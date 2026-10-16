@@ -54,6 +54,8 @@ export interface CoreApiWiring {
   streamMaxAgeMs?: number;
   /** Ceiling on every app pool's size (config `MUNIM_DB_POOL_MAX`); unset = core 10, svc 5, platform 2. */
   poolMax?: number;
+  /** How long `POST /v1/ask` waits for intel (config `MUNIM_ASK_TIMEOUT_S`); unset = the ask port's 90 s. */
+  askTimeoutMs?: number;
 }
 
 export interface CoreApi {
@@ -94,7 +96,7 @@ export async function composeCoreApi(w: CoreApiWiring): Promise<CoreApi> {
   const app = await createApp(deps, { corsOrigins: w.corsOrigins ?? [] });
   configureInternal(deps, { serviceSecret: w.serviceSecret, keys });
   // T-082b: `POST /v1/ask` calls intel's `/ask` synchronously (a test may re-configure the port on the same deps).
-  configureThreads(deps, { keys, intel: createHttpAskPort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
+  configureThreads(deps, { keys, intel: createHttpAskPort({ url: w.intelUrl, serviceSecret: w.serviceSecret, ...(w.askTimeoutMs ? { timeoutMs: w.askTimeoutMs } : {}) }) });
   configureInvestigations(deps, { keys, narrate: createHttpNarratePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
   // T-114: `POST /v1/rfq-requests` calls intel's `/negotiate` synchronously.
   configureRfq(deps, { keys, intel: createHttpNegotiatePort({ url: w.intelUrl, serviceSecret: w.serviceSecret }) });
@@ -126,6 +128,7 @@ export function wiringFromConfig(config: Config, log: Logger, o: { idpMode: IdpM
     corsOrigins: parseCorsOrigins(config.corsOrigins),
     trustedProxyHops: config.trustedProxyHops,
     streamMaxAgeMs: config.streamMaxAgeMs,
+    askTimeoutMs: config.askTimeoutMs,
     ...(config.dbPoolMax ? { poolMax: config.dbPoolMax } : {}),
   };
 }

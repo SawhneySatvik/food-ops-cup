@@ -96,6 +96,7 @@ Run them with `node_modules/.bin/…` from `apps/web` (or `pnpm --filter @munim/
 | `vitest run` | unit tests: the shop (refusal copy, error parsing, tracker, pricing on the mock) and the staff screens (refs and "Cannot verify", copy, who may approve which draft, the mock's member rules, the demo sign-in route) |
 | `tsx scripts/smoke.ts` | storefront smoke; needs an absolute `NEXT_PUBLIC_MUNIM_API` (e.g. `http://localhost:4320/mock`) and the storefront key |
 | `tsx scripts/staff-smoke.ts` | staff smoke; on the real API also `STAFF_SMOKE_TOKENS=<file {"owner", "scoped"}>`. It places and completes one counter order, so run it only against the mock or a local copy, never a shared deployment |
+| `tsx scripts/nav-smoke.ts [--port=4510] [--shots=<dir>]` | the real clicks in Chromium on a production build of the mock (`next build` with `NEXT_PUBLIC_MUNIM_API=/mock`, the mock's storefront key and `NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=1`): menu, checkout, the tracker after placing, Request quotes and the staff detail pages, each reached by a client navigation through a stand-in for the deploy platform's routing of prerendered shells. It starts and stops `next start` itself |
 
 ## Art log
 

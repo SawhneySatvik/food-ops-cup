@@ -6,6 +6,7 @@
 //   stream composeCoreApi's streamMaxAgeMs reaches the stream: the server ends it with a max_age reconnect hint at
 //          that age, and the SDK reader reconnects (red-proven by removing the wiring — see the lane B2 report)
 //   pools  poolMax clamps every app pool
+//   ask    composeCoreApi's askTimeoutMs (MUNIM_ASK_TIMEOUT_S) is how long POST /v1/ask waits for an intel that never answers
 import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { serve } from "@hono/node-server";
 import { createLogger } from "@munim/config";
@@ -29,7 +30,7 @@ const lines: string[] = [];
 const closers: Array<() => Promise<void> | void> = [];
 const url = (role: string) => `postgres://${role}:${db.password}@127.0.0.1:${db.port}/${db.database}`;
 
-async function compose(extra: { streamMaxAgeMs?: number; poolMax?: number } = {}): Promise<{ api: CoreApi; base: string }> {
+async function compose(extra: { streamMaxAgeMs?: number; poolMax?: number; askTimeoutMs?: number; intelUrl?: string } = {}): Promise<{ api: CoreApi; base: string }> {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const config = { nodeEnv: "test", redact: (s: string) => s };
   const api = await composeCoreApi({
@@ -165,6 +166,26 @@ describe("stream lifetime from the wiring", () => {
     const deadline = Date.now() + 8_000;
     while (states.filter((s) => s === "open").length < 3 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
     expect(states.filter((s) => s === "open").length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("ask timeout from the wiring", () => {
+  it("askTimeoutMs is how long POST /v1/ask waits for intel: an intel that never answers is 503 at that age, not at 90 s", async () => {
+    // An intel that takes the request and never answers.
+    const held: Array<() => void> = [];
+    const intel = serve({ fetch: () => new Promise<Response>((resolve) => held.push(() => resolve(new Response(null, { status: 599 })))), port: 0, hostname: "127.0.0.1" });
+    const port = await new Promise<number>((resolve) => intel.once("listening", () => resolve((intel.address() as { port: number }).port)));
+    closers.push(() => new Promise<void>((r) => { held.forEach((f) => f()); intel.close(() => r()); }));
+    const { base } = await compose({ askTimeoutMs: 1_500, intelUrl: `http://127.0.0.1:${port}` });
+    const t0 = Date.now();
+    const res = await fetch(`${base}/v1/ask`, {
+      method: "POST", body: JSON.stringify({ question: "Why did butter waste go up?" }),
+      headers: { Authorization: `Bearer ${idp.sign({ sub: ownerSub })}`, [TENANT_HEADER]: w.tenant, "content-type": "application/json" },
+    });
+    const age = Date.now() - t0;
+    expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([503, "unavailable"]);
+    expect(age).toBeGreaterThanOrEqual(1_400);
+    expect(age).toBeLessThan(10_000);
   });
 });
 

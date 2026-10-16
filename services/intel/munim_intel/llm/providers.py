@@ -27,6 +27,7 @@ import asyncio
 import re
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import Any
 
 from google.adk.integrations.openai import OpenAILlm
 from google.adk.models.google_llm import Gemini
@@ -115,6 +116,45 @@ async def served(llm: TimedGemini | TimedOpenAILlm, req: LlmRequest, call: Async
     return [r.model_copy(update={"custom_metadata": {**(r.custom_metadata or {}), KEY: path}}) for r in responses]
 
 
+#: The JSON-schema keywords sent to Gemini: the part of its documented `response_json_schema` subset these schemas use.
+#: The rest (`minLength`, `maxLength`, `pattern`, `default`) are left out — UNVERIFIED that each alone is refused; the
+#: claims schema, which carries all four, answered 200 without them (R63).
+_GEMINI_KEYWORDS = frozenset(
+    ("type", "properties", "required", "additionalProperties", "items", "minItems", "maxItems", "minimum", "maximum", "enum", "anyOf")
+    + ("title", "description")
+)
+
+
+def _gemini_schema(node: Any) -> Any:
+    if not isinstance(node, dict):
+        return node
+    out: dict[str, Any] = {}
+    for k, v in node.items():
+        if k not in _GEMINI_KEYWORDS:
+            continue
+        if k == "properties":
+            out[k] = {name: _gemini_schema(s) for name, s in v.items()}
+        elif k == "anyOf":
+            out[k] = [_gemini_schema(s) for s in v]
+        else:
+            out[k] = _gemini_schema(v)
+    return out
+
+
+def gemini_request(req: LlmRequest) -> LlmRequest:
+    """The request as the Gemini API accepts it (R63, measured on gemini-3.5-flash-lite and gemini-3.8-flash; codes only).
+    A JSON-schema dict in `response_schema` (the quarantine's Pydantic schemas: supplier quotes, claims, invoice vision) is
+    sent as `response_json_schema`: `response_schema` is Google's OpenAPI subset, which has no `additionalProperties`, so
+    the API answered it 400 on every model. Keywords outside `_GEMINI_KEYWORDS` are left out; the response is still
+    validated against the whole Pydantic schema after it comes back (ingest.quarantine.call). A `types.Schema` (the
+    router's enum) stays as it is. A copy: the caller's request keys the recorded fallback (`served`) unchanged."""
+    schema = req.config.response_schema
+    if not isinstance(schema, dict):
+        return req
+    config = req.config.model_copy(update={"response_schema": None, "response_json_schema": _gemini_schema(schema)})
+    return req.model_copy(update={"config": config})
+
+
 class TimedGemini(Gemini):
     timeout_s: float = 60.0
     price: Price | None = None
@@ -124,7 +164,7 @@ class TimedGemini(Gemini):
     capped: bool = False
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
-        for r in await served(self, llm_request, super().generate_content_async(llm_request, stream)):
+        for r in await served(self, llm_request, super().generate_content_async(gemini_request(llm_request), stream)):
             yield r
 
 
