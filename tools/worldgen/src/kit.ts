@@ -460,7 +460,7 @@ export async function expense(c: Ctx, key: string, outletId: string, category: s
 
 // ---- imports (a file → parsed run → the owner approves the draft; nothing reaches the books before that) ------------
 
-export type ImportKindName = "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log";
+export type ImportKindName = "payout_statement" | "bank_statement" | "pos_export" | "tally_export" | "market_signal" | "pos_bills" | "waste_log" | "shift_log";
 interface Queued { key: string; kind: ImportKindName; filename: string; text: string; reason: string | null; hold: boolean }
 const queueOf = (c: Ctx): Queued[] => ((c.s.importQueue as Queued[] | undefined) ??= []);
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));

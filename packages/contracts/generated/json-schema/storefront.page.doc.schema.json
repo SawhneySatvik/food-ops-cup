@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "storefront.page.doc",
+  "title": "StorefrontPageDoc",
+  "x-munim-module": "storefront",
+  "type": "object",
+  "properties": {
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9a-f]{6}$"
+        },
+        "secondary": {
+          "type": "string",
+          "pattern": "^#[0-9a-f]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9a-f]{6}$"
+        },
+        "radius": {
+          "type": "string",
+          "enum": [
+            "soft",
+            "round"
+          ]
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "hero-banner",
+            "menu-grid",
+            "menu-list"
+          ]
+        }
+      },
+      "required": [
+        "primary",
+        "secondary",
+        "accent",
+        "radius",
+        "layout"
+      ],
+      "additionalProperties": false
+    },
+    "sections": {
+      "minItems": 4,
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "hero"
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "badge": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "tagline": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "kind",
+              "visible",
+              "badge",
+              "tagline"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "outlets"
+              },
+              "visible": {
+                "type": "boolean",
+                "const": true
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              }
+            },
+            "required": [
+              "kind",
+              "visible",
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "ribbon"
+              },
+              "visible": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "visible"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "cards"
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "cards": {
+                "minItems": 2,
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "body"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "visible",
+              "cards"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "theme",
+    "sections"
+  ],
+  "additionalProperties": false
+}

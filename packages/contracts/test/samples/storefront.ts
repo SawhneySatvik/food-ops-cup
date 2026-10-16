@@ -4,7 +4,24 @@ import { SAMPLES as ORDERS, placeOrder } from "./orders.ts";
 const accepting = { outlet_id: u(2), state: "busy", busy_extra_min: 10, default_prep_min: 15, next_open: null, tz: "Asia/Kolkata", as_of: T_PG };
 const guest = { name: "Asha (synthetic)", phone: "+919800000000", email: null, consent: { marketing: false, at: T_Z } };
 
+const pageDoc = {
+  theme: { primary: "#7b3f1d", secondary: "#9e2f4e", accent: "#f6d9c8", radius: "round", layout: "hero-banner" },
+  sections: [
+    { kind: "hero", visible: true, badge: "Lucknow · pickup only", tagline: "Baked at dawn." },
+    { kind: "outlets", visible: true, title: "Pick your bakehouse" },
+    { kind: "ribbon", visible: false },
+    { kind: "cards", visible: true, cards: [{ title: "Gift boxes", body: "Pick a box." }, { title: "Cakes", body: "With a message." }] },
+  ],
+};
+const pageVersion = { page_id: u(70), version: 2, created_at: T_PG, created_by: u(4), created_by_name: "Nandini (synthetic)" };
+
 export const SAMPLES: Record<string, unknown> = {
+  "storefront.page.doc": pageDoc,
+  "storefront.page.save.v1": { page_id: u(70), based_on_version: 1, doc: pageDoc },
+  "storefront.page.publish.v1": { publish_id: u(71), page_id: u(70) },
+  "v1.storefront-pages": { versions: [pageVersion], live: { page_id: u(70), version: 2, published_at: T_PG, published_by: u(4), published_by_name: "Nandini (synthetic)" } },
+  "v1.storefront-page": { ...pageVersion, doc: pageDoc },
+  "storefront.page.public": { page: { version: 2, published_at: T_PG, doc: pageDoc } },
   "storefront.guest.create.v1": guest,
   "storefront.order.cancel.v1": { order_id: u(10), reason: "changed_mind" },
   "storefront.order.reschedule.v1": { order_id: u(10), pickup_window_id: u(60), promised_at: T, preview_total_minor: 33600 },

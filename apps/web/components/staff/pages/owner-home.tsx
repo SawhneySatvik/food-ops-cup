@@ -22,6 +22,7 @@ import { OfflineBanner } from "../../ui";
 import { useStaff } from "../shell";
 import { CannotVerify, SnapshotDrawer, SourcedValue, StatCard } from "../source";
 import { RequestQuotes } from "../suppliers/request-quotes";
+import { Rollup } from "../rollup";
 import { LiveLine, NotForRole, type OpenRef } from "./inbox";
 
 
@@ -61,6 +62,9 @@ export function OwnerHomePage() {
   const online = useOnline();
   const waitS = useCountdown(retryAt, () => setRetryAt(null));
   const outletId = outlet?.id ?? null;
+  // T-128: the owner of several outlets also sees them together ("All outlets"); each outlet's books stay apart.
+  const [scope, setScope] = useState<"outlet" | "all">("outlet");
+  const rollupAllowed = session.me.outlet_ids === "*" && outlets.length > 1 && ["owner", "judge"].includes(session.me.role);
 
   const loadFigures = useCallback(async () => {
     if (!outletId) return;
@@ -123,17 +127,27 @@ export function OwnerHomePage() {
         <div className="wrap staff-main space-y-2">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="section-title">{outlet.name} today</h1>
+              {rollupAllowed && (
+                <div role="radiogroup" aria-label="Show" className="mb-3 flex flex-wrap gap-2">
+                  <button type="button" role="radio" aria-checked={scope === "outlet"} className="chip" aria-current={scope === "outlet" ? "true" : undefined} onClick={() => setScope("outlet")}>{outlet.name}</button>
+                  <button type="button" role="radio" aria-checked={scope === "all"} className="chip" aria-current={scope === "all" ? "true" : undefined} onClick={() => setScope("all")}>All outlets</button>
+                </div>
+              )}
+              <h1 className="section-title">{scope === "all" && rollupAllowed ? "All outlets today" : `${outlet.name} today`}</h1>
               <p className="mt-3 text-muted">
                 {today ? `Business date ${formatDate(today, SITE.locale)} · ` : ""}Figures are taken from the books when this page opens.
               </p>
             </div>
-            <button type="button" className="btn btn-plain" disabled={figures === null || retryAt !== null} onClick={() => void loadFigures()}>Refresh figures</button>
+            {scope === "outlet" && <button type="button" className="btn btn-plain" disabled={figures === null || retryAt !== null} onClick={() => void loadFigures()}>Refresh figures</button>}
           </div>
           {retryAt !== null && <p className="text-muted" role="status">Too many requests. Please wait a moment and try again. You can refresh in {waitS} s.</p>}
           {figures?.error && figures.error.kind !== "rate_limited" && !today && <p className="text-muted">{staffErrorText(figures.error, "home")}</p>}
         </div>
 
+        {scope === "all" && rollupAllowed && today && fmt && (
+          <div className="wrap"><Rollup client={client} outlets={outlets} today={today} fmt={fmt} onOpen={open} onAuth={handleAuth} /></div>
+        )}
+        {(scope === "outlet" || !rollupAllowed) && (
         <section aria-label="Today's figures" className="wrap grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="card stat">
             <p className="stat-label">Orders today</p>
@@ -169,6 +183,7 @@ export function OwnerHomePage() {
             <p className="text-[14px] text-muted">To simulated recipients. Measured on synthetic data. <Link href="/staff/cares" className="inline-flex min-h-12 items-center font-semibold">Open Cares</Link></p>
           </div>
         </section>
+        )}
 
         <div className="wrap grid gap-6 lg:grid-cols-[2fr_1fr]">
           <section aria-labelledby="needs-title" className="space-y-3">

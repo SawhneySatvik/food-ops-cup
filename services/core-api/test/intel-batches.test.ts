@@ -267,13 +267,14 @@ const returnDraft = (note: string, pack = "inventory_purchasing", basis = "on_ha
 const drafts = () => count(`SELECT count(*) n FROM core.draft WHERE tenant_id = $1`, [A.tenant]);
 
 describe("drafts: number grammar over prose leaves (gate 6), pack = an F8 id (gate 7)", () => {
-  it("the prose leaves of every intel-proposable draftable = the hand list (3); imports.* are excepted (no specialist proposes them)", async () => {
+  it("the prose leaves of every intel-proposable draftable = the hand list (4); imports.* are excepted (no specialist proposes them)", async () => {
     await loadRegistry();
     // Hand list (T-080's finding, read from the proposal schemas by eye): free strings a person reads on the draft. The
     // workflow invoice's `invoice_no` is an identifier (excepted by name, beside the coupon code); its description is prose.
-    // customers.campaign.create.v1's `name` left with the campaign draftable (R-B S1-D ruling, 11 Oct: no specialist proposes it).
-    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "purchasing.invoice.record.v1:lines[].description",
-      "purchasing.supplier_return.create.v1:note"];
+    // customers.campaign.create.v1's `name` left with the campaign draftable (R-B S1-D ruling, 11 Oct) and is back with it
+    // (R67, 16 Oct: the Customers desk proposes the demo win-back campaign), so a digit in it is refused like any other prose.
+    const HAND = ["compliance.maintenance.schedule.v1:vendor_note", "customers.campaign.create.v1:name",
+      "purchasing.invoice.record.v1:lines[].description", "purchasing.supplier_return.create.v1:note"];
     const proposable = [...new Set(SPECIALIST_REGISTRY.specialists.flatMap((s) => [...s.draftables, ...s.workflow_draftables]))];
     expect(proposable.length).toBeGreaterThan(10);
     expect(proposable.flatMap((t) => [...proseLeafPaths(t)].map((p) => `${t}:${p}`)).sort()).toEqual(HAND);

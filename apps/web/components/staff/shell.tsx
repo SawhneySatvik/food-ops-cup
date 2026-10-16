@@ -48,8 +48,12 @@ const NAV: readonly { href: string; label: string; screen: string; also?: string
   { href: "/staff/home", label: "Home", screen: "home" },
   { href: "/staff/inbox", label: "Inbox", screen: "inbox" },
   { href: "/staff/ask", label: "Ask Munim", screen: "ask" },
+  { href: "/staff/office", label: "The office", screen: "office" },
+  { href: "/staff/investigations", label: "Investigations", screen: "investigations" },
   { href: "/staff/cares", label: "Cares", screen: "cares" },
   { href: "/staff/suppliers", label: "Suppliers", screen: "suppliers", also: "/staff/purchase-orders" },
+  { href: "/staff/campaigns", label: "Campaigns", screen: "campaigns" },
+  { href: "/staff/storefront", label: "Storefront", screen: "storefront" },
 ];
 
 // "sm" and up, as Tailwind's: the bar keeps everything in one row there; on a phone the outlet and the labels move under it.

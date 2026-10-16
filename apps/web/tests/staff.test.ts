@@ -83,8 +83,9 @@ describe("mock member rules (14 §10, 15 §10)", () => {
   it("the inbox holds the expiry finding, the Cares proposal and the pooled purchase order", async () => {
     const r = await call("GET", "/v1/inbox", "owner");
     const items = r.body.items as { kind: string }[];
-    expect(items.length).toBe(8);
-    expect(items.filter((i) => i.kind === "draft").length).toBe(5);
+    // T-128 (R67): plus the Customers desk's lapsing-regulars finding and its win-back campaign draft.
+    expect(items.length).toBe(10);
+    expect(items.filter((i) => i.kind === "draft").length).toBe(6);
   });
 
   it("staff cannot mint or decide; a staff withdraw is book_write_refused", async () => {

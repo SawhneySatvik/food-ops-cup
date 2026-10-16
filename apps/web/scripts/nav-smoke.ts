@@ -1,7 +1,8 @@
 // file: scripts/nav-smoke.ts
 // The real clicks on a production build, in a browser: home → menu → checkout → place → tracker (router.replace), and as
 // the owner: Low stock → Request quotes for both outlets → the purchase-order draft, Suppliers → a purchase order → a
-// supplier. Every hop into a route with an id in its path is a client navigation, as people make them.
+// supplier, then (T-128) Investigations → an investigation and The office → the Customers desk. Every hop into a route with
+// an id in its path is a client navigation, as people make them.
 //   cd apps/web && NEXT_PUBLIC_MUNIM_API=/mock NEXT_PUBLIC_MUNIM_STOREFRONT_KEY=<the mock's key> NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=1 next build
 //   tsx scripts/nav-smoke.ts [--port=4510] [--shots=<dir>]
 // It starts `next start` on --port (MUNIM_MOCK=1) and a stand-in for the deploy platform's routing on --port + 1, drives Chromium
@@ -135,6 +136,20 @@ async function owner(page: Page, width: number) {
   await page.waitForURL(/\/staff\/suppliers\/[0-9a-f-]{36}$/);
   await until("the supplier", async () => (await heading(page)) !== "", 20_000).catch(() => undefined);
   check("a supplier after a client navigation", !/^Not found\.?$/.test(await heading(page)) && (await heading(page)) !== "", await heading(page));
+
+  // T-128's routes with a param in the path: an investigation and a specialist's desk, each reached by a click.
+  await page.getByRole("link", { name: "Investigations", exact: true }).first().click();
+  await page.waitForURL(/\/staff\/investigations$/);
+  await page.locator("a[href^='/staff/investigations/']").first().click({ timeout: 20_000 });
+  await page.waitForURL(/\/staff\/investigations\/[0-9a-f-]{36}$/);
+  await until("the investigation", async () => (await heading(page)) !== "", 20_000).catch(() => undefined);
+  check("an investigation after a client navigation", !/couldn't find|isn't valid/.test(await heading(page)) && (await heading(page)) !== "", await heading(page));
+  await page.getByRole("link", { name: "The office", exact: true }).first().click();
+  await page.waitForURL(/\/staff\/office$/);
+  await page.locator("a[href='/staff/office/customers']").click({ timeout: 20_000 });
+  await page.waitForURL(/\/staff\/office\/customers$/);
+  await until("the desk", async () => (await heading(page)) !== "", 20_000).catch(() => undefined);
+  check("a specialist's desk after a client navigation", (await heading(page)) === "Customers desk", await heading(page));
 }
 
 async function main() {

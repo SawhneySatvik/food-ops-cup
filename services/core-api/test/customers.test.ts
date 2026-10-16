@@ -23,7 +23,7 @@ import { loyaltyEarnFor, loyaltyRedeem, loyaltyReverseFor, readLoyalty } from ".
 import { runTemplate } from "../src/modules/approvals/snapshots.ts";
 import { createLocalIdp } from "../src/auth/local-idp.ts";
 import { openDb } from "./db.ts";
-import { findSendPaths } from "./customers.nosend.ts";
+import { findSendPaths, SENT_ALLOWED_IN } from "./customers.nosend.ts";
 import { buildTenant, type Tenant } from "./world.ts";
 
 const idp = createLocalIdp();
@@ -322,6 +322,37 @@ describe("campaigns: drafts only, never sent", () => {
     // Nothing in this module ever marks a campaign sent.
     expect(await count(`SELECT count(*) n FROM core.campaign WHERE status = 'sent'`)).toBe(0);
   });
+
+  it("R67: recording a queued campaign as sent (simulated) — refused demo_only on a business that is not a demo; on a demo business the owner's command moves it once", async () => {
+    const snap = await mint(7);
+    const p = payloadFor(snap);
+    expect((await approve(await draftFor(p, [p.audience_count as string]))).status).toBe(200);
+    const sent = () => post("owner", "/v1/campaigns:record-sent", "customers.campaign.record_sent.v1", { campaign_id: p.campaign_id });
+    const once = env("customers.campaign.record_sent.v1", { campaign_id: p.campaign_id });
+    const statusOf = async () => (await one<{ status: string }>(`SELECT status FROM core.campaign WHERE id = $1`, [p.campaign_id])).status;
+    expect(await err(await sent())).toEqual({ status: 403, code: "forbidden", reason: "demo_only" });
+    expect(await statusOf()).toBe("queued");
+    // is_demo is the operator's (provisioning); the fixture flips it as plumbing, then puts it back.
+    const demo = (on: boolean) => db.admin(`SET session_replication_role = replica; UPDATE core.tenant SET is_demo = ${on} WHERE tenant_id = '${t.tenant}'; RESET session_replication_role`);
+    await demo(true);
+    try {
+      expect((await post("manager", "/v1/campaigns:record-sent", "customers.campaign.record_sent.v1", { campaign_id: p.campaign_id })).status).toBe(403);
+      const first = await call("POST", "/v1/campaigns:record-sent", t.ownerSub, once);
+      const body = await first.text();
+      const replay = await call("POST", "/v1/campaigns:record-sent", t.ownerSub, once);
+      expect([first.status, replay.status, replay.headers.get("X-Munim-Replayed"), (await replay.text()) === body]).toEqual([200, 200, "true", true]);
+      expect(await statusOf()).toBe("sent");
+      expect(await err(await sent())).toEqual({ status: 409, code: "illegal_transition", reason: null });
+      expect(await count(`SELECT count(*) n FROM core.audit_log WHERE entity = 'core.campaign' AND entity_id = $1 AND after ->> 'status' = 'sent'`, [p.campaign_id])).toBe(1);
+      const audit = await one<{ after: { status: string; simulated: boolean } }>(
+        `SELECT after FROM core.audit_log WHERE entity = 'core.campaign' AND entity_id = $1 AND after ->> 'status' = 'sent'`, [p.campaign_id]);
+      expect(audit.after).toEqual({ status: "sent", simulated: true });
+      const list = CampaignListResponse.parse(await (await get("owner", "/v1/campaigns")).json());
+      expect(list.campaigns.find((c) => c.campaign_id === p.campaign_id)).toMatchObject({ status: "sent", never_auto_sent: true });
+    } finally {
+      await demo(false);
+    }
+  });
 });
 
 describe("no code path sends a message (R40 C6)", () => {
@@ -346,10 +377,21 @@ describe("no code path sends a message (R40 C6)", () => {
     ];
     for (const line of planted) expect(findSendPaths(MODULE, { extra: { "planted.ts": line } }).length, line).toBeGreaterThanOrEqual(1);
   });
+  it("R67: the sent status is allowed only in campaign-sent.ts, which is still scanned for every send path", () => {
+    const sent = `await c.query("UPDATE core.campaign SET status = 'sent'");`;
+    // the same line in any other file of the module is a hit; in the allowed file alone it is not …
+    expect(findSendPaths(MODULE, { extra: { [`${MODULE}records-extra.ts`]: sent } })).toHaveLength(1);
+    expect(findSendPaths(MODULE, { extra: { [`${MODULE}${SENT_ALLOWED_IN}`]: sent } })).toEqual([]);
+    // … and a send path planted in the allowed file is still found.
+    for (const line of [`await fetch("https://sms.example.test", { method: "POST" });`, `import { twilio } from "twilio";`, `sendSms(to, body);`]) {
+      expect(findSendPaths(MODULE, { extra: { [`${MODULE}${SENT_ALLOWED_IN}`]: `${sent}\n${line}` } }).length, line).toBeGreaterThanOrEqual(1);
+    }
+  });
   it("the router exposes no send/create route for campaigns", async () => {
     const mod = await import("../src/modules/customers/index.ts");
     const paths = (mod.router.routes as Array<{ method: string; path: string }>).map((r) => `${r.method} ${r.path}`);
-    expect([...new Set(paths.filter((p) => /campaign/.test(p)))].sort()).toEqual(["GET /v1/campaigns", "POST /v1/campaigns:cancel"]);
+    // R67: record-sent records a demo campaign as sent (simulated); it sends nothing (the scanner above covers its file).
+    expect([...new Set(paths.filter((p) => /campaign/.test(p)))].sort()).toEqual(["GET /v1/campaigns", "POST /v1/campaigns:cancel", "POST /v1/campaigns:record-sent"]);
   });
 });
 

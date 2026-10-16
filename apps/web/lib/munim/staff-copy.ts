@@ -4,7 +4,7 @@
 // so client.ts files them under kind "invalid", which is not what the person needs to hear.
 import type { MunimError } from "./client";
 
-export type StaffWhere = "counter" | "kitchen" | "home" | "inbox" | "ask" | "cares" | "suppliers" | "sign-in";
+export type StaffWhere = "counter" | "kitchen" | "home" | "inbox" | "ask" | "cares" | "suppliers" | "sign-in" | "investigations" | "office" | "storefront" | "campaigns";
 
 /** One line for a failed call. Callers handle kind "auth" (401: sign out) and "not_found" (404) themselves. */
 export function staffErrorText(e: MunimError, where: StaffWhere): string {
@@ -21,11 +21,15 @@ export function staffErrorText(e: MunimError, where: StaffWhere): string {
       return "It was approved but could not be applied. Nothing changed.";
     case "forbidden":
     case "book_write_refused":
-      return "Your role can't do this. Ask the owner.";
+      return (e.reasonCode && e.reasonCode !== "authority_denied" && reasonText(e.reasonCode)) || "Your role can't do this. Ask the owner.";
     case "idempotency_conflict":
       return "That didn't go through. Please try again.";
     case "currency_mismatch":
       return "That amount is in the wrong currency.";
+    case "sequence_gap":
+      return "Someone else ran that step first. It has been refreshed.";
+    case "investigation_refused":
+      return "This investigation can't take that step any more. It has been refreshed.";
     default:
       break;
   }
@@ -75,6 +79,14 @@ export function reasonText(code: string): string | null {
     qty_exceeds_listed: "That's more than was listed.",
     unit_mismatch: "That unit doesn't match the item's stock unit.",
     rate_limited: "Too many requests. Please wait a moment and try again.",
+    // T-128
+    mode_above_ceiling: "Your role can't use that mode. The owner sets the highest mode for each role.",
+    theme_contrast: "Those colours are too hard to read. Pick colours with stronger contrast.",
+    page_version_stale: "Someone saved a newer version while you were editing. Your changes are still here: load the newest, then save again.",
+    demo_only: "Recording a message as sent is only for the demo business. Munim never sends messages.",
+    demo_protected: "This is switched off on the shared demo business so it keeps working for everyone.",
+    no_marketing_consent: "Nobody in this group has agreed to hear from you, so there is no one to send it to.",
+    campaign_audience_unscoped: "This message's audience isn't limited to the customers it is about, so it can't be prepared.",
   };
   return t[code] ?? null;
 }

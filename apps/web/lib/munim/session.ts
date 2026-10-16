@@ -150,5 +150,11 @@ export const CAN: Record<string, readonly Role[]> = {
   ask: ["owner", "manager", "staff", "advisor", "judge"],
   cares: ["owner", "manager", "staff", "judge"],
   suppliers: ["owner", "manager", "judge"],
+  // T-128. Investigations read finance templates (advisor and up), so a manager would only ever see them restricted.
+  investigations: ["owner", "advisor", "judge"],
+  office: ["owner", "manager", "judge"],
+  campaigns: ["owner", "manager", "judge"],
+  // Saving needs every outlet (the storefront serves them all); a single-outlet manager sees the page read-only.
+  storefront: ["owner", "manager", "judge"],
 };
 export const can = (s: Session | null, screen: keyof typeof CAN): boolean => s !== null && CAN[screen]!.includes(s.me.role);

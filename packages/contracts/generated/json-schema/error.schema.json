@@ -138,7 +138,11 @@
                 "rate_limited",
                 "handover_must_be_complete",
                 "offer_handover_final",
-                "pickup_time_outside_window"
+                "pickup_time_outside_window",
+                "theme_contrast",
+                "page_version_stale",
+                "demo_only",
+                "demo_protected"
               ]
             },
             {

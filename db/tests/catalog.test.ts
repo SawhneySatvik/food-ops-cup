@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { TestDb } from "../src/harness.ts";
 import { openDb } from "./db.ts";
 import {
-  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, OUTLET_NULLABLE, OUTLET_TABLES, PARENT_SCOPED,
+  CUSTOMER_CODE, CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_PUBLISHED, CUSTOMER_VIA_ORDER, OUTLET_NULLABLE, OUTLET_TABLES, PARENT_SCOPED,
   RUN_SCOPED, RUN_SCOPED_CHILDREN, TENANT_TABLES,
 } from "./manifest.ts";
 
@@ -92,6 +92,9 @@ function customerForm(t: string): [string, string] | null {
   if (CUSTOMER_VIA_ORDER.includes(t)) return [viaOrder(t.split(".")[1]!), viaOrder(t.split(".")[1]!)];
   if (CUSTOMER_PUBLIC.includes(t)) return ["true", NC];
   if (CUSTOMER_CODE.includes(t)) return [`(${NC} OR (code = ANY ((( SELECT NULLIF(current_setting('app.coupon_codes'::text, true), ''::text) AS "nullif"))::text[])))`, NC];
+  if (CUSTOMER_PUBLISHED.includes(t)) return [`(${NC} OR (EXISTS ( SELECT 1
+   FROM core.storefront_page_publish p
+  WHERE ((p.tenant_id = storefront_page_version.tenant_id) AND (p.page_id = storefront_page_version.id)))))`, NC];
   return [NC, NC];
 }
 

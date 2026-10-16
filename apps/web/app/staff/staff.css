@@ -126,4 +126,36 @@
 
   /* ---- states ---- */
   .state-box { display: grid; justify-items: center; gap: 10px; padding: 36px 20px; text-align: center; color: var(--muted); }
+
+  /* ---- T-128 ---- */
+  /* A warning as a block: "Waiting for the books" and its kind, the --warn pair (6.10 : 1, 02 §2). */
+  .note-warn { padding: 12px 14px; background: var(--warn-bg); color: var(--warn); border: 1.5px solid var(--warn); border-radius: var(--radius-field); }
+
+  /* The AI office: desks on a tiled floor; the active desk nods and its lamp lights (CSS only, off under reduced motion). */
+  .office-floor {
+    padding: 14px; border: 1.5px solid var(--line); border-radius: var(--radius-card);
+    background-color: var(--bg-deep);
+    background-image: linear-gradient(90deg, rgb(140 110 90 / 0.12) 1px, transparent 1px), linear-gradient(rgb(140 110 90 / 0.12) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .office-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .office-desk {
+    display: grid; gap: 4px; align-content: start; min-height: 48px; padding: 10px 10px 12px; text-align: center; color: var(--ink); text-decoration: none;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow);
+  }
+  .office-desk[data-active="true"] { border-color: var(--primary); border-width: 2.5px; box-shadow: var(--shadow-lift); }
+  .office-desk-name { font-weight: 700; font-size: 16px; line-height: 1.25; }
+  .office-bubble { justify-self: center; max-width: 100%; padding: 4px 10px; border-radius: var(--radius-pill); border: 1.5px solid var(--primary); background: var(--card); font-size: 14px; font-weight: 650; }
+  .office-bubble[data-tone="found"], .office-bubble[data-tone="draft"] { background: var(--accent); color: var(--on-accent); }
+  .office-bubble[data-tone="stop"] { border-color: var(--danger); color: var(--danger); }
+  .office-bubble[data-tone="cannot"] { border-style: dashed; border-color: var(--danger); color: var(--danger); }
+  .office-art { display: block; width: 100%; height: auto; max-height: 120px; }
+  .office-art[data-active="true"] .office-person { animation: office-nod 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+  .office-art[data-active="true"] .office-lamp { fill: var(--warn-bg); }
+  .office-art[data-active="true"] .office-paper { animation: office-drop 1.4s ease-out infinite; transform-box: fill-box; }
+  @keyframes office-nod { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+  @keyframes office-drop { 0% { transform: translateY(-8px); opacity: 0.4; } 40%, 100% { transform: translateY(0); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .office-art[data-active="true"] .office-person, .office-art[data-active="true"] .office-paper { animation: none; }
+  }
 }

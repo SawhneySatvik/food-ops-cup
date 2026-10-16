@@ -20,6 +20,7 @@ import { accepting, channelKind, menu, outletRow, outlets, pickupWindows } from 
 import { cancelHandler, getOrder, rescheduleHandler, reschedulePreview, runShopperCommand } from "./orders.ts";
 import { router as caresSection } from "./cares.ts";
 import { router as caresNetwork } from "../cares-network/index.ts";
+import { router as pages } from "./pages.ts";
 
 export { configureStorefront, resetStorefront } from "./config.ts";
 export type { SaleEntry, Seams } from "./config.ts";
@@ -104,3 +105,5 @@ export const router = new Hono<AppEnv>()
 // T-004, is unchanged).
 router.route("/", caresSection);
 router.route("/", caresNetwork);
+// T-128: the storefront page (theme and home page sections): member edits and the shopper's read of the live version.
+router.route("/", pages);

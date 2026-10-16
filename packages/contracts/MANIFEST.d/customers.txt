@@ -3,6 +3,7 @@ customers.loyalty.adjust.v1
 customers.campaign.create.v1
 proposal.customers.campaign.create.v1
 customers.campaign.cancel.v1
+customers.campaign.record_sent.v1
 customers.reservation.upsert.v1
 customers.review.record.v1
 customers.bulk_order.upsert.v1

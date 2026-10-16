@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { AppContext, TestDb } from "../src/harness.ts";
 import { openDb } from "./db.ts";
 import { attempt } from "./gates.ts";
-import { CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_VIA_ORDER, CUSTOMER_CODE, TENANT_TABLES } from "./manifest.ts";
+import { CUSTOMER_OPEN, CUSTOMER_OWN, CUSTOMER_PUBLIC, CUSTOMER_PUBLISHED, CUSTOMER_VIA_ORDER, CUSTOMER_CODE, TENANT_TABLES } from "./manifest.ts";
 import { buildWorld, ownerCtx, uuidv7, type World } from "./world.ts";
 
 let db: TestDb;
@@ -240,7 +240,8 @@ async function customerProbe(x: TestDb): Promise<Record<string, number>> {
 describe("#31 F4 — customer RLS", () => {
   test("a customer sees own rows, the public catalogue and presented codes; 0 rows everywhere else", async () => {
     const seen = await customerProbe(db);
-    const reachable = [...CUSTOMER_OWN, ...CUSTOMER_VIA_ORDER, ...CUSTOMER_PUBLIC, ...CUSTOMER_CODE, ...CUSTOMER_OPEN];
+    // 0034: the world publishes its storefront page, so the shopper reads that one version (CUSTOMER_PUBLISHED).
+    const reachable = [...CUSTOMER_OWN, ...CUSTOMER_VIA_ORDER, ...CUSTOMER_PUBLIC, ...CUSTOMER_CODE, ...CUSTOMER_OPEN, ...CUSTOMER_PUBLISHED];
     const leaked = Object.entries(seen).filter(([t, n]) => !reachable.includes(t) && n > 0);
     console.log(`F4 probe: ${Object.values(seen).filter((n) => n === 0).length}/${TENANT_TABLES.length} tables show 0 rows; journal ${seen["core.journal_entry"]}, member ${seen["core.member"]}, audit ${seen["core.audit_log"]}, outbox ${seen["core.outbox"]}, draft ${seen["core.draft"]}, finding ${seen["intel.finding"]}, snapshot ${seen["evidence.snapshot"]}; own orders ${seen["core.order"]}, coupons ${seen["core.coupon"]}`);
     expect(leaked).toEqual([]);
@@ -249,6 +250,7 @@ describe("#31 F4 — customer RLS", () => {
     expect(seen["core.order"]).toBe(2); // both of the world customer's orders (outlets 1 and 2): no outlet scope for shoppers
     expect(seen["core.coupon"]).toBe(1);
     expect(seen["core.price"]).toBeGreaterThan(0);
+    expect([seen["core.storefront_page_publish"], seen["core.storefront_page_version"]]).toEqual([1, 1]);
     const own = await db.withContext("munim_core", cust(A.customer, "customers.data.export.v1"), (c) =>
       c.query(`SELECT DISTINCT customer_id FROM core."order" UNION SELECT DISTINCT customer_id FROM core.loyalty_entry`));
     expect(own.rows.map((r) => r.customer_id)).toEqual([A.customer]);

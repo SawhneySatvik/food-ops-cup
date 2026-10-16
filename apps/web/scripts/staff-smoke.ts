@@ -1,7 +1,8 @@
 // file: scripts/staff-smoke.ts
 // Proves the staff client against an API before any staff UI is built: who am I, the till (menu, preview, place,
 // replay, key reuse, read, tender), the kitchen (board, live event, advance, stale advance), the inbox and drafts,
-// snapshots, Ask (mock only unless STAFF_SMOKE_ASK=1), Cares, suppliers, and the 401 / 404 rules.
+// snapshots, Ask (mock only unless STAFF_SMOKE_ASK=1), Cares, suppliers, T-128's reads (investigations, a desk, runs and traces,
+// brands, the storefront page, campaigns; a Step investigation on the mock only), and the 401 / 404 rules.
 //   Mock:     NEXT_PUBLIC_MUNIM_API=http://localhost:3000/mock npx tsx scripts/staff-smoke.ts
 //   Real API: also STAFF_SMOKE_TOKENS=<path to {"owner": "<token>", "scoped": "<token>"}>. Tokens are read from that
 //             file and never printed. "scoped" is a member with a list of outlets (counter staff on the mock).
@@ -189,6 +190,33 @@ async function main(): Promise<void> {
   const items = suppliers.ok ? suppliers.data.items : [];
   const labelled = items.filter((s) => s.kind === "simulated" && s.label === "Simulated supplier").length;
   check("suppliers", items.length > 0 && labelled === items.length, suppliers.ok ? `${items.length} supplier(s), ${labelled} simulated and labelled` : why(suppliers.error));
+
+  // ---- T-128: investigations, the office, brands, the storefront page, campaigns (reads; a Step investigation on the mock) ----
+  const policy = await owner.getAiPolicy();
+  check("ai policy", policy.ok && policy.data.ceilings.some((c) => c.role === "owner"), policy.ok ? `${policy.data.ceilings.length} role ceilings` : why(policy.error));
+  const invs = await owner.listInvestigations();
+  check("investigations", invs.ok, invs.ok ? `${invs.data.items.length} visible` : why(invs.error));
+  if (isMock) {
+    const id = uuidv7();
+    const made = await owner.createInvestigation({ investigation_id: id, playbook_id: "margin_fall", params: { period_month: "2026-09-01", compare_month: "2026-08-01" } });
+    const stepped = made.ok ? await owner.continueInvestigation(id, 1) : made;
+    check("investigation: create and run step 1", stepped.ok && stepped.data.steps_done === 1, stepped.ok ? `${stepped.data.status}` : why(stepped.error));
+  } else skip("investigation step", "the real API would write an investigation");
+  const desk = await owner.getSpecialistDesk("inventory_purchasing");
+  check("a specialist's desk", desk.ok && desk.data.specialist.id === "inventory_purchasing", desk.ok ? `${desk.data.findings.length} finding(s), ${desk.data.drafts.length} draft(s)` : why(desk.error));
+  const runs = await owner.listRuns();
+  const firstRun = runs.ok ? runs.data.items[0] : undefined;
+  if (!firstRun) check("runs", runs.ok, runs.ok ? "none yet" : why(runs.error));
+  else {
+    const t = await owner.getTraces(firstRun.run_id);
+    check("a run's trace", t.ok && t.data.run_id === firstRun.run_id, t.ok ? `${t.data.events.length} event(s)` : why(t.error));
+  }
+  const brands = await owner.listBrands();
+  check("brands", brands.ok, brands.ok ? `${brands.data.brands.length} brand(s)` : why(brands.error));
+  const pages = await owner.listStorefrontPages();
+  check("storefront page versions", pages.ok, pages.ok ? `${pages.data.versions.length} version(s), live ${pages.data.live ? `v${pages.data.live.version}` : "none"}` : why(pages.error));
+  const campaigns = await owner.listCampaigns();
+  check("campaigns", campaigns.ok && campaigns.data.campaigns.every((c) => c.never_auto_sent), campaigns.ok ? `${campaigns.data.campaigns.length} campaign(s)` : why(campaigns.error));
 
   // ---- credentials and scope ----
   const noToken = await createStaffClient({ baseUrl, token: () => "", tenantId: who.tenantId }).listOutlets();

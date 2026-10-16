@@ -14,13 +14,19 @@ export interface MockControls {
   ai?: ForcedAi | null;
   /** A request for quotes answers this negotiation status (core's X-Munim-Negotiation values). */
   negotiation?: string | null;
+  /** T-128: the business runs three brands (a cloud kitchen), so the brand switch shows. */
+  brands?: "three" | null;
+  /** T-128: a business that is not a demo: publishing the storefront works, recording a campaign as sent does not. */
+  demo?: "off" | null;
+  /** T-128: a new investigation's later month is missing bank lines, so it waits for the books. */
+  investigation?: "waiting" | null;
 }
 
 const STORAGE_KEY = "munim.mock.controls";
 export const MOCK_CONTROLS_ENABLED = process.env.NEXT_PUBLIC_MUNIM_MOCK_CONTROLS === "1";
 
 export function readMockControls(): MockControls {
-  const none: MockControls = { accepting: null, force429: false, decision: null, ai: null, negotiation: null };
+  const none: MockControls = { accepting: null, force429: false, decision: null, ai: null, negotiation: null, brands: null, demo: null, investigation: null };
   if (!MOCK_CONTROLS_ENABLED || typeof window === "undefined") return none;
   try {
     return { ...none, ...(JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<MockControls>) };
@@ -45,5 +51,8 @@ export function mockHeaders(): Record<string, string> {
   if (c.decision) h["X-Mock-Force-Decision"] = c.decision;
   if (c.ai) h["X-Mock-Force-Ai"] = c.ai;
   if (c.negotiation) h["X-Mock-Force-Negotiation"] = c.negotiation;
+  if (c.brands) h["X-Mock-Brands"] = c.brands;
+  if (c.demo) h["X-Mock-Demo"] = c.demo;
+  if (c.investigation) h["X-Mock-Force-Investigation"] = c.investigation;
   return h;
 }

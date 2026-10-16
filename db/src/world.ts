@@ -536,7 +536,24 @@ export async function buildWorld(db: TestDb, opts: { country?: "IN" | "AU" } = {
     await c.query(`INSERT INTO platform.llm_budget (tenant_id, month, limit_minor, currency) VALUES ($1, '2026-10-01', 500000, $2)`, [T, currency]);
   });
   await addCares(db, w);
+  await addStorefrontPage(db, w);
   return w;
+}
+
+/** 0034 (T-128): the owner saves the storefront page as version 1 and publishes it (each under its own command), so both
+ *  new tenant tables hold a row and a shopper reads one live page. Skipped on a database migrated to an earlier file. */
+async function addStorefrontPage(db: TestDb, w: World): Promise<void> {
+  if (!(await db.admin("SELECT to_regclass('core.storefront_page_version') IS NOT NULL AS ok")).rows[0]!.ok) return;
+  const page = u();
+  const doc = { theme: { primary: "#7b3f1d", secondary: "#9e2f4e", accent: "#f6d9c8", radius: "round", layout: "hero-banner" },
+    sections: [{ kind: "hero", visible: true, badge: "Synthetic", tagline: "Fresh every morning." }, { kind: "outlets", visible: true, title: "Our outlets" },
+      { kind: "ribbon", visible: false }, { kind: "cards", visible: true, cards: [{ title: "Order ahead", body: "Pick up at the counter." }, { title: "Gift boxes", body: "Pick a box." }] }] };
+  await db.withContext("munim_core", ownerCtx(w, { command_type: "storefront.page.save.v1" }), (c) =>
+    c.query(`INSERT INTO core.storefront_page_version (tenant_id, id, version, doc, created_by, origin) VALUES ($1, $2, 1, $3, $4, '{}')`,
+      [w.tenant, page, JSON.stringify(doc), w.owner]));
+  await db.withContext("munim_core", ownerCtx(w, { command_type: "storefront.page.publish.v1" }), (c) =>
+    c.query(`INSERT INTO core.storefront_page_publish (tenant_id, id, page_id, published_by, origin) VALUES ($1, $2, $3, $4, '{}')`,
+      [w.tenant, u(), page, w.owner]));
 }
 
 /** 0028 (Munim Cares): rows in the ten new tenant tables only — no stock movement, task or batch — so lanes counting the

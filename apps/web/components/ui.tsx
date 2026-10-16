@@ -225,6 +225,27 @@ export function MockPanel({ onChange, staff = false }: { onChange?: () => void; 
                   <option value="abstain">abstain</option>
                 </select>
               </label>
+              <label className="block">
+                Brands
+                <select value={c.brands ?? ""} onChange={(e) => update({ ...c, brands: (e.target.value || null) as "three" | null })}>
+                  <option value="">none (Cobnut)</option>
+                  <option value="three">three (a cloud kitchen)</option>
+                </select>
+              </label>
+              <label className="block">
+                Demo business
+                <select value={c.demo ?? ""} onChange={(e) => update({ ...c, demo: (e.target.value || null) as "off" | null })}>
+                  <option value="">yes</option>
+                  <option value="off">no</option>
+                </select>
+              </label>
+              <label className="block">
+                New investigations
+                <select value={c.investigation ?? ""} onChange={(e) => update({ ...c, investigation: (e.target.value || null) as "waiting" | null })}>
+                  <option value="">books complete</option>
+                  <option value="waiting">waiting for the books</option>
+                </select>
+              </label>
             </>
           )}
           <button type="button" className="btn btn-plain w-full" onClick={() => setOpen(false)}>Hide</button>

@@ -121,6 +121,8 @@ export function createMunimClient(opts: MunimClientOptions) {
     getOrder: (orderId: string, guestToken: string | null) =>
       settle(() => sdk.GET("/v1/storefront/orders/{id}", { params: { path: { id: orderId } }, ...init(guestToken) })),
     getCares: () => settle(() => sdk.GET("/v1/storefront/cares", init())),
+    /** T-128: the live storefront page (theme and home sections), or `page: null` for the built-in look. */
+    getPage: () => settle(() => sdk.GET("/v1/storefront/page", init())),
     /** Credential-free (no key, no token). Not served by the mock: expect 404 there and hide the figure. */
     getNetworkImpact: () =>
       settle(() => open.GET("/v1/cares-network/impact", { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) })),

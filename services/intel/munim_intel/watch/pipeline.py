@@ -64,7 +64,7 @@ from munim_intel.runtime.runner import RunFailed
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.tools.generated import run_start_ms, uuid7
 from munim_intel.tools.handles import HandleTable
-from munim_intel.trace.buffer import TraceBuffer, TraceLabelError
+from munim_intel.trace.buffer import TraceBuffer, TraceLabelError, error_label
 from munim_intel.trace.spend import Meter
 from munim_intel.watch.frame import Frame
 
@@ -378,6 +378,11 @@ class WatchRun:
                     "draft", spec.pack, {"command_type": proposal.command_type, "draft_id": req.draft_id.root, "status": "recorded"}
                 )
                 return
+            if e.status == 422 and e.reason_code == "campaign_audience_unscoped":
+                # R67: core takes the win-back campaign on a demo business only; everywhere else it is the expected refusal.
+                self.report.drafts["abstained"] += 1
+                await self.trace("abstain", spec.pack, {"detector": spec.id, "reason": "campaign_audience_unscoped"})
+                return
             self.report.errors += 1
             await self.trace("error", spec.pack, {"where": "draft", "detector": spec.id, "error": _label(e)})
             return
@@ -394,7 +399,7 @@ class WatchRun:
 def _label(e: Exception) -> str:
     if isinstance(e, CoreError):
         return f"core_{e.status}_{e.reason_code or e.code}"
-    return type(e).__name__
+    return error_label(e)  # C2: ADK's `_ResourceExhaustedError` (a 429) is not a label as named
 
 
 def detectors_for(event_type: str | None) -> dict[str, list[DetectorSpec]]:

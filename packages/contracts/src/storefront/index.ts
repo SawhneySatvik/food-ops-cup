@@ -11,6 +11,9 @@ import type { Route } from "../shared/routes.ts";
 import { DealWindow, Diet } from "../catalogue/index.ts";
 import { ChannelKind } from "../tenancy/index.ts";
 import { OrderKind, OrdersPlaceV1, OrdersPreviewRequest, OrdersPreviewResponse, TenderMethod } from "../orders/index.ts";
+import { PAGE_ROUTES, PAGE_SCHEMAS } from "./page.ts";
+
+export * from "./page.ts";
 
 /** No customer_id: core-api mints the guest's id and puts it on the principal (W1 fix #45). */
 export const StorefrontGuestCreateV1 = z.strictObject({
@@ -294,6 +297,7 @@ export const SCHEMAS = {
   "storefront.preview.response": StorefrontPreviewResponse,
   "storefront.refusal-error": RefusalErrorResponse,
   "stream.event": StreamEvent,
+  ...PAGE_SCHEMAS,
 };
 
 const outlet = [{ name: "outlet_id", uuid: true }];
@@ -313,4 +317,5 @@ export const ROUTES: readonly Route[] = [
   // the Last-Event-ID header. Any topic the caller may not read → 404 for the whole request.
   { surface: "public", method: "get", path: "/v1/stream", operationId: "streamEvents", summary: "Server-sent events for the given topics (kds / order / inbox / trace); text/event-stream, read with the SDK's openStream; resume with Last-Event-ID; heartbeat every 20 s, closed at 55 min", auth: "storefront", guest: true, alsoAuth: ["member"], stream: true, response: "stream.event", status: 200,
     query: [{ name: "topics", required: true, schema: { type: "string", minLength: 1, description: "Comma list of kds:<outlet id>, order:<order id>, inbox:<tenant id>, trace:<run id>" } }] },
+  ...PAGE_ROUTES,
 ];

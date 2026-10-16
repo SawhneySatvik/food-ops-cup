@@ -4955,10 +4955,10 @@ class RefId(RootModel[str]):
 
 
 class ReasonCode(
-    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed', 'cares_not_available', 'cares_not_enabled', 'cares_not_opted_in', 'cares_city_mismatch', 'recipient_ineligible', 'listing_expired', 'qty_exceeds_on_hand', 'qty_exceeds_listed', 'cooked_hold_exceeded', 'line_expired', 'no_eligible_recipient', 'no_rostered_staff', 'offer_not_enabled', 'offer_closed', 'claim_decided', 'claim_received', 'rate_limited', 'handover_must_be_complete', 'offer_handover_final', 'pickup_time_outside_window']]
+    RootModel[Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed', 'cares_not_available', 'cares_not_enabled', 'cares_not_opted_in', 'cares_city_mismatch', 'recipient_ineligible', 'listing_expired', 'qty_exceeds_on_hand', 'qty_exceeds_listed', 'cooked_hold_exceeded', 'line_expired', 'no_eligible_recipient', 'no_rostered_staff', 'offer_not_enabled', 'offer_closed', 'claim_decided', 'claim_received', 'rate_limited', 'handover_must_be_complete', 'offer_handover_final', 'pickup_time_outside_window', 'theme_contrast', 'page_version_stale', 'demo_only', 'demo_protected']]
 ):
     root: Annotated[
-        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed', 'cares_not_available', 'cares_not_enabled', 'cares_not_opted_in', 'cares_city_mismatch', 'recipient_ineligible', 'listing_expired', 'qty_exceeds_on_hand', 'qty_exceeds_listed', 'cooked_hold_exceeded', 'line_expired', 'no_eligible_recipient', 'no_rostered_staff', 'offer_not_enabled', 'offer_closed', 'claim_decided', 'claim_received', 'rate_limited', 'handover_must_be_complete', 'offer_handover_final', 'pickup_time_outside_window'],
+        Literal['number_grammar', 'unresolved_ref', 'cross_tenant_ref', 'quote_mismatch', 'missing_ref', 'settlements_missing', 'recipe_missing', 'stale_draft', 'authority_denied', 'cost_price_missing', 'ticket_times_missing', 'count_missing', 'expiry_missing', 'budget_exceeded', 'budget_missing', 'margin_below_floor', 'moq_exceeds_need', 'open_commitment_overlap', 'payment_terms_worse', 'consent_record_missing', 'bank_lines_missing', 'attendance_missing', 'payroll_out_of_scope', 'no_marketing_consent', 'not_a_certificate', 'log_coverage_missing', 'signal_source_missing', 'insufficient_history', 'forecast_stale', 'window_full', 'outlet_paused', 'item_sold_out', 'deal_rejudged', 'coupon_invalid', 'coupon_cap_reached', 'coupon_min_spend', 'change_window_closed', 'coupon_expired', 'coupon_out_of_scope', 'price_above_mrp', 'expired_batch', 'period_closed', 'model_blocked', 'preview_total_changed', 'buyer_identity_required', 'tax_id_missing', 'unknown_tax_class', 'unknown_channel', 'unit_mismatch', 'not_applicable', 'item_unavailable', 'reason_required', 'deal_changed', 'duplicate_invoice', 'guest_cannot_change', 'refund_first', 'order_tendered', 'cash_below_rounding', 'recently_rejected', 'mode_above_ceiling', 'cap_above_platform_budget', 'platform_budget_missing', 'assignee_missing', 'campaign_audience_unscoped', 'specialist_needed', 'cares_not_available', 'cares_not_enabled', 'cares_not_opted_in', 'cares_city_mismatch', 'recipient_ineligible', 'listing_expired', 'qty_exceeds_on_hand', 'qty_exceeds_listed', 'cooked_hold_exceeded', 'line_expired', 'no_eligible_recipient', 'no_rostered_staff', 'offer_not_enabled', 'offer_closed', 'claim_decided', 'claim_received', 'rate_limited', 'handover_must_be_complete', 'offer_handover_final', 'pickup_time_outside_window', 'theme_contrast', 'page_version_stale', 'demo_only', 'demo_protected'],
         Field(title='ReasonCode'),
     ]
 
@@ -5623,6 +5623,148 @@ class StreamEvent(BaseModel):
     id: str
     type: str
     data: dict[str, Any]
+
+
+class Theme(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    primary: Annotated[str, Field(pattern='^#[0-9a-f]{6}$')]
+    secondary: Annotated[str, Field(pattern='^#[0-9a-f]{6}$')]
+    accent: Annotated[str, Field(pattern='^#[0-9a-f]{6}$')]
+    radius: Literal['soft', 'round']
+    layout: Literal['hero-banner', 'menu-grid', 'menu-list']
+
+
+class Sections(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['hero']
+    visible: bool
+    badge: Annotated[str, Field(max_length=60, min_length=1)]
+    tagline: Annotated[str, Field(max_length=160, min_length=1)]
+
+
+class Sections1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['outlets']
+    visible: Literal[True]
+    title: Annotated[str, Field(max_length=60, min_length=1)]
+
+
+class Sections2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['ribbon']
+    visible: bool
+
+
+class Card(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    title: Annotated[str, Field(max_length=60, min_length=1)]
+    body: Annotated[str, Field(max_length=240, min_length=1)]
+
+
+class Sections3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['cards']
+    visible: bool
+    cards: Annotated[list[Card], Field(max_length=2, min_length=2)]
+
+
+class StorefrontPageDoc(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    theme: Theme
+    sections: Annotated[list[Sections | Sections1 | Sections2 | Sections3], Field(max_length=4, min_length=4)]
+
+
+class BasedOnVersion(RootModel[int]):
+    root: Annotated[int, Field(ge=1, le=9007199254740991)]
+
+
+class StorefrontPageSaveV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    based_on_version: BasedOnVersion | None
+    doc: StorefrontPageDoc
+
+
+class StorefrontPagePublishV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    publish_id: Uuid7
+    page_id: Uuid7
+
+
+class Version4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    created_at: IsoDatetime
+    created_by: Uuid7
+    created_by_name: str
+
+
+class Live(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    published_at: IsoDatetime
+    published_by: Uuid7
+    published_by_name: str
+
+
+class V1StorefrontPages(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    versions: list[Version4]
+    live: Live | None
+
+
+class V1StorefrontPage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_id: Uuid7
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    created_at: IsoDatetime
+    created_by: Uuid7
+    created_by_name: str
+    doc: StorefrontPageDoc
+
+
+class Page2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    version: Annotated[int, Field(ge=1, le=9007199254740991)]
+    published_at: IsoDatetime
+    doc: StorefrontPageDoc
+
+
+class StorefrontPagePublic(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page: Page2 | None
 
 
 class Weekday(RootModel[int]):
@@ -8356,6 +8498,13 @@ class ProposalCustomersCampaignCreateV1(BaseModel):
 
 
 class CustomersCampaignCancelV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    campaign_id: Uuid7
+
+
+class CustomersCampaignRecordSentV1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )

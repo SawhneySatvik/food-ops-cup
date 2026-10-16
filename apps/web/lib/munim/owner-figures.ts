@@ -61,7 +61,7 @@ const num = (v: Cell | undefined): number => (typeof v === "number" ? v : Number
 /** Mints the five snapshots for one outlet's business date and picks the cells the cards show. Params are exactly
  *  each template's keys (core refuses anything else with 422). Five calls, five new snapshot rows: call this on
  *  load, on an outlet change and on "Refresh figures" only. */
-export async function loadOwnerFigures(client: StaffClient, outletId: string, today: string): Promise<OwnerFigures> {
+export async function loadOwnerFigures(client: StaffClient, outletId: string | null, today: string): Promise<OwnerFigures> {
   const monday = mondayOf(today);
   const [t, n, w, c, b] = await Promise.all([
     client.mintSnapshot({ template_id: "kitchen.ticket_coverage", params: { outlet_id: outletId, from: today, to: today } }),
@@ -91,10 +91,34 @@ export async function loadOwnerFigures(client: StaffClient, outletId: string, to
     shared = { portions: at(c.data, total, "portions_milli"), units: at(c.data, total, "units_milli"), handovers: at(c.data, total, "handovers") };
   }
 
-  // below_reorder takes no params and covers every outlet the person sees: keep the chosen outlet's rows.
-  const lowStock = !b.ok ? null : b.data.rows.flatMap((r, i) => (r.outlet_id !== outletId ? [] : [{
+  // below_reorder takes no params and covers every outlet the person sees: keep the chosen outlet's rows (all of them for
+  // the whole business, outletId null).
+  const lowStock = !b.ok ? null : b.data.rows.flatMap((r, i) => (outletId !== null && r.outlet_id !== outletId ? [] : [{
     ingredientId: text(r.ingredient_id), name: text(r.ingredient_name), onHand: at(b.data, i, "on_hand_milli"), minimum: at(b.data, i, "min_qty_milli"),
   }]));
 
   return { tickets: t.ok ? at(t.data, 0, "tickets") : null, netSales, waste, shared, lowStock, error: failed[0] ?? null };
+}
+
+/** T-128, the owner's "All outlets": the whole business's figures, minted with `outlet_id: null` so the books work the total
+ *  out (never added up here), and each outlet's own, minted for that outlet alone, so every outlet's books stay apart. */
+export async function loadRollup(client: StaffClient, outletIds: readonly string[], today: string): Promise<{ business: OwnerFigures; outlets: OwnerFigures[] }> {
+  const [business, ...outlets] = await Promise.all([loadOwnerFigures(client, null, today), ...outletIds.map((id) => loadOwnerFigures(client, id, today))]);
+  return { business: business!, outlets };
+}
+
+/** One P&L row (finance.pnl, advisor and up): its key (an outlet or brand id, or "unassigned") and its cells. */
+export interface PnlRow { key: string; revenue: Figure | null; labour: Figure | null; net: Figure | null }
+
+/** Last month's profit and loss by outlet or by brand: one snapshot, one row per key; null = "Cannot verify". */
+export async function loadPnl(client: StaffClient, today: string, groupBy: "outlet" | "brand"): Promise<{ rows: PnlRow[]; error: MunimError | null } | null> {
+  const r = await client.mintSnapshot({ template_id: "finance.pnl", params: { period_month: monthStartOf(lastMonth(today)), group_by: groupBy } });
+  if (!r.ok) return { rows: [], error: r.error };
+  return { rows: r.data.rows.map((row, i) => ({ key: text(row.key) ?? "unassigned", revenue: at(r.data, i, "revenue_minor"), labour: at(r.data, i, "labour_minor"), net: at(r.data, i, "net_minor") })), error: null };
+}
+
+/** A date in the month before (calendar arithmetic on the business date, never the tablet's clock). */
+export function lastMonth(isoDate: string): string {
+  const [y, m] = isoDate.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
 }

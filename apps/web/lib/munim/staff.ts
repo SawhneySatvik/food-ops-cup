@@ -41,6 +41,14 @@ export type RecordHandoverCommand = Cmd<"cares.handover.record.v1", Schemas["Car
 export type CreatePoCommand = Cmd<"purchasing.po.create.v1", Schemas["PurchasingPoCreateV1"]>;
 export type ReceiveGoodsCommand = Cmd<"purchasing.grn.receive.v1", Schemas["PurchasingGrnReceiveV1"]>;
 export type RfqCommand = Cmd<"purchasing.rfq.request.v1", Schemas["PurchasingRfqRequestV1"]>;
+export type SavePageCommand = Cmd<"storefront.page.save.v1", Schemas["StorefrontPageSaveV1"]>;
+export type PublishPageCommand = Cmd<"storefront.page.publish.v1", Schemas["StorefrontPagePublishV1"]>;
+export type CancelCampaignCommand = Cmd<"customers.campaign.cancel.v1", Schemas["CustomersCampaignCancelV1"]>;
+export type RecordSentCommand = Cmd<"customers.campaign.record_sent.v1", Schemas["CustomersCampaignRecordSentV1"]>;
+
+/** POST /v1/investigations/{id}:approve-plan answers once every step the plan allows has run (core runs them in that
+ *  request; the the deploy platform function may take up to 300 s), so the browser waits as long as Ask does. */
+export const PLAN_TIMEOUT_MS = 290_000;
 
 /** POST /v1/rfq-requests is answered once the negotiation with the simulated suppliers is over (core waits up to 120 s). */
 export const RFQ_TIMEOUT_MS = 130_000;
@@ -109,6 +117,36 @@ export function createStaffClient(opts: StaffClientOptions) {
       settle(() => sdk.GET("/v1/threads", { params: { query: { ...query, specialist: query.specialist ?? undefined } }, ...init() })),
     getThread: (threadId: string) => settle(() => sdk.GET("/v1/threads/{id}", { params: id(threadId), ...init() })),
     listSpecialists: () => settle(() => sdk.GET("/v1/specialists", init())),
+    /** A desk: its open findings, proposed drafts, track record (snapshot cells) and threads. */
+    getSpecialistDesk: (specialist: string) => settle(() => sdk.GET("/v1/specialists/{id}", { params: { path: { id: specialist } }, ...init() })),
+    /** Recent AI runs the person may see, newest first (the office's replay picker). */
+    listRuns: (limit = 20) => settle(() => sdk.GET("/v1/runs", { params: { query: { limit } }, ...init() })),
+    /** A run's trace events in seq order: ids and short labels only, never text a model or a person wrote. */
+    getTraces: (runId: string) => settle(() => sdk.GET("/v1/traces/{run}", { params: { path: { run: runId }, query: { limit: 500 } }, ...init() })),
+
+    // ---- investigations ----
+    /** Per-role investigation-mode ceilings: which of Step, Plan and Auto this person may pick. */
+    getAiPolicy: () => settle(() => sdk.GET("/v1/ai/policy", init())),
+    listInvestigations: () => settle(() => sdk.GET("/v1/investigations", { params: { query: {} }, ...init() })),
+    getInvestigation: (invId: string) => settle(() => sdk.GET("/v1/investigations/{id}", { params: id(invId), ...init() })),
+    /** Not a command: the client names the investigation id (its idempotency key). The same body again replays. */
+    createInvestigation: (body: Schemas["V1InvestigationCreateRequest"]) => settle(() => sdk.POST("/v1/investigations", { body, ...init() })),
+    /** Runs exactly step `step_no` (= steps_done + 1, the idempotency key): a replay of the same step answers the view. */
+    continueInvestigation: (invId: string, stepNo: number) => settle(() => sdk.POST("/v1/investigations/{id}:continue", { params: id(invId), body: { step_no: stepNo }, ...init(PLAN_TIMEOUT_MS) })),
+    cancelInvestigation: (invId: string) => settle(() => sdk.POST("/v1/investigations/{id}:cancel", { params: id(invId), body: {}, ...init() })),
+    approvePlan: (invId: string, mode: "plan" | "auto") => settle(() => sdk.POST("/v1/investigations/{id}:approve-plan", { params: id(invId), body: { mode }, ...init(PLAN_TIMEOUT_MS) })),
+
+    // ---- brands, the storefront page, campaigns ----
+    listBrands: () => settle(() => sdk.GET("/v1/brands", init())),
+    listStorefrontPages: () => settle(() => sdk.GET("/v1/storefront-pages", init())),
+    getStorefrontPage: (pageId: string) => settle(() => sdk.GET("/v1/storefront-pages/{id}", { params: id(pageId), ...init() })),
+    /** 201. The next version number; 409 page_version_stale when someone else saved since this editor loaded. */
+    saveStorefrontPage: (body: SavePageCommand) => settle(() => sdk.POST("/v1/storefront-pages", { body, ...init() })),
+    publishStorefrontPage: (pageId: string, body: PublishPageCommand) => settle(() => sdk.POST("/v1/storefront-pages/{id}:publish", { params: id(pageId), body, ...init() })),
+    listCampaigns: () => settle(() => sdk.GET("/v1/campaigns", init())),
+    cancelCampaign: (body: CancelCampaignCommand) => settle(() => sdk.POST("/v1/campaigns:cancel", { body, ...init() })),
+    /** Demo businesses only: records a queued campaign as sent (simulated). No message ever leaves Munim. */
+    recordCampaignSent: (body: RecordSentCommand) => settle(() => sdk.POST("/v1/campaigns:record-sent", { body, ...init() })),
 
     // ---- Cares (14) ----
     getCaresProfile: () => settle(() => sdk.GET("/v1/cares/profile", init())),

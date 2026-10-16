@@ -4,15 +4,16 @@
 //   GET  /v1/customers/{id}/loyalty              balance (latest balance_after) + ledger entries
 //   GET  /v1/customers/{id}/coupon-uses          coupon use history
 //   POST /v1/loyalty:adjust                      customers.loyalty.adjust.v1
-//   GET  /v1/campaigns · POST /v1/campaigns:cancel
+//   GET  /v1/campaigns · POST /v1/campaigns:cancel · POST /v1/campaigns:record-sent (R67, demo businesses only)
 //   GET/POST reservations, reviews, bulk-orders
 // There is NO route that creates or sends a campaign. A campaign exists only once an approved draft of
 // customers.campaign.create.v1 executes (registered below), is stored `queued`, and nothing in Munim sends it
-// until the founder picks a channel (R15, R16, R40 C6). Customer self-service (own profile, consent grant, own
+// until the founder picks a channel (R15, R16, R40 C6). On a demo business the owner may record it as sent, simulated
+// (campaign-sent.ts): a record, not a send. Customer self-service (own profile, consent grant, own
 // loyalty) is accounts (T-035); `readLoyalty` is exported for it. Seams for orders: loyalty.ts.
 import { commandEnvelopeOf } from "@munim/contracts";
 import {
-  CustomersBulkOrderUpsertV1, CustomersCampaignCancelV1, CustomersCustomerUpsertV1, CustomersLoyaltyAdjustV1,
+  CustomersBulkOrderUpsertV1, CustomersCampaignCancelV1, CustomersCampaignRecordSentV1, CustomersCustomerUpsertV1, CustomersLoyaltyAdjustV1,
   CustomersReservationUpsertV1, CustomersReviewRecordV1,
 } from "@munim/contracts/customers";
 import { Hono, type Context } from "hono";
@@ -22,6 +23,7 @@ import { withContext } from "../../lib/db.ts";
 import { ApiError } from "../../lib/errors.ts";
 import type { AppEnv } from "../../lib/types.ts";
 import { registerDraftHandler } from "../approvals/index.ts";
+import { campaignRecordSent } from "./campaign-sent.ts";
 import { bulkOrderUpsert, campaignCancel, campaignCreate, customerUpsert, loyaltyAdjust, reservationUpsert, reviewRecord } from "./records.ts";
 import {
   customerExists, listBulkOrders, listCampaigns, listCouponUses, listCustomers, listReservations, listReviews, readLoyalty, type Scope,
@@ -130,6 +132,7 @@ export const router = new Hono<AppEnv>()
     return c.json({ campaigns: await read(c, m, listCampaigns) }, 200);
   })
   .post("/v1/campaigns:cancel", requireMember, (c) => command(c, "customers.campaign.cancel.v1", CustomersCampaignCancelV1, campaignCancel))
+  .post("/v1/campaigns:record-sent", requireMember, (c) => command(c, "customers.campaign.record_sent.v1", CustomersCampaignRecordSentV1, campaignRecordSent))
   .get("/v1/reservations", requireMember, async (c) => {
     const m = member(c);
     allow(m, "owner", "manager", "staff", "judge");

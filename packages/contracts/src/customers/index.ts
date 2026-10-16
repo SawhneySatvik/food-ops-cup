@@ -53,6 +53,9 @@ export const CustomersCampaignCreateV1 = z.strictObject({
 export const CAMPAIGN_CREATE_DRAFT = defineDraftable("customers.campaign.create.v1", CustomersCampaignCreateV1);
 
 export const CustomersCampaignCancelV1 = z.strictObject({ campaign_id: Uuid7 });
+/** R67 (founder, 16 Oct): on a demo business the owner records a queued campaign as "Sent (simulated)": no message left
+ *  Munim (there is no send path, R40 C6). Refused on any other business. */
+export const CustomersCampaignRecordSentV1 = z.strictObject({ campaign_id: Uuid7 });
 
 export const ReservationStatus = z.enum(["booked", "seated", "completed", "cancelled", "no_show"]);
 export const CustomersReservationUpsertV1 = z.strictObject({
@@ -182,6 +185,7 @@ export const SCHEMAS = {
   "customers.campaign.create.v1": CustomersCampaignCreateV1,
   "proposal.customers.campaign.create.v1": CAMPAIGN_CREATE_DRAFT.proposal,
   "customers.campaign.cancel.v1": CustomersCampaignCancelV1,
+  "customers.campaign.record_sent.v1": CustomersCampaignRecordSentV1,
   "customers.reservation.upsert.v1": CustomersReservationUpsertV1,
   "customers.review.record.v1": CustomersReviewRecordV1,
   "customers.bulk_order.upsert.v1": CustomersBulkOrderUpsertV1,
@@ -215,8 +219,9 @@ export const ROUTES: readonly Route[] = [
   get("/v1/customers/{id}/loyalty", "getCustomerLoyalty", "Loyalty balance (latest balance_after) and ledger entries", "customers.loyalty.ledger", { pathParams: uuidParam }),
   get("/v1/customers/{id}/coupon-uses", "listCustomerCouponUses", "Coupon use history of one customer", "customers.coupon-use.list", { pathParams: uuidParam }),
   post("/v1/loyalty:adjust", "adjustLoyalty", "customers.loyalty.adjust.v1 — append an adjustment entry (never below zero)", "customers.loyalty.adjust.v1"),
-  get("/v1/campaigns", "listCampaigns", "Queued / cancelled campaigns (created only by an approved draft; never sent by Munim)", "customers.campaign.list"),
+  get("/v1/campaigns", "listCampaigns", "Queued, cancelled and (demo) recorded-as-sent campaigns (created only by an approved draft; never sent by Munim)", "customers.campaign.list"),
   post("/v1/campaigns:cancel", "cancelCampaign", "customers.campaign.cancel.v1 — cancel a queued campaign", "customers.campaign.cancel.v1"),
+  post("/v1/campaigns:record-sent", "recordCampaignSent", "customers.campaign.record_sent.v1 — on a demo business, record a queued campaign as sent (simulated: no message leaves Munim; owner)", "customers.campaign.record_sent.v1"),
   get("/v1/reservations", "listReservations", "Reservations", "customers.reservation.list", { query: [q("outlet_id"), q("from"), q("to")] }),
   post("/v1/reservations:upsert", "upsertReservation", "customers.reservation.upsert.v1", "customers.reservation.upsert.v1"),
   get("/v1/reviews", "listReviews", "Imported or hand-entered reviews", "customers.review.list", { query: [q("outlet_id"), q("limit")] }),

@@ -85,3 +85,10 @@ export function bankFile(account: string, lines: Array<{ date: string; ref: stri
 export function signalFile(rows: Array<{ on: string; kind: string; label: string; outlet: string; source: string }>): string {
   return csv([["on_date", "kind", "label", "outlet_ref", "value", "unit", "source"], ...rows.map((r) => [r.on, r.kind, r.label, r.outlet, "", "", r.source])]);
 }
+
+/** A shift log (shift_log_v1): one closed drawer session per row, money in the major unit. "Cash Tenders" is a control total core
+ *  checks against its own figure; "Counted Cash" here is the float plus it (no variance). */
+export function shiftFile(rows: Array<{ no: string; date: string; outlet: string; opened: string; closed: string; by: string; floatMinor: number; cashMinor: number }>): string {
+  return csv([["Shift No", "Date", "Outlet", "Opened At", "Closed At", "Opened By", "Closed By", "Float", "Counted Cash", "Cash Tenders"],
+    ...rows.map((r) => [r.no, r.date, r.outlet, r.opened, r.closed, r.by, r.by, major(r.floatMinor), major(r.floatMinor + r.cashMinor), major(r.cashMinor)])]);
+}

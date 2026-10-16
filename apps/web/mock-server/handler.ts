@@ -6,7 +6,7 @@ import { BRAND, CHANNEL_ID, DEALS, ITEMS, OUTLETS, PREP_MIN, STOREFRONT_KEY, TZ,
 import { BadRequest, localClock, outletById, price, type Accepting } from "./pricing";
 import { book, openWindows } from "./windows";
 import { eventsUntil, issueToken, readToken, recordFrom, viewOf } from "./orders";
-import { handleStaff, isStaffRequest } from "./staff";
+import { handleStaff, isStaffRequest, livePage } from "./staff";
 
 type ReasonCode = Schemas["ReasonCode"];
 type ErrorCode = Schemas["Error"]["error"]["code"];
@@ -290,6 +290,8 @@ export async function handle(req: Request, segments: string[]): Promise<Response
         return r && r.order_id === x[1] ? json(200, viewOf(r, now)) : notFound();
       }
       if (path === "/v1/storefront/cares") return json(200, cares(now));
+      // T-128: the live storefront page (theme and home sections) the owner published in the staff half; null = built-in.
+      if (path === "/v1/storefront/page") return json(200, livePage());
       if (path === "/v1/stream") return stream(req, url, now);
       return notFound();
     }

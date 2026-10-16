@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "customers.campaign.record_sent.v1",
+  "title": "CustomersCampaignRecordSentV1",
+  "x-munim-module": "customers",
+  "type": "object",
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "campaign_id"
+  ],
+  "additionalProperties": false
+}

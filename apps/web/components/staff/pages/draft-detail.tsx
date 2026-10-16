@@ -19,6 +19,7 @@ import { dayLabel, formatDate, formatTime, formatWhen, titleCase } from "@/lib/m
 import { columnOf, formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
+import { CHANNEL, NO_SEND, messageWords } from "@/lib/munim/campaign-words";
 import { DRAFT_STATUS, staffErrorText } from "@/lib/munim/staff-copy";
 import { topic, type LiveState } from "@/lib/munim/staff-stream";
 import { templateWords } from "@/lib/munim/template-words";
@@ -201,6 +202,12 @@ export function DraftDetailPage() {
   if (typeof p.business_date === "string") textRows.push(["For", formatDate(p.business_date, SITE.locale)]);
   if (typeof p.valid_from === "string") textRows.push(["Starts", formatDate(p.valid_from, SITE.locale)]);
   if (typeof p.expected_on === "string") textRows.push(["Expected", formatDate(p.expected_on, SITE.locale)]);
+  // A campaign (R67): the fixed message the customers would read, how, and the planned day. Nothing is ever sent.
+  if (detail.draft.command_type === "customers.campaign.create.v1") {
+    if (typeof p.message_key === "string") textRows.push(["Message", <q key="m">{messageWords(p.message_key)}</q>]);
+    if (p.channel === "sms" || p.channel === "email") textRows.push(["By", CHANNEL[p.channel]]);
+    if (typeof p.send_at === "string") textRows.push(["Planned for", dayLabel(p.send_at, tz, SITE.locale)]);
+  }
 
   return (
     <>
@@ -228,6 +235,7 @@ export function DraftDetailPage() {
           </div>
 
           {detail.draft.command_type === "purchasing.po.create.v1" && <p className="text-[14px] text-muted">{PO_LINE}</p>}
+          {detail.draft.command_type === "customers.campaign.create.v1" && <p className="badge badge-sim h-auto whitespace-normal py-1">{NO_SEND}</p>}
 
           {detail.draft.based_on.length > 0 && (
             <div className="space-y-1">
@@ -276,6 +284,7 @@ export function DraftDetailPage() {
             onReject={dec.reject}
           />
           {result?.type === "purchasing.po.create.v1" && <Link href={`/staff/purchase-orders/${result.entityId}`} className="btn btn-secondary">Open the purchase order</Link>}
+          {result?.type === "customers.campaign.create.v1" && <Link href="/staff/campaigns" className="btn btn-secondary">Open campaigns</Link>}
         </article>
 
         <section aria-labelledby="history-title" className="space-y-2">

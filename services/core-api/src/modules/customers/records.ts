@@ -4,7 +4,8 @@
 //   customers.customer.upsert.v1   → core.customer          (a person's own command; consent can only be withdrawn)
 //   customers.loyalty.adjust.v1    → core.loyalty_entry     (owner/manager/judge, tenant scope)
 //   customers.campaign.create.v1   → core.campaign          (ONLY via an approved draft — the database refuses a direct write)
-//   customers.campaign.cancel.v1   → core.campaign          (status queued → cancelled; there is no 'sent' writer anywhere)
+//   customers.campaign.cancel.v1   → core.campaign          (status queued → cancelled; the only other status move is
+//                                                          campaign-sent.ts, a demo business's simulated record, R67)
 //   customers.reservation.upsert.v1 / review.record.v1 / bulk_order.upsert.v1
 import {
   CustomersBulkOrderUpsertV1, CustomersCampaignCancelV1, CustomersCampaignCreateV1, CustomersCustomerUpsertV1,

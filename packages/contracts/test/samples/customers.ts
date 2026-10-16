@@ -14,6 +14,7 @@ export const SAMPLES: Record<string, unknown> = {
   "customers.campaign.create.v1": { campaign_id: u(350), name: "Come back", channel: "email", outlet_ids: [u(2)], segment_snapshot_id: u(900), audience_count: 12, message_key: "campaign.come_back", placeholders: [{ key: "regulars", value: 40 }], coupon_id: null, send_at: T, window_from: null, window_to: null },
   "proposal.customers.campaign.create.v1": { campaign_id: u(350), name: "Come back", channel: "email", outlet_ids: [u(2)], segment_snapshot_id: u(900), audience_count: `⟨snap:${u(900)}·0·consented⟩`, message_key: "campaign.come_back", placeholders: [{ key: "regulars", value: `⟨snap:${u(900)}·0·audience⟩` }], coupon_id: null, send_at: T, window_from: null, window_to: null },
   "customers.campaign.cancel.v1": { campaign_id: u(350) },
+  "customers.campaign.record_sent.v1": { campaign_id: u(350) },
   "customers.reservation.upsert.v1": reservation,
   "customers.review.record.v1": review,
   "customers.bulk_order.upsert.v1": bulk,

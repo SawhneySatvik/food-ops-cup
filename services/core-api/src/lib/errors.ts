@@ -81,6 +81,8 @@ const REASON_MESSAGES: Partial<Record<ReasonCode, string>> = {
   platform_budget_missing: "The platform has not set this month's AI budget in your business currency, so a cap cannot be set yet.",
   // T-099 (G-12).
   pickup_time_outside_window: "That pickup time is outside the pickup window you chose.",
+  // R64 X-2 (lib/demo-guard.ts).
+  demo_protected: "This is switched off on the shared demo business so it keeps working for everyone.",
 };
 export const ERROR_CODES: readonly ErrorCode[] = CONTRACT_ERROR_CODES;
 

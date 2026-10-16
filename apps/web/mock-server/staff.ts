@@ -13,6 +13,10 @@ import {
   addressedTo, answerFor, boardOf, buildOrder, businessDate, menuFor, mintRows, orderListItem, posDevice, receiptOf, reorderLevels, seedDrafts, seedFindings, seedListings,
   seedGoodsReceived, seedOrders, seedPurchaseOrders, seedSnapshots, seedSuppliers, seedThreads, snapshotOf, type Placed,
 } from "./staff-data";
+import {
+  BRANDS_RESPONSE, BUILT_IN_PAGE, T128_COLUMNS, T128_MIN_ROLE, brandOf, campaignDraft, churnSnapshot, investigationSnapshots, lapsingFinding,
+  newInvestigation, pnlRows, runStep, seedInvestigations, seedRuns, tracesOf, type InvestigationState,
+} from "./staff-data-t128";
 
 type S = Schemas;
 type Me = S["V1Me"];
@@ -78,6 +82,10 @@ interface World {
   grns: Map<string, S["V1GoodsReceived"]>;
   log: Map<string, { hash: string; status: number; body: unknown }>;
   events: LiveEvent[];
+  // T-128
+  investigations: Map<string, InvestigationState>;
+  pages: { versions: Array<S["V1StorefrontPage"]>; publishes: Array<{ publish_id: string; page_id: string; at: string; by: string }> };
+  campaigns: Map<string, S["V1Campaign"]>;
 }
 let world: World | null = null;
 
@@ -87,9 +95,9 @@ function books(now: Date): World {
   world = {
     orders: new Map(orders.map((p) => [p.order.order_id, p])),
     ticketNo: new Map(), invoiceNo: new Map(), usedLineIds: new Set(orders.flatMap((p) => p.order.lines.map((l) => l.line_id))),
-    findings: new Map(seedFindings(now).map((f) => [f.finding_id, f])),
-    drafts: new Map(seedDrafts(now).map((draft) => [draft.draft_id, { draft, decision: null, final: null, history: [{ event: "proposed", at: draft.created_at, by: draft.source }] }])),
-    snapshots: new Map(seedSnapshots(now).map((s) => [s.snapshot_id, s])),
+    findings: new Map([...seedFindings(now), lapsingFinding(now)].map((f) => [f.finding_id, f])),
+    drafts: new Map([...seedDrafts(now), campaignDraft(now)].map((draft) => [draft.draft_id, { draft, decision: null, final: null, history: [{ event: "proposed", at: draft.created_at, by: draft.source }] }])),
+    snapshots: new Map([...seedSnapshots(now), churnSnapshot(now)].map((s) => [s.snapshot_id, s])),
     threads: new Map(seedThreads(now).map((t) => [t.thread_id, t])),
     listings: new Map(seedListings(now).map((l) => [l.listing_id, l])),
     pos: new Map(seedPurchaseOrders(now).map((p) => [p.po_id, p])),
@@ -100,7 +108,11 @@ function books(now: Date): World {
     ]])),
     grns: new Map(seedGoodsReceived(now).map((g) => [g.grn_id, g])),
     log: new Map(), events: [],
+    investigations: new Map(seedInvestigations(now).map((x) => [x.view.investigation_id, x])),
+    pages: { versions: [], publishes: [] },
+    campaigns: new Map(),
   };
+  for (const x of world.investigations.values()) for (const snap of x.snapshots) world.snapshots.set(snap.snapshot_id, snap);
   for (const p of orders) world.ticketNo.set(p.order.outlet_id, Math.max(world.ticketNo.get(p.order.outlet_id) ?? 0, p.order.ticket_no));
   return world;
 }
@@ -133,7 +145,10 @@ const DECIDE_ROLES = ["owner", "manager", "judge"];
 const DRAFT_TYPE_ROLES: Record<string, readonly string[]> = {
   "kitchen.prep_time.set.v1": DECIDE_ROLES, "kitchen.prep_list.create.v1": DECIDE_ROLES, "purchasing.po.create.v1": DECIDE_ROLES,
   "cares.listing.publish.v1": ["owner", "judge"],
+  "customers.campaign.create.v1": DECIDE_ROLES,
 };
+/** Types whose authority row is the whole business (scope tenant): only someone with every outlet decides them. */
+const WHOLE_BUSINESS_TYPES = new Set(["customers.campaign.create.v1"]);
 
 // ---------------------------------------------------------------- commands
 interface Command<P> {
@@ -392,6 +407,7 @@ function decide(w: World, who: Who, draftId: string, verb: "approve" | "reject",
   // core judges both verbs over every one of the draft's outlets (none = the whole business, so every outlet), and
   // approve also over the outlets its payload writes to: a manager of one outlet cannot decide a two-outlet draft.
   if (!seesAll(who.m, d.draft.outlet_ids) || (verb === "approve" && !seesAll(who.m, targetsOf(d.draft.payload as Json)))) refuse(403, "forbidden", "authority_denied");
+  if (WHOLE_BUSINESS_TYPES.has(d.draft.command_type) && who.m.outlet_ids !== "*") refuse(403, "forbidden", "authority_denied");
   const by = { member_id: who.m.member_id, name: who.m.name };
   /** Audit-made history rows (executed, stale, failed) name the role, as core's do; the decision row names the person. */
   const byRole = { member_id: who.m.member_id, role: who.m.role };
@@ -473,6 +489,14 @@ function execute(w: World, type: string, payload: Json, now: Date, actor: { memb
     return p.po_id;
   }
   if (type === "kitchen.prep_list.create.v1") return String(payload.prep_list_id);
+  if (type === "customers.campaign.create.v1") {
+    // As core's campaignCreate: stored queued, never sent; the audience is the cell the approver saw.
+    const p = payload as unknown as Omit<S["V1Campaign"], "status" | "never_auto_sent" | "created_at">;
+    if (p.audience_count === 0) refuse(422, "invalid_payload", "no_marketing_consent");
+    w.campaigns.set(p.campaign_id, { campaign_id: p.campaign_id, name: p.name, channel: p.channel, outlet_ids: p.outlet_ids, segment_snapshot_id: p.segment_snapshot_id,
+      audience_count: p.audience_count, message_key: p.message_key, coupon_id: p.coupon_id, send_at: p.send_at, status: "queued", never_auto_sent: true, created_at: now.toISOString() });
+    return p.campaign_id;
+  }
   return id7(`${type}:${JSON.stringify(payload)}`); // prep_time.set: a new prep-time row
 }
 
@@ -509,22 +533,23 @@ function lineage(w: World, m: Me, table: string, id: string): Response {
 }
 
 // ---------------------------------------------------------------- snapshots
-function mint(w: World, who: Who, body: unknown, now: Date): Response {
+function mint(w: World, who: Who, body: unknown, req: Request, now: Date): Response {
   const b = body as S["V1SnapshotsRequest"] | null;
   const template = b?.template_id ?? "";
-  const cols = TEMPLATE_COLUMNS[template];
-  if (!cols || RANK[who.m.role]! < RANK[TEMPLATE_MIN_ROLE[template]!]!) return notFound();
+  const cols = TEMPLATE_COLUMNS[template] ?? (template === "finance.pnl" ? T128_COLUMNS[template] : undefined);
+  if (!cols || RANK[who.m.role]! < RANK[TEMPLATE_MIN_ROLE[template] ?? T128_MIN_ROLE[template]!]!) return notFound();
   const params = b?.params ?? {};
   const required: Record<string, string[]> = {
     "kitchen.ticket_coverage": ["outlet_id", "from", "to"], "people.labour_pct": ["outlet_id", "from", "to"], "cares.impact": ["outlet_id", "from", "to"],
     "inventory.waste_week": ["outlet_id", "week_start"], "inventory.below_reorder": [], "purchasing.quote_compare": ["negotiation_run_id"],
     "inventory.expiry_risk": ["outlet_id", "days", "as_of"], "cares.recipient_match": ["outlet_id", "needs_cooked", "needs_raw", "needs_packaged", "qty_milli", "unit", "expires_on"],
+    "finance.pnl": ["period_month", "group_by"],
   };
   if (!required[template]) return notFound(); // run-minted only on the mock (03 §2)
   const keys = Object.keys(params);
   if (keys.some((k) => !required[template]!.includes(k)) || required[template]!.some((k) => !(k in params))) refuse(422, "invalid_payload");
   if (typeof params.outlet_id === "string" && !sees(who.m, params.outlet_id)) refuse(403, "forbidden");
-  const rows = mintRows(template, params, w.orders, [...w.listings.values()], now)!;
+  const rows = template === "finance.pnl" ? pnlRows(String(params.group_by), brandsOn(req)) : mintRows(template, params, w.orders, [...w.listings.values()], now)!;
   const scope = typeof params.outlet_id === "string" ? [params.outlet_id] : who.m.outlet_ids === "*" ? ["*"] : who.m.outlet_ids;
   const s = snapshotOf(id7(`snap:minted:${w.snapshots.size}:${now.getTime()}`), template, params, cols, rows, { member: who.m.member_id }, scope as S["Snapshot"]["outlet_scope"], now.toISOString());
   w.snapshots.set(s.snapshot_id, s);
@@ -533,7 +558,7 @@ function mint(w: World, who: Who, body: unknown, now: Date): Response {
 /** core's visibleTo: the template's role or above, and a scope inside the person's (one of every outlet, "*", opens only
  *  for someone with every outlet). Every value beside a ref is read through this. */
 function canOpen(m: Me, s: S["Snapshot"]): boolean {
-  if (RANK[m.role]! < RANK[TEMPLATE_MIN_ROLE[s.template_id] ?? "owner"]!) return false;
+  if (RANK[m.role]! < RANK[TEMPLATE_MIN_ROLE[s.template_id] ?? T128_MIN_ROLE[s.template_id] ?? "owner"]!) return false;
   const scope = s.outlet_scope as string[];
   return m.outlet_ids === "*" || (!scope.includes("*") && scope.every((o) => sees(m, o)));
 }
@@ -790,6 +815,187 @@ function webOrder(w: World, who: Who, body: unknown, now: Date): Response {
   return staffJson(201, { order_id: orderId, ticket_no: ticketNo, by: who.m.member_id });
 }
 
+// ---------------------------------------------------------------- T-128: investigations, desks, brands, the storefront page, campaigns
+/** X-Mock-Brands: three: this business runs three brands (a cloud kitchen), so the brand switch shows. */
+const brandsOn = (req: Request) => req.headers.get("X-Mock-Brands") === "three";
+/** X-Mock-Demo: off: a business that is not a demo (publishing works; recording a campaign as sent does not). */
+const demoOn = (req: Request) => req.headers.get("X-Mock-Demo") !== "off";
+const MODE_RANK: Record<string, number> = { step: 1, plan: 2, auto: 3 };
+const CEILING: Record<string, "step" | "plan" | "auto"> = { owner: "auto", manager: "plan", staff: "step", advisor: "step", judge: "plan" };
+/** core's investigation visibility: a playbook judged on finance templates (advisor and up) is `restricted` below that. */
+const FINANCE_RANK = RANK.advisor!;
+
+/** The investigation as this person sees it: values only for cells they may open; below the finance templates' role every
+ *  item is restricted (no verdict, refs or narration), as core redacts per viewer. */
+function investigationView(w: World, m: Me, st: InvestigationState): S["V1Investigation"] {
+  const v = st.view;
+  if (RANK[m.role]! < FINANCE_RANK) {
+    return { ...v, status: "restricted", stop_reason: null, checklist: v.checklist.map((c) => ({ ...c, status: "restricted", snapshot_ids: [], refs: [] })),
+      steps: v.steps.map((x) => ({ ...x, item_updates: [], narration: null })), resolved_refs: [] };
+  }
+  const refs = [...v.checklist.flatMap((c) => c.refs), ...v.steps.flatMap((x) => x.item_updates.flatMap((u) => u.refs)),
+    ...(v.plan?.estimate.estimate_ref ? [v.plan.estimate.estimate_ref, v.plan.estimate.currency_ref!] : [])];
+  const resolved = [...new Set(refs)].flatMap((r) => { const c = cellFor(w, m, r); return c ? [{ ref: r, value: c.value }] : []; });
+  return { ...v, resolved_refs: resolved };
+}
+const seesInvestigation = (m: Me, st: InvestigationState) => (st.view.outlet_scope as string[])[0] === "*" ? m.outlet_ids === "*" : (st.view.outlet_scope as string[]).every((o) => sees(m, o));
+
+function createInvestigation(w: World, who: Who, body: unknown, req: Request, now: Date): Response {
+  const b = body as S["V1InvestigationCreateRequest"] | null;
+  const months = /^\d{4}-\d{2}-01$/;
+  if (!b || !UUID7.test(String(b.investigation_id)) || b.playbook_id !== "margin_fall" || !months.test(String(b.params?.period_month)) || !months.test(String(b.params?.compare_month))
+    || !(b.params.compare_month < b.params.period_month) || (b.mode !== undefined && !(b.mode in MODE_RANK))) refuse(422, "invalid_payload");
+  if (b!.outlet_scope && b!.outlet_scope[0] !== "*" && !(b!.outlet_scope as string[]).every((o) => sees(who.m, o))) return notFound();
+  if (MODE_RANK[b!.mode ?? "step"]! > MODE_RANK[CEILING[who.m.role]!]!) refuse(403, "forbidden", "mode_above_ceiling");
+  const prior = w.investigations.get(b!.investigation_id);
+  if (prior) {
+    const same = prior.view.created_by === who.m.member_id && prior.view.params.period_month === b!.params.period_month && prior.view.params.compare_month === b!.params.compare_month;
+    return same ? staffJson(201, investigationView(w, who.m, prior), { "X-Munim-Replayed": "true" }) : fail(409, "idempotency_conflict");
+  }
+  const view = newInvestigation(b!, who.m.member_id, now);
+  const st: InvestigationState = { view, snapshots: investigationSnapshots(view.investigation_id, view.params, req.headers.get("X-Mock-Force-Investigation") === "waiting", now.toISOString()) };
+  for (const x of st.snapshots) w.snapshots.set(x.snapshot_id, x);
+  w.investigations.set(view.investigation_id, st);
+  emit(w, "inbox.investigation", { investigation_id: view.investigation_id, status: view.status }, { inbox: true });
+  return staffJson(201, investigationView(w, who.m, st));
+}
+
+function investigationAction(w: World, who: Who, id: string, verb: string, body: unknown, now: Date): Response {
+  const st = w.investigations.get(id);
+  if (!st || !seesInvestigation(who.m, st)) return notFound();
+  const v = st.view;
+  const terminal = ["done", "no_driver_found", "cannot_verify", "cancelled", "exhausted"].includes(v.status);
+  const answer = () => {
+    emit(w, "inbox.investigation", { investigation_id: id, status: v.status }, { inbox: true });
+    return staffJson(200, investigationView(w, who.m, st));
+  };
+  if (verb === "cancel") {
+    if (v.created_by !== who.m.member_id) refuse(403, "forbidden");
+    if (v.status === "cancelled") return staffJson(200, investigationView(w, who.m, st), { "X-Munim-Replayed": "true" });
+    if (terminal) refuse(409, "illegal_transition");
+    Object.assign(v, { status: "cancelled", stop_reason: null, updated_at: now.toISOString() });
+    return answer();
+  }
+  if (verb === "continue") {
+    const step = (body as { step_no?: unknown } | null)?.step_no;
+    if (typeof step !== "number" || !Number.isInteger(step) || step < 1) refuse(422, "invalid_payload");
+    if (step === v.steps_done && v.steps_done > 0) return staffJson(200, investigationView(w, who.m, st), { "X-Munim-Replayed": "true" });
+    if (step !== v.steps_done + 1) refuse(409, "sequence_gap");
+    if (terminal) refuse(409, "investigation_refused");
+    if (v.mode !== "step" && v.plan?.approved_by === null) refuse(409, "investigation_refused");
+    runStep(st, who.m.member_id, "member", now);
+    return answer();
+  }
+  // approve-plan: the creator, within their ceiling; it runs the plan's steps now (one step judges every item here).
+  const mode = (body as { mode?: unknown } | null)?.mode ?? "plan";
+  if (mode !== "plan" && mode !== "auto") refuse(422, "invalid_payload");
+  if (v.created_by !== who.m.member_id) refuse(403, "forbidden");
+  if (MODE_RANK[mode as string]! > MODE_RANK[CEILING[who.m.role]!]!) refuse(403, "forbidden", "mode_above_ceiling");
+  if (!v.plan) refuse(409, "illegal_transition");
+  if (v.plan!.approved_by !== null) return staffJson(200, investigationView(w, who.m, st), { "X-Munim-Replayed": "true" });
+  if (terminal) refuse(409, "illegal_transition");
+  v.plan!.approved_by = who.m.member_id;
+  v.plan!.approved_at = now.toISOString();
+  v.mode = mode as "plan" | "auto";
+  runStep(st, who.m.member_id, mode === "auto" ? "auto" : "plan", now);
+  return answer();
+}
+
+/** A specialist's desk (core's GET /v1/specialists/{id}): its open findings, proposed drafts, track record and threads. */
+function desk(w: World, who: Who, id: string, now: Date): Response {
+  const entry = SPECIALISTS.items.find((x) => x.id === id);
+  if (!entry) return notFound();
+  const m = who.m;
+  const findings = [...w.findings.values()].filter((f) => f.pack === id && f.status === "open").map((f) => ({ ...f, resolved_refs: seen(w, m, f.resolved_refs) }));
+  const drafts = [...w.drafts.values()].filter((d) => d.draft.source === `intel:${id}` && d.draft.status === "proposed" && visibleDraft(m, d)).map((d) => viewOf(w, m, d).draft);
+  let track: S["V1SpecialistDesk"]["track_record"] = null;
+  if (id !== "manager" && RANK[m.role]! >= RANK.manager!) {
+    const mine = [...w.drafts.values()].filter((d) => d.draft.source === `intel:${id}`);
+    const count = (f: (d: DraftState) => boolean) => mine.filter(f).length;
+    const row = { specialist: id, proposed: mine.length, approved: count((d) => d.decision?.verdict === "approved"), edited: count((d) => d.decision?.verdict === "edited"),
+      rejected: count((d) => d.decision?.verdict === "rejected"), stale: count((d) => d.draft.status === "stale"), abstained: 0 };
+    const snapId = id7(`snap:track:${id}:${w.snapshots.size}:${now.getTime()}`);
+    w.snapshots.set(snapId, snapshotOf(snapId, "intel.agent_track_record", { specialist: id }, T128_COLUMNS["intel.agent_track_record"]!, [row], { member: m.member_id }, (m.outlet_ids === "*" ? ["*"] : m.outlet_ids) as S["Snapshot"]["outlet_scope"], now.toISOString()));
+    const cell = (c: string) => `⟨snap:${snapId}·0·${c}⟩`;
+    track = { snapshot_id: snapId, cells: mine.length === 0 ? null : { proposed: cell("proposed"), approved: cell("approved"), edited: cell("edited"), rejected: cell("rejected"), stale: cell("stale"), abstained: cell("abstained") } };
+  }
+  const threads = [...w.threads.values()].filter((t) => seesThread(m, t) && (id === "manager" ? t.specialist === null : t.specialist === id || t.turns.some((x) => x.addressed_to === id)))
+    .map((t) => ({ thread_id: t.thread_id, last_activity_at: t.updated_at }));
+  return staffJson(200, { specialist: entry, applicable: true, findings, drafts, track_record: track, threads } satisfies S["V1SpecialistDesk"]);
+}
+
+/** core's runs visibility: a run's outlet scope inside the person's (every outlet: only someone with every outlet). */
+const seesRun = (m: Me, r: S["V1RunResponse"]) => (r.outlet_scope as string[])[0] === "*" ? m.outlet_ids === "*" : (r.outlet_scope as string[]).every((o) => sees(m, o));
+
+// The storefront page (0034): versions and publishes kept for this server instance.
+function pagesView(w: World): S["V1StorefrontPages"] {
+  const live = w.pages.publishes.at(-1);
+  const v = live ? w.pages.versions.find((x) => x.page_id === live.page_id) : undefined;
+  return {
+    versions: [...w.pages.versions].reverse().map((v) => ({ page_id: v.page_id, version: v.version, created_at: v.created_at, created_by: v.created_by, created_by_name: v.created_by_name })),
+    live: live && v ? { page_id: v.page_id, version: v.version, published_at: live.at, published_by: live.by, published_by_name: MEMBERS.find((x) => x.me.member_id === live.by)?.me.name ?? "" } : null,
+  };
+}
+/** WCAG contrast, as core-domain's judgeTheme: primary and secondary need white or ink text at 4.5:1 and read at 4.5:1 on the
+ *  page; ink must read at 4.5:1 on the accent. */
+function themeOk(t: S["StorefrontPageDoc"]["theme"]): boolean {
+  const lum = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+    .reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i]!, 0);
+  const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x! + 0.05) / (y! + 0.05); };
+  const fill = (c: string) => Math.max(ratio("#ffffff", c), ratio("#2a1a12", c)) >= 4.5 && ratio(c, "#fbf4ea") >= 4.5;
+  return fill(t.primary) && fill(t.secondary) && ratio("#2a1a12", t.accent) >= 4.5;
+}
+function savePage(w: World, who: Who, body: unknown): Response {
+  const cmd = envelopeOf<S["StorefrontPageSaveV1"]>(body, "storefront.page.save.v1");
+  const p = cmd.payload;
+  allow(who.m, ["owner", "manager", "judge"], "book_write_refused");
+  if (who.m.outlet_ids !== "*") refuse(403, "book_write_refused", "authority_denied");
+  const d = p.doc;
+  const kinds = Array.isArray(d?.sections) ? d.sections.map((x) => x.kind) : [];
+  if (!UUID7.test(String(p.page_id)) || !d?.theme || new Set(kinds).size !== 4 || kinds.length !== 4 || d.sections.some((x) => x.kind === "outlets" && x.visible !== true)) refuse(422, "invalid_payload");
+  return once(w, who, cmd, 201, () => {
+    if (!themeOk(d.theme)) refuse(422, "invalid_payload", "theme_contrast");
+    const newest = w.pages.versions.at(-1)?.version ?? null;
+    if (newest !== p.based_on_version) refuse(409, "conflict", "page_version_stale");
+    w.pages.versions.push({ page_id: p.page_id, version: (newest ?? 0) + 1, created_at: new Date().toISOString(), created_by: who.m.member_id, created_by_name: who.m.name, doc: d });
+    return result(cmd, p.page_id);
+  });
+}
+function publishPage(w: World, who: Who, id: string, body: unknown, req: Request, now: Date): Response {
+  const cmd = envelopeOf<S["StorefrontPagePublishV1"]>(body, "storefront.page.publish.v1");
+  if (cmd.payload.page_id !== id) refuse(422, "invalid_payload");
+  allow(who.m, ["owner", "judge"], "book_write_refused");
+  // R64 X-2 / R67 W-3: on a demo business core refuses the publish (lib/demo-guard.ts: 403 forbidden, demo_protected).
+  if (demoOn(req)) refuse(403, "forbidden", "demo_protected");
+  return once(w, who, cmd, 200, () => {
+    if (!w.pages.versions.some((x) => x.page_id === id)) refuse(404, "not_found");
+    if (w.pages.publishes.at(-1)?.page_id === id) refuse(409, "illegal_transition");
+    w.pages.publishes.push({ publish_id: cmd.payload.publish_id, page_id: id, at: now.toISOString(), by: who.m.member_id });
+    return result(cmd, cmd.payload.publish_id);
+  });
+}
+function campaignCommand(w: World, who: Who, verb: "cancel" | "record-sent", body: unknown, req: Request): Response {
+  const cmd = envelopeOf<{ campaign_id: string }>(body, verb === "cancel" ? "customers.campaign.cancel.v1" : "customers.campaign.record_sent.v1");
+  allow(who.m, verb === "cancel" ? ["owner", "manager", "judge"] : ["owner", "judge"], "book_write_refused");
+  if (who.m.outlet_ids !== "*") refuse(403, "book_write_refused", "authority_denied");
+  return once(w, who, cmd, 200, () => {
+    if (verb === "record-sent" && !demoOn(req)) refuse(403, "forbidden", "demo_only");
+    const c = w.campaigns.get(cmd.payload.campaign_id);
+    if (!c) refuse(404, "not_found");
+    if (c!.status !== "queued") refuse(409, "illegal_transition");
+    c!.status = verb === "cancel" ? "cancelled" : "sent";
+    return result(cmd, c!.campaign_id);
+  });
+}
+
+/** The live storefront page for the shopper's half of the mock (handler.ts): null until something is published. */
+export function livePage(): S["StorefrontPagePublic"] {
+  const live = world?.pages.publishes.at(-1);
+  const v = live ? world!.pages.versions.find((x) => x.page_id === live.page_id) : undefined;
+  return { page: live && v ? { version: v.version, published_at: live.at, doc: v.doc } : null };
+}
+export { BUILT_IN_PAGE };
+
 // ---------------------------------------------------------------- routing
 /** True for a request the member half answers: every /v1 path except the storefront's, the public Cares pages,
  *  and a guest's stream (which sends no Authorization). */
@@ -820,7 +1026,7 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
 
     if (req.method === "GET") {
       if (path === "/v1/me") return staffJson(200, m);
-      if (path === "/v1/tenant") return staffJson(200, TENANT);
+      if (path === "/v1/tenant") return staffJson(200, { ...TENANT, is_demo: demoOn(req) });
       // Like core today: every outlet of the business, whatever the person's scope (screens filter by GET /v1/me).
       if (path === "/v1/outlets") return staffJson(200, MEMBER_OUTLETS);
       if (path === "/v1/channels") return staffJson(200, CHANNELS);
@@ -830,7 +1036,8 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
         const outlet = q("outlet") ?? "", kind = q("channel_kind");
         if (!kind || !UUID7.test(outlet)) return fail(400, "bad_request");
         if (!outletById(outlet) || !sees(m, outlet)) return notFound();
-        return staffJson(200, menuFor(outlet, kind, now));
+        const menu = menuFor(outlet, kind, now);
+        return staffJson(200, brandsOn(req) ? { ...menu, entries: menu.entries.map((i) => ({ ...i, brand_id: brandOf(i.category) })) } : menu);
       }
       if (path === "/v1/orders") {
         const outlet = q("outlet"), status = q("status"), date = q("business_date");
@@ -888,6 +1095,48 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
         return t && seesThread(m, t) ? staffJson(200, { ...t, turns: t.turns.map((x) => ({ ...x, answer: x.answer && forViewer(w, m, x.answer) })) }) : notFound();
       }
       if (path === "/v1/specialists") return staffJson(200, SPECIALISTS);
+      r = x(/^\/v1\/specialists\/([a-z_]+)$/);
+      if (r) return desk(w, who, r[1]!, now);
+      if (path === "/v1/ai/policy") return staffJson(200, { ceilings: Object.entries(CEILING).map(([role, mode_ceiling]) => ({ role, mode_ceiling, source: "default" })), cap: null } as S["V1AiPolicy"]);
+      if (path === "/v1/investigations") {
+        const items = [...w.investigations.values()].filter((st) => seesInvestigation(m, st)).map((st) => investigationView(w, m, st))
+          .map((v) => ({ investigation_id: v.investigation_id, playbook_id: v.playbook_id, params: v.params, outlet_scope: v.outlet_scope, mode: v.mode, status: v.status,
+            stop_reason: v.stop_reason, created_by: v.created_by, steps_done: v.steps_done, max_steps: v.max_steps, created_at: v.created_at, updated_at: v.updated_at }))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at));
+        return staffJson(200, { items, next_cursor: null } satisfies S["V1InvestigationsResponse"]);
+      }
+      r = x(/^\/v1\/investigations\/([^/:]+)$/);
+      if (r) {
+        const st = w.investigations.get(r[1]!);
+        return st && seesInvestigation(m, st) ? staffJson(200, investigationView(w, m, st)) : notFound();
+      }
+      if (path === "/v1/runs") return staffJson(200, { items: seedRuns(now).filter((run) => seesRun(m, run)), next_cursor: null } satisfies S["V1RunsResponse"]);
+      r = x(/^\/v1\/runs\/([^/:]+)$/);
+      if (r) {
+        const run = seedRuns(now).find((y) => y.run_id === r![1]);
+        return run && seesRun(m, run) ? staffJson(200, run) : notFound();
+      }
+      r = x(/^\/v1\/traces\/([^/:]+)$/);
+      if (r) {
+        const run = seedRuns(now).find((y) => y.run_id === r![1]);
+        const events = run && seesRun(m, run) ? tracesOf(run.run_id, now) : null;
+        return events ? staffJson(200, { run_id: run!.run_id, events, next_after_seq: null } satisfies S["V1TracesResponse"]) : notFound();
+      }
+      if (path === "/v1/brands") return staffJson(200, brandsOn(req) ? BRANDS_RESPONSE : { brands: [] });
+      if (path === "/v1/storefront-pages") {
+        if (!["owner", "manager", "judge"].includes(m.role)) refuse(403, "forbidden");
+        return staffJson(200, pagesView(w));
+      }
+      r = x(/^\/v1\/storefront-pages\/([^/:]+)$/);
+      if (r) {
+        if (!["owner", "manager", "judge"].includes(m.role)) refuse(403, "forbidden");
+        const v = w.pages.versions.find((y) => y.page_id === r![1]);
+        return v ? staffJson(200, v) : notFound();
+      }
+      if (path === "/v1/campaigns") {
+        if (!["owner", "manager", "judge"].includes(m.role)) refuse(403, "forbidden");
+        return staffJson(200, { campaigns: [...w.campaigns.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)) } satisfies S["CustomersCampaignList"]);
+      }
       if (path === "/v1/cares/profile") return staffJson(200, CARES_PROFILE);
       if (path === "/v1/cares/recipients") {
         const outlet = q("outlet");
@@ -972,7 +1221,7 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
           return result(cmd, f.finding_id);
         });
       }
-      if (path === "/v1/snapshots") return mint(w, who, body, now);
+      if (path === "/v1/snapshots") return mint(w, who, body, req, now);
       if (path === "/v1/ask") return ask(w, who, body, req, now);
       if (path === "/v1/cares/listings") return publishListing(w, who, body, now);
       r = x(/^\/v1\/cares\/listings\/([^/:]+):withdraw$/);
@@ -982,6 +1231,14 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       if (path === "/v1/rfq-requests") return requestQuotes(w, who, body, req);
       if (path === "/v1/goods-received") return receiveGoods(w, who, body, now);
       if (path === "/v1/_mock/web-order") return webOrder(w, who, body, now);
+      if (path === "/v1/investigations") return createInvestigation(w, who, body, req, now);
+      r = x(/^\/v1\/investigations\/([^/:]+):(continue|cancel|approve-plan)$/);
+      if (r) return investigationAction(w, who, r[1]!, r[2]!, body, now);
+      if (path === "/v1/storefront-pages") return savePage(w, who, body);
+      r = x(/^\/v1\/storefront-pages\/([^/:]+):publish$/);
+      if (r) return publishPage(w, who, r[1]!, body, req, now);
+      if (path === "/v1/campaigns:cancel") return campaignCommand(w, who, "cancel", body, req);
+      if (path === "/v1/campaigns:record-sent") return campaignCommand(w, who, "record-sent", body, req);
       return notFound();
     }
     return notFound();

@@ -13,3 +13,9 @@ storefront.order.view
 storefront.preview.response
 storefront.refusal-error
 stream.event
+storefront.page.doc
+storefront.page.save.v1
+storefront.page.publish.v1
+v1.storefront-pages
+v1.storefront-page
+storefront.page.public

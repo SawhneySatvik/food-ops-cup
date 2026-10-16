@@ -1,4 +1,4 @@
-// The migration manifest: a HAND-WRITTEN list of what 0001–0033 must create. Gates compare the live catalog
+// The migration manifest: a HAND-WRITTEN list of what 0001–0034 must create. Gates compare the live catalog
 // against this list in both directions; never derive these from the catalog itself.
 // Update it in the same change as any migration that adds a table.
 
@@ -36,6 +36,7 @@ export const MIGRATIONS = [
   "0031_tick_ledger",
   "0032_rfq_authority",
   "0033_forecast_per_outlet",
+  "0034_t128_storefront_page_campaign_sent",
 ] as const;
 /** `-- requires: vector`: skipped loudly on embedded Postgres (no pgvector), applied where it exists. */
 export const SKIPPED_HERE = [{ name: "0013_embeddings", missing: ["vector"] }];
@@ -238,6 +239,9 @@ export const TABLES: Record<string, T> = {
   "core.cares_allocation": book(true),
   // 0031 (T-117): the tick ledger — which core-worker job ran for which tick slot (service state, no tenant)
   "core.tick_claim": global,
+  // 0034 (T-128): the storefront page — saved versions and publish events, tenant-level books
+  "core.storefront_page_version": book(),
+  "core.storefront_page_publish": book(),
 };
 
 export const OUR_SCHEMAS = ["core", "evidence", "intel", "platform", "intel_ro", "munim_meta"];
@@ -257,8 +261,9 @@ export const OUTLET_TABLES = names.filter((n) => TABLES[n]!.outlet);
  *  investigation_grant 4, investigation_step 5, intel.run.grant_id 1) = 365; 0024 adds 1 (intel.supplier_quote.source_chunk_id
  *  → intel.chunk) = 366; 0028 adds 29 (cares_recipient 1, cares_enablement 2, network_snapshot 3, cares_profile 1, cares_outlet 2,
  *  cares_listing 3, cares_listing_line 4, cares_handover 3 + the allocation FK added after, cares_handover_line 2, cares_claim 2,
- *  cares_claim_line 2, cares_allocation 2, task.cares_listing_id 1) = 395. */
-export const EXPECTED_COUNTS = { all: 168, core: 135, book: 103, tenant: 150, outlet: 59, fk: 395 };
+ *  cares_claim_line 2, cares_allocation 2, task.cares_listing_id 1) = 395; 0034 adds 5 (storefront_page_version 2,
+ *  storefront_page_publish 3) = 400. */
+export const EXPECTED_COUNTS = { all: 170, core: 137, book: 105, tenant: 152, outlet: 59, fk: 400 };
 
 /** F4 (0014): the restrictive customer_scope policy class per tenant table; every other tenant table is
  *  "deny". "open" tables carry no customer_scope policy (placement writes them). */
@@ -267,8 +272,10 @@ export const CUSTOMER_VIA_ORDER = ["core.order_line", "core.order_event", "core.
   "core.void", "core.sale_return", "core.kitchen_ticket"];
 export const CUSTOMER_PUBLIC = ["core.tenant", "core.outlet", "core.brand", "core.channel", "core.item", "core.variant",
   "core.option_group", "core.option", "core.price", "core.deal", "core.item_availability", "core.outlet_calendar",
-  "core.prep_time", "core.recipe_version"];
+  "core.prep_time", "core.recipe_version", "core.storefront_page_publish"];
 export const CUSTOMER_CODE = ["core.coupon"];
+/** 0034: a shopper reads a storefront page version only once a publish row names it. */
+export const CUSTOMER_PUBLISHED = ["core.storefront_page_version"];
 export const CUSTOMER_OPEN = ["core.ticket_counter", "core.pickup_window"];
 
 /** Tables a pack-scoped tenant may legitimately leave empty (AU: payroll_scope = 'roster_only'). */

@@ -7516,6 +7516,87 @@
       ]
     },
     {
+      "name": "core.storefront_page_publish",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "page_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "published_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "name": "core.storefront_page_version",
+      "tag": "book",
+      "tenant": true,
+      "primary_key": "{tenant_id,id}",
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "doc",
+          "type": "jsonb",
+          "not_null": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "not_null": true
+        },
+        {
+          "name": "origin",
+          "type": "jsonb",
+          "not_null": true
+        }
+      ]
+    },
+    {
       "name": "core.supplier",
       "tag": "book",
       "tenant": true,
@@ -12583,6 +12664,41 @@
       {
         "name": "storefront_key_tenant_id_fkey",
         "from": "core.storefront_key",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "storefront_page_publish_tenant_id_fkey",
+        "from": "core.storefront_page_publish",
+        "to": "core.tenant",
+        "from_cols": "{tenant_id}",
+        "to_cols": "{tenant_id}"
+      },
+      {
+        "name": "storefront_page_publish_tenant_id_page_id_fkey",
+        "from": "core.storefront_page_publish",
+        "to": "core.storefront_page_version",
+        "from_cols": "{tenant_id,page_id}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "storefront_page_publish_tenant_id_published_by_fkey",
+        "from": "core.storefront_page_publish",
+        "to": "core.member",
+        "from_cols": "{tenant_id,published_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "storefront_page_version_tenant_id_created_by_fkey",
+        "from": "core.storefront_page_version",
+        "to": "core.member",
+        "from_cols": "{tenant_id,created_by}",
+        "to_cols": "{tenant_id,id}"
+      },
+      {
+        "name": "storefront_page_version_tenant_id_fkey",
+        "from": "core.storefront_page_version",
         "to": "core.tenant",
         "from_cols": "{tenant_id}",
         "to_cols": "{tenant_id}"
@@ -23638,7 +23754,7 @@
   ],
   "stamp": {
     "inputs": {
-      "sha256": "771ebd437f3bf993933b4b67e2124328d7329d797331b91e190bb4e558302824",
+      "sha256": "0a37132062573ac6a3aa921a51abd5c8e979d2b6405fa3ed062b40a500d4d4ad",
       "files": {
         "db/migrations/0001_roles_schemas.sql": "c8ca50512df6ed4667f85d9b76e1f1e427cbf76c06123881b7586539e361153c",
         "db/migrations/0002_platform.sql": "c64200cdcced4198b425fb684b4d5e408b61e0d80751c074b89935a05dbb93b1",
@@ -23673,6 +23789,7 @@
         "db/migrations/0031_tick_ledger.sql": "9fb59dfd0563ac5d7d3c059dab9957090ddd1a727671557f608d7267e866e035",
         "db/migrations/0032_rfq_authority.sql": "b06db355bfdbb5946663355dd152743fef4c6044525c4b791e746382fb5d1f14",
         "db/migrations/0033_forecast_per_outlet.sql": "af502f55800c9954fe035939bcb9c679e9a94bdf9bc658d31b16cf752863a67f",
+        "db/migrations/0034_t128_storefront_page_campaign_sent.sql": "8caa9fd051561d6ec062de252d7ef873e0bb30f5e73301710e0f403fea50df83",
         "packages/contracts/package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
         "packages/contracts/scripts/ontology.ts": "8170c0c0de6323f029db10c55a670ca2eb3ac8bb4fdcc1b473c99ecd372bde93",
         "packages/contracts/src/accounts/index.ts": "4cfbe46bdcfd1bd695e3916a6e9950a6662902aa1a38c2d987425276976c14b0",
@@ -23683,7 +23800,7 @@
         "packages/contracts/src/catalogue/index.ts": "5212abe35ebf621976a4b10265a952599eb4b99d36e9cfe4f34122d7ee67fbdd",
         "packages/contracts/src/catalogue/read-routes.ts": "65e2781fd30d130e750d914241bafd5c8e6ec197c17663bf28d2143b0b65fb96",
         "packages/contracts/src/compliance/index.ts": "4e6db3e379d9df14cce7b7f03a3e9f0301d3ab0803bdd0b81a60e250e370aa0b",
-        "packages/contracts/src/customers/index.ts": "16cdc538740cf838f90600a590a45516eddff19d9a3630c0b376090869c00b18",
+        "packages/contracts/src/customers/index.ts": "48e1b03cb6bdceba8b894d7e965a4f86ccd592d486237519d7acdfef4d215d3f",
         "packages/contracts/src/customers/read-routes.ts": "b7c48d8e7cd4c2af5eb185461132309382987d090a651dd20cf80f2b6dca202c",
         "packages/contracts/src/events/index.ts": "bf71718146f0e2e06fe4f94d9c65811aad7ac2143915495a1f64cb28b246b534",
         "packages/contracts/src/finance/index.ts": "2fb1455ed0c9dbf0b69915411d9cb8281423ceb820bf0bc6e2e5bb04af1ac674",
@@ -23695,7 +23812,7 @@
         "packages/contracts/src/index.ts": "2c90520a36598bd035e2a37430ba88b9dfead17eee2bf1a675cb1a77e73a1d73",
         "packages/contracts/src/intel/index.ts": "0bce938d3c02a0fdb5ed6a6bbf3e4f3adcb4a6dee4a0f6fc4fdaf599f65e9b66",
         "packages/contracts/src/intel/read-routes.ts": "41ca6a802faab473b6b92556ae063b6437fc9788dfc5ea89359a9aa95a16006d",
-        "packages/contracts/src/intel/specialists.ts": "d8b581ddfb7e9aa688c03e1042a5a1825c870feb845b2e65b7971a3e26364d93",
+        "packages/contracts/src/intel/specialists.ts": "ecbd50ecfb7d0769244bfd25d3cfa765c5a72ed0b40844b569f5236d83186ac7",
         "packages/contracts/src/internal/index.ts": "e391e4bb7b7b4c5de5413f9100435c7ac9718fb39f10d2b442b97c7cdfe66491",
         "packages/contracts/src/inventory/index.ts": "6901a0a716f29fb209f44dd6460e095ce963691507f9c9741a355dc015d77a34",
         "packages/contracts/src/inventory/read-routes.ts": "71ee24cd61ddba899d309547c0ab12383455baec5766ddfc53f807aed4e8dda4",
@@ -23728,19 +23845,20 @@
         "packages/contracts/src/shared/grammar/number-words.json": "1ef95e05812a400c92e66ad87918cb6319f95ee17978e71dbe1d00e66cdfd746",
         "packages/contracts/src/shared/index.ts": "33478f42974a05e1529f860afd1718b8ad75bd64b1f77405c7c3f790ee9bacf7",
         "packages/contracts/src/shared/primitives.ts": "97b9d196f7f5354c5924e12475ab6f2c7fa79b109e8ce3fb3ab961167bdf7de2",
-        "packages/contracts/src/shared/reason-codes.ts": "c46e0a15fd3c6ca8ca17bcd1780556697bf59aa45526d1f676b5813476961d08",
+        "packages/contracts/src/shared/reason-codes.ts": "180e3d0a2b670700ebb9c9985ae4182315ff2f5e0161bca6da629d1172640e7c",
         "packages/contracts/src/shared/refs.ts": "1ca3960ba3c317b909b6dfddf6c73ac16b4d7afd1acbccae8a8405c6ca1c006c",
         "packages/contracts/src/shared/routes.ts": "7728dc6babd70d9239b6b69aed1ecc70a9479ddac3a8e56c81240134e0e3da5f",
         "packages/contracts/src/shared/run-token.ts": "0edaf277e73c31a5ea7bc45c16c452e06950dcf17beb9c1cc1007dbab5321097",
         "packages/contracts/src/shared/snapshot.ts": "3d3ca4eda9abae7a51208c8bcc4df616f99001f67499c8793e650a1dacde0e02",
         "packages/contracts/src/shared/trace.ts": "e19ee5fc552145df4cb537537066b1274568e0c8da0ef8d5a2dc5f18d6ff02f1",
         "packages/contracts/src/specialists/index.ts": "49b1f2b6fb2211d804a6ecf246db00faaceb5359abe477e1f3d0c52bb940d477",
-        "packages/contracts/src/storefront/index.ts": "7eca651618a1f5eef459b4ee767000d3417f259c91c1ccc6af7300ecdfb5156c",
+        "packages/contracts/src/storefront/index.ts": "a9a75c3fc0801cea12d6a1e133bc9b8b1bfebee0d17a4ad3d3a8d61ea6589117",
+        "packages/contracts/src/storefront/page.ts": "c3bc574c54bf4acd69e686f3d06ea420460335f281e01c53e7269fd2d3ce9883",
         "packages/contracts/src/tenancy/index.ts": "d2c466a6fd8c464f4549e9ac512ef1881e92019b654759114309c2034d1c9985",
         "packages/contracts/src/tenancy/read-routes.ts": "4600ab573128f6968df96aadd9285d09a0ab011da24be566d971f42d02483c09",
         "packages/contracts/src/threads/index.ts": "acd53e03ec1b88adf0eaeb4dacd63e0b16b8ada29eef1bcac8813c230be7a7f3"
       }
     },
-    "body_sha256": "734b42bb8a23a624052d318efd7073111cb0358939db23834ab59c3b76e3a0d2"
+    "body_sha256": "9bae4f70acfae5271acb0ad45c2ea279ae684b662c6b247546bf463ada5d45a5"
   }
 }

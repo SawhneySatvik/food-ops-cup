@@ -9,7 +9,7 @@ import type { Api } from "../src/api.ts";
 import { makeCtx } from "../src/ctx.ts";
 import { operatorApprove } from "../src/kit.ts";
 import { runWorld } from "../src/run.ts";
-import { businessToday } from "../src/time.ts";
+import { businessToday, monthStartBefore } from "../src/time.ts";
 import { startStack, type Stack } from "./stack.ts";
 
 // The mock's data, loaded by path: apps/web is not an ES-module package to tsc, so this file types the parts it reads.
@@ -169,6 +169,37 @@ describe("cobnut", () => {
         assert.deepEqual(menuDiff(menu.items as MenuItem[], o.name), []);
       }
     }
+  });
+
+  test("R67: six regulars stopped coming to Hazratganj — its churn segment counts them at risk, enough for the watcher to fire", async () => {
+    // Hand count from the seed's plant: 6 named regulars, each with ≥ 3 orders in 90 days and the last 36 days back; the watcher
+    // fires on at_risk × 10,000 ≥ 1,000 × regular_count (packs/customers-growth.md §4, 10% of regulars).
+    for (const { api, tenantId } of seeded) {
+      const hzg = (await stack.admin(`SELECT id FROM core.outlet WHERE tenant_id = $1 AND name = 'Cobnut Hazratganj'`, [tenantId])).rows[0]!.id as string;
+      const snap = await api.post("owner", "/v1/snapshots", { template_id: "customers.churn_segments", params: { outlet_id: hzg, as_of: businessToday(new Date(), "Asia/Kolkata") } });
+      const sigma = (snap.rows as Array<Record<string, unknown>>).find((r) => r.customer_id === null)!;
+      const [atRisk, regular] = [Number(sigma.at_risk_count), Number(sigma.regular_count)];
+      assert.equal(atRisk, 6);
+      assert.ok(atRisk * 10_000 >= 1_000 * regular, `${atRisk} at risk of ${regular} regulars`);
+    }
+  });
+
+  test("R67 W-4: on a Cobnut long enough to hold last month and the one before, a margin-fall plan runs to done", { timeout: 900_000 }, async () => {
+    // Its own seed: 110 days reach the first of the month before last. Hand expectations: the tills, bank lines and (no) payouts are
+    // complete for both months (data_complete), and the plant's ₹16,800 of extra discount in the later month is far over a tenth of
+    // the margin it lost (deals); the plan then judges every item in one step.
+    const today = businessToday(new Date(), "Asia/Kolkata");
+    const r = await runWorld({ world: "cobnut", seed: "cobnut-gate-mf", asOf: today, days: 110, baseUrl: stack.baseUrl, token: stack.token("cobnut"), operator: true, simUrl: SIM });
+    const id = r.api.id("t128:investigation");
+    const params = { period_month: monthStartBefore(today, 1), compare_month: monthStartBefore(today, 2) };
+    const opened = await r.api.post("owner", "/v1/investigations", { investigation_id: id, playbook_id: "margin_fall", params, mode: "plan" });
+    assert.deepEqual([opened.mode, opened.status], ["plan", "open"]);
+    const v = await r.api.post("owner", "/v1/investigations/{id}:approve-plan", {}, { params: { id } });
+    const status = Object.fromEntries((v.checklist as Array<{ item_id: string; status: string }>).map((c) => [c.item_id, c.status]));
+    console.log(`margin_fall on cobnut: ${v.status} after ${v.steps_done} step(s), ${JSON.stringify(status)}`);
+    assert.equal(v.status, "done");
+    assert.equal(status.data_complete, "supported");
+    assert.equal(status.deals, "supported");
   });
 
   test("the mock's coupons behave the same", async () => {

@@ -236,6 +236,7 @@ const TITLE: Record<string, string> = {
   "catalogue.deal.end.v1": "End a deal",
   "cares.listing.publish.v1": "List surplus food on Munim Cares",
   "goals.task.create.v1": "A task for the team",
+  "customers.campaign.create.v1": "A message to regulars who stopped coming",
 };
 /** What a draft proposes, in words, from its command type. */
 export const draftTitle = (commandType: string): string => TITLE[commandType] ?? "A proposed change";
@@ -244,6 +245,7 @@ const FINDING: Record<string, string> = {
   "inventory.waste_spike": "More waste than a usual week",
   "kitchen.ticket_drift": "Tickets running past their prep time",
   "inventory.expiry_risk": "Food at risk of going to waste",
+  "customers.regulars_lapsing": "Regulars who have stopped coming",
 };
 /** What a finding is about, from its type. */
 export const findingTitle = (type: string): string => FINDING[type] ?? titleCase(type);
@@ -256,6 +258,7 @@ const FIELD: Record<string, string> = {
   min_qty_milli: "Minimum",
   par_qty_milli: "Par level",
   min_spend_minor: "Minimum spend",
+  audience_count: "Customers it would reach",
 };
 /** A numeric field's label, from its payload name. */
 export const fieldLabel = (column: string): string => FIELD[column] ?? titleCase(column);

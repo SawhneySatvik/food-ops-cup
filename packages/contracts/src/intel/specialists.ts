@@ -110,6 +110,10 @@ export const SPECIALIST_REGISTRY: z.infer<typeof SpecialistRegistry> = {
       ["customers.coupon_leakage", "customers.staff_coupon_use", "customers.coupon_daily", "customers.churn_segments", "customers.review_trend", "customers.consented_audience", "customers.coupon_current"],
       // No model-path draftables (R-B S1-B, S1-D): coupon.set and campaign.create are not agent-exposed.
       [],
+      "specialist",
+      // R67 (founder, 16 Oct): the regulars_lapsing win-back campaign, drafted by mapping code only. Core admits it on a demo
+      // business only (internal/drafts.ts); everywhere else the S1-D refusal stands.
+      ["customers.campaign.create.v1"],
     ),
     e(
       "compliance",

@@ -6,8 +6,11 @@
 //      `draftables`, or one of its `workflow_draftables` (DECISIONS 11 Oct, W3.2: emitted by deterministic intel code,
 //      never a model tool; contracts DraftsRequest lets such a draft cite no snapshot cell when every numeric leaf is a
 //      document span or a quote row) — else 422.
-//      Campaign and coupon drafts are no specialist's draftable (R-B S1-B / S1-D ruling, 11 Oct: an approved campaign must
-//      never reach customers outside the finding; coupon.set waits for pack §6's executable tightening), so check 0 refuses them.
+//      Coupon drafts are no specialist's draftable (R-B S1-B, 11 Oct: coupon.set waits for pack §6's executable tightening), so
+//      check 0 refuses them. Campaign drafts (R-B S1-D: an approved campaign must never reach customers outside the finding)
+//      are the customers pack's workflow draftable since R67, admitted only by check 0d.
+//  0d. R67 (founder, 16 Oct): a customers.campaign.create.v1 draft only on a demo business, with its audience the at-risk count
+//      of the finding's own churn segment (lib/demo.ts, the one place) — else 422 `campaign_audience_unscoped`, nothing stored.
 //  0b. A payroll draft outside the pack's `payroll_scope` → 422 `payroll_out_of_scope` (W3.2; nothing stored).
 //  0c. A goals.task.create.v1 draft naming a Cares listing from any pack but people → 422 (ADR-015 §4; nothing stored).
 //   2. The validator (04 §4 check 5): payload numbers are refs (the proposal schema refuses a bare number: 422),
@@ -46,6 +49,7 @@ import { DraftsRequest } from "@munim/contracts/internal";
 import { SPECIALIST_REGISTRY } from "@munim/contracts/intel";
 import { checkGrammar, validateDraft } from "@munim/core-domain/envelope";
 import { canonicalJson, sha256Hex } from "../commit/index.ts";
+import { campaignAudienceScoped } from "../lib/demo.ts";
 import { ApiError } from "../lib/errors.ts";
 import { payrollScope } from "../modules/people/payroll.ts";
 import type { Queryable } from "../runtoken/index.ts";
@@ -175,6 +179,9 @@ export async function writeDraft(c: Queryable, run: Run, raw: unknown): Promise<
   // code); any other proposer of goals.task.create.v1 sends null (ontology `fixed`), so a listing id from it is refused.
   if (req.command_type === "goals.task.create.v1" && (req.payload as { cares_listing_id?: unknown }).cares_listing_id != null && req.pack !== "people") {
     throw new ApiError("invalid_payload");
+  }
+  if (req.command_type === "customers.campaign.create.v1" && !(await campaignAudienceScoped(c, req))) {
+    throw new ApiError("invalid_payload", "campaign_audience_unscoped");
   }
   const answer = (b: Body) => JSON.stringify(b);
   // A run proposes only inside its own scope; a tenant-wide draft ([]) needs a run over every outlet.

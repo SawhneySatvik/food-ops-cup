@@ -1064,7 +1064,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Queued / cancelled campaigns (created only by an approved draft; never sent by Munim) */
+        /** Queued, cancelled and (demo) recorded-as-sent campaigns (created only by an approved draft; never sent by Munim) */
         get: operations["listCampaigns"];
         put?: never;
         post?: never;
@@ -1085,6 +1085,23 @@ export interface paths {
         put?: never;
         /** customers.campaign.cancel.v1 — cancel a queued campaign */
         post: operations["cancelCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns:record-sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** customers.campaign.record_sent.v1 — on a demo business, record a queued campaign as sent (simulated: no message leaves Munim; owner) */
+        post: operations["recordCampaignSent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3318,6 +3335,75 @@ export interface paths {
         };
         /** Server-sent events for the given topics (kds / order / inbox / trace); text/event-stream, read with the SDK's openStream; resume with Last-Event-ID; heartbeat every 20 s, closed at 55 min */
         get: operations["streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/storefront-pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The storefront page's saved versions and the live one */
+        get: operations["listStorefrontPages"];
+        put?: never;
+        /** storefront.page.save.v1 — save the next version of the storefront page (owner; all-outlet manager) */
+        post: operations["saveStorefrontPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/storefront-pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One saved version of the storefront page with its theme and sections */
+        get: operations["getStorefrontPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/storefront-pages/{id}:publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** storefront.page.publish.v1 — put a saved version live; an older one restores it (owner) */
+        post: operations["publishStorefrontPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/storefront/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The live storefront page (theme and home page sections), or null for the built-in look */
+        get: operations["storefrontPage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6081,6 +6167,10 @@ export interface components {
         CustomersCampaignCancelV1: {
             campaign_id: components["schemas"]["Uuid7"];
         };
+        /** CustomersCampaignRecordSentV1 */
+        CustomersCampaignRecordSentV1: {
+            campaign_id: components["schemas"]["Uuid7"];
+        };
         /** CustomersReservationUpsertV1 */
         CustomersReservationUpsertV1: {
             reservation_id: components["schemas"]["Uuid7"];
@@ -8471,7 +8561,7 @@ export interface components {
          * ReasonCode
          * @enum {string}
          */
-        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited" | "handover_must_be_complete" | "offer_handover_final" | "pickup_time_outside_window";
+        ReasonCode: "number_grammar" | "unresolved_ref" | "cross_tenant_ref" | "quote_mismatch" | "missing_ref" | "settlements_missing" | "recipe_missing" | "stale_draft" | "authority_denied" | "cost_price_missing" | "ticket_times_missing" | "count_missing" | "expiry_missing" | "budget_exceeded" | "budget_missing" | "margin_below_floor" | "moq_exceeds_need" | "open_commitment_overlap" | "payment_terms_worse" | "consent_record_missing" | "bank_lines_missing" | "attendance_missing" | "payroll_out_of_scope" | "no_marketing_consent" | "not_a_certificate" | "log_coverage_missing" | "signal_source_missing" | "insufficient_history" | "forecast_stale" | "window_full" | "outlet_paused" | "item_sold_out" | "deal_rejudged" | "coupon_invalid" | "coupon_cap_reached" | "coupon_min_spend" | "change_window_closed" | "coupon_expired" | "coupon_out_of_scope" | "price_above_mrp" | "expired_batch" | "period_closed" | "model_blocked" | "preview_total_changed" | "buyer_identity_required" | "tax_id_missing" | "unknown_tax_class" | "unknown_channel" | "unit_mismatch" | "not_applicable" | "item_unavailable" | "reason_required" | "deal_changed" | "duplicate_invoice" | "guest_cannot_change" | "refund_first" | "order_tendered" | "cash_below_rounding" | "recently_rejected" | "mode_above_ceiling" | "cap_above_platform_budget" | "platform_budget_missing" | "assignee_missing" | "campaign_audience_unscoped" | "specialist_needed" | "cares_not_available" | "cares_not_enabled" | "cares_not_opted_in" | "cares_city_mismatch" | "recipient_ineligible" | "listing_expired" | "qty_exceeds_on_hand" | "qty_exceeds_listed" | "cooked_hold_exceeded" | "line_expired" | "no_eligible_recipient" | "no_rostered_staff" | "offer_not_enabled" | "offer_closed" | "claim_decided" | "claim_received" | "rate_limited" | "handover_must_be_complete" | "offer_handover_final" | "pickup_time_outside_window" | "theme_contrast" | "page_version_stale" | "demo_only" | "demo_protected";
         /** AnswerEnvelope */
         AnswerEnvelope: {
             answer_id: components["schemas"]["Uuid7"];
@@ -8928,6 +9018,88 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** StorefrontPageDoc */
+        StorefrontPageDoc: {
+            theme: {
+                primary: string;
+                secondary: string;
+                accent: string;
+                /** @enum {string} */
+                radius: "soft" | "round";
+                /** @enum {string} */
+                layout: "hero-banner" | "menu-grid" | "menu-list";
+            };
+            sections: ({
+                /** @constant */
+                kind: "hero";
+                visible: boolean;
+                badge: string;
+                tagline: string;
+            } | {
+                /** @constant */
+                kind: "outlets";
+                /** @constant */
+                visible: true;
+                title: string;
+            } | {
+                /** @constant */
+                kind: "ribbon";
+                visible: boolean;
+            } | {
+                /** @constant */
+                kind: "cards";
+                visible: boolean;
+                cards: {
+                    title: string;
+                    body: string;
+                }[];
+            })[];
+        };
+        /** StorefrontPageSaveV1 */
+        StorefrontPageSaveV1: {
+            page_id: components["schemas"]["Uuid7"];
+            based_on_version: number | null;
+            doc: components["schemas"]["StorefrontPageDoc"];
+        };
+        /** StorefrontPagePublishV1 */
+        StorefrontPagePublishV1: {
+            publish_id: components["schemas"]["Uuid7"];
+            page_id: components["schemas"]["Uuid7"];
+        };
+        /** V1StorefrontPages */
+        V1StorefrontPages: {
+            versions: {
+                page_id: components["schemas"]["Uuid7"];
+                version: number;
+                created_at: components["schemas"]["IsoDatetime"];
+                created_by: components["schemas"]["Uuid7"];
+                created_by_name: string;
+            }[];
+            live: {
+                page_id: components["schemas"]["Uuid7"];
+                version: number;
+                published_at: components["schemas"]["IsoDatetime"];
+                published_by: components["schemas"]["Uuid7"];
+                published_by_name: string;
+            } | null;
+        };
+        /** V1StorefrontPage */
+        V1StorefrontPage: {
+            page_id: components["schemas"]["Uuid7"];
+            version: number;
+            created_at: components["schemas"]["IsoDatetime"];
+            created_by: components["schemas"]["Uuid7"];
+            created_by_name: string;
+            doc: components["schemas"]["StorefrontPageDoc"];
+        };
+        /** StorefrontPagePublic */
+        StorefrontPagePublic: {
+            page: {
+                version: number;
+                published_at: components["schemas"]["IsoDatetime"];
+                doc: components["schemas"]["StorefrontPageDoc"];
+            } | null;
         };
         /** V1OutletCalendar */
         V1OutletCalendar: {
@@ -15274,6 +15446,92 @@ export interface operations {
                     /** @constant */
                     type: "customers.campaign.cancel.v1";
                     payload: components["schemas"]["CustomersCampaignCancelV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordCampaignSent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "customers.campaign.record_sent.v1";
+                    payload: components["schemas"]["CustomersCampaignRecordSentV1"];
                 };
             };
         };
@@ -26996,6 +27254,377 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listStorefrontPages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1StorefrontPages"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    saveStorefrontPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "storefront.page.save.v1";
+                    payload: components["schemas"]["StorefrontPageSaveV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getStorefrontPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["V1StorefrontPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    publishStorefrontPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command_id: components["schemas"]["Uuid7"];
+                    idempotency_key: string;
+                    /** @constant */
+                    type: "storefront.page.publish.v1";
+                    payload: components["schemas"]["StorefrontPagePublishV1"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description "true" when this is the stored response of an earlier identical request */
+                    "X-Munim-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    storefrontPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontPagePublic"];
                 };
             };
             /** @description Bad request */

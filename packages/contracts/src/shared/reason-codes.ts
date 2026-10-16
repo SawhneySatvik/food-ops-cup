@@ -91,6 +91,11 @@ export const CARES_REASON_CODES = [
 /** T-099 (docs/kit/gaps.md G-12): a storefront order's `promised_at` that is not inside the pickup window it names. */
 export const STOREFRONT_T099_REASON_CODES = ["pickup_time_outside_window"] as const;
 
+/** T-128 (R66, R67): a storefront theme whose colours do not reach 4.5:1; a page save on top of a version that is no longer
+ *  the newest; a command that only a demo business takes (recording a campaign as sent, simulated); a command an onboarded
+ *  demo business refuses so it keeps working for everyone (R64 X-2, core-api lib/demo-guard.ts). */
+export const T128_REASON_CODES = ["theme_contrast", "page_version_stale", "demo_only", "demo_protected"] as const;
+
 export const REASON_CODES = [
   ...CORE_REASON_CODES,
   ...PACK_REASON_CODES,
@@ -101,6 +106,7 @@ export const REASON_CODES = [
   ...W3_REASON_CODES,
   ...CARES_REASON_CODES,
   ...STOREFRONT_T099_REASON_CODES,
+  ...T128_REASON_CODES,
 ] as const;
 export const ReasonCode = z.enum(REASON_CODES);
 export type ReasonCode = z.infer<typeof ReasonCode>;

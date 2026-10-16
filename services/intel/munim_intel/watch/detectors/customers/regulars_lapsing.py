@@ -7,13 +7,22 @@ with no regulars would otherwise pass the share test as 0 ≥ 0. Severity is L o
 customers' 90-day spend ÷ 3. Who counts as at risk is the template's rule (an INFERENCE in 0021). Dedupe
 `<outlet>:<iso_week>`.
 
-No draft yet. The win-back campaign (pack §6) takes `audience_count` from `consented_audience`, minted on this snapshot,
-and a mapping cannot mint (reported). Pack §7's `no_marketing_consent` belongs to that draft.
+Draft (R67, founder 16 Oct; T-128): the win-back campaign (pack §6), by code — the model never proposes it. Its audience is
+the Σ row's `at_risk_count` and its segment is this very snapshot, so the campaign names the finding's at-risk customers and
+nobody else; core admits it on a demo business only (synthetic customers: no marketing-consent count) and refuses it
+everywhere else (`campaign_audience_unscoped`, the 11 Oct S1-D ruling). The message is a fixed template (`message_key`, no
+placeholders), so no copy is written here. Nothing is ever sent: approved, it is queued; on a demo the owner may record it as
+sent, simulated.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from munim_intel.detect import DetectorSpec, Ladder, OutletFrame, Row, Severity, Thresholds, Window, num, register
+from munim_intel.mapping import Detection, Proposal
+
+CAMPAIGN = "customers.campaign.create.v1"
 
 
 def windows(outlet: OutletFrame, _: Thresholds) -> list[Window]:
@@ -36,6 +45,32 @@ def dedupe(_: Row, w: Window) -> str:
     return f"{w.params['outlet_id']}:{w.key}"
 
 
+def win_back(d: Detection) -> Proposal:
+    """Plain text with no digit (core's number grammar reads `name`). `send_at`: noon UTC on the day after the outlet's
+    business date — that day in every pack's zones (IN +05:30, AU +10/+11) — so the screens show the planned day; intel
+    computes no local time (one tz module, in core)."""
+    day = d.outlet.business_date + timedelta(days=1)
+    return Proposal(
+        command_type=CAMPAIGN,
+        payload={
+            "name": "Win back regulars who have stopped coming",
+            "channel": "sms",
+            "outlet_ids": [d.outlet.id],
+            "segment_snapshot_id": d.snapshot_id,
+            "audience_count": d.ref("at_risk_count"),
+            "message_key": "campaign.win_back",
+            "placeholders": [],
+            "coupon_id": None,
+            "send_at": f"{day.isoformat()}T12:00:00Z",
+            "window_from": None,
+            "window_to": None,
+        },
+        based_on=[d.ref("at_risk_count")],
+        targets=[d.outlet.id],
+        minted=["campaign_id"],
+    )
+
+
 SPEC = register(
     DetectorSpec(
         id="customers.regulars_lapsing",
@@ -52,5 +87,6 @@ SPEC = register(
             "{at_risk_count} regular customers have stayed away well past their usual gap between orders, "
             "alongside {regular_count} who still come; together they spent {at_risk_spend_minor} a month."
         ),
+        mapping=win_back,
     )
 )

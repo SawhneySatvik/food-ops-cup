@@ -16710,6 +16710,21 @@
         ],
         "additionalProperties": false
       },
+      "CustomersCampaignRecordSentV1": {
+        "title": "CustomersCampaignRecordSentV1",
+        "x-munim-contract": "customers.campaign.record_sent.v1",
+        "x-munim-module": "customers",
+        "type": "object",
+        "properties": {
+          "campaign_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "campaign_id"
+        ],
+        "additionalProperties": false
+      },
       "CustomersReservationUpsertV1": {
         "title": "CustomersReservationUpsertV1",
         "x-munim-contract": "customers.reservation.upsert.v1",
@@ -38080,7 +38095,11 @@
           "rate_limited",
           "handover_must_be_complete",
           "offer_handover_final",
-          "pickup_time_outside_window"
+          "pickup_time_outside_window",
+          "theme_contrast",
+          "page_version_stale",
+          "demo_only",
+          "demo_protected"
         ]
       },
       "AnswerEnvelope": {
@@ -40936,6 +40955,393 @@
           "id",
           "type",
           "data"
+        ],
+        "additionalProperties": false
+      },
+      "StorefrontPageDoc": {
+        "title": "StorefrontPageDoc",
+        "x-munim-contract": "storefront.page.doc",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "object",
+            "properties": {
+              "primary": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "secondary": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "accent": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "radius": {
+                "type": "string",
+                "enum": [
+                  "soft",
+                  "round"
+                ]
+              },
+              "layout": {
+                "type": "string",
+                "enum": [
+                  "hero-banner",
+                  "menu-grid",
+                  "menu-list"
+                ]
+              }
+            },
+            "required": [
+              "primary",
+              "secondary",
+              "accent",
+              "radius",
+              "layout"
+            ],
+            "additionalProperties": false
+          },
+          "sections": {
+            "minItems": 4,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "hero"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    },
+                    "badge": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    },
+                    "tagline": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "visible",
+                    "badge",
+                    "tagline"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "outlets"
+                    },
+                    "visible": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "visible",
+                    "title"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "ribbon"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "visible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "cards"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    },
+                    "cards": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 60
+                          },
+                          "body": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "body"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "visible",
+                    "cards"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "theme",
+          "sections"
+        ],
+        "additionalProperties": false
+      },
+      "StorefrontPageSaveV1": {
+        "title": "StorefrontPageSaveV1",
+        "x-munim-contract": "storefront.page.save.v1",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "based_on_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doc": {
+            "$ref": "#/components/schemas/StorefrontPageDoc"
+          }
+        },
+        "required": [
+          "page_id",
+          "based_on_version",
+          "doc"
+        ],
+        "additionalProperties": false
+      },
+      "StorefrontPagePublishV1": {
+        "title": "StorefrontPagePublishV1",
+        "x-munim-contract": "storefront.page.publish.v1",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "publish_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "page_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          }
+        },
+        "required": [
+          "publish_id",
+          "page_id"
+        ],
+        "additionalProperties": false
+      },
+      "V1StorefrontPages": {
+        "title": "V1StorefrontPages",
+        "x-munim-contract": "v1.storefront-pages",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "created_at": {
+                  "$ref": "#/components/schemas/IsoDatetime"
+                },
+                "created_by": {
+                  "$ref": "#/components/schemas/Uuid7"
+                },
+                "created_by_name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "page_id",
+                "version",
+                "created_at",
+                "created_by",
+                "created_by_name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "live": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "page_id": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "published_at": {
+                    "$ref": "#/components/schemas/IsoDatetime"
+                  },
+                  "published_by": {
+                    "$ref": "#/components/schemas/Uuid7"
+                  },
+                  "published_by_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "page_id",
+                  "version",
+                  "published_at",
+                  "published_by",
+                  "published_by_name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "versions",
+          "live"
+        ],
+        "additionalProperties": false
+      },
+      "V1StorefrontPage": {
+        "title": "V1StorefrontPage",
+        "x-munim-contract": "v1.storefront-page",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/IsoDatetime"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Uuid7"
+          },
+          "created_by_name": {
+            "type": "string"
+          },
+          "doc": {
+            "$ref": "#/components/schemas/StorefrontPageDoc"
+          }
+        },
+        "required": [
+          "page_id",
+          "version",
+          "created_at",
+          "created_by",
+          "created_by_name",
+          "doc"
+        ],
+        "additionalProperties": false
+      },
+      "StorefrontPagePublic": {
+        "title": "StorefrontPagePublic",
+        "x-munim-contract": "storefront.page.public",
+        "x-munim-module": "storefront",
+        "type": "object",
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "published_at": {
+                    "$ref": "#/components/schemas/IsoDatetime"
+                  },
+                  "doc": {
+                    "$ref": "#/components/schemas/StorefrontPageDoc"
+                  }
+                },
+                "required": [
+                  "version",
+                  "published_at",
+                  "doc"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "page"
         ],
         "additionalProperties": false
       },

@@ -4,10 +4,11 @@
 // menu against that file. Every reseed is a fresh tenant (cli.ts picks a fresh seed), so the platform-wide rows it names — the Lucknow city
 // and the two simulated recipients — carry ids that do not depend on the seed. All people, businesses and suppliers are invented.
 import type { Ctx } from "../ctx.ts";
-import { customers, Plan, type Waste } from "../history.ts";
+import { bankFile, shiftFile } from "../files.ts";
+import { customers, Plan, type PBill, type Waste } from "../history.ts";
 import { idOf } from "../ids.ts";
 import * as k from "../kit.ts";
-import { addDays, at, businessToday, mondayOf } from "../time.ts";
+import { addDays, at, businessToday, daysBetween, mondayOf, monthStartBefore } from "../time.ts";
 
 export const meta = { tz: "Asia/Kolkata", currency: "INR", personas: ["owner", "manager", "counter", "kitchen"] } as const;
 
@@ -160,7 +161,8 @@ export async function build(c: Ctx): Promise<void> {
   await k.coupon(c, "first50", "FIRST50", { bp: 5000, from: histFrom, cap: 1 });
 
   // ---- dated history (R44b): bills and waste through the approved-import path ----
-  const people = await customers(c, "IN", 20, 0);
+  // Six named regulars (T-128, R67) besides the pool the baseline bills draw from: see the lapse plant below.
+  const people = await customers(c, "IN", 20, 6);
   // Butter waste at Hazratganj: three logs a week of 0.9 kg (₹504 a log at ₹560/kg) in every week of the timeline before yesterday's ISO week, then
   // three of 2.9 kg in that week: ₹4,872 against a usual ₹1,512, so inventory.waste_spike fires for that week only (≥ 1.5× the median of the 8 weeks
   // before it and ≥ ₹1,500 over it; every earlier week has the usual waste, so none of them does).
@@ -175,8 +177,34 @@ export async function build(c: Ctx): Promise<void> {
   const spikeDays = [0, 1, 2, 3, 4, 5, 6].map((n) => addDays(spikeWeek, n)).filter((d) => d <= D(1));
   for (let i = 0; i < 3; i++) plantedWaste.push({ date: spikeDays[i % spikeDays.length]!, time: `20:${10 + 10 * i}`, outlet: 0, ing: butter, qtyMilli: 2900, reason: "expired" });
   const simple = DISHES.filter((d) => d.variants.length === 0 && d.groups.length === 0);
+  // Every planted bill below sells only cardamom knots (butter and flour, no hazelnuts), so the hazelnut draw the RFQ demo depends on
+  // is untouched, and at 16:30 (outside the morning bake's 08:00-11:00 window).
+  const knots = (no: string, date: string, o: Partial<PBill> = {}): PBill =>
+    ({ no, date, time: "16:30", outlet: 0, channel: "counter", type: "takeaway", lines: [{ item: "cardamom_knot", qty: 2 }], tender: "upi", ...o });
+  const planted: PBill[] = [];
+  // R67 (customers.regulars_lapsing → the win-back campaign draft): the six regulars bought every five days from up to 80 days back and
+  // stopped 36 days back. churn_segments then counts them at_risk (≥ 3 orders in 90 days; 36 days since the last > max(2 × the 5-day
+  // gap, 14)) beside the 20 pool customers, who buy almost daily: 6 of 26 regulars is over the pack's 10% (detector fires on
+  // at_risk × 10,000 ≥ 1,000 × regular_count).
+  for (const [i, phone] of people.regulars.entries()) {
+    for (let n = Math.min(80, c.days - 1); n >= 36; n -= 5) planted.push(knots(`CB-REG-${i + 1}-${n}`, D(n), { phone }));
+  }
+  // R67 W-4 (T-128): a margin-fall investigation that completes. The month pair is the calendar month before as-of's month (pm0)
+  // against the one before it (cm0), planted only when the history reaches cm0's first day. Hazratganj sells the same 120 bills of
+  // two knots (₹280 each before tax) in both months; in pm0 every one carries a 50% discount (a staff-run "half-price knots"
+  // fortnight): ₹16,800 of discount the compare month does not have. Shifts and bank lines for both months follow the bills below.
+  const cm0 = monthStartBefore(A, 2);
+  const pm0 = monthStartBefore(A, 1);
+  const margin = daysBetween(cm0, A) <= c.days;
+  if (margin) {
+    for (const [tag, m0] of [["A", cm0], ["S", pm0]] as const) {
+      for (let i = 0; i < 120; i++) {
+        planted.push(knots(`CB-MF-${tag}-${String(i + 1).padStart(3, "0")}`, addDays(m0, 2 + (i % 14)), tag === "S" ? { lines: [{ item: "cardamom_knot", qty: 2, discBp: 5000 }] } : {}));
+      }
+    }
+  }
   const plan = new Plan(c, {
-    prefix: "CB", inclusive: false, phones: people.pool, planted: [], plantedWaste, hours: [8, 20],
+    prefix: "CB", inclusive: false, phones: people.pool, planted, plantedWaste, hours: [8, 20],
     outlets: [{ outlet: hzg, perDay: [16, 24] }, { outlet: gmt, perDay: [9, 15] }],
     channels: [{ kind: "counter", w: 70, types: ["takeaway", "dine_in"] }, { kind: "own_site", w: 30, types: ["pickup"] }],
     items: simple.map((d) => ({ key: d.key, priceMinor: d.price!, taxClass: TAX, w: d.category === "pastries" ? 5 : 3, recipe: RECIPES[d.key]! })),
@@ -196,6 +224,26 @@ export async function build(c: Ctx): Promise<void> {
   c.s.hazelnutsLeftMilli = hazelLeft;
   plan.queue();
   await k.flushImports(c);
+  if (margin) {
+    // finance.close_status for both months (the investigation's data_complete item): every trading day of each outlet has a closed
+    // drawer session (one 04:00 → 03:59 shift per business date, the default cutoff; its Cash Tenders is core's own figure, so the
+    // log is uploaded after the bills are committed), and the bank lines reach each month's last day (one UPI credit per outlet and
+    // day: what the day's bills took by UPI, so the tender-vs-bank reconciliation finds no gap). Cobnut has no aggregator channel,
+    // so there are no payouts to import.
+    const last = addDays(monthStartBefore(A, 0), -1);
+    const inPair = (d: string) => d >= cm0 && d <= last;
+    const shifts = biz.outlets.flatMap((o, oi) => plan.tradingDays(oi).filter(inPair).map((d) => ({
+      no: `CB-SH-${oi + 1}-${d.replaceAll("-", "")}`, date: d, outlet: o.name, opened: "04:00", closed: "03:59", by: "Nandini Mehrotra",
+      floatMinor: 200_000, cashMinor: plan.cashIn(oi, d),
+    })));
+    const credits = biz.outlets.flatMap((o, oi) => plan.tradingDays(oi).filter((d) => d <= last).flatMap((d) => {
+      const minor = plan.upiTendered(oi, d);
+      return minor > 0 ? [{ date: d, ref: `CB-UPI-${oi + 1}-${d}`, outlet: o.name, minor, narration: "UPI settlement (synthetic)" }] : [];
+    }));
+    k.importFile(c, "history:shifts:CB", "shift_log", "CB-shifts.csv", shiftFile(shifts), "Synthetic dated history");
+    k.importFile(c, "history:bank:CB", "bank_statement", "CB-upi-credits.csv", bankFile("SB-SYN-COBNUT", credits, biz.currency), "Synthetic dated history");
+    await k.flushImports(c);
+  }
 
   // ---- simulated suppliers (hard rule 5), with their price lists; last week's butter order, received ----
   const observed = at(D(3), "10:00", tz);

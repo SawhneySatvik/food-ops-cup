@@ -6,7 +6,7 @@
 // 90 s) and gives no run id to follow, so the screen shows a waiting state, then the answer, then refetches. A lost
 // request is looked for, never resent. A 503 hides the ask box and keeps past answers readable.
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useCountdown, useOnline } from "@/lib/hooks";
 import { addressee, findLostAnswer, pickable, QUESTION_MAX, signatureWords, withMention, type Specialist, type Thread, type ThreadItem, type Turn } from "@/lib/munim/ask";
@@ -61,6 +61,7 @@ export function AskPage() {
   const params = useParams<{ threadId?: string }>();
   const threadId = params.threadId ?? null;
   const router = useRouter();
+  const search = useSearchParams();
   const { session, client, outlet, handleAuth } = useStaff();
   const me = session.me;
   const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
@@ -114,10 +115,17 @@ export function AskPage() {
 
   useEffect(() => {
     void client.getTenant().then((r) => r.ok && setTenant(r.data));
-    void client.listSpecialists().then((r) => r.ok && setSpecialists(pickable(r.data.items)));
+    void client.listSpecialists().then((r) => {
+      if (!r.ok) return;
+      const team = pickable(r.data.items);
+      setSpecialists(team);
+      // From a desk in the office (?to=<specialist>): start the question with that desk's @name.
+      const to = team.find((s) => s.id === search.get("to"));
+      if (to) setText((q) => (q ? q : withMention("", to)));
+    });
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; state is set after the response
     void loadThreads();
-  }, [client, loadThreads]);
+  }, [client, loadThreads, search]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new thread: clear the last one's state, then fetch

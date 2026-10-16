@@ -1,8 +1,10 @@
 // Scanner for the "no code path sends a message" gate (R40 C6): no outbound network, mail/SMS client, delivery
 // adapter import, or 'sent' campaign status may appear in the customers module. Used by customers.test.ts, which
 // proves it fires on planted send paths before trusting its silence on the real module.
+// R67 (T-128): the sent status may appear in exactly one file, campaign-sent.ts (a demo business's simulated record of a
+// queued campaign, the owner's own command). That file is still scanned for every other pattern.
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const PATTERNS: Array<[string, RegExp]> = [
   ["fetch call", /\bfetch\s*\(/],
@@ -13,6 +15,9 @@ const PATTERNS: Array<[string, RegExp]> = [
   ["delivery adapter import", /from\s+["'][^"']*adapters\/[^"']*["']|publisher-http/],
   ["campaign 'sent' status", /["'`]sent["'`]/],
 ];
+const SENT_PATTERN = "campaign 'sent' status";
+/** The one file that records a queued campaign as sent (simulated) on a demo business (R67). */
+export const SENT_ALLOWED_IN = "campaign-sent.ts";
 
 function* walk(dir: string): Generator<string> {
   for (const n of readdirSync(dir)) {
@@ -30,7 +35,10 @@ export function findSendPaths(dir: string, o: { extra?: Record<string, string> }
   for (const [file, text] of files) {
     // Comments describe the absence of a send path; only code counts.
     const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-    for (const [name, re] of PATTERNS) if (re.test(code)) hits.push(`${file}: ${name}`);
+    for (const [name, re] of PATTERNS) {
+      if (name === SENT_PATTERN && basename(file) === SENT_ALLOWED_IN) continue;
+      if (re.test(code)) hits.push(`${file}: ${name}`);
+    }
   }
   return hits;
 }

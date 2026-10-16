@@ -61,6 +61,13 @@ function Till() {
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [waitUntil, setWaitUntil] = useState<number | null>(null);
   const wait = useCountdown(waitUntil, () => setWaitUntil(null));
+  // A business with several brands (a cloud kitchen): the till shows one brand's menu at a time. Hidden with fewer than two.
+  const [brands, setBrands] = useState<Array<{ id: string; name: string }>>([]);
+  const [brand, setBrand] = useState<string | null>(null);
+  useEffect(() => {
+    void client.listBrands().then((r) => r.ok && setBrands(r.data.brands.filter((b) => b.active && b.outlet_ids.includes(outlet!.id))));
+  }, [client, outlet]);
+  const shown = (entries: readonly MenuEntry[]) => (brands.length > 1 && brand ? entries.filter((e) => e.brand_id === brand) : entries);
   const ctx: TillContext | null = useMemo(() => (setup ? { outletId: outlet!.id, channelId: setup.counter.id, deviceId: setup.deviceId, kind, tableRef: kind === "dine_in" ? table.trim().slice(0, 20) || null : null } : null), [setup, outlet, kind, table]);
   const { preview, loading, error: previewError } = useTillPreview(client, ctx, lines, bump);
   const { place, busy } = usePlace(client);
@@ -114,9 +121,17 @@ function Till() {
         ) : (
           <div className="pos">
             <section aria-label="Menu" className="space-y-5">
+              {brands.length > 1 && (
+                <div role="radiogroup" aria-label="Brand" className="flex flex-wrap gap-2">
+                  <button type="button" role="radio" aria-checked={brand === null} className="chip" aria-current={brand === null ? "true" : undefined} onClick={() => setBrand(null)}>All brands</button>
+                  {brands.map((b) => (
+                    <button key={b.id} type="button" role="radio" aria-checked={brand === b.id} className="chip" aria-current={brand === b.id ? "true" : undefined} onClick={() => setBrand(b.id)}>{b.name}</button>
+                  ))}
+                </div>
+              )}
               {!setup ? <div className="tile-grid">{Array.from({ length: 9 }, (_, i) => <div key={i} className="skeleton h-[104px]" aria-hidden="true" />)}</div>
                 : setup.menu.entries.length === 0 ? <p className="state-box">Nothing is on sale at this counter right now.</p>
-                : grouped(setup.menu.entries).map(([cat, entries]) => (
+                : grouped(shown(setup.menu.entries)).map(([cat, entries]) => (
                   <div key={cat}>
                     <h2 className="mb-2 flex items-center gap-2 text-[22px]"><CategoryMotif slug={cat} size={26} /> {categoryLabel(cat)}</h2>
                     <div className="tile-grid">

@@ -15,6 +15,12 @@ const WORDS: Record<string, string> = {
   "inventory.shortfall": "Stock short of what is needed",
   "purchasing.price_creep": "Supplier prices over time",
   "purchasing.deal_inputs": "What a quote was checked against",
+  "finance.margin_bridge": "How the margin moved between the two months",
+  "finance.close_status": "Whether a month's books are complete",
+  "finance.pnl": "Profit and loss for the month",
+  "intel.investigation_cost_estimate": "What the next steps may cost in AI",
+  "intel.agent_track_record": "This desk's proposals and how they were decided",
+  "customers.churn_segments": "Regular customers, and who has stopped coming",
 };
 
 export const templateWords = (templateId: string): string => WORDS[templateId] ?? templateId;

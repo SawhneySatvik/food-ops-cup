@@ -218,6 +218,20 @@ export class Plan {
     return this.bills.filter((b) => b.outlet === outletIdx && b.date === date && !b.voided).reduce((a, b) => a + b.upi, 0);
   }
 
+  /** The cash a history drawer took at one outlet on one business date: cash tenders of its bills that day less the cash refunds
+   *  dated that day (a refund lands on its own date, at its bill's time). Core's own figure for a shift over that day (imports/
+   *  shifts.ts cashIn), which a shift log's "Cash Tenders" control total must equal to the paisa. */
+  cashIn(outletIdx: number, date: string): number {
+    const taken = this.bills.filter((b) => b.outlet === outletIdx && b.date === date && !b.voided).reduce((a, b) => a + b.cash, 0);
+    const back = this.bills.filter((b) => b.outlet === outletIdx && b.refund?.mode === "cash" && b.refund.date === date).reduce((a, b) => a + b.refund!.minor, 0);
+    return taken - back;
+  }
+
+  /** The dates one outlet traded on (a bill that was not voided): each needs a closed shift for its month to close. */
+  tradingDays(outletIdx: number): string[] {
+    return [...new Set(this.bills.filter((b) => b.outlet === outletIdx && !b.voided).map((b) => b.date))].sort();
+  }
+
   /** Queue the month files of bills and one waste file; the caller flushes. */
   queue(): void {
     const { prefix, outlets } = this.#cfg;
