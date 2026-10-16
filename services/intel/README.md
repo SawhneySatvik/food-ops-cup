@@ -21,20 +21,22 @@ only the public key.
 
 ## Layout
 
+Paths are under `munim_intel/`, except `fixtures/`, which sits beside it.
+
 | Path | What it holds |
 |---|---|
-| `manager/` | One ask end to end (`ask.py`) and the six routing paths (`paths.py`) |
+| `manager/` | One ask end to end (`ask.py`) and the table from the six `route.intent` intents to four paths (`paths.py`) |
 | `decide/` | The constrained decision model behind `route.intent` and the import column mapper |
 | `skills/<pack>/` | The eight specialists: `catalogue`, `kitchen`, `inventory_purchasing`, `finance`, `people`, `customers`, `compliance`, `market`; `loader.py` binds a skill's tools just in time |
 | `tools/` | Generated `read_*` and `propose_*` tools, the cell-handle table, `submit_answer`, the number grammar |
 | `runtime/` | `RunContext` built from a run token, the internal client, the ADK runner, per-run state and budget |
 | `context/` | The context assembler: what each model call sees |
-| `watch/`, `events/`, `brief/`, `narrate/`, `mapping/` | Detectors, event handling, the daily brief, finding narration, detection-to-draft mapping |
+| `detect/`, `watch/`, `events/`, `brief/`, `narrate/`, `mapping/` | Detector specs and their registry, the watcher pipeline and each specialist's detectors, event handling, the daily brief, finding narration, detection-to-draft mapping |
 | `investigate/` | Narration of one investigation step |
 | `negotiate/` | The supplier negotiation: policy, chooser, extractor, deal review, simulated-only check |
 | `fanout/` | The Manager's `fan_out` tool: up to four read-only specialist branches |
 | `forecast/` | A deterministic demand forecast, no model |
-| `ingest/`, `wiki/`, `graph/` | Extraction, wiki compiler, graph port with a Postgres-edges adapter. Library code with tests; no route calls the first two or the projector yet |
+| `ingest/`, `wiki/`, `graph/` | Extraction, wiki compiler, graph port with a Postgres-edges adapter. The negotiation uses the quarantined extractor (`ingest/quarantine.py`), and the Menu & Pricing and Stock & Purchasing skills carry the `graph_*` tools, which query core's Postgres edges; no route calls document ingestion, the wiki compiler or the projector (`graph/project.py`) yet |
 | `llm/` | Provider classes and the recorded model (`RecordedLlm`) |
 | `trace/` | The ADK plugin, the trace buffer and spend meter |
 | `contracts_gen/` | Pydantic models generated from `packages/contracts`; never edited by hand |
@@ -43,9 +45,15 @@ only the public key.
 ## Run and test
 
 ```bash
-uv run --locked --directory services/intel python -m munim_intel      # needs MUNIM_CORE_URL, the service secret and the run-token public key
+uv run --locked --directory services/intel python -m munim_intel      # serves on MUNIM_INTEL_URL (default 127.0.0.1:8081)
 uv run --locked --directory services/intel --with pytest==9.1.1 pytest -q
 ```
+
+intel reaches core-api at `MUNIM_CORE_URL` (unset: `http://127.0.0.1:<PORT>`, `PORT` 8787 by default). It answers
+every route but `/health` with `503` until it has the service secret (`MUNIM_SERVICE_SECRET`, else `.run/service-secret`
+at the repository root) and core's run-token public key (`MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM`, else `.run/keys/run-token-ed25519.pub.pem`); core-api
+writes both files on its first start. `python -m munim_intel` reads provider keys from the environment or the
+repository's `.env` file.
 
 Every test runs with `MUNIM_MODEL_MODE=recorded` (the default): model calls are served from `fixtures/recorded/`, the network
 and any environment file are blocked, and a missing fixture fails the test. Live mode (`MUNIM_MODEL_MODE=live`) needs a

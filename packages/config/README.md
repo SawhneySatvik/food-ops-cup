@@ -13,8 +13,9 @@ reads provider keys or database passwords.
   `munim_svc` or `munim_platform`, with that role's password from `MUNIM_DB_PASSWORD_<ROLE>` or from `.run/db-roles.json`
   (written by `db/scripts/bootstrap-roles.ts`).
 - **Internal settings.** The service secret, the run-token key pair, ports, timeouts, the stream's maximum age and the
-  identity-provider and blob-store modes (`MUNIM_IDP`: `identity-platform` or `local`; `MUNIM_BLOB`: `gcs` or `fs`) default
-  in code or come from the environment or from files under `.run/`.
+  blob-store mode (`MUNIM_BLOB`: `fs`, the default, or `gcs`) default in code or come from the environment or from files
+  under `.run/`. The identity-provider mode has no default: `MUNIM_IDP` must be `identity-platform` or `local`, and
+  `resolveIdpMode` refuses `local` unless `MUNIM_ENV=dev`, and always under `NODE_ENV=production`.
 - **Redaction.** Every registered secret (keys, URLs with passwords, role passwords) is replaced in `Config.redact`, which
   `createLogger` applies to every line and error.
 
@@ -39,6 +40,7 @@ pnpm -F @munim/config test
 pnpm -F @munim/config typecheck
 ```
 
-`test/config.test.ts` passes planted, synthetic values in directly and never reads a real environment file. The Python services have the same
-module in `services/intel/munim_intel/config.py`. The variable names used on Google Cloud are in the table in
+`test/config.test.ts` passes planted, synthetic values in directly and never reads a real environment file. On the
+Python side, intel has its own config module, `services/intel/munim_intel/config.py`. The variable names used on Google
+Cloud are in the table in
 [`infra/gcp/README.md`](../../infra/gcp/README.md).

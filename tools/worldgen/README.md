@@ -2,21 +2,25 @@
 
 The synthetic world builder. It creates **Cobnut Bakehouse**, the demo business: a two-outlet bakery in Lucknow with a menu,
 four people, simulated suppliers, simulated community-food recipients, and months of dated history. Everything is invented and
-marked synthetic. It writes **only through the public API**, as the demo people would, so the seeded data passes the same
-guard, row-level security and audit as real data. The public repository carries the Cobnut world only.
+marked synthetic. It writes **only through core-api's HTTP API** (`/v1` as the demo people would, `/platform/v1` for the
+operator's steps), so the seeded data passes the same guard, row-level security and audit as real data. This repository
+carries the Cobnut world only, so `cobnut` is the only `--world` that runs here.
 
 ## The world
 
 - Business: "Cobnut Bakehouse (synthetic)", India pack, INR, `Asia/Kolkata`. Outlets: Cobnut Hazratganj (tax ids, a current
   FSSAI licence) and Cobnut Gomti Nagar (no tax ids, no licence, busy by default).
 - People: Nandini Mehrotra (owner), Farah Qureshi (manager, Gomti Nagar), Imran Siddiqui (staff, Hazratganj, counter) and Kavya
-  Tandon (staff, Hazratganj, kitchen). Their sign-ins are `owner`, `manager`, `counter` and `kitchen`.
+  Tandon (staff, Hazratganj, kitchen). Their sign-ins are `owner`, `manager`, `counter` and `kitchen`. Two more staff records
+  at Gomti Nagar, Rehan Ansari and Meher Kapoor, are rostered but have no sign-in.
 - Menu: 14 items in pastries, cakes, cookies, gift boxes and drinks, with variants, option groups, a morning-bake deal, and
   coupons. Prices are the in-app mock's, and a test diffs the seeded menu against `apps/web/mock-server/data.ts`.
 - History and planted situations the AI layer can find: a butter-waste spike at Hazratganj; six regulars who stopped coming;
   hazelnut stock low enough that a request for quotes finds a shortfall; sourdough about to expire (a Cares donation draft);
-  when the history is long enough, two months of closed shifts and bank lines and a month of half-price knots that a margin-fall investigation can explain.
-- Suppliers are `core.supplier` rows of kind `simulated`, pointing at the agent cards served by `services/suppliers-sim`.
+  when the history is long enough, two months of closed shifts and bank lines and a month of half-price knots that a
+  margin-fall investigation can explain.
+- Suppliers are `core.supplier` rows of kind `simulated`. Two carry price lists; the three a request for quotes asks point at
+  the agent cards served by `services/suppliers-sim`.
 
 ## Run
 
@@ -39,9 +43,9 @@ Flags (both `--flag value` and `--flag=value` work; anything else is refused): `
 - The sign-in tokens are ID tokens from the identity provider core-api trusts. The `operator` token is needed so the
   business is provisioned as a demo business (every screen then says "Sample data") with the AI budget set; without it the
   seed refuses before writing anything.
-- It prints only the tenant id and paths, and writes under `.run/cobnut/` (mode 0700, files 0600, git-ignored):
-  `storefront-key`, `site.env` (`MUNIM_DEMO_TENANT_ID` and the storefront key for `apps/web`), and, only against a core-api with
-  the local test identity provider, `demo-tokens.json`.
+- It prints the tenant id and the paths it wrote, never a key or a token, and writes under `.run/cobnut/` (mode 0700, files
+  0600, git-ignored): `storefront-key`, `site.env` (`MUNIM_DEMO_TENANT_ID` and the storefront key for `apps/web`), and, only
+  against a core-api with the local development identity provider (`MUNIM_IDP=local`), `demo-tokens.json`.
 
 The Google Cloud runbook, `infra/gcp/README.md`, walks through the seed against a deployed core-api.
 

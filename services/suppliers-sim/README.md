@@ -9,7 +9,8 @@ intel's negotiation (`services/intel/munim_intel/negotiate/`) is the only client
 
 ## The three suppliers
 
-Prices are basis points of the reference price the buyer's request carries (the tenant's last supplier price).
+Prices are basis points of the reference price the buyer's request carries (the lowest last price any of the tenant's
+suppliers holds for the item).
 
 | Key | Name | First quote | Concedes per round | Floor | Minimum order | Payment |
 |---|---|---|---|---|---|---|

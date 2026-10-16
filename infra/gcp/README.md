@@ -8,24 +8,19 @@ Everything here is **synthetic data, simulated suppliers, recorded payments**. `
 `/health` with the label "Simulated supplier"; no real supplier, customer or money is involved. Gemini runs **live** on the
 free tier under the in-product monthly AI spend cap; every test and gate stays recorded.
 
-**State on 15 Oct (read this first).**
-- Nothing here has run against a real project: no `gcloud` command in this file has been executed, and Docker was not
-  available when it was written. Every claim about Google Cloud behaviour is `UNVERIFIED` until the first deploy.
-- The services read the neutral names in the table below: core-api and core-worker choose the IdP and the blob
-  store by `MUNIM_IDP` / `MUNIM_BLOB`, each runtime role logs in as itself on `MUNIM_DB_URL_*`, and the three database CLIs
+**Verification state (read this first).**
+- Nothing here has run against a real project: no `gcloud` command in this file has been executed, and no image has been
+  built with Docker yet. Every claim about Google Cloud behaviour is `UNVERIFIED` until the first deploy.
+- The services read the neutral names in the table below: core-api chooses the IdP by `MUNIM_IDP`, core-api and core-worker
+  choose the blob store by `MUNIM_BLOB`, each runtime role logs in as itself on `MUNIM_DB_URL_*`, and the three database CLIs
   read `MUNIM_DB_URL_SESSION`. An unset `MUNIM_IDP` is refused at boot.
-- Without Docker, each service's build context was reproduced by a script that applies its `.dockerignore` rules, then
-  installed (locked), built and started on Node 22 locally (the images use Node 24): web answered 200 on `/` and
-  `/staff/sign-in`; intel answered `/health` 200 and 401 without the service secret; suppliers-sim answered `/health` 200;
-  core-api listened on `$PORT` and answered `/health` 503 with no database and `/v1/me` 401. That checks the file lists and the
-  locked installs, not the Dockerfiles themselves.
 
 ## What is in this folder
 
 | Path | What |
 |---|---|
 | `docker/<service>.Dockerfile` | One image per service, built from the repo root. Each has its own `<name>.Dockerfile.dockerignore`, an allowlist, so `.env`, `.run/` and keys never enter a build. |
-| `entries/core-api.mjs`, `entries/core-worker.mjs` | Cloud Run entries, copied into the image as `cloud-run-entry.mjs`. The services' own entries bind `127.0.0.1` and read `.env` and `.run/`; these read the process environment only and listen on `$PORT`. |
+| `entries/core-api.mjs`, `entries/core-worker.mjs` | Cloud Run entries, copied into the image as `cloud-run-entry.mjs`. The services' own entries read `.env` and `.run/` (core-api's also binds `127.0.0.1`); these read the process environment only and listen on `$PORT`. |
 | `cloudbuild.yaml`, `cloudbuild-web.yaml` | Build one image and push it to Artifact Registry. web is separate because Next fixes the core-api origin and the storefront key at build time. |
 | `cloudbuild-deploy.yaml` | What the GitHub trigger runs: all five images in parallel, pushed with the commit's short SHA as the tag, then `scripts/deploy-gcp.sh --skip-build`. |
 | `test/` | `deploy-gcp.test.sh` runs the script against a stub `gcloud`; `cloudbuild-deploy.test.py` runs `cloudbuild-deploy.yaml`'s steps against stub `docker`, `gcloud` and `curl` (needs PyYAML: `uv run python infra/gcp/test/cloudbuild-deploy.test.py`). No Google calls. |
@@ -38,7 +33,7 @@ free tier under the in-product monthly AI spend cap; every test and gate stays r
 |---|---|---|---|---|---|---|---|
 | `munim-web` | Next standalone | `munim-web` | all, public | 0–2 | 1 / 512Mi | 3600 s | Only entry people open. Its `/api` rewrite carries SSE to core-api. |
 | `munim-core-api` | Node 24 | `munim-core-api` | all, public | **1–1** | 1 / 512Mi, **CPU always allocated** | 3600 s | A throttled instance stalls the LISTEN connection behind `/v1/stream`. Streams end at 3300 s (`MUNIM_STREAM_MAX_AGE_S`), under Cloud Run's 3600 s cap. |
-| `munim-core-worker` | Node 24 | `munim-core-worker` | internal, no public access | **1–1** | 1 / 512Mi, **CPU always allocated** | default | The real long-running worker: outbox sweep and cron jobs. Exactly one instance; a job's time slot is also claimed in the database, so a rollout overlap does not repeat a job. |
+| `munim-core-worker` | Node 24 | `munim-core-worker` | internal, no public access | **1–1** | 1 / 512Mi, **CPU always allocated** | default | The real long-running worker: outbox sweep and cron jobs. Exactly one instance: two would run each cron job twice (a rollout overlap is covered below the connection table). |
 | `munim-intel` | Python 3.12, ADK | `munim-intel` | all | 0–3 | 1 / 1Gi, startup boost | 300 s | No database. Every route but `/health` needs the service secret; most also need a run token core minted. |
 | `munim-suppliers-sim` | Python 3.12 | `munim-sim` | all | 0–2 | 1 / 512Mi | 60 s | Three **simulated** suppliers over A2A. Holds no secret and no data. |
 
@@ -46,13 +41,12 @@ Why intel and suppliers-sim are not internal-only: another Cloud Run service rea
 VPC (Direct VPC egress), and with all egress on the VPC the callers also lose their direct route to Gemini and Identity
 Platform unless Private Google Access or NAT is set up. That is a VPC, a private-IP database and several settings, all
 unverified, for no code-level gain: intel already checks the service secret on every call (and the run token on most).
-So this folder uses a public IP with Cloud Run's built-in Cloud SQL connection and no VPC. The first draft of
-this folder used a VPC and was changed for that reason.
+So this folder uses a public IP with Cloud Run's built-in Cloud SQL connection and no VPC.
 
-## One-time setup (the founder runs this)
+## One-time setup (you run this once)
 
 Commands work in zsh and bash. Nothing below prints a secret; values go from a pipe straight into Secret Manager.
-Replace the three placeholders in the first block.
+Replace the two placeholders in the first block (the project id and the billing account).
 
 ```bash
 export PROJECT_ID=your-project-id            # 6-30 characters: lowercase letters, digits, hyphens
@@ -80,11 +74,11 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregi
 
 ### 2. Budget alert — before anything that costs money
 
-The amount is the founder's. `FOUNDER_AMOUNT` is a number plus the billing account's currency, for example `5000INR`.
+The amount is yours to choose. `BUDGET_AMOUNT` is a number plus the billing account's currency, for example `5000INR`.
 
 ```bash
 gcloud billing budgets create --billing-account="$BILLING_ACCOUNT" --display-name="munim-cup" \
-  --budget-amount=FOUNDER_AMOUNT --filter-projects="projects/$PROJECT_ID" \
+  --budget-amount=BUDGET_AMOUNT --filter-projects="projects/$PROJECT_ID" \
   --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 --threshold-rule=percent=1.0
 ```
 
@@ -152,8 +146,8 @@ gcloud sql databases create munim --instance=munim-db
 
 The instance has a public IP and **no authorised networks**, so nothing can reach it except Cloud Run's built-in connection
 and Cloud SQL's auth proxy, both IAM-gated; `--ssl-mode=ENCRYPTED_ONLY` refuses any unencrypted connection (both connectors
-encrypt their own leg, so neither is affected; `UNVERIFIED` until the first deploy). Postgres 17 is the version the
-migrations were measured on; they use nothing newer than 15 (`INFERENCE`). `--backup-start-time` is UTC (21:00 is 02:30 IST).
+encrypt their own leg, so neither is affected; `UNVERIFIED` until the first deploy). The database tests apply the
+migrations on an embedded Postgres 18; they use nothing newer than 15 (`INFERENCE`). `--backup-start-time` is UTC (21:00 is 02:30 IST).
 
 **Why `db-g1-small` — the connection arithmetic.** Worst case, from the code:
 
@@ -172,12 +166,15 @@ migrations were measured on; they use nothing newer than 15 (`INFERENCE`). `--ba
 | Both rolling at once | **31** | does not fit | fits, 19 spare |
 
 Cloud Run starts the new revision before the old one drains, and `--max-instances` applies per revision, so the service
-being deployed briefly doubles. The pools are lazy (core-api's idle after 30 s, the worker's after 10 s), so real peaks sit
-below this, but the budget uses the worst case. `db-g1-small` is the smallest tier that fits every row. The 25 and 50 are
+being deployed briefly doubles. The pools are lazy (core-api's pools and the worker's publisher/minter pool close an idle
+connection after 30 s, the `Worker` pool after 10 s), so real peaks sit below this, but the budget uses the worst case. `db-g1-small` is the smallest tier that fits every row. The 25 and 50 are
 Cloud SQL's connection limits for those two tiers (`UNVERIFIED`); after creating the instance run `SHOW max_connections;` and compare.
 
-During a core-worker rollout two workers overlap for a few seconds. A cron job does not run twice for that: each job claims
-its (job, time slot) in the `core.tick_claim` table just before it starts, and the outbox sweep is guarded by an advisory lock.
+During a core-worker rollout two workers overlap for a few seconds. The cron registry claims no time slot in this mode (the
+per-slot claim in `core.tick_claim` belongs to the tick route, which is off here), so a job whose boundary falls inside the
+overlap can fire in both workers. The outbox sweep holds an advisory lock and import parsing takes each run with
+`SKIP LOCKED`, so neither does the same work twice; a repeated watcher sweep merges into the open finding with the same
+dedupe key instead of opening a second one.
 
 ### 6. Secrets
 
@@ -201,7 +198,7 @@ monthly spend cap is the second limit; the budget alert in setup step 2 is the t
 
 **Identity Platform and its web API key.**
 1. Console, Identity Platform: click Enable. Providers: add Email/Password and turn it on.
-2. After `munim-web` exists (deploy step 7 below): Settings, Authorized domains, add the `munim-web-<project number>.asia-south1.run.app` host.
+2. Once `munim-web` exists (deploy step 6 below), in deploy step 7: Settings, Authorized domains, add the `munim-web-<project number>.asia-south1.run.app` host.
 3. The API key for the server-side demo sign-in (public by design; restricted to the one API):
 
 ```bash
@@ -210,7 +207,7 @@ KEY=$(gcloud services api-keys list --filter='displayName=munim-idp-web' --forma
 gcloud services api-keys get-key-string "$KEY" --format='value(keyString)' | tr -d '\n' | mk munim-idp-web-api-key
 ```
 
-**Three more secrets come later** (they do not exist yet): `munim-db-password-munim-core`, `-munim-svc`, `-munim-platform`
+**Five more secrets come later** (they do not exist yet): `munim-db-password-munim-core`, `-munim-svc`, `-munim-platform`
 after deploy step 2; `munim-storefront-key` and `munim-demo-password` after the seed (deploy step 6).
 
 **Per-secret access.** Run this after the later secrets exist (or re-run it; it is idempotent):
@@ -231,8 +228,8 @@ once continuous deployment is set up, by `munim-deploy` for web's build (its one
 
 ## Environment names — one table
 
-Every name the five services read on Cloud Run. Plain values are set by `scripts/deploy-gcp.sh`; secrets are mounted from
-Secret Manager `:latest`.
+Every name the deploy sets on the five Cloud Run services; the rest the code reads keep their defaults. Plain values are set
+by `scripts/deploy-gcp.sh`; secrets are mounted from Secret Manager `:latest`.
 
 | Name | Service(s) | Kind | Source |
 |---|---|---|---|
@@ -245,7 +242,7 @@ Secret Manager `:latest`.
 | `MUNIM_RUN_TOKEN_PRIVATE_KEY_PEM` | core-api, core-worker | secret `munim-run-token-private-key` | `openssl genpkey` |
 | `MUNIM_RUN_TOKEN_PUBLIC_KEY_PEM` | core-api, core-worker, intel | secret `munim-run-token-public-key` | same pair |
 | `MUNIM_IDP` | core-api, web | plain `identity-platform` | script |
-| `MUNIM_IDP_PROJECT_ID` | core-api, web | plain | script (`$PROJECT_ID`) |
+| `MUNIM_IDP_PROJECT_ID` | core-api | plain | script (`$PROJECT_ID`; the script also sets it on web, which does not read it) |
 | `MUNIM_IDP_WEB_API_KEY` | web | secret `munim-idp-web-api-key` | API key, setup step 6 |
 | `MUNIM_BLOB` | core-api, core-worker | plain `gcs` | script |
 | `MUNIM_BLOB_BUCKET` | core-api, core-worker | plain `<project>-munim-blobs` | script |
@@ -263,7 +260,7 @@ Secret Manager `:latest`.
 **Build-time only (web image):** `MUNIM_API_ORIGIN` (core-api's URL, from the script), `NEXT_PUBLIC_MUNIM_STOREFRONT_KEY`
 (secret `munim-storefront-key`, read by the script as you; public by design), `NEXT_PUBLIC_MUNIM_API=/api` and
 `MUNIM_NEXT_STANDALONE=1` (set in `web.Dockerfile`). **Set by Cloud Run or the Dockerfiles:** `PORT`, `NODE_ENV=production`,
-`HOSTNAME`, `SUPPLIERS_SIM_HOST`.
+`HOSTNAME`, `SUPPLIERS_SIM_HOST`, `SUPPLIERS_SIM_PORT`.
 
 **Deliberately unset:**
 - `MUNIM_TRUSTED_PROXY_HOPS` (0: the rate limiters key on the socket address): no hop count has been measured, and a
@@ -331,10 +328,9 @@ returns 200 with the migration version.
 ### 4. Seed Cobnut as a demo business, with the synthetic seed operator
 
 The seed runs from your laptop through core-api's public `/v1` API with five sign-ins: the four demo people and the
-**synthetic seed operator**, the same one every other hosted seed uses (`worldgen-cobnut-operator`; not a person and not a
-demo account). With an operator token worldgen provisions the tenant as a **demo business** (`is_demo`, so every staff screen
-shows "Sample data"), prices the live AI roles at ₹0 and writes the ₹100 monthly AI budget, each an
-operator-approved config draft. Without it the Cobnut seed refuses before writing anything. It makes a **fresh tenant
+**synthetic seed operator** (`worldgen-cobnut-operator`; not a person and not a demo account). With an operator token
+worldgen provisions the tenant as a **demo business** (`is_demo`, so every staff screen shows "Sample data"), prices the
+live AI roles at ₹0 and writes the ₹100 monthly AI budget, each an operator-approved config draft. Without it the Cobnut seed refuses before writing anything. It makes a **fresh tenant
 every run**, prints the tenant id, and writes `storefront-key` and `site.env` under `.run/cobnut/` (git-ignored, 0600).
 
 Every account is made by you, with the same Identity Toolkit calls `adapters/gcp/idp-identity-platform/demo-accounts.ts` makes,
@@ -631,7 +627,7 @@ gcloud run services update-traffic munim-core-api --region "$REGION" --to-latest
 scripts/deploy-gcp.sh --project "$PROJECT_ID" --only core-worker --skip-build --tag EARLIER_TAG
 ```
 
-- **Database.** Migrations only go forward (rule 6): a bad migration is fixed with a new one, never edited. The data is
+- **Database.** Migrations only go forward: a bad migration is fixed with a new one, never edited. The data is
   append-only books, so there is no row-level undo either. The last resort is a Cloud SQL backup restore
   (`gcloud sql backups list --instance munim-db`, then `gcloud sql backups restore BACKUP_ID --restore-instance=munim-db`),
   which **overwrites** the instance and loses every write since that backup.
@@ -682,7 +678,8 @@ All figures are `INFERENCE` from public list prices and `UNVERIFIED` for `asia-s
    password containing `@` and `/` intact); Cloud Run's side of it was not.
 4. Migrations on Cloud SQL's `postgres` user, which is not a true superuser: `ALTER ROLE … BYPASSRLS`, `GRANT munim_migrator
    TO CURRENT_USER`, `ALTER DEFAULT PRIVILEGES FOR ROLE munim_migrator`, `btree_gist`, `pgcrypto`, `vector`
-   (the statements are in `db/migrations/0001_roles_schemas.sql` and `db/scripts/bootstrap-roles.ts`).
+   (the statements are in `db/migrations/0001_roles_schemas.sql`, `db/migrations/0013_embeddings.sql` and
+   `db/scripts/bootstrap-roles.ts`).
 5. `roles/storage.objectViewer` is enough for core-worker's reads through the BlobStore adapter.
 6. An organisation policy that forbids `allUsers` would block `--allow-unauthenticated`.
 7. `SHOW max_connections;` on the new instance is at least 50.

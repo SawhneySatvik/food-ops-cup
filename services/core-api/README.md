@@ -43,12 +43,13 @@ The routes are generated into [`packages/contracts/generated/openapi/`](../../pa
 | `src/runtoken/` | Minting and verifying Ed25519 run tokens, and the key helpers |
 | `src/commit/` | `executeCommand`, the audit chain, the outbox and the HTTP publisher |
 | `src/lib/` | Database context (`SET LOCAL`), errors, CORS, rate limiting, the demo guard |
-| `src/cron/` | An optional HTTP tick route for a scheduler (answers 404 unless configured) |
+| `src/cron/` | An optional HTTP tick route for a scheduler. Only the env-only boot (`src/env-root.ts`) wires it, and only when `MUNIM_CRON_SECRET` is set; otherwise it answers 404 |
 
 ## Run and test
 
 ```bash
-pnpm -F @munim/core-api start        # node src/server.ts; needs database URLs, the run-token keys and a service secret
+pnpm -F @munim/core-api start        # node src/server.ts; needs MUNIM_DB_URL_*, the role passwords and MUNIM_IDP
+                                     # (the service secret and run-token keys are generated under .run/ when unset)
 pnpm -F @munim/core-api test         # vitest on an embedded Postgres; the models are not involved
 pnpm -F @munim/core-api typecheck
 ```

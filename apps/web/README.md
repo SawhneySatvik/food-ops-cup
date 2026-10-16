@@ -67,9 +67,10 @@ The mock keeps its books in memory, per server process, seeded from the clock. A
 ## Develop against a local core-api
 
 Run core-api, core-worker, intel (or its recorded stand-in) and `suppliers-sim` against your own Postgres, then seed the
-Cobnut world with `node tools/worldgen/src/cli.ts --world=cobnut`. The seed needs an operator token and
-`SUPPLIERS_SIM_PUBLIC_URL`; the header of that file lists the variables. It prints the tenant id and writes the storefront
-key and the demo tokens under `.run/cobnut/`. Then, in `apps/web/.env.local`:
+Cobnut world with `node tools/worldgen/src/cli.ts --world=cobnut`. The seed needs `MUNIM_SEED_TOKENS`, a JSON object of
+bearer tokens for `owner`, `manager`, `counter`, `kitchen` and `operator`, and `SUPPLIERS_SIM_PUBLIC_URL`; it calls
+`MUNIM_API_URL` (default `http://127.0.0.1:8787`). It prints the tenant id and writes the storefront key, a `site.env`
+and, against a core-api on the local IdP, the demo tokens under `.run/cobnut/`. Then, in `apps/web/.env.local`:
 
 ```bash
 NEXT_PUBLIC_MUNIM_API=/api
@@ -104,7 +105,8 @@ pass through the rewrite as fetch-based server-sent events with the bearer token
 
 ## Scripts
 
-Run them with `node_modules/.bin/…` from `apps/web` (or `pnpm --filter @munim/web <script>`).
+Run them with `node_modules/.bin/…` from `apps/web`. All but `csp-check.ts` are also `package.json` scripts (`dev`,
+`build`, `start`, `typecheck`, `lint`, `test`, `smoke`, `staff-smoke`, `nav-smoke`): `pnpm --filter @munim/web <script>`.
 
 | Command | What |
 |---|---|
@@ -129,3 +131,4 @@ art. Fonts: Fraunces and Inter (both SIL OFL), served through `next/font`.
 | 2026-10-14 | `app/globals.css` | Section-title swash (inline SVG), scalloped doily edge (CSS gradient) |
 | 2026-10-14 | `components/staff/source.tsx` | Ledger-stamp mark in the source chip (rounded square, two ruled lines) |
 | 2026-10-14 | `app/staff/staff.css` | Staff pills, source and "Cannot verify" chips, ticket heads and edges (CSS only, no images) |
+| 2026-10-16 | `components/staff/office-art.tsx` | The AI office: one desk per specialist, the simulated suppliers' bay and the owner's desk (plain SVG shapes, CSS motion) |

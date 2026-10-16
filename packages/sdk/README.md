@@ -4,13 +4,15 @@ Typed client for the Munim `/v1` API, built on `openapi-fetch`. It also has the 
 and a fetch-based SSE reader. ESM only, Node 20+ and browsers. Licence: UNLICENSED (shared with you for building the
 storefronts, not for redistribution).
 
-**Everything here is simulated.** The mock API at `<site>/mock` serves synthetic data only. Orders are never paid
+**Everything here is simulated.** The mock API at `<site>/mock` serves synthetic data only (in the Munim repository,
+`apps/web` serves one at `/mock` when it runs with `MUNIM_MOCK=1`). Orders are never paid
 (payment is "at the counter", recorded, never processed), and no real person, brand or supplier is involved.
 
 ## Install
 
 ```bash
-# from the folder that holds the tarball you downloaded from /downloads/munim-sdk-0.3.0.tgz
+# from the folder that holds munim-sdk-0.3.0.tgz (downloaded, or built in the Munim repository with
+# node packages/sdk/scripts/pack.mjs --out <dir>, which writes the .tgz and its .sha256)
 npm install ./munim-sdk-0.3.0.tgz        # or: pnpm add ./munim-sdk-0.3.0.tgz
 ```
 
@@ -109,7 +111,7 @@ const money = (minor: number, currency: string) =>
   new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-AU", { style: "currency", currency }).format(minor / 100);
 ```
 
-## Example (storefront, 30 lines)
+## Example (storefront)
 
 ```ts
 import { createMunimClient, uuidv7 } from "@munim/sdk";
@@ -134,5 +136,5 @@ const { data: preview } = await client.POST("/v1/storefront/orders:preview", {
 console.log("server total", preview!.total_minor, preview!.currency);
 // Place with orders.place.v1 + storefront.guest.create.v1, keep guest_access_token, then track the order
 // with openStream (or a second client: createMunimClient({ baseUrl: API, storefrontKey, guestToken })).
-// The complete, runnable version is examples/storefront-min (place, then track over SSE).
+// A complete run (preview, place, replay, read, then track over SSE): apps/web/scripts/smoke.ts in the Munim repository.
 ```

@@ -6,15 +6,15 @@ drift apart.
 
 ## What it holds
 
-- `src/<module>/index.ts`: one folder per domain (accounts, approvals, cares, catalogue, compliance, customers, events,
-  finance, findings, goals, imports, intel, internal, inventory, investigations, kitchen, lineage, orders, packs, people,
-  platform, purchasing, specialists, storefront, tenancy, threads). Each exports `SCHEMAS` and `ROUTES`; the generators
-  discover modules by folder.
+- `src/<module>/index.ts`: one folder per domain (accounts, ai_policy, approvals, cares, catalogue, compliance, customers,
+  events, finance, findings, goals, imports, intel, internal, inventory, investigations, kitchen, lineage, orders, packs,
+  people, platform, purchasing, specialists, storefront, tenancy, threads). Each exports `SCHEMAS` and `ROUTES`; the
+  generators discover modules by folder.
 - `src/shared/`: the command envelope (`command.ts`), the error body and codes (`error.ts`), reason codes
   (`reason-codes.ts`), refs (`refs.ts`), answer envelopes (`envelope.ts`), the draft payload rule (`draft.ts`), run-token claims
   (`run-token.ts`), snapshots, traces, CloudEvents, and the number grammar (`grammar/`).
-- `src/intel/specialists.ts`: the registry of the eight specialists, with their snapshot templates, detectors and draftable
-  commands.
+- `src/intel/specialists.ts`: the registry of the eight specialists, the Manager and the Forecast service, with their
+  snapshot templates, detectors and draftable commands.
 - `src/ontology/`: the transform that turns snapshot templates and draftable commands into model-facing tool schemas.
 - `packs/IN.json` and `packs/AU.json`: the country packs, seeded into `platform.country_pack` by `db/seeds/packs.ts`.
 - `generated/`: `openapi/public.json` (`/v1` and `/platform/v1`), `openapi/internal.json` (`/internal/intel/v1`),

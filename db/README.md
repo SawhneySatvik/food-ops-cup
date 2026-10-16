@@ -12,7 +12,7 @@ the result.
 | `migrate.ts` | The runner. Applies files in order, one transaction each, from `0002` on under `SET LOCAL ROLE munim_migrator`. Records each file's SHA-256 in `munim_meta.schema_migrations` and refuses an applied file whose bytes changed. A `-- requires: vector` header skips a file loudly where the extension is missing. |
 | `seeds/packs.ts` | Seeds `platform.country_pack` from `packages/contracts/packs/*.json`. Idempotent; a changed document for a published version is refused. |
 | `scripts/bootstrap-roles.ts` | Sets a fresh random password on each login role and writes `.run/db-roles.json` (mode 0600). Re-running rotates every password. |
-| `derivation-rules.json` | The allow-listed derivations that `core.derivation_rule` is seeded from |
+| `derivation-rules.json` | A hand-written list of every `core.derivation_rule` row the migrations seed; a test asserts the database equals it |
 | `src/` | The test harness: `harness.ts` starts an embedded Postgres 18 and applies the migrations; `world.ts` builds a canonical world with at least one row in every tenant table, through the runtime roles and the book guard |
 | `tests/` | The database gates (see below) |
 
@@ -93,21 +93,21 @@ Files are named `NNNN_<name>.sql` in `migrations/`.
 | `0018` | Dated history through the approved-import path (POS bills, waste) |
 | `0019` | Outlet-scoped policies on remaining outlet tables; the first catalogue and finance snapshot templates |
 | `0020` | Ask threads, per-role AI ceilings and monthly cap, investigations, steps and standing grants |
-| `0021` | Snapshot templates for every specialist; shift-log and stock-count imports |
+| `0021` | Snapshot templates for the remaining specialist packs (44); shift-log and stock-count imports and the count-adjust derivation |
 | `0022` | The derivation binding predicate in the book guard; as-of template parameters |
 | `0023` | Second versions of nine templates |
-| `0024` | Unique stock counts, supplier-quote provenance, a widened chunk check |
+| `0024` | Unique stock counts, agent cards on simulated suppliers only, supplier-quote provenance, a widened chunk check, settlement-vs-orders template v3 |
 | `0025` | Investigation cost template v2; NOTIFY on investigations |
-| `0026` | Model-role prices, the owner's negotiation target and walk-away, a deal-review template version |
+| `0026` | Model-role prices, the owner's negotiation target and walk-away, new versions of the labour-vs-demand and deal-inputs templates |
 | `0027` | A lowered ceiling downgrades a running Auto investigation to Plan |
-| `0028` | Munim Cares: platform cities, recipients, enablement, network snapshots; core listings, claims, hand-overs; public reads |
-| `0029` | Owner-entered display text and diet on menu rows |
+| `0028` | Munim Cares: platform cities, recipients, enablement, network snapshots; core profiles, listings, hand-overs, claims, allocations; five cross-tenant read functions; five templates |
+| `0029` | Owner-entered display text and diet on menu rows; the outlet's phone |
 | `0030` | Display order columns on menu rows |
-| `0031` | `core.tick_claim`, so a scheduled job runs once per slot |
+| `0031` | `core.tick_claim`, so a job run through core-api's tick route runs once per slot |
 | `0032` | Command authority for a person's request for quotes |
 | `0033` | Per-outlet versions of six forecast-reading templates |
-| `0034` | Storefront page versions and publishes; command authority for recording a campaign as sent on a demo business |
-| `0035` | Version 2 of the consented-audience template: "Send me offers" counts as email consent only; SMS needs its own consent |
+| `0034` | Storefront page versions and publishes and their two commands; command authority for recording a campaign as sent on a demo business |
+| `0035` | Version 2 of the consented-audience template: a general "Send me offers" counts as email consent only; a channel's own flag wins; non-boolean values never count |
 
 ## Tests
 

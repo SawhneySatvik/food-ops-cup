@@ -26,10 +26,11 @@ pnpm -F @munim/core-domain test
 pnpm -F @munim/core-domain typecheck
 ```
 
-`test/` covers: the DST suite for `Australia/Melbourne` and `Asia/Kolkata` (both transitions, `tz.test.ts`); golden receipts
-and tax totals for the India and Australia packs (`test/goldens/`); money and rounding; the validator with forged-ref,
-cross-tenant-ref and free-digit cases (`validator.test.ts`); `country-literals.test.ts`, which scans the source for any literal
-that names a country pack; and `rules-parity.test.ts`, which compares this package's rules with the migrations'.
+`test/` covers: the DST suite (both `Australia/Melbourne` transitions, `Asia/Kolkata` as the control, `tz.test.ts`);
+golden receipts and tax totals for the India and Australia packs (`test/goldens/`); money and rounding; the validator with
+forged-ref, cross-tenant-ref and free-digit cases (`validator.test.ts`); `country-literals.test.ts`, which scans the source
+for any literal that names a country pack; and `rules-parity.test.ts`, which compares this package's rules with the
+migrations'.
 
 Import a folder directly, for example `import { businessDate } from "@munim/core-domain/tz"` (the package exports `./*` as
 `./*/index.ts`).

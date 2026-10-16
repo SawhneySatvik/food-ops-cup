@@ -6,8 +6,11 @@ runs can change the books. Run **exactly one instance**.
 
 ## Jobs
 
-`src/worker.ts` registers these on a cron registry (`src/cron.ts`). A job whose previous run is still going skips the
-boundary, and each (job, slot) is claimed in `core.tick_claim` so a slot never runs twice.
+All seven run on one cron registry (`src/cron.ts`): `src/worker.ts` registers the first four, and `composeWorker` in
+`src/main.ts` adds the last three. A job whose previous run is still going skips the boundary. A host without this
+process can instead run the jobs through core-api's `/internal/cron/v1/tick` (`Worker.tick`; core-api's env-only boot
+with `MUNIM_CRON_SECRET` set). Each tick runs every job once for its slot (`MUNIM_TICK_PERIOD_MIN`, default a day), and
+each (job, slot) is claimed in `core.tick_claim`, so a repeated or retried tick never runs a slot twice.
 
 | Job | Every | What it does |
 |---|---|---|
@@ -30,7 +33,8 @@ boundary, and each (job, slot) is claimed in `core.tick_claim` so a slot never r
 ```bash
 pnpm -F @munim/core-worker test         # vitest on an embedded Postgres, with a fake clock and a stub intel
 pnpm -F @munim/core-worker typecheck
-node src/main.ts                        # from services/core-worker; needs database URLs, run-token keys, the service secret and intel's URL
+node src/main.ts                        # from services/core-worker; needs MUNIM_DB_URL_TRANSACTION, munim_svc's password
+                                        # (it shares core-api's .run/ secret and keys; MUNIM_INTEL_URL: 127.0.0.1:8081)
 ```
 
 The environment names are in `packages/config/src/index.ts` and in the table in
@@ -41,8 +45,8 @@ The environment names are in `packages/config/src/index.ts` and in the table in
 | Path | What it does |
 |---|---|
 | `src/worker.ts` | The `Worker`: pool, role check, the cron jobs |
-| `src/cron.ts` | The cron registry and the slot ledger |
+| `src/cron.ts` | The cron registry, and the slot-claim interface a tick uses |
 | `src/sweeper.ts` | The outbox sweep, with an advisory lock so only one sweeper runs |
 | `src/fanout.ts` | Per-tenant fan-out to intel with bounded concurrency |
 | `src/local-time.ts` | Which tenants and outlets are due at a local time, across time zones |
-| `test/` | Cron, sweeper, fan-out, poison-row, local-time, tick and worker tests |
+| `test/` | Cron, sweeper, fan-out, poison-row, local-time, tick, investigations and worker tests |
