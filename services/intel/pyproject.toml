@@ -17,7 +17,12 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest==9.1.1", "ruff==0.17.0", "mypy==2.4.0", "a2a-sdk[http-server]==1.2.2"]
+# munim-suppliers-sim: the negotiation tests drive the simulated suppliers in-process (tests/negotiate/kit.py); without it
+# a clean checkout (CI) cannot import them. Dev only: the deployed intel never imports another service.
+dev = ["pytest==9.1.1", "ruff==0.17.0", "mypy==2.4.0", "a2a-sdk[http-server]==1.2.2", "munim-suppliers-sim"]
+
+[tool.uv.sources]
+munim-suppliers-sim = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

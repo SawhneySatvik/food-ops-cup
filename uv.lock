@@ -615,6 +615,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "a2a-sdk", extra = ["http-server"] },
+    { name = "munim-suppliers-sim" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -635,6 +636,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "a2a-sdk", extras = ["http-server"], specifier = "==1.2.2" },
+    { name = "munim-suppliers-sim", editable = "services/suppliers-sim" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "ruff", specifier = "==0.17.0" },
