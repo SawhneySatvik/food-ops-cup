@@ -64,7 +64,7 @@ from munim_intel.runtime.runner import RunFailed
 from munim_intel.runtime.state import Budget, RunState
 from munim_intel.tools.generated import run_start_ms, uuid7
 from munim_intel.tools.handles import HandleTable
-from munim_intel.trace.buffer import TraceBuffer, TraceLabelError, error_label
+from munim_intel.trace.buffer import TraceBuffer, TraceLabelError, error_label, label_of
 from munim_intel.trace.spend import Meter
 from munim_intel.watch.frame import Frame
 
@@ -164,7 +164,7 @@ class WatchRun:
 
     async def _failed(self, spec: DetectorSpec, where: str, e: Exception) -> None:
         self.report.errors += 1
-        await self.trace("error", spec.pack, {"where": where, "detector": spec.id, "error": "detector_error", "type": type(e).__name__})
+        await self.trace("error", spec.pack, {"where": where, "detector": spec.id, "error": "detector_error", "type": error_label(e)})
 
     async def _detector(self, spec: DetectorSpec) -> None:
         pack_thresholds = self.frame.detectors.get(spec.id)
@@ -334,7 +334,7 @@ class WatchRun:
             )
         except RunFailed as e:
             self.report.narrations["failed"] += 1
-            await self.trace("error", spec.pack, {"where": "narrate", "detector": spec.id, "error": e.kind})
+            await self.trace("error", spec.pack, {"where": "narrate", "detector": spec.id, "error": label_of(e.kind)})
             return
         if segments is None:
             self.report.narrations["empty"] += 1

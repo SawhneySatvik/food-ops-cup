@@ -12,7 +12,7 @@ import type { MunimError } from "@/lib/munim/client";
 import { envelope } from "@/lib/munim/commands";
 import { draftTitle } from "@/lib/munim/drafts";
 import { dayLabel, formatWhen } from "@/lib/munim/format";
-import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
+import { formatCell, snapRef, outletNames, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { staffErrorText, staffWriteErrorText } from "@/lib/munim/staff-copy";
 import { templateWords } from "@/lib/munim/template-words";
@@ -94,7 +94,7 @@ export function CampaignsPage() {
   if (!allowed) return <NotForRole />;
   if (!outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
   const tz = outlet.tz;
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const outletWords = (ids: string[]) => (ids.length === 0 ? "Whole business" : ids.map((o) => outlets.find((x) => x.id === o)?.name ?? "An outlet").join(", "));
 

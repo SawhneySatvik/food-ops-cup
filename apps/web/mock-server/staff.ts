@@ -1119,8 +1119,15 @@ export async function handleStaff(req: Request, path: string, url: URL, now: Dat
       r = x(/^\/v1\/traces\/([^/:]+)$/);
       if (r) {
         const run = seedRuns(now).find((y) => y.run_id === r![1]);
-        const events = run && seesRun(m, run) ? tracesOf(run.run_id, now) : null;
-        return events ? staffJson(200, { run_id: run!.run_id, events, next_after_seq: null } satisfies S["V1TracesResponse"]) : notFound();
+        // core's paging rules (services/core-api/src/modules/traces): after_seq >= 0 and 1 <= limit <= 100 (default 100), else 400;
+        // a full page may have more behind it (next_after_seq = its last seq), a short page is the end.
+        const after = q("after_seq") === null ? 0 : Number(q("after_seq"));
+        const limit = q("limit") === null ? 100 : Number(q("limit"));
+        if (!Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 100) return fail(400, "bad_request");
+        const all = run && seesRun(m, run) ? tracesOf(run.run_id, now) : null;
+        if (!all) return notFound();
+        const events = all.filter((e) => e.seq > after).slice(0, limit);
+        return staffJson(200, { run_id: run!.run_id, events, next_after_seq: events.length === limit ? events.at(-1)!.seq : null } satisfies S["V1TracesResponse"]);
       }
       if (path === "/v1/brands") return staffJson(200, brandsOn(req) ? BRANDS_RESPONSE : { brands: [] });
       if (path === "/v1/storefront-pages") {

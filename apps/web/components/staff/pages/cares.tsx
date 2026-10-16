@@ -13,7 +13,7 @@ import {
 } from "@/lib/munim/cares-flow";
 import type { Outcome } from "@/lib/munim/drafts";
 import { formatClock, formatDate, titleCase } from "@/lib/munim/format";
-import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
+import { formatCell, snapRef, outletNames, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
 import { staffErrorText } from "@/lib/munim/staff-copy";
@@ -54,7 +54,7 @@ export function CaresScreen() {
 }
 
 function Cares({ outlet }: { outlet: Outlet }) {
-  const { session, client, handleAuth } = useStaff();
+  const { session, client, outlets, handleAuth } = useStaff();
   const role = session.me.role;
   const insight = caresCan(role, "insight");
   // inbox:<tenant> is owner and manager only: opening it for anyone else would make the whole stream 404.
@@ -191,7 +191,7 @@ function Cares({ outlet }: { outlet: Outlet }) {
 
   if (notFound) return <FullPage title="Not found."><p>It may have been removed, or it isn&apos;t in your outlets.</p></FullPage>;
 
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const tz = outlet.tz;
   const openDrawer = (snapshotId: string, refToken: string) => setDrawer({ snapshotId, refToken });
   const here = profile && !failed(profile) ? profile.outlets.find((o) => o.outlet_id === outlet.id) : undefined;

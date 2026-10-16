@@ -330,13 +330,14 @@ def test_over_the_cap_a_live_step_narrates_and_never_with_ai_off(ai_enabled: boo
     assert (out.source, len(llm.requests)) == (("model", 1) if narrates else ("template", 0))
 
 
-@pytest.mark.parametrize(("level", "provider_calls"), [("hard", 0), ("ok", 1)])
+@pytest.mark.parametrize(("level", "provider_calls"), [("hard", 0), ("ok", 2)])
 def test_over_the_cap_the_app_builds_the_narration_model_capped_and_no_call_reaches_the_provider(
     level: str, provider_calls: int, cfg: Config, minted: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """T-127 (R58, money): through the app in live mode, a step over the month's cap (AI on) builds the narrate model `capped`:
     no call reaches the provider (no fixture holds this narration, so the step keeps core's template). Paired: with budget left
-    the same step calls the provider once (rate-limited here, so it too keeps the template)."""
+    the same step calls the provider (rate-limited here, so it too keeps the template): twice, the try and the one retry of a 429
+    (llm/providers.retrying, C3)."""
     calls: list[str] = []
 
     async def rate_limited(_llm: Gemini, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:

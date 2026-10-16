@@ -5,15 +5,15 @@
 // an id in its path is a client navigation, as people make them.
 //   cd apps/web && NEXT_PUBLIC_MUNIM_API=/mock NEXT_PUBLIC_MUNIM_STOREFRONT_KEY=<the mock's key> NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=1 next build
 //   tsx scripts/nav-smoke.ts [--port=4510] [--shots=<dir>]
-// It starts `next start` on --port (MUNIM_MOCK=1) and a stand-in for the deploy platform's routing on --port + 1, drives Chromium
+// It starts `next start` on --port (MUNIM_MOCK=1) and a stand-in for the deploy platform's CDN routing on --port + 1, drives Chromium
 // (playwright-core's own build) through the stand-in, and stops both. --shots also saves every Request-quotes outcome at
 // 390 and 1280 px wide. Exit 1 on any failed check.
 //
 // Why the stand-in (go-live A, measured on munim-cobnut, 16 Oct): with Next's cacheComponents every route with an id in
-// its path was prerendered as one shell with placeholder params, and the deploy platform answered each client navigation's RSC
+// its path was prerendered as one shell with placeholder params, and the deploy platform's CDN answered each client navigation's RSC
 // request from that cached shell (`x-matched-path: /o/[outletId].rsc`, HIT, segment keys `%%drp:…%%`), so useParams()
 // read no real id and the page said "This link isn't valid." until a reload. `next start` renders the real params and
-// cannot show that, so the stand-in answers RSC requests for such routes as the deploy platform did — from this build's own
+// cannot show that, so the stand-in answers RSC requests for such routes as the CDN did — from this build's own
 // prerender-manifest and segment files — and passes everything else to `next start`.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -33,7 +33,7 @@ const check = (name: string, ok: boolean, detail = "") => {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? `: ${detail}` : ""}`);
 };
 
-/** the deploy platform's answer to an RSC request for a route this build prerendered as a shell with placeholder params. */
+/** The deploy platform's CDN answer to an RSC request for a route this build prerendered as a shell with placeholder params. */
 function standIn(): Server {
   const manifest = JSON.parse(readFileSync(join(NEXT_DIR, "prerender-manifest.json"), "utf8")) as {
     dynamicRoutes: Record<string, { renderingMode?: string; fallback?: unknown; routeRegex: string }>;

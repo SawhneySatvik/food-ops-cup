@@ -12,7 +12,7 @@ import { useOnline } from "@/lib/hooks";
 import type { MunimError } from "@/lib/munim/client";
 import { formatWhen } from "@/lib/munim/format";
 import { ITEM_STATUS, MODE, PLAYBOOK_WORDS, STATUS, STOP_REASON, TRIGGERED, isTerminal, itemWords, modesUpTo, type Mode } from "@/lib/munim/investigation-words";
-import { formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
+import { formatCell, parseRef, outletNames, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
 import { specialistName, staffErrorText, staffWriteErrorText } from "@/lib/munim/staff-copy";
@@ -110,7 +110,7 @@ export function InvestigationPage() {
   if (!view || !tenant || !outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
 
   const tz = outlet.tz;
-  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency };
+  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) };
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const mine = view.created_by === me.member_id;
   const restricted = view.status === "restricted";

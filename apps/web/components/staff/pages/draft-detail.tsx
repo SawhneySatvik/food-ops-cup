@@ -16,7 +16,7 @@ import {
   type DraftDetail, type NumericField, type Outcome,
 } from "@/lib/munim/drafts";
 import { dayLabel, formatDate, formatTime, formatWhen, titleCase } from "@/lib/munim/format";
-import { columnOf, formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
+import { columnOf, formatCell, parseRef, outletNames, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
 import { CHANNEL, NO_SEND, messageWords } from "@/lib/munim/campaign-words";
@@ -163,7 +163,7 @@ export function DraftDetailPage() {
   if (!detail || !tenant) return <main className="wrap staff-main"><div className="skeleton h-96" role="status" aria-label="Loading" /></main>;
 
   const tz = outlets.find((o) => o.id === detail.draft.outlet_ids[0])?.tz ?? outlets[0]?.tz ?? tenant.home_tz ?? "UTC";
-  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency };
+  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) };
   const when = (iso: string) => formatWhen(iso, tz, SITE.locale);
   const open = (snapshotId: string, refToken: string) => setDrawer({ snapshotId, refToken });
   const fields = numericFields(detail);

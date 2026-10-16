@@ -11,7 +11,7 @@ import type { MunimError } from "@/lib/munim/client";
 import { attemptFor, retryable, type CommandAttempt } from "@/lib/munim/commands";
 import { draftTitle, findingTitle, personName, sourceName, type Draft, type Decision } from "@/lib/munim/drafts";
 import { formatWhen } from "@/lib/munim/format";
-import { columnOf, formatCell, parseRef, type CellFormat } from "@/lib/munim/refs";
+import { columnOf, formatCell, parseRef, outletNames, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
 import { abstainText, DRAFT_STATUS, REJECT_REASONS, specialistName, staffErrorText, staffWriteErrorText, VERDICT } from "@/lib/munim/staff-copy";
@@ -191,7 +191,7 @@ export function InboxPage() {
   if (!allowed) return <NotForRole />;
 
   const tz = outlets[0]?.tz ?? tenant?.home_tz ?? "UTC";
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const outletName = (id: string) => outlets.find((o) => o.id === id)?.name ?? "Another outlet";
   const changed = (msg: string) => {
     setToast(msg);

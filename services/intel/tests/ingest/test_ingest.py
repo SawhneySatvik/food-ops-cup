@@ -687,7 +687,8 @@ class _Roles:
 
 
 def _live(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Live mode with a fake key; the provider planted in place of the network answers every call 429 (free tier)."""
+    """Live mode with a fake key; the provider planted in place of the network answers every call 429 (free tier), so each
+    model call is two requests: the try and its one retry (llm/providers.retrying, C3)."""
     calls: list[str] = []
 
     async def rate_limited(_llm: Gemini, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
@@ -740,7 +741,7 @@ def test_a_live_extraction_that_fails_is_served_from_the_ingest_fixtures_and_tra
     assert isinstance(llm, TimedGemini) and llm.fallback is not None and llm.fallback.fixtures_dir == FIXTURES_DIR
     rows, routes, report = _rows_and_routes(llm)
     assert rows == recorded_rows and report.refused == {}
-    assert routes == [("specialist:inventory_purchasing", {"model_path": "recorded-fallback"})] and len(calls) == 1
+    assert routes == [("specialist:inventory_purchasing", {"model_path": "recorded-fallback"})] and len(calls) == 2
 
 
 def test_a_live_extraction_with_no_fixture_abstains_as_before_and_is_traced_abstained(
@@ -753,5 +754,5 @@ def test_a_live_extraction_with_no_fixture_abstains_as_before_and_is_traced_abst
     with pytest.raises(quarantine.ModelUnavailable) as e:
         asyncio.run(quarantine.call(llm, extract_request(llm, "A note nobody recorded: X supplies paneer."), ExtractedClaims, state))
     asyncio.run(state.traces.flush())
-    assert e.value.code == "model_error:ClientError" and len(calls) == 1
+    assert e.value.code == "model_error:ClientError" and len(calls) == 2
     assert _routes(sent) == [("manager", {"model_path": "abstained"})]

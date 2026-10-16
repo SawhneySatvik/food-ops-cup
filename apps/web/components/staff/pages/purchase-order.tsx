@@ -10,7 +10,7 @@ import { useOnline } from "@/lib/hooks";
 import type { MunimError } from "@/lib/munim/client";
 import { personName } from "@/lib/munim/drafts";
 import { formatDate, formatDayTime, formatMoney, formatQty } from "@/lib/munim/format";
-import type { CellFormat, Snapshot } from "@/lib/munim/refs";
+import { outletNames, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { PO_STATUS, staffErrorText, VERDICT } from "@/lib/munim/staff-copy";
 import { ingredientOf, quoteParams, type GoodsReceived, type PurchaseOrder, type Supplier } from "@/lib/munim/supply-flow";
@@ -130,7 +130,7 @@ function PurchaseOrderView({ poId }: { poId: string }) {
   if (!po || !grns || !base) return <main className="wrap staff-main"><div className="skeleton h-96" role="status" aria-label="Loading" /></main>;
 
   const tz = outlets.find((o) => po.outlet_ids.includes(o.id))?.tz ?? outlet?.tz ?? base.tenant.home_tz ?? "UTC";
-  const fmt: CellFormat = { locale: SITE.locale, currency: base.tenant.base_currency };
+  const fmt: CellFormat = { locale: SITE.locale, currency: base.tenant.base_currency, outletNames: outletNames(outlets) };
   const offline = !online || error?.kind === "network";
   const mine = outlets.filter((o) => po.outlet_ids.includes(o.id)).map((o) => ({ id: o.id, name: o.name }));
   const outletName = (id: string) => outlets.find((o) => o.id === id)?.name ?? "another outlet";

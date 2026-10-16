@@ -11,6 +11,18 @@ type Of<T extends { _output: unknown }> = T["_output"];
 const iso = (d: Date | string): string => new Date(d).toISOString();
 const int = (v: string | number | null): number | null => (v === null ? null : Number(v));
 
+/** The record's `consent` as the view's {email, sms}. A customer's own grant is {marketing, at} (accounts/handlers.ts); staff can
+ *  only withdraw, which writes email/sms false (records.ts). A channel's own flag wins over `marketing`, so a withdrawal holds. */
+const consentFlags = (c: Record<string, unknown>): { email?: boolean; sms?: boolean } => {
+  const marketing = typeof c.marketing === "boolean" ? c.marketing : undefined;
+  const out: { email?: boolean; sms?: boolean } = {};
+  for (const ch of ["email", "sms"] as const) {
+    const v = typeof c[ch] === "boolean" ? c[ch] : marketing;
+    if (v !== undefined) out[ch] = v;
+  }
+  return out;
+};
+
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
 
 /** "+919876543210" → "+91••••••3210": country prefix (first 3) and the last four digits. */
@@ -27,7 +39,7 @@ export async function listCustomers(c: Queryable, f: CustomerFilter): Promise<{ 
   const q = f.q?.trim() ?? "";
   const digits = q.replace(/\D/g, "");
   const like = `%${escapeLike(q)}%`;
-  const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, boolean>; has_account: boolean; erased: boolean; created_at: Date }>(
+  const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, unknown>; has_account: boolean; erased: boolean; created_at: Date }>(
     `SELECT id, name, phone, email, consent, idp_sub IS NOT NULL AS has_account, erased_at IS NOT NULL AS erased, created_at
        FROM core.customer
       WHERE ($1 = '' OR name ILIKE $2 OR ($6::boolean AND email ILIKE $2)
@@ -43,7 +55,7 @@ export async function listCustomers(c: Queryable, f: CustomerFilter): Promise<{ 
     customers: page.map((x) => ({
       customer_id: x.id, name: x.name,
       phone: f.full ? x.phone : maskPhone(x.phone), email: f.full ? x.email : null,
-      consent: x.consent, has_account: x.has_account, erased: x.erased, created_at: iso(x.created_at),
+      consent: consentFlags(x.consent), has_account: x.has_account, erased: x.erased, created_at: iso(x.created_at),
     })),
     next_cursor: r.rows.length > f.limit ? page[page.length - 1]!.id : null,
   };
@@ -139,12 +151,12 @@ export async function listBulkOrders(c: Queryable, scope: Scope, f: { outlet_id?
 
 /** One merchant-side customer record (T-092b), shaped and masked like a `listCustomers` row; null when not visible. */
 export async function getCustomer(c: Queryable, id: string, full: boolean): Promise<Of<typeof CustomerView> | null> {
-  const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, boolean>; has_account: boolean; erased: boolean; created_at: Date }>(
+  const r = await c.query<{ id: string; name: string | null; phone: string | null; email: string | null; consent: Record<string, unknown>; has_account: boolean; erased: boolean; created_at: Date }>(
     `SELECT id, name, phone, email, consent, idp_sub IS NOT NULL AS has_account, erased_at IS NOT NULL AS erased, created_at FROM core.customer WHERE id = $1`, [id]);
   const x = r.rows[0];
   if (!x) return null;
   return {
     customer_id: x.id, name: x.name, phone: full ? x.phone : maskPhone(x.phone), email: full ? x.email : null,
-    consent: x.consent, has_account: x.has_account, erased: x.erased, created_at: iso(x.created_at),
+    consent: consentFlags(x.consent), has_account: x.has_account, erased: x.erased, created_at: iso(x.created_at),
   };
 }

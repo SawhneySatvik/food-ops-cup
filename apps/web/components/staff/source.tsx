@@ -4,7 +4,7 @@
 // it; or the "Cannot verify" chip when it does not trace. Plus the stat card (owner home), the simulated badges and
 // the status pill. AI text is rendered as text nodes only, never as HTML.
 import { useEffect, useRef, useState } from "react";
-import { cellOf, columnOf, formatCell, parseRef, renderSegment, type CellFormat, type Part, type ResolvedRef, type Snapshot } from "@/lib/munim/refs";
+import { cellOf, columnOf, drawerCell, formatCell, parseRef, renderSegment, type CellFormat, type Part, type ResolvedRef, type Snapshot } from "@/lib/munim/refs";
 import type { StaffClient } from "@/lib/munim/staff";
 import { CANNOT_VERIFY, SIMULATED_RECIPIENT, SIMULATED_SUPPLIER } from "@/lib/munim/staff-copy";
 import { formatDayTime } from "@/lib/munim/format";
@@ -121,7 +121,7 @@ export function SnapshotDrawer({ client, open, onClose, fmt, tz, label }: {
                       <tr key={i} aria-current={here ? "true" : undefined}>
                         {columns.map((c) => (
                           <td key={c.name} className={c.type === "integer" || c.type === "numeric" ? "num" : undefined} aria-current={here && cited?.kind === "snap" && cited.column === c.name ? "true" : undefined}>
-                            {c.type === "uuid" ? `…${String(row[c.name] ?? "—").slice(-8)}` : formatCell(row[c.name] ?? null, c.name, fmt)}
+                            {drawerCell(c.type, row[c.name], c.name, fmt)}
                             {c.name === "name" && row.simulated === true && <> <SimulatedRecipient /></>}
                           </td>
                         ))}

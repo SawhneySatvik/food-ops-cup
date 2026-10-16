@@ -102,7 +102,7 @@ export interface Config {
    *  default 3300 (55 min); a host that cuts requests sooner (e.g. at 300 s) sets it below its limit. */
   streamMaxAgeMs: number;
   /** `MUNIM_ASK_TIMEOUT_S` × 1000: how long `POST /v1/ask` waits for intel's answer. Whole seconds 10–600, default 90. A host
-   *  that cuts requests (the deploy platform Hobby: 300 s) sets it under that limit and above intel's own `MUNIM_ASK_BUDGET_S`. */
+   *  that cuts requests (a serverless host's 300 s cap) sets it under that limit and above intel's own `MUNIM_ASK_BUDGET_S`. */
   askTimeoutMs: number;
   /** `MUNIM_DB_POOL_MAX`: a ceiling on core-api's app pools (3–50; below 3 is refused: untested, and a request that
    *  holds one connection while asking for another would wait forever), for a host that runs many small instances

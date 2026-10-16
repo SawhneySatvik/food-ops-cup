@@ -19,20 +19,29 @@ fixture the original exception is re-raised untouched, so every caller degrades 
 the path that served it, and an abstaining exception its label (trace/served.py). A served fixture's token counts are
 the authoring run's, not this call's: they are dropped, so the call is charged the request-size estimate (trace/spend.py),
 as a failed call is.
+
+Transient Gemini errors (C3; found live: flash-lite answered 5xx twice in three Asks, and once cost a supplier's quote): a call
+that fails with a 5xx or a 429 is started over, at most twice in all and a 429 at most once, after a jittered wait (`retrying`).
+It sits inside `bounded`, so the retries and their waits spend the role's own timeout, which the ask's budget already contains;
+a timeout is never retried. A call still failing after its retries takes the path above: the recorded fixture, else the error.
+Gemini only: the OpenAI-compatible client retries on its own (the SDK's default). google-genai's `HttpRetryOptions`, which ADK
+passes through, cannot say "a 429 once", so it is not used. Recorded mode never reaches this file's live classes.
 """
 
 from __future__ import annotations
 
 import asyncio
+import random
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from google.adk.integrations.openai import OpenAILlm
 from google.adk.models.google_llm import Gemini
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+from google.genai.errors import ClientError, ServerError
 
 from munim_intel.config import Config, ProviderKeyName
 from munim_intel.contracts_gen.models import PlatformModelRoleRow
@@ -91,6 +100,52 @@ async def bounded(responses: AsyncGenerator[LlmResponse, None], seconds: float) 
     and only then handed on, so the deadline never spans the caller's own work between responses."""
     async with asyncio.timeout(seconds):
         return [r async for r in responses]
+
+
+#: Transient-error retries (module doc): at most two starts-over per call, a 429 at most one of them.
+RETRIES = 2
+RETRIES_429 = 1
+#: The wait before a retry, in seconds, jittered by x0.5 to x1.5: a 5xx 0.5 then 1; a 429 (a rate limit, so longer) 2.
+BACKOFF_5XX_S = 0.5
+BACKOFF_429_S = 2.0
+#: Module attributes so a test can replace the wait and the jitter.
+_sleep = asyncio.sleep
+_jitter = random.uniform
+
+
+def transient(e: BaseException) -> Literal["5xx", "429"] | None:
+    """What kind of transient provider error `e` is, by google-genai's own classes (ADK's `_ResourceExhaustedError` is a
+    ClientError with code 429); None: not transient, never retried (a 400, a timeout, a validation error)."""
+    if isinstance(e, ServerError):
+        return "5xx"
+    if isinstance(e, ClientError) and e.code == 429:
+        return "429"
+    return None
+
+
+async def retrying(make: Callable[[], AsyncGenerator[LlmResponse, None]]) -> AsyncGenerator[LlmResponse, None]:
+    """The responses of `make()`, starting the call over when it fails with a transient error (module doc). An attempt's
+    responses are collected before any is yielded (`bounded` collects them anyway), so a retry never repeats a response."""
+    left, left_429, waits = RETRIES, RETRIES_429, 0
+    while True:
+        try:
+            responses = [r async for r in make()]
+        except Exception as e:  # noqa: BLE001 — anything not transient is re-raised untouched
+            kind = transient(e)
+            if kind is None or left == 0 or (kind == "429" and left_429 == 0):
+                raise
+            left -= 1
+            if kind == "429":
+                left_429 -= 1
+                wait = BACKOFF_429_S
+            else:
+                wait = BACKOFF_5XX_S * 2**waits
+                waits += 1
+            await _sleep(wait * _jitter(0.5, 1.5))
+            continue
+        for r in responses:
+            yield r
+        return
 
 
 class OverCap(Exception):
@@ -164,7 +219,8 @@ class TimedGemini(Gemini):
     capped: bool = False
 
     async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
-        for r in await served(self, llm_request, super().generate_content_async(gemini_request(llm_request), stream)):
+        sent = gemini_request(llm_request)
+        for r in await served(self, llm_request, retrying(lambda: super(TimedGemini, self).generate_content_async(sent, stream))):
             yield r
 
 

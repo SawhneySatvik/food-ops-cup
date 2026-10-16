@@ -5,7 +5,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { RunTokenClaims } from "../../../../packages/contracts/src/shared/run-token.ts";
 import { uuidv7 } from "../../../core-api/src/commit/canonical.ts";
-import { signJwt, ttlSeconds } from "../../../core-api/src/runtoken/index.ts";
+import { signJwt } from "../../../core-api/src/runtoken/index.ts";
 
 const core = generateKeyPairSync("ed25519");
 const other = generateKeyPairSync("ed25519");
@@ -13,8 +13,11 @@ const tenantA = uuidv7();
 const tenantB = uuidv7();
 const outlet = uuidv7();
 const nowS = Math.floor(Date.now() / 1000);
+// The tokens are minted once per pytest session. With core's own lifetimes (ask 15 min, ingest 30 min) a slow suite outlived
+// them and failed on "expired" (C3). The suite's fixture lives a day; core's lifetimes are pinned in core-api's runtoken.test.ts.
+const FIXTURE_TTL_S = 24 * 3600;
 
-function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope: string[], iat = nowS) {
+function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope: string[], iat = nowS, exp = iat + FIXTURE_TTL_S) {
   return RunTokenClaims.parse({
     iss: "munim-core",
     aud: "munim-intel",
@@ -24,7 +27,7 @@ function claims(tenant: string, trigger: RunTokenClaims["trigger"], outletScope:
     trigger,
     actor: trigger === "ask" || trigger === "ingest" || trigger === "auto_step" ? uuidv7() : trigger === "brief" ? "brief" : "watcher:smoke",
     iat,
-    exp: iat + ttlSeconds(trigger),
+    exp,
   });
 }
 
@@ -34,7 +37,7 @@ const brief = claims(tenantA, "brief", ["*"]);
 const ingest = claims(tenantA, "ingest", [outlet]);
 // Auto mode's worker narrates each investigation step under an auto_step run (T-089b).
 const autoStep = claims(tenantA, "auto_step", [outlet]);
-const expired = claims(tenantA, "event", ["*"], nowS - 3 * 3600);
+const expired = claims(tenantA, "event", ["*"], nowS - 3 * 3600, nowS - 3600);
 const validToken = signJwt(valid, core.privateKey);
 const [h, , s] = validToken.split(".") as [string, string, string];
 const toB = Buffer.from(JSON.stringify({ ...valid, tenant_id: tenantB })).toString("base64url");

@@ -11,7 +11,7 @@ import type { MunimError } from "@/lib/munim/client";
 import { draftTitle } from "@/lib/munim/drafts";
 import { formatWhen } from "@/lib/munim/format";
 import { DESKS, DESK_BLURB, type Desk } from "@/lib/munim/office";
-import { formatCell, type CellFormat, type Snapshot } from "@/lib/munim/refs";
+import { formatCell, outletNames, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { specialistName, staffErrorText } from "@/lib/munim/staff-copy";
 import { templateWords } from "@/lib/munim/template-words";
@@ -30,7 +30,7 @@ const RECORD: Array<[keyof NonNullable<NonNullable<DeskView["track_record"]>["ce
 
 export function DeskPage() {
   const { desk } = useParams<{ desk: string }>();
-  const { session, client, outlet, handleAuth } = useStaff();
+  const { session, client, outlet, outlets, handleAuth } = useStaff();
   const allowed = can(session, "office");
   const known = (DESKS as readonly string[]).includes(desk);
   const [view, setView] = useState<DeskView | "not_found" | null>(null);
@@ -71,7 +71,7 @@ export function DeskPage() {
 
   const d = desk as Desk;
   const tz = outlet.tz;
-  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency };
+  const fmt: CellFormat = { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) };
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const cells = view.track_record?.cells ?? null;
   const name = specialistName(d);

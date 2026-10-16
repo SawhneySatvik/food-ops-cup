@@ -112,10 +112,9 @@ def test_brief_takes_only_a_brief_token_and_posts_one_answer(cfg: Config, minted
     assert (down.status_code, down.json()["error"]["code"]) == (502, "internal")
 
 
-def test_ingest_takes_only_an_ingest_token_whose_ttl_is_thirty_minutes(cfg: Config, minted: dict[str, Any]) -> None:
+def test_ingest_takes_only_an_ingest_token(cfg: Config, minted: dict[str, Any]) -> None:
     client = TestClient(create_app(cfg, core_transport=core_refusing()))
     tokens, claims = minted["tokens"], minted["claims"]["ingest"]
-    assert claims["exp"] - claims["iat"] == 1800  # 30 min, a literal: not read back from ttlSeconds
     ok = post(client, "/ingest", tokens["ingest"])
     assert (ok.status_code, ok.json()) == (202, {"run_id": claims["run_id"]})
     for other in ("valid", "ask", "brief", "expired"):

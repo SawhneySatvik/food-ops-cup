@@ -3,7 +3,7 @@
 // client in client.ts, with the person's token and tenant instead of the storefront key. One instance per session
 // (session.ts). It never logs, and never puts the token or the tenant in a URL.
 import { createMunimClient as createSdkClient } from "@munim/sdk";
-import { settle } from "./client";
+import { settle, type Result } from "./client";
 import type { Envelope } from "./commands";
 import type { Schemas } from "./types";
 
@@ -22,7 +22,7 @@ export interface StaffClientOptions {
 }
 
 /** POST /v1/ask is answered only after the AI has finished: core waits MUNIM_ASK_TIMEOUT_S (90 s by default, 240 s on the
- *  the deploy platform deploy). The browser waits longer than any core, so core's own answer (or its 503) arrives first. */
+ *  hosted deploy). The browser waits longer than any core, so core's own answer (or its 503) arrives first. */
 export const ASK_TIMEOUT_MS = 250_000;
 
 type Cmd<T extends string, P> = Envelope<T, P>;
@@ -47,11 +47,15 @@ export type CancelCampaignCommand = Cmd<"customers.campaign.cancel.v1", Schemas[
 export type RecordSentCommand = Cmd<"customers.campaign.record_sent.v1", Schemas["CustomersCampaignRecordSentV1"]>;
 
 /** POST /v1/investigations/{id}:approve-plan answers once every step the plan allows has run (core runs them in that
- *  request; the the deploy platform function may take up to 300 s), so the browser waits as long as Ask does. */
+ *  request; the hosted function may take up to 300 s), so the browser waits as long as Ask does. */
 export const PLAN_TIMEOUT_MS = 290_000;
 
 /** POST /v1/rfq-requests is answered once the negotiation with the simulated suppliers is over (core waits up to 120 s). */
 export const RFQ_TIMEOUT_MS = 130_000;
+
+/** core's trace page size (its cap); a replay follows pages up to MAX_TRACE_PAGES (5,000 events), then stops with what it has. */
+const TRACE_PAGE = 100;
+const MAX_TRACE_PAGES = 50;
 
 export function createStaffClient(opts: StaffClientOptions) {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
@@ -121,8 +125,20 @@ export function createStaffClient(opts: StaffClientOptions) {
     getSpecialistDesk: (specialist: string) => settle(() => sdk.GET("/v1/specialists/{id}", { params: { path: { id: specialist } }, ...init() })),
     /** Recent AI runs the person may see, newest first (the office's replay picker). */
     listRuns: (limit = 20) => settle(() => sdk.GET("/v1/runs", { params: { query: { limit } }, ...init() })),
-    /** A run's trace events in seq order: ids and short labels only, never text a model or a person wrote. */
-    getTraces: (runId: string) => settle(() => sdk.GET("/v1/traces/{run}", { params: { path: { run: runId }, query: { limit: 500 } }, ...init() })),
+    /** A run's trace events in seq order: ids and short labels only, never text a model or a person wrote. core serves at most
+     *  100 a page (a larger limit is a 400), so this follows `next_after_seq` until it is null; the first failed page is the answer. */
+    getTraces: async (runId: string): Promise<Result<Schemas["V1TracesResponse"]>> => {
+      const events: Schemas["V1TracesResponse"]["events"] = [];
+      let after = 0;
+      for (let page = 0; page < MAX_TRACE_PAGES; page++) {
+        const r = await settle(() => sdk.GET("/v1/traces/{run}", { params: { path: { run: runId }, query: { after_seq: after, limit: TRACE_PAGE } }, ...init() }));
+        if (!r.ok) return r;
+        events.push(...r.data.events);
+        if (r.data.next_after_seq === null) return { ...r, data: { ...r.data, events, next_after_seq: null } };
+        after = r.data.next_after_seq;
+      }
+      return { ok: true, status: 200, replayed: false, data: { run_id: runId, events, next_after_seq: after } };
+    },
 
     // ---- investigations ----
     /** Per-role investigation-mode ceilings: which of Step, Plan and Auto this person may pick. */

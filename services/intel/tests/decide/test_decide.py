@@ -513,7 +513,8 @@ def test_map_columns_with_logprobs_rejected_abstains_without_a_retry(monkeypatch
 
 def test_the_retry_happens_at_most_once(monkeypatch: pytest.MonkeyPatch) -> None:
     """Gate (c): a retry that fails too ends adapter_error after exactly two calls; a 429 (ADK's
-    _ResourceExhaustedError is a ClientError) is not a logprobs rejection and is never retried."""
+    _ResourceExhaustedError is a ClientError) is not a logprobs rejection: the DecisionModel never retries it (one model call).
+    The provider class starts a 429 over once on its own (llm/providers.retrying, C3), so two requests reach the provider."""
     seen = gemini_rejecting_logprobs(monkeypatch, "D")
 
     async def always_400(self: Any, *, model: str, contents: Any, config: types.GenerateContentConfig) -> Any:
@@ -526,7 +527,7 @@ def test_the_retry_happens_at_most_once(monkeypatch: pytest.MonkeyPatch) -> None
     assert answer_or_fallback(ROUTE_INTENT, r) == "explain"
     seen = gemini_rejecting_logprobs(monkeypatch, "D", status=429)
     [r] = asyncio.run(live_router().decide(CTX, route_state("Order 20 kg of onions"), [ROUTE_INTENT]))
-    assert (r.abstained, r.reason, r.model_calls, len(seen)) == (True, "adapter_error", 1, 1)
+    assert (r.abstained, r.reason, r.model_calls, len(seen)) == (True, "adapter_error", 1, 2)
 
 
 def test_live_mode_uses_the_router_role_only() -> None:

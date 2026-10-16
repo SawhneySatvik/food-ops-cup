@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from munim_intel.config import Config, load_config
+from munim_intel.llm import providers
 from munim_intel.llm.recorded import RecordedFixtureMissing
 
 INTEL = Path(__file__).resolve().parents[1]
@@ -40,6 +41,17 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "connect_ex", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
+
+
+@pytest.fixture(autouse=True)
+def no_retry_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A live call that fails with a 5xx or a 429 is started over after a jittered wait (llm/providers.retrying, C3). The
+    retries still happen, so call counts show them; no test sleeps the wait."""
+
+    async def instant(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(providers, "_sleep", instant)
 
 
 @pytest.fixture(autouse=True)

@@ -84,6 +84,21 @@ def test_expiry_boundary(minted: dict[str, Any]) -> None:
         verify_run_token(minted["tokens"]["valid"], key, now=lambda: exp)
 
 
+def test_the_fixture_tokens_outlive_a_slow_suite(minted: dict[str, Any]) -> None:
+    """The session mints once; with core's own 15-minute ask lifetime a suite slower than that failed on "expired" (C3).
+    Every fixture token must still verify hours after issue, and the expired one must stay refused."""
+    key = load_public_key(minted["public_key_pem"].encode())
+    assert set(minted["claims"]) == {"valid", "ask", "brief", "ingest", "auto_step"}
+
+    def run_id_at(name: str, at: int) -> str:
+        return verify_run_token(minted["tokens"][name], key, now=lambda: at).run_id
+
+    for name, claims in minted["claims"].items():
+        assert run_id_at(name, claims["iat"] + 4 * 3600) == claims["run_id"], name
+    with pytest.raises(RunTokenRefused, match="expired"):
+        verify_run_token(minted["tokens"]["expired"], key)
+
+
 def test_a_token_of_another_tenant_is_refused(minted: dict[str, Any]) -> None:
     key = load_public_key(minted["public_key_pem"].encode())
     assert verify_run_token(minted["tokens"]["tenant_b"], key, tenant_id=minted["tenant_b"]).tenant_id == minted["tenant_b"]

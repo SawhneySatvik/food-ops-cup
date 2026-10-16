@@ -87,10 +87,27 @@ export function draftValue(leaf: unknown, path: string, resolved: readonly Resol
 export interface CellFormat {
   locale: string;
   currency: string;
+  /** outlet id -> name, from the outlets the session already has (GET /v1/outlets); an `outlet_id` cell shows the name. */
+  outletNames?: Readonly<Record<string, string>>;
 }
+/** The names to put in `CellFormat.outletNames`. */
+export const outletNames = (outlets: readonly { id: string; name: string }[]): Record<string, string> => Object.fromEntries(outlets.map((o) => [o.id, o.name]));
+
+/** An `outlet_id` cell as the outlet's name; null for any other cell, or an outlet the session has no name for (that one is
+ *  shown as stored). The cell stays the snapshot's: only its look changes. */
+const outletLabel = (value: Cell | undefined, column: string, f: CellFormat): string | null =>
+  column === "outlet_id" && typeof value === "string" ? (f.outletNames?.[value] ?? null) : null;
+
+/** One cell of the snapshot drawer's table: an id column shows its last 8 characters (v7 ids share their first ones), unless it
+ *  is an outlet the session knows by name. */
+export const drawerCell = (type: string, value: Cell | undefined, column: string, f: CellFormat): string =>
+  type === "uuid" ? (outletLabel(value, column, f) ?? `…${String(value ?? "—").slice(-8)}`) : formatCell(value ?? null, column, f);
+
 export function formatCell(value: Cell, column: string, f: CellFormat): string {
   if (value === null) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  const outlet = outletLabel(value, column, f);
+  if (outlet !== null) return outlet;
   const n = typeof value === "number" ? value : /^-?\d+$/.test(value) ? Number(value) : null;
   if (n === null) return String(value); // text, dates and numeric strings with a fraction are shown as stored
   if (column.endsWith("_minor")) return formatMoney(n, f.currency, f.locale);

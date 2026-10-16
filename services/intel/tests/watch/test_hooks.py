@@ -12,13 +12,18 @@ refuse case; expected values are hand values (the fixture's own rows and ids), n
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
 from dataclasses import replace
 from datetime import date
 from typing import Any
 
+from google.adk.models import BaseLlm
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from test_watch import CFG, CTX, ITEM, OUTLET, FakeCore, ad_row, frame, run
 
 from munim_intel.detect import OutletFrame
+from munim_intel.llm.recorded import RecordedLlm
 from munim_intel.mapping import Abstain, Detection, FollowUp, Proposal
 from munim_intel.runtime.internal_client import CoreError
 from munim_intel.watch.detectors.catalogue import above_mrp
@@ -268,3 +273,46 @@ def test_every_as_of_a_sweep_mints_is_the_outlets_business_date() -> None:
         "market.upcoming", "people.advances_open", "purchasing.price_creep", "finance.missing_payouts",
     }  # fmt: skip
     assert {t for t, _ in as_of} == want and {v for _, v in as_of} == {"2026-10-10"}
+
+
+# -- C3: a class name reaches a trace only as a label ----------------------------------------------------------------------
+
+
+class _ResourceExhaustedError(RuntimeError):
+    """Named as ADK's own wrapper of a provider 429 (google_llm.py): a class name with a leading underscore, which is not a label."""
+
+
+class RateLimited(BaseLlm):
+    model: str = "gemini-3.8-flash"
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False) -> AsyncGenerator[LlmResponse, None]:
+        raise _ResourceExhaustedError("429 RESOURCE_EXHAUSTED, a message never traced")
+        yield  # an async generator, never reached
+
+
+def test_a_rate_limited_narration_is_traced_by_label_and_the_finding_stands() -> None:
+    """The narration's model answers a 429: run_agent fails with the class name `_ResourceExhaustedError` as `RunFailed.kind`,
+    and the pipeline traced it raw, so the trace check (TraceLabelError) ended the whole sweep. Now it is traced as
+    `ResourceExhaustedError`, the narration counted failed, and the template finding stays. Paired: the same sweep with a
+    model that works traces no error."""
+    rows = {"finance.unapproved_deductions": [ad_row(55_000)]}
+    limited, fine = FakeCore(rows), FakeCore(rows)
+    report, _ = run(limited, frame("IN", narration="model"), {"finance": [SPEC]}, llm=RateLimited())
+    run(fine, frame("IN", narration="model"), {"finance": [SPEC]}, llm=RecordedLlm(model="recorded/narrate"))
+    print("errors:", errors_of(limited), "narrations:", dict(report.narrations))
+    # The ADK plugin traces the same failure under model, agent and run; the pipeline adds its own, narrate.
+    assert [e["where"] for e in errors_of(limited)] == ["model", "agent", "run", "narrate"]
+    assert {e["error"] for e in errors_of(limited)} == {"ResourceExhaustedError"}
+    assert errors_of(limited)[-1] == {"where": "narrate", "detector": SPEC.id, "error": "ResourceExhaustedError"}
+    assert (report.narrations["failed"], [f.type for f in limited.findings]) == (1, ["reconciliation_break.unapproved_ad_fee"])
+    assert errors_of(fine) == [] and "RESOURCE_EXHAUSTED" not in str(limited.traces)  # the exception's message is never traced
+
+
+def test_a_detector_failing_with_an_underscored_class_name_is_traced_by_label() -> None:
+    def private(*_args: Any) -> Any:
+        raise _ResourceExhaustedError("quota, never traced")
+
+    core = FakeCore({**follow_rows(12), **MRP})
+    report, _ = run(core, frame("IN", "store"), {"finance": [replace(SPEC, fires=private)], "catalogue": [above_mrp.SPEC]})
+    assert errors_of(core) == [{"where": "hits", "detector": SPEC.id, "error": "detector_error", "type": "ResourceExhaustedError"}]
+    assert ([x.type for x in core.findings], report.errors) == (["catalogue.above_mrp"], 1) and "quota" not in str(core.traces)

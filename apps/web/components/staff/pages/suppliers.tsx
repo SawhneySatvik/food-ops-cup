@@ -12,7 +12,7 @@ import { useOnline } from "@/lib/hooks";
 import type { MunimError } from "@/lib/munim/client";
 import type { Outcome } from "@/lib/munim/drafts";
 import { formatDate, formatDayTime, formatMoney } from "@/lib/munim/format";
-import { formatCell, snapRef, type CellFormat, type Snapshot } from "@/lib/munim/refs";
+import { formatCell, snapRef, outletNames, type CellFormat, type Snapshot } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { RECORDED_ONLY } from "@/lib/munim/copy";
 import { watchFor } from "@/lib/munim/staff-app";
@@ -211,7 +211,7 @@ function Suppliers() {
   };
 
   const tz = outlet.tz;
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const supplierList = suppliers && !failed(suppliers) ? suppliers : [];
   const outletName = (id: string) => outlets.find((o) => o.id === id)?.name ?? "another outlet";

@@ -10,7 +10,7 @@ import { useCountdown, useOnline } from "@/lib/hooks";
 import { findingTitle, draftTitle, sourceName } from "@/lib/munim/drafts";
 import { formatDate, formatWhen } from "@/lib/munim/format";
 import { loadOwnerFigures, noFigures, type Figure, type OwnerFigures } from "@/lib/munim/owner-figures";
-import { formatCell, type CellFormat } from "@/lib/munim/refs";
+import { formatCell, outletNames, type CellFormat } from "@/lib/munim/refs";
 import { can } from "@/lib/munim/session";
 import { watchFor } from "@/lib/munim/staff-app";
 import { specialistName, staffErrorText } from "@/lib/munim/staff-copy";
@@ -113,7 +113,7 @@ export function OwnerHomePage() {
   if (!outlet) return <main className="wrap staff-main"><div className="state-box" role="status">Loading</div></main>;
 
   const tz = outlet.tz;
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const ing = (id: string | null) => ingredients.find((i) => i.ingredient_id === id);
   const f = fmt ? figures : null;

@@ -46,11 +46,17 @@ class TraceLabelError(ValueError):
     """A payload value is not a label. The message names the key only, never the value."""
 
 
-def error_label(e: BaseException) -> str:
-    """An exception's class name as a label (never its message). ADK wraps a provider 429 as `_ResourceExhaustedError`, and
-    no label may start with an underscore: leading separators and characters outside the label set are dropped."""
-    name = re.sub(r"[^A-Za-z0-9_.:/-]", "", type(e).__name__).lstrip("_.:/-")[:200]
+def label_of(class_name: str) -> str:
+    """A class name as a label. ADK wraps a provider 429 as `_ResourceExhaustedError`, and no label may start with an
+    underscore: leading separators and characters outside the label set are dropped. For a name already taken off its
+    exception (`RunFailed.kind`); anything else uses `error_label`."""
+    name = re.sub(r"[^A-Za-z0-9_.:/-]", "", class_name).lstrip("_.:/-")[:200]
     return name if LABEL.match(name) else "error"
+
+
+def error_label(e: BaseException) -> str:
+    """An exception's class name as a label (never its message): the only way an exception reaches a trace."""
+    return label_of(type(e).__name__)
 
 
 def check_payload(payload: Payload) -> Payload:

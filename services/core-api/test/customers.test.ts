@@ -464,6 +464,22 @@ describe("customer records, role limits and the rest of the member surface", () 
     expect(await one(`SELECT name, phone, consent FROM core.customer WHERE id = $1`, [id])).toEqual({ name: "Zainab S.", phone: null, consent: { sms: false, email: false } });
   });
 
+  it("C3: a customer's own grant is {marketing, at}; the member's record view shows it as email and sms flags, and an explicit staff withdrawal wins", async () => {
+    const granted = uuidv7(), later = uuidv7();
+    for (const [id, name, consent] of [[granted, "Granted By Customer", { marketing: true, at: "2026-10-16T09:00:00Z" }], [later, "Declined By Customer", { marketing: false, at: "2026-10-16T09:00:00Z" }]] as const)
+      await db.withContext("munim_core", own("customers.customer.upsert.v1"), (c) =>
+        c.query(`INSERT INTO core.customer (tenant_id, id, name, consent, is_guest, origin) VALUES ($1, $2, $3, $4, true, '{}')`, [t.tenant, id, name, JSON.stringify(consent)]));
+    const view = async (id: string, q: string) => CustomerListResponse.parse(await (await get("owner", `/v1/customers?q=${encodeURIComponent(q)}`)).json()).customers.find((c) => c.customer_id === id)?.consent;
+    expect([await view(granted, "Granted By"), await view(later, "Declined By")]).toEqual([{ email: true, sms: true }, { email: false, sms: false }]);
+    // Staff withdraw sms: that explicit flag wins over the customer's {marketing: true}; email stays on.
+    expect((await post("owner", "/v1/customers:upsert", "customers.customer.upsert.v1",
+      { customer_id: granted, name: "Granted By Customer", phone: null, email: null, withdraw_consent: ["sms"] })).status).toBe(200);
+    expect(await view(granted, "Granted By")).toEqual({ email: true, sms: false });
+    // The one-record read (GET /v1/customers/{id}) agrees.
+    const record = await get("owner", `/v1/customers/${granted}`);
+    expect([record.status, (await record.json()).consent]).toEqual([200, { email: true, sms: false }]);
+  });
+
   it("R1-m3: staff cannot change a signed-in customer's name or phone; what staff cannot see (the full phone, the email) is kept", async () => {
     const signedIn = uuidv7();
     await db.withContext("munim_core", own("customers.customer.upsert.v1"), (c) =>

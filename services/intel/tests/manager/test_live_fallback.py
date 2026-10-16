@@ -54,6 +54,9 @@ ROLES = {"items": [{"role": "router", "model_id": ROUTER, **_ROLE, **_INR}, {"ro
 NOBODY = "A question nobody recorded an answer for"
 #: Every way a live call fails; `over_cap` makes no provider call at all.
 KINDS = ("rate_limited", "provider_error", "timeout", "over_cap")
+#: Provider requests per model call, by how the provider fails: a 429 is started over once (llm/providers.retrying, C3), any other
+#: error or a timeout is not, and over the cap none is made.
+ATTEMPTS = {"rate_limited": 2, "provider_error": 1, "timeout": 1, "over_cap": 0}
 SNAP = uuid7(TS, "snap-1")  # the in-memory core's first mint
 #: The kit's LOOKUP_FINANCE script answer, expanded by hand.
 RECORDED_ANSWER = f"Net for ⟨snap:{SNAP}·0·key⟩ this month was ⟨snap:{SNAP}·0·net_minor⟩."
@@ -167,8 +170,9 @@ def test_a_failed_live_call_is_served_from_the_fixture_of_that_exact_call(
     assert answer["envelope"]["abstained"] is False
     assert [s["text"] for s in answer["envelope"]["segments"]] == [RECORDED_ANSWER]
     assert paths(core) == ("recorded-fallback", ["recorded-fallback", "recorded-fallback"])
-    # Each call went to the provider first (the router's, then the Manager's two steps); over the cap none did.
-    assert provider.calls == ([] if kind == "over_cap" else [ROUTER, REASON, REASON])
+    # Each call went to the provider first (the router's, then the Manager's two steps), each as often as ATTEMPTS says.
+    n = ATTEMPTS[kind]
+    assert provider.calls == [ROUTER] * n + [REASON] * (2 * n)
     # One spend row per model call, as today; over the cap no provider was called, so none is charged.
     assert len(core.spend) == 3
     if kind == "over_cap":
@@ -191,7 +195,7 @@ def test_with_no_fixture_a_failed_live_call_abstains_exactly_as_today(kind: str,
     # Today's error trace stays, right after the label: the class name only.
     i = next(i for i, e in enumerate(core.traces) if e["payload"] == {"model_path": "abstained"})
     assert core.traces[i + 1]["kind"] == "error" and core.traces[i + 1]["payload"]["where"] == "model"
-    assert provider.calls == ([] if kind == "over_cap" else [ROUTER, REASON])
+    assert provider.calls == [ROUTER] * ATTEMPTS[kind] + [REASON] * ATTEMPTS[kind]
 
 
 def test_a_400_on_a_logprobs_request_with_no_fixture_is_still_retried_without_logprobs(
@@ -388,4 +392,4 @@ def test_the_live_probe_is_never_served_from_a_fixture(tmp_path: Path, monkeypat
 
     with pytest.raises(RunFailed) as failed:
         asyncio.run(probe())
-    assert failed.value.kind == "ClientError" and provider.calls == [ROUTER]
+    assert failed.value.kind == "ClientError" and provider.calls == [ROUTER] * ATTEMPTS["rate_limited"]

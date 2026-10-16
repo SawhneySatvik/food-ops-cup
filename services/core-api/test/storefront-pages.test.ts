@@ -14,6 +14,8 @@
 //      403 forbidden demo_protected, nothing written, and the shopper still reads the world's version 1.
 //   S5 the write path: a publish envelope sent twice replays (X-Munim-Replayed, the same body) and adds no publish row; the
 //      audit chain of every business here verifies after all of the above.
+//   S6 the built-in look (a world without the page): nothing published → `page: null`, and saving a version does not change that;
+//      a published document that no longer parses → `page: null` too.
 import { createHash } from "node:crypto";
 import { createLogger } from "@munim/config";
 import { StorefrontPagePublic, StorefrontPagesResponse, StorefrontPageView } from "@munim/contracts/storefront";
@@ -35,6 +37,7 @@ let app: Hono<AppEnv>;
 let W: Tenant;
 let X: Tenant;
 let D: Tenant;
+let N: Tenant;
 const keys: Record<string, string> = {};
 
 type Res = Omit<Response, "json"> & { json(): Promise<any> };
@@ -66,8 +69,9 @@ beforeAll(async () => {
   W = await buildTenant(db, "T128a");
   X = await buildTenant(db, "T128b");
   D = await buildTenant(db, "T128d");
+  N = await buildTenant(db, "T128n");
   // A pickup-channel storefront key per business (buildTenant's key sits on the world's counter channel).
-  for (const t of [W, X, D]) {
+  for (const t of [W, X, D, N]) {
     const channel = uuidv7();
     keys[t.tenant] = `sfk_T128_${uuidv7().replaceAll("-", "")}${uuidv7().replaceAll("-", "")}`;
     await db.withContext("munim_core", ownerCtx(t, { command_type: "tenancy.channel.create.v1" }), (c) =>
@@ -179,5 +183,27 @@ describe("S5 write path", () => {
       const v = await verifyAuditChain(svcTx(db), t.tenant);
       expect([v.ok, v.firstBadSeq, v.rows > 0]).toEqual([true, null, true]);
     }
+  });
+});
+
+describe("S6 the built-in look", () => {
+  it("a business with nothing published reads page null, a saved version does not change that, and a published document that no longer parses reads null", async () => {
+    // buildWorld publishes version 1 in every business, so N starts without it: the fixture removes the world's two page tables' rows
+    // (the owner has no DELETE grant; the superuser plumbing does, and the book guard fires on INSERT and UPDATE only).
+    await db.admin(`DELETE FROM core.storefront_page_publish WHERE tenant_id = $1`, [N.tenant]);
+    await db.admin(`DELETE FROM core.storefront_page_version WHERE tenant_id = $1`, [N.tenant]);
+    const got: unknown[] = [(await shopper(N)).page];
+    const saved = uuidv7();
+    got.push((await save(N, N.ownerSub, saved, null, doc("Saved, not published."))).status, (await shopper(N)).page);
+    // A document the contract no longer accepts (e.g. written by an older build) is shown as the built-in look, not as an error.
+    const broken = uuidv7();
+    await db.withContext("munim_core", ownerCtx(N, { command_type: "storefront.page.save.v1" }), (c) =>
+      c.query(`INSERT INTO core.storefront_page_version (tenant_id, id, version, doc, created_by, origin) VALUES ($1, $2, 2, '{"theme": 1}', $3, '{}')`, [N.tenant, broken, N.owner]));
+    await db.withContext("munim_core", ownerCtx(N, { command_type: "storefront.page.publish.v1" }), (c) =>
+      c.query(`INSERT INTO core.storefront_page_publish (tenant_id, id, page_id, published_by, origin) VALUES ($1, $2, $3, $4, '{}')`, [N.tenant, uuidv7(), broken, N.owner]));
+    got.push((await shopper(N)).page);
+    expect(got).toEqual([null, 201, null, null]);
+    // The same storefront call answers a real page for a business that published one (control: the null is the data, not the route).
+    expect((await shopper(W)).page?.version).toBe(2);
   });
 });

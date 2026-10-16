@@ -31,6 +31,29 @@ Schemas: `core` (137 tables), `evidence` (2), `intel` (18), `platform` (12), `in
 | `munim_platform` | yes | The operator routes |
 | `munim_intel_ro` | yes | Reads the `intel_ro` views only; the tests assert it can write nothing |
 
+## Errors the database raises
+
+Book-guard and integrity triggers raise these SQLSTATEs; core-api maps each to one API error code
+(`services/core-api/src/lib/errors.ts`, tested in `services/core-api/test/envelope.test.ts`).
+
+| Code | Name | Raised by |
+|---|---|---|
+| `MB001` | `book_write_refused` | `core.guard_book_write()` on every book table |
+| `MB002` | `country_locked` | change of country/currency/FY start/onboarded_at after onboarding |
+| `MB003` | `currency_mismatch` | any currency column ≠ tenant base currency |
+| `MB004` | `illegal_transition` | order, draft, purchase order, transfer status; forged `exec_txid` |
+| `MB005` | `override_refused` | expired-sale override reused, or `decided_by` ≠ signed-in member; a Cares actor column (`published_by`, `recorded_by`, `voided_by`, `created_by`, `decided_by`) ≠ signed-in member (0028) |
+| `MB006` | `decision_refused` | `core.decision.decided_by` ≠ `app.member_id`, or `app.role` not allowed for the draft's command type |
+| `MB007` | `customer_erased` | `erased_at` set outside `customers.erasure.request.v1`, or any change to an erased profile |
+| `MB008` | `command_table_mismatch` | the command (own command, or the approved draft's command type) does not list the table in `core.command_authority.target_tables`, and no later branch admits the row |
+| `MB009` | `period_closed` | a journal entry dated in a closed month (`core.period_close`, outlet or tenant-wide) |
+| `MB010` | `books_unbalanced` | at COMMIT: an entry with < 2 postings or Σ ≠ 0 in a currency, or not visible in the committing context; a posting added outside its entry's transaction |
+| `MB011` | `loyalty_refused` | a loyalty entry that would take the balance below 0 (under the customer's row lock); a `reverse` entry that does not undo an entry of the same customer and order with the opposite sign and at most its points (0016) |
+| `MB012` | `claim_quote_mismatch` | `intel.claim.quote` ≠ the source chunk/message text at `[span_start, span_end)` |
+| `MB013` | `out_of_pack_scope` | a payroll draft where the pack's `payroll_scope` ≠ `drafts`; a licence kind not in the pack's `licence_kinds` |
+| `MB014` | `sequence_gap` | an `intel.trace_event` seq that is not the run's last seq + 1; since 0020 also a `core.ai_thread_turn.turn_no` / `core.investigation_step.step_no` that is not the next one |
+| `MB015` | `investigation_refused` | (0020) an investigation not created by the signed-in member; a plan approved twice or by someone else; a step whose trigger is not who it claims (member / plan / auto — below); a standing grant not the creator's own for the investigation's scope, or revoked twice / by someone else; an `auto_step` run without a live grant of its actor covering its scope |
+
 ## Run
 
 ```bash

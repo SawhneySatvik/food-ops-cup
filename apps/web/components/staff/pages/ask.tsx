@@ -12,7 +12,7 @@ import { useCountdown, useOnline } from "@/lib/hooks";
 import { addressee, findLostAnswer, pickable, QUESTION_MAX, signatureWords, withMention, type Specialist, type Thread, type ThreadItem, type Turn } from "@/lib/munim/ask";
 import type { MunimError } from "@/lib/munim/client";
 import { formatWhen } from "@/lib/munim/format";
-import type { CellFormat } from "@/lib/munim/refs";
+import { outletNames, type CellFormat } from "@/lib/munim/refs";
 import { abstainText, specialistName, staffErrorText } from "@/lib/munim/staff-copy";
 import { templateWords } from "@/lib/munim/template-words";
 import type { Schemas } from "@/lib/munim/types";
@@ -62,7 +62,7 @@ export function AskPage() {
   const threadId = params.threadId ?? null;
   const router = useRouter();
   const search = useSearchParams();
-  const { session, client, outlet, handleAuth } = useStaff();
+  const { session, client, outlet, outlets, handleAuth } = useStaff();
   const me = session.me;
   const [tenant, setTenant] = useState<Schemas["V1Tenant"] | null>(null);
   const [specialists, setSpecialists] = useState<Specialist[]>([]);
@@ -188,7 +188,7 @@ export function AskPage() {
   }
 
   const tz = outlet?.tz ?? tenant?.home_tz ?? "UTC";
-  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency } : null;
+  const fmt: CellFormat | null = tenant ? { locale: SITE.locale, currency: tenant.base_currency, outletNames: outletNames(outlets) } : null;
   const open: OpenRef = (snapshotId, refToken) => setDrawer({ snapshotId, refToken });
   const to = addressee(text, specialists, current?.specialist ?? null);
   const tooLong = text.trim().length > QUESTION_MAX;
