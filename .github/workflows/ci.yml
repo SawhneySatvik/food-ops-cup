@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      MUNIM_MODEL_MODE: recorded
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v10.2.0
+      # No secrets and no cloud account: the database tests start an embedded Postgres, models are recorded.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --no-bail run typecheck
+      - run: node_modules/.bin/depcruise --config .dependency-cruiser.cjs --output-type err apps services packages adapters tools
+      - run: pnpm -r --no-bail run test
+      - run: cd apps/web && node_modules/.bin/next build
+      - run: uv run --locked --directory services/intel --with pytest==9.1.1 pytest -q
+      - run: uv run --locked --directory services/suppliers-sim --with pytest==9.1.1 pytest -q

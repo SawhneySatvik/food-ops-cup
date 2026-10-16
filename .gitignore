@@ -1,0 +1,14 @@
+node_modules/
+.venv/
+__pycache__/
+.next/
+dist/
+.env
+.env.*
+!.env.example
+.run/
+*.tsbuildinfo
+apps/web/next-env.d.ts
+pnpm-exec-summary.json
+.DS_Store
+scratchpad/

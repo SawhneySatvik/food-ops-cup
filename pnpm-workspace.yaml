@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "services/core-api"
+  - "services/core-worker"
+  - "packages/*"
+  - "tools/*"
+  - "adapters/gcp/*"
+  - "db"
+allowBuilds:
+  '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/darwin-x64': true
+  '@embedded-postgres/linux-x64': true
+  '@embedded-postgres/linux-arm64': true
+  esbuild: false
+  unrs-resolver: false

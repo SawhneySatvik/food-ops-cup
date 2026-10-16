@@ -1,6 +1,6 @@
 {
   "sources": {
-    "sha256": "3d8de4cc27a7a40c90db30faf00b091c4f693688c1ca6e684f6bbfb9de3d147f",
+    "sha256": "edc840c7510abf49ea6aa1c46735fc9b0818a34334d57dcb86c8c4d490e76ac3",
     "files": {
       "package.json": "ba245a5e913d77687b8cd8a8dc1f7de3ec5a1b663f8c59452959541b437428f9",
       "scripts/gen.ts": "10706811f9b0d09ce96ede6d854e2269aef0f93f572829dcd46a1fe11a279e5f",
@@ -13,13 +13,13 @@
       "src/approvals/index.ts": "6eb93a5fa59b6b69a3ccb466429f8028223518b4495b7ae6c16c1902f98d56f0",
       "src/cares/events.ts": "af4fb897186592cad810cc4b75d45f80a55f04ed9f28dedf0fdb9b47d26419c7",
       "src/cares/index.ts": "c79c7a59fa5cd6b4d351f739c41e11ec387a7b2357492f58d45e5f264af72999",
-      "src/catalogue/index.ts": "5212abe35ebf621976a4b10265a952599eb4b99d36e9cfe4f34122d7ee67fbdd",
+      "src/catalogue/index.ts": "60c6acf0b4154137669251d5af657df703912c8d926a48b28b22c0008d5075e7",
       "src/catalogue/read-routes.ts": "65e2781fd30d130e750d914241bafd5c8e6ec197c17663bf28d2143b0b65fb96",
       "src/compliance/index.ts": "4e6db3e379d9df14cce7b7f03a3e9f0301d3ab0803bdd0b81a60e250e370aa0b",
       "src/customers/index.ts": "48e1b03cb6bdceba8b894d7e965a4f86ccd592d486237519d7acdfef4d215d3f",
       "src/customers/read-routes.ts": "b7c48d8e7cd4c2af5eb185461132309382987d090a651dd20cf80f2b6dca202c",
       "src/events/index.ts": "bf71718146f0e2e06fe4f94d9c65811aad7ac2143915495a1f64cb28b246b534",
-      "src/finance/index.ts": "2fb1455ed0c9dbf0b69915411d9cb8281423ceb820bf0bc6e2e5bb04af1ac674",
+      "src/finance/index.ts": "c3bdf514b22f39fdfacabec3c11b0ea3fad5ea65420c130e6c5d386b9f687ca4",
       "src/finance/read-routes.ts": "9e7260d74eebc6c4e03eeaf1a84d1e86ccf13ffebf243d11cb232217d27da4a7",
       "src/findings/index.ts": "33ca0bb6cb4f8ec360ca7c0792c3479e2d2bff491cd3362f41c0c8583d72df03",
       "src/goals/index.ts": "17c09806bb3d86bdcaa5b0d9b6944e6ae16b32d93dee68f8ec4adf1a1fdb9e6f",
@@ -49,7 +49,7 @@
       "src/people/read-routes.ts": "97b9a114de5099ff5c70ab74afb071b838922436ce1b1feafd2d437e33607a8a",
       "src/platform/index.ts": "14ae9957f97134e9a7329984a40bfcaa3a3f472a65c66dfb41ae14044d738877",
       "src/platform/read-routes.ts": "dc5da34a61187595de3c1c8f7999d93c93ab6b63b5661762817d3940c6481b6d",
-      "src/purchasing/index.ts": "f2710afa5267412af51ef93bda2f6be23d36637d56351cab9c4d163eecf6b551",
+      "src/purchasing/index.ts": "f2251f2d9c9045dcfffff449d56b7a05c760c7a2c70465b4e5c9dbe9c1be8086",
       "src/registry.ts": "3bf9e3d6c17675f4ea3877cfcb94ef18f9b97cbd75b7d9a1bdd92291f1330b42",
       "src/shared/cloudevents.ts": "33700ec7cfef94d50183f19f8175c31fdff87adfa9e047a550e40488d724088f",
       "src/shared/command.ts": "54b44302d0fa5e1f54eb9dafc18cec2bcb8e68b3afdce15dc82fe2c2bfc68b38",
