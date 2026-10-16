@@ -26,8 +26,17 @@ Env: `MUNIM_BLOB=gcs`, `MUNIM_BLOB_BUCKET`.
 - Token verify and password grant need no role (public JWKS, public web API key).
 - Secrets: `roles/secretmanager.secretAccessor` on the secrets the revision mounts (infra/gcp).
 
-All routes are UNVERIFIED against a live project until the first deploy.
+The tests below use local mock servers and make no Google calls. The adapters are exercised against a real project only
+by a deploy, following [`infra/gcp/README.md`](../../infra/gcp/README.md).
 
-## Tests
+## Run and test
 
-`cd adapters/gcp/<adapter> && node node_modules/vitest/vitest.mjs run` (no network; local servers on 4370-4371).
+```bash
+pnpm -F @munim/idp-identity-platform test
+pnpm -F @munim/blob-gcs test
+pnpm -F @munim/idp-identity-platform typecheck
+pnpm -F @munim/blob-gcs typecheck
+```
+
+Tests run without network. They start local HTTP servers that stand in for Google's endpoints (the blob tests use ports 4370
+and 4371 for the Cloud Storage JSON API and the metadata server), so binary bodies and URL encoding are exercised for real.

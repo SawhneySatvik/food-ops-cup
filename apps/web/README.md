@@ -26,7 +26,7 @@ The site talks to one of two backends:
 | `NEXT_PUBLIC_MUNIM_MOCK_CONTROLS` | build | `1` shows the mock's test controls. Only with the mock |
 | `MUNIM_MOCK` | server | `1` serves `/mock/v1/*`; otherwise those routes answer 404. Production never sets it |
 | `MOCK_TOKEN_SECRET` | server | optional: signs the mock's guest tokens |
-| `MUNIM_API_ORIGIN` | build and server | `/api/:path*` is rewritten to `${MUNIM_API_ORIGIN}/:path*` (the deployed core-api, or `http://127.0.0.1:8790` locally). Unset: no rewrite |
+| `MUNIM_API_ORIGIN` | build and server | `/api/:path*` is rewritten to `${MUNIM_API_ORIGIN}/:path*` (the deployed core-api, or `http://127.0.0.1:8787`, core-api's default port, locally). Unset: no rewrite |
 | `MUNIM_DEMO_SIGNIN` | server | `1` turns on the demo picker's sign-in route, `POST /staff/demo-session`; otherwise it answers 404 |
 | `MUNIM_DEMO_TENANT_ID` | server | the Cobnut tenant the picker signs into. Point it at a freshly seeded tenant to reset the demo |
 | `MUNIM_IDP` | server | how the picker signs a person in, as core-api verifies them: `identity-platform` (Identity Platform's password grant) or `local` (a tokens file, development only) |
@@ -62,17 +62,18 @@ cp apps/web/.env.example apps/web/.env.local
 cd apps/web && node_modules/.bin/next dev -p 4320   # http://localhost:4320
 ```
 
-The mock keeps its books in memory, per server process, seeded from the clock. A second server instance (as on a
-serverless host) has its own books, which is why production never runs it.
+The mock keeps its books in memory, per server process, seeded from the clock. A second server instance has its own books, which is why production never runs it.
 
 ## Develop against a local core-api
 
-Seed the Cobnut world into the local database (`make seed WORLD=cobnut`; it prints the tenant id and where it wrote
-the storefront key and the demo tokens), then in `apps/web/.env.local`:
+Run core-api, core-worker, intel (or its recorded stand-in) and `suppliers-sim` against your own Postgres, then seed the
+Cobnut world with `node tools/worldgen/src/cli.ts --world=cobnut`. The seed needs an operator token and
+`SUPPLIERS_SIM_PUBLIC_URL`; the header of that file lists the variables. It prints the tenant id and writes the storefront
+key and the demo tokens under `.run/cobnut/`. Then, in `apps/web/.env.local`:
 
 ```bash
 NEXT_PUBLIC_MUNIM_API=/api
-MUNIM_API_ORIGIN=http://127.0.0.1:8790
+MUNIM_API_ORIGIN=http://127.0.0.1:8787
 NEXT_PUBLIC_MUNIM_STOREFRONT_KEY=<the key the seed wrote>
 NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=
 MUNIM_MOCK=
@@ -85,6 +86,22 @@ MUNIM_DEMO_TENANT_ID=<the tenant id it printed>
 The browser only ever calls this site's origin, so there is no CORS to set up; the live order and kitchen streams
 pass through the rewrite as fetch-based server-sent events with the bearer token.
 
+## Where things are
+
+| Path | What it holds |
+|---|---|
+| `app/(shop)/` | The shop: `/`, `/o/[outletId]`, checkout, the order tracker, `/cares`, `/story` |
+| `app/staff/` | The staff screens: `sign-in`, `home`, `counter`, `kitchen`, `inbox`, `ask`, `investigations`, `office`, `suppliers`, `purchase-orders`, `cares`, `campaigns`, `storefront`; `demo-session/route.ts` is the demo sign-in |
+| `app/mock/` | The in-app mock's route (`/mock/v1/*`); its data and handlers are in `mock-server/` |
+| `components/`, `components/staff/` | The shop and staff components, including the source chip (`staff/source.tsx`) that opens a snapshot's rows |
+| `lib/munim/` | The client layer over `@munim/sdk`: sessions, commands, streams, copy, and the helpers each screen uses |
+| `lib/server/demo-session.ts` | The server-side demo sign-in (Identity Platform's password grant, or a local token file) |
+| `next.config.ts` | The `/api` rewrite, the standalone output for the container build, and the security headers |
+
+`next.config.ts` sets a `Content-Security-Policy` (`default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`),
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy` on every response, and
+`scripts/csp-check.ts` fails on a violation. The app renders no raw HTML.
+
 ## Scripts
 
 Run them with `node_modules/.bin/…` from `apps/web` (or `pnpm --filter @munim/web <script>`).
@@ -96,7 +113,8 @@ Run them with `node_modules/.bin/…` from `apps/web` (or `pnpm --filter @munim/
 | `vitest run` | unit tests: the shop (refusal copy, error parsing, tracker, pricing on the mock) and the staff screens (refs and "Cannot verify", copy, who may approve which draft, the mock's member rules, the demo sign-in route) |
 | `tsx scripts/smoke.ts` | storefront smoke; needs an absolute `NEXT_PUBLIC_MUNIM_API` (e.g. `http://localhost:4320/mock`) and the storefront key |
 | `tsx scripts/staff-smoke.ts` | staff smoke; on the real API also `STAFF_SMOKE_TOKENS=<file {"owner", "scoped"}>`. It places and completes one counter order, so run it only against the mock or a local copy, never a shared deployment |
-| `tsx scripts/nav-smoke.ts [--port=4510] [--shots=<dir>]` | the real clicks in Chromium on a production build of the mock (`next build` with `NEXT_PUBLIC_MUNIM_API=/mock`, the mock's storefront key and `NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=1`): menu, checkout, the tracker after placing, Request quotes and the staff detail pages, each reached by a client navigation through a stand-in for the deploy platform's routing of prerendered shells. It starts and stops `next start` itself |
+| `tsx scripts/nav-smoke.ts [--port=4510] [--shots=<dir>]` | the real clicks in Chromium on a production build of the mock (`next build` with `NEXT_PUBLIC_MUNIM_API=/mock`, the mock's storefront key and `NEXT_PUBLIC_MUNIM_MOCK_CONTROLS=1`): menu, checkout, the tracker after placing, Request quotes and the staff detail pages. It starts and stops `next start` itself |
+| `tsx scripts/csp-check.ts [--port=4520]` | on a production build of the mock (built as for `nav-smoke.ts`), walks the shop (home, menu, cart, checkout) and the staff sign-in and owner home in Chromium; fails if a response lacks the headers `next.config.ts` sets or the browser reports a Content-Security-Policy violation |
 
 ## Art log
 
